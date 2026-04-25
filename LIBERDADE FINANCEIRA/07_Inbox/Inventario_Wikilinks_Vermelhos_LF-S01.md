@@ -48,17 +48,17 @@ Links para arquivos existentes (mesmo como stubs em `07_Inbox/`) não foram incl
 ## MOC_Asset_Allocation
 
 ### Conceitos
-- [ ] [[Alocação de Ativos]] — arquivo existe como `Asset_Allocation.md` (nome em inglês)
+- [ ] [[Alocacao_de_Ativos|Alocação de Ativos]] — arquivo existe como `Asset_Allocation.md` (nome em inglês)
 - [ ] [[Correlação de Ativos]] — arquivo existe como `Correlacao.md` (sem acento, nome diferente)
 - [ ] [[Risco-Retorno]]
 - [ ] [[Diversificação]]
 - [ ] [[Rebalanceamento]] — arquivo existe como `Rebalancing.md` (nome em inglês)
-- [ ] [[Alocação Estratégica]] — arquivo existe como `Strategic_Asset_Allocation.md` (nome em inglês)
-- [ ] [[Alocação Tática]] — arquivo existe como `Tactical_Asset_Allocation.md` (nome em inglês)
+- [ ] [[Alocacao_Estrategica|Alocação Estratégica]] — arquivo existe como `Strategic_Asset_Allocation.md` (nome em inglês)
+- [ ] [[Alocacao_Tatica|Alocação Tática]] — arquivo existe como `Tactical_Asset_Allocation.md` (nome em inglês)
 - [ ] [[Core-Satellite]]
 - [ ] [[Desvio de Volatilidade]]
 - [ ] [[Duração]]
-- [ ] [[Fronteira Eficiente de Markowitz]] — arquivo existe como `Efficient_Frontier.md` (nome em inglês)
+- [ ] [[Fronteira_Eficiente|Fronteira Eficiente de Markowitz]] — arquivo existe como `Efficient_Frontier.md` (nome em inglês)
 - [ ] [[Capital Asset Pricing Model (CAPM)]]
 - [ ] [[Alocação Dinâmica]]
 - [ ] [[Viés de Otimismo nos Modelos]]
@@ -90,7 +90,7 @@ Links para arquivos existentes (mesmo como stubs em `07_Inbox/`) não foram incl
 - [ ] [[Correlação Dinâmica]]
 - [ ] [[Risco de Cauda (Tail Risk)]]
 - [ ] [[Beta]]
-- [ ] [[Risco de Capital Humano]] — arquivo existe como `Human_Capital_Risk.md` (nome em inglês)
+- [ ] [[Risco_de_Capital_Humano|Risco de Capital Humano]] — arquivo existe como `Human_Capital_Risk.md` (nome em inglês)
 - [ ] [[Risco de Longevidade]]
 - [ ] [[Hedging Dinâmico]]
 - [ ] [[Análise de Cenários]]

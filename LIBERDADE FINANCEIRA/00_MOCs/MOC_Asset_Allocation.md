@@ -23,7 +23,7 @@ A escolha de alocação não é técnica pura — reflete sua tolerância a risc
 
 Fundações essenciais para alocação de ativos:
 
-- [[Alocação de Ativos]] - definição e importância estratégica
+- [[Alocacao_de_Ativos|Alocação de Ativos]] - definição e importância estratégica
 - [[Classes_de_Ativos]] - características de renda fixa, ações, imóveis, commodities
 - [[Correlação de Ativos]] - como ativos se movem juntos e separadamente
 - [[Risco-Retorno]] - relação fundamental na construção de alocações
@@ -34,8 +34,8 @@ Fundações essenciais para alocação de ativos:
 
 Conceitos que refinam a prática de alocação:
 
-- [[Alocação Estratégica]] - alocação de longo prazo baseada em objetivos
-- [[Alocação Tática]] - ajustes de curto a médio prazo baseados em oportunidades
+- [[Alocacao_Estrategica|Alocação Estratégica]] - alocação de longo prazo baseada em objetivos
+- [[Alocacao_Tatica|Alocação Tática]] - ajustes de curto a médio prazo baseados em oportunidades
 - [[Core-Satellite]] - núcleo estável cercado por alocações satélites ativas
 - [[Desvio de Volatilidade]] - medindo o risco efetivo da carteira
 - [[Sharpe Ratio]] - avaliando retorno ajustado ao risco
@@ -45,10 +45,10 @@ Conceitos que refinam a prática de alocação:
 
 Frameworks sofisticados de alocação otimizada:
 
-- [[Fronteira Eficiente de Markowitz]] - conceito matemático de carteiras ótimas
+- [[Fronteira_Eficiente|Fronteira Eficiente de Markowitz]] - conceito matemático de carteiras ótimas
 - [[Capital Asset Pricing Model (CAPM)]] - precificação de risco e retorno esperado
-- [[Black-Litterman]] - modelo que incorpora visões do investidor na otimização
-- [[Risk Parity]] - igualando contribuição de risco entre ativos
+- [[Black_Litterman]] - modelo que incorpora visões do investidor na otimização
+- [[Paridade_de_Risco|Risk Parity]] - igualando contribuição de risco entre ativos
 - [[Alocação Dinâmica]] - ajustes sistemáticos conforme mudanças de vida
 - [[Viés de Otimismo nos Modelos]] - compreendendo limitações de previsões
 

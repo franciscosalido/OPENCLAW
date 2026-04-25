@@ -36,7 +36,7 @@ Conceitos que aprofundam análise de riscos:
 
 - [[Value at Risk (VaR)]] - perda máxima esperada em cenário de confiança
 - [[Conditional VaR]] - perda além do VaR em piores cenários
-- [[Sequence of Returns Risk]] - risco da ordem de retornos na fase de retirada
+- [[Risco_de_Sequencia_de_Retornos|Risco de Sequência de Retornos]] - risco da ordem de retornos na fase de retirada
 - [[Correlação Dinâmica]] - correlação que muda em crises
 - [[Risco de Cauda (Tail Risk)]] - probabilidade de eventos extremos
 - [[Beta]] - sensibilidade de ativo ao movimento geral do mercado
@@ -45,7 +45,7 @@ Conceitos que aprofundam análise de riscos:
 
 Conceitos sofisticados de gestão avançada de risco:
 
-- [[Risco de Capital Humano]] - quantificando valor futuro de sua renda de trabalho
+- [[Risco_de_Capital_Humano|Risco de Capital Humano]] - quantificando valor futuro de sua renda de trabalho
 - [[Risco de Longevidade]] - incerteza sobre tempo de vida útil do capital
 - [[Hedging Dinâmico]] - proteção contra riscos específicos
 - [[Análise de Cenários]] - testando portfólio sob múltiplos futuros
