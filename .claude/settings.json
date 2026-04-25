@@ -1,0 +1,9 @@
+{
+  "projectName": "OPENCLAW",
+  "description": "Second Brain — Radiology, AI/ML and Claude ecosystem",
+  "memory": {
+    "provider": "claude-mem",
+    "dbPath": "~/.claude-mem/claude-mem.db",
+    "projectTag": "OPENCLAW"
+  }
+}
