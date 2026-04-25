@@ -1,7 +1,6 @@
 # Python
 __pycache__/
-*.py[cod]
-*$py.class
+*.py[cod]\n*$py.class
 *.so
 .Python
 build/
@@ -62,9 +61,15 @@ Thumbs.db
 logs/
 *.log
 
-# Claude / AI sessions
-.claude/
+# Claude Code — local session artifacts (NOT hooks.json/settings.json — esses são versionados)
 *.claude_session
+.claude/todos/
+.claude/cache/
+
+# claude-mem — banco de dados e estado local (ficam em ~/.claude-mem/, nunca no repo)
+claude-mem.db
+*.claude-mem.db
+.claude-mem/
 
 # Secrets
 secrets/
