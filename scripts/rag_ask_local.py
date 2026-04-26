@@ -17,6 +17,7 @@ from typing import Any
 from backend.rag.context_packer import ContextPacker
 from backend.rag.embeddings import OllamaEmbedder
 from backend.rag.generator import DEFAULT_GENERATION_MODEL, LocalGenerator
+from backend.rag.health import check_local_services
 from backend.rag.pipeline import LocalRagPipeline, RagPipelineResult
 from backend.rag.prompt_builder import PromptBuilder
 from backend.rag.qdrant_store import QdrantVectorStore
@@ -89,6 +90,7 @@ def parse_args() -> argparse.Namespace:
 
 async def main_async() -> None:
     args = parse_args()
+    check_local_services(require_qdrant=True, require_embedder=True)
     result = await ask_local(
         question=args.question,
         top_k=args.top_k,
