@@ -3,6 +3,7 @@
 
 Usage:
     python scripts/rag_ingest_synthetic.py
+    python scripts/rag_ingest_synthetic.py --dry-run
 
 The script uses only synthetic documents bundled with the repository.
 No real portfolio, brokerage, private document, or remote AI is accessed.
@@ -18,6 +19,7 @@ from dataclasses import dataclass
 from typing import Protocol, cast
 
 from backend.rag.embeddings import OllamaEmbedder
+from backend.rag.health import check_local_services
 from backend.rag.qdrant_store import QdrantVectorStore, VectorStoreChunk
 from backend.rag.synthetic_documents import (
     SyntheticDocument,
@@ -134,13 +136,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Executa chunking e métricas sem chamar Ollama/Qdrant.",
+        help="Executa chunking e metricas sem chamar Ollama/Qdrant.",
     )
     return parser.parse_args()
 
 
 async def main_async() -> None:
     args = parse_args()
+    if not args.dry_run:
+        check_local_services(require_qdrant=True, require_embedder=True)
     await ingest_synthetic_documents(
         max_tokens=args.max_tokens,
         overlap_tokens=args.overlap_tokens,
