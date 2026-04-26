@@ -4,7 +4,7 @@
 > Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of meaningful sessions.
 
 **Last updated:** 2026-04-26
-**Updated by:** Codex — RAG-05 local pipeline smoke prep
+**Updated by:** Codex — RAG-06 CLI/smoke prep
 
 ---
 
@@ -16,7 +16,7 @@
 - Local only for RAG-0.
 - Ollama only for embeddings/generation.
 - Qdrant local for vector storage.
-- No LiteLLM, remote providers, FastAPI, LangChain, sentence-transformers, real portfolio data, or private documents.
+- No LiteLLM, remote providers, FastAPI, LangChain, sentence-transformers, Redis, real portfolio data, or private documents.
 
 ---
 
@@ -28,94 +28,77 @@
 | RAG-02 | `feat/rag-embeddings` | Merged | Ollama embeddings + mocked unit tests |
 | RAG-03 | `feat/rag-qdrant-store` | Merged | Qdrant store + integration tests |
 | RAG-04 | `feat/rag-retriever-context` | Merged | Retriever + ContextPacker |
-| RAG-05 | `feat/rag-local-pipeline-smoke` | Active PR prep | PromptBuilder + LocalGenerator + LocalRagPipeline + fake smoke |
-| RAG-06 | `feat/rag-cli-smoke` | Planned | Synthetic ingest/query CLI + real local smoke |
-| RAG-07 | `feat/rag-docs-runbook` | Planned | Runbook + ADR + final checklist |
+| RAG-05 | `feat/rag-local-pipeline-smoke` | Merged | PromptBuilder + LocalGenerator + LocalRagPipeline + fake smoke |
+| RAG-06 | `feat/rag-cli-smoke` | Active PR prep | Synthetic ingest/query scripts + integration/smoke |
+| RAG-07 | `feat/rag-docs-runbook` | Planned | Runbook + ADR + validation debt cleanup |
 
-Current issue for active work: <https://github.com/franciscosalido/OPENCLAW/issues/12>
-
----
-
-## What Exists in `main` Now
-
-```text
-backend/rag/
-  __init__.py
-  chunking.py
-  context_packer.py
-  embeddings.py
-  qdrant_store.py
-  retriever.py
-
-tests/
-  unit/test_chunking.py
-  unit/test_context_packer.py
-  unit/test_embeddings.py
-  unit/test_retriever.py
-  integration/test_qdrant_store.py
-
-config/rag_config.yaml
-docker/docker-compose.qdrant.yml
-docs/04_MEM/AGENT_CONTEXT.md
-docs/04_MEM/current_state.md
-docs/04_MEM/decisions.md
-docs/04_MEM/next_actions.md
-```
+Current issue for active work: <https://github.com/franciscosalido/OPENCLAW/issues/14>
 
 ---
 
-## Active Branch: `feat/rag-local-pipeline-smoke`
+## Active Branch: `feat/rag-cli-smoke`
 
-Planned files for PR #12:
+Planned files for PR #14:
 
 ```text
-backend/rag/prompt_builder.py
-backend/rag/generator.py
-backend/rag/pipeline.py
-tests/unit/test_prompt_builder.py
-tests/unit/test_generator.py
-tests/smoke/test_rag_pipeline_smoke.py
-AGENTS.md
+backend/rag/synthetic_documents.py
+scripts/rag_ingest_synthetic.py
+scripts/rag_ask_local.py
+tests/integration/test_rag_pipeline.py
+tests/smoke/test_rag_smoke.py
 docs/04_MEM/AGENT_CONTEXT.md
 docs/04_MEM/current_state.md
 ```
 
 Current implementation summary:
 
-- `PromptBuilder` formats context blocks with citations and uses `/no_think` by default.
-- `LocalGenerator` calls Ollama `/api/chat` with `stream=false` and can be fully mocked.
-- `LocalRagPipeline` orchestrates retrieval, prompt building, local generation, chunks used, citations, and latency.
-- Fake smoke test validates the complete flow without real Ollama or Qdrant.
-- Real local service smoke remains for a later CLI/smoke PR.
+- `synthetic_documents.py` provides five fictional PT-BR finance documents:
+  `selic_projecao`, `fiis_analise`, `rebalanceamento`, `regime_macro`, `risco_concentracao`.
+- `rag_ingest_synthetic.py` performs chunk -> embed -> Qdrant upsert with per-document metrics and `--dry-run`.
+- `rag_ask_local.py` performs question -> retrieval -> prompt -> local generation and prints chunks, answer, and latency.
+- `tests/integration/test_rag_pipeline.py` exercises chunk, embed, upsert, retrieve, prompt, generate, and delete with in-memory Qdrant and fakes.
+- `tests/smoke/test_rag_smoke.py` exercises three queries, `thinking_mode=True`, and empty retrieval path.
+
+---
+
+## Thinking Mode Policy
+
+MVP policy:
+
+- Default all RAG factual calls to `/no_think`.
+- Use `thinking_mode=True` only when explicitly requested, tested, or later routed by Gateway-0/LiteLLM.
+- Future Gateway-0 policy: calls originating from OpenCraw or selected agents may set `thinking_mode=True`; calls that only access RAG/Qdrant should prefer `/no_think`.
+
+RAG-06 covers the `thinking_mode=True` wiring with a smoke test but does not introduce LiteLLM or remote routing.
 
 ---
 
 ## Latest Local Validation
 
-Targeted RAG-05 checks already passed:
+Targeted RAG-06 checks already passed:
 
 ```bash
-uv run pytest tests/unit/test_prompt_builder.py tests/unit/test_generator.py tests/smoke/test_rag_pipeline_smoke.py -v
+uv run pytest tests/integration/test_rag_pipeline.py tests/smoke/test_rag_smoke.py -v
 ```
 
 Result:
 
 ```text
-12 passed
+5 passed
 ```
 
 ```bash
-uv run mypy --explicit-package-bases --strict backend/rag/prompt_builder.py backend/rag/generator.py backend/rag/pipeline.py tests/unit/test_prompt_builder.py tests/unit/test_generator.py tests/smoke/test_rag_pipeline_smoke.py
+uv run mypy --explicit-package-bases --strict backend/rag/synthetic_documents.py scripts/rag_ingest_synthetic.py scripts/rag_ask_local.py tests/integration/test_rag_pipeline.py tests/smoke/test_rag_smoke.py
 ```
 
 Result:
 
 ```text
-Success: no issues found in 6 source files
+Success: no issues found in 5 source files
 ```
 
 ```bash
-uv run pyright backend/rag/prompt_builder.py backend/rag/generator.py backend/rag/pipeline.py tests/unit/test_prompt_builder.py tests/unit/test_generator.py tests/smoke/test_rag_pipeline_smoke.py
+uv run pyright backend/rag/synthetic_documents.py scripts/rag_ingest_synthetic.py scripts/rag_ask_local.py tests/integration/test_rag_pipeline.py tests/smoke/test_rag_smoke.py
 ```
 
 Result:
@@ -123,6 +106,25 @@ Result:
 ```text
 0 errors, 0 warnings, 0 informations
 ```
+
+```bash
+uv run python scripts/rag_ingest_synthetic.py --dry-run
+uv run python scripts/rag_ask_local.py --help
+```
+
+Result:
+
+```text
+Both commands passed.
+```
+
+---
+
+## RAG-07 Tech Debt
+
+- `_validate_question` remains duplicated in `prompt_builder.py`, `pipeline.py`, and `retriever.py`.
+- Do not refactor it inside RAG-06.
+- Candidate RAG-07 cleanup: extract to `backend/rag/_validation.py` and update tests.
 
 ---
 
@@ -134,19 +136,29 @@ Suggested Claude commands after PR opens:
 
 ```bash
 git fetch --prune
-git checkout feat/rag-local-pipeline-smoke
+git checkout feat/rag-cli-smoke
 git pull --ff-only
 uv run pytest -v
-uv run mypy --explicit-package-bases --strict backend/rag tests/unit tests/integration tests/smoke
-uv run pyright backend/rag tests/unit tests/integration tests/smoke
-uv run python -m py_compile backend/rag/*.py tests/unit/*.py tests/integration/*.py tests/smoke/*.py
-rg -n "LangChain|sentence_transformers|openai|anthropic|remote" backend tests || true
+uv run mypy --explicit-package-bases --strict backend/rag scripts tests/unit tests/integration tests/smoke
+uv run pyright backend/rag scripts tests/unit tests/integration tests/smoke
+uv run python -m py_compile backend/rag/*.py scripts/*.py tests/unit/*.py tests/integration/*.py tests/smoke/*.py
+uv run python scripts/rag_ingest_synthetic.py --dry-run
+uv run python scripts/rag_ask_local.py --help
+rg -n "LangChain|sentence_transformers|from openai|import openai|anthropic|LiteLLM|Redis|FastAPI|remote" backend scripts tests || true
+```
+
+Real local service checks when Ollama + Qdrant are running:
+
+```bash
+docker compose -f docker/docker-compose.qdrant.yml up -d
+uv run python scripts/rag_ingest_synthetic.py
+uv run python scripts/rag_ask_local.py "Qual o impacto sintetico da Selic?" --verbose
+uv run python scripts/rag_ask_local.py "Riscos de concentracao" --thinking --top-k 3
 ```
 
 ---
 
 ## Remaining Risks
 
-- PR has not yet been reviewed by Claude.
-- Real Ollama + Docker Qdrant end-to-end remains for RAG-06.
+- Real Ollama + Docker Qdrant script execution has not yet been run in this session.
 - No real data has been used or accessed.
