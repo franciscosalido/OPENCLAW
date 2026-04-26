@@ -127,13 +127,13 @@ SyntheticDocument
 
 Near-term PR sequence:
 
-| PR | Branch | Scope | Status Source |
+| PR | Branch | Scope | Status |
 |---|---|---|---|
-| RAG-01 | `feat/rag-chunking-*` | Chunking + tests | GitHub |
-| RAG-02 | `feat/rag-embeddings` | Ollama embeddings + tests | GitHub |
-| RAG-03 | `feat/rag-qdrant-store` | Qdrant store + integration tests | GitHub |
-| RAG-04 | `feat/rag-retriever-context` | Retriever + ContextPacker | GitHub issue |
-| RAG-05 | `feat/rag-prompt-generator` | PromptBuilder + LocalGenerator | Planned |
+| RAG-01 | `feat/rag-chunking-*` | Chunking + tests | Merged ✅ |
+| RAG-02 | `feat/rag-embeddings` | Ollama embeddings + tests | Merged ✅ |
+| RAG-03 | `feat/rag-qdrant-store` | Qdrant store + integration tests | Merged ✅ |
+| RAG-04 | `feat/rag-retriever-context` | Retriever + ContextPacker | PR #11 — ready to merge |
+| RAG-05 | `feat/rag-prompt-generator` | PromptBuilder + LocalGenerator | Next |
 | RAG-06 | `feat/rag-cli-smoke` | Synthetic ingest/query CLI + smoke | Planned |
 | RAG-07 | `feat/rag-docs-runbook` | Runbook + ADR + final checklist | Planned |
 
@@ -279,3 +279,33 @@ Append or paste this at the end of substantial sessions:
 - Update only coordination rules, stable project context, and handoff protocol.
 - Put volatile sprint status in `current_state.md`.
 - Put architectural rationale in `decisions.md`.
+
+---
+
+## Handoff — 2026-04-26
+
+**Agent:** Claude (Cowork)  
+**Branch:** `feat/rag-retriever-context`  
+**Issue/PR:** #10 / PR #11  
+**Task:** Review RAG-04 — Retriever + ContextPacker; approve for merge.
+
+### Changed
+- `docs/04_MEM/AGENT_CONTEXT.md`: section 4 table updated — RAG-01–03 marked merged, RAG-04 ready to merge, RAG-05 next.
+
+### Validation
+- PR #11 diff reviewed: `context_packer.py`, `retriever.py`, `test_context_packer.py`, `test_retriever.py`, `current_state.md`.
+- 31 passed, 3 subtests passed (validated locally by Codex + human).
+- mypy strict: 0 issues. pyright: 0 errors. py_compile: passed. git diff --check: passed.
+- No forbidden files touched. No LangChain, sentence-transformers, remote AI, or real data.
+
+### Not Changed
+- `CLAUDE.md`, `.claude/`, `.env`, dependencies, `uv.lock` untouched.
+- No real portfolio data accessed.
+
+### Next Action
+- Human merges PR #11 (`gh pr merge 11 --squash --delete-branch` or equivalent).
+- Open issue #12 for RAG-05: PromptBuilder + LocalGenerator.
+
+### Risks
+- Smoke tests with real Ollama + Docker Qdrant remain for RAG-06.
+- None known for this PR.
