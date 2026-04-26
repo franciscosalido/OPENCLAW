@@ -1,0 +1,52 @@
+[project]
+name = "openclaw"
+version = "0.1.0"
+description = "OPENCLAW — Local-first AI financial intelligence"
+requires-python = ">=3.12"
+
+dependencies = [
+    # RAG-0 core
+    "httpx>=0.28.0",
+    "qdrant-client>=1.13.0",
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.7.0",
+    "pyyaml>=6.0.2",
+    "loguru>=0.7.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.25.0",
+    "mypy>=1.13.0",
+    "pyright>=1.1.390",
+    "types-pyyaml>=6.0.12",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["backend"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "smoke: end-to-end tests requiring Ollama + Qdrant",
+    "integration: tests requiring Qdrant running",
+]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+ignore_missing_imports = false
+warn_return_any = true
+warn_unused_configs = true
+
+[tool.pyright]
+pythonVersion = "3.12"
+typeCheckingMode = "basic"
+venvPath = "."
+venv = ".venv"
