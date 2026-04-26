@@ -11,7 +11,7 @@ import asyncio
 import time
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, cast
 
 import httpx
 from loguru import logger
@@ -176,8 +176,7 @@ class OllamaEmbedder:
                 response = await self.client.post("/api/embed", json=payload)
                 if response.status_code >= 400:
                     response.raise_for_status()
-                data: dict[str, Any] = response.json()
-                return data
+                return cast(dict[str, Any], response.json())
             except (
                 httpx.TimeoutException,
                 httpx.TransportError,
