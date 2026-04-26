@@ -4,6 +4,21 @@
 
 ---
 
+## Shared Agent Context File
+
+> **`docs/04_MEM/AGENT_CONTEXT.md` is the shared context file between Claude, Claude Code, Codex, and ChatGPT Thinking.**
+>
+> It contains: the 15 token-economy rules, the A2A coordination protocol, security boundaries, session startup sequence, documentation map, handoff template, and update rules.
+>
+> Read it at the start of every session, alongside this file and `docs/04_MEM/current_state.md`.
+
+```bash
+cat docs/04_MEM/AGENT_CONTEXT.md
+cat docs/04_MEM/current_state.md
+```
+
+---
+
 ## Project Identity
 
 | Field | Value |
@@ -23,13 +38,14 @@
 
 ## Session Startup Protocol
 
-Before writing any code, always:
+Before writing any code, always run in this order:
 
 ```bash
 cd ~/projetos/OPENCLAW
 git status --short
 git log --oneline --decorate -5
-cat docs/04_MEM/current_state.md
+cat docs/04_MEM/AGENT_CONTEXT.md   # ← shared A2A context (Claude + ChatGPT + Codex)
+cat docs/04_MEM/current_state.md   # ← live sprint state
 ```
 
 Do not read the whole repo. Do not open node_modules, .venv, dist, caches, or large binary files.
@@ -80,7 +96,7 @@ Do not read the whole repo. Do not open node_modules, .venv, dist, caches, or la
 - Ollama direct (no LiteLLM yet)
 - Qdrant v1.13.2 Docker
 - nomic-embed-text (768d)
-- qwen3:14b (thinking_mode=false by default)
+- qwen3:14b — `/no_think` by default for RAG, `/think` only for analytical mode
 - Python + httpx + qdrant-client
 
 **LiteLLM enters in Gateway-0 (next sprint).**
@@ -89,24 +105,25 @@ Do not read the whole repo. Do not open node_modules, .venv, dist, caches, or la
 
 | PR | Branch | Status | Scope |
 |---|---|---|---|
-| 1 | sprint/RAG-PR1 | ✅ MERGED | types + config + chunking + 9 tests |
-| 2 | sprint/LF-S01 | ✅ MERGED | LIBERDADE FINANCEIRA knowledge vault |
-| ops | ops/memory-foundation | 🔄 OPEN | CLAUDE.md + pyproject + docs/04_MEM |
-| 3 | feat/rag-ollama-embeddings | ⏳ NEXT | embeddings.py + 5 unit tests |
-| 4 | feat/rag-qdrant-store | ⏳ TODO | qdrant_store.py + 6 integration tests |
-| 5 | feat/rag-retriever-context | ⏳ TODO | retriever.py + context_packer.py |
-| 6 | feat/rag-prompt-generator | ⏳ TODO | prompt_builder.py + generator.py |
-| 7 | feat/rag-cli-smoke | ⏳ TODO | scripts + smoke test E2E |
-| 8 | feat/rag-docs-runbook | ⏳ TODO | ADR + runbook + acceptance checklist |
+| RAG-01 | sprint/RAG-PR1 | ✅ MERGED | chunking + types + config + tests |
+| LF-S01 | sprint/LF-S01 | ✅ MERGED | LIBERDADE FINANCEIRA knowledge vault |
+| OPS | ops/memory-foundation | ✅ MERGED | CLAUDE.md + pyproject + docs/04_MEM |
+| RAG-02 | feat/rag-embeddings | ✅ MERGED | OllamaEmbedder + 7 unit tests |
+| RAG-03 | feat/rag-qdrant-store | ✅ MERGED | QdrantVectorStore + 6 integration tests |
+| RAG-04 | feat/rag-retriever-context | ⏳ NEXT | context_packer.py + retriever.py + tests |
+| RAG-05 | feat/rag-prompt-generator | ⏳ TODO | prompt_builder.py + generator.py |
+| RAG-06 | feat/rag-cli-smoke | ⏳ TODO | scripts + smoke test E2E |
+| RAG-07 | feat/rag-docs-runbook | ⏳ TODO | ADR + runbook + acceptance checklist |
 
 ### Merge Criteria (every PR)
 
 1. `pytest tests/` passes (unit + integration when applicable)
 2. `mypy backend/ --strict` → 0 errors
-3. No imports of LangChain, sentence-transformers, or remote LLM APIs
-4. No hardcoded endpoints or model names
-5. Docstrings present on all public functions
-6. `loguru` used, not `print()`
+3. `pyright backend/` → 0 errors
+4. No imports of LangChain, sentence-transformers, or remote LLM APIs
+5. No hardcoded endpoints or model names
+6. Docstrings present on all public functions
+7. `loguru` used, not `print()`
 
 ---
 
@@ -122,16 +139,16 @@ OPENCLAW/
 ├── backend/
 │   └── rag/
 │       ├── __init__.py
-│       ├── chunking.py         ← DONE (PR1)
-│       ├── embeddings.py       ← PR3
-│       ├── qdrant_store.py     ← PR4
-│       ├── retriever.py        ← PR5
-│       ├── context_packer.py   ← PR5
-│       ├── prompt_builder.py   ← PR6
-│       └── generator.py        ← PR6
+│       ├── chunking.py         ← ✅ DONE
+│       ├── embeddings.py       ← ✅ DONE
+│       ├── qdrant_store.py     ← ✅ DONE
+│       ├── context_packer.py   ← ⏳ RAG-04
+│       ├── retriever.py        ← ⏳ RAG-04
+│       ├── prompt_builder.py   ← ⏳ RAG-05
+│       └── generator.py        ← ⏳ RAG-05
 ├── scripts/
-│   ├── rag_ingest_synthetic.py ← PR7
-│   └── rag_ask_local.py        ← PR7
+│   ├── rag_ingest_synthetic.py ← ⏳ RAG-06
+│   └── rag_ask_local.py        ← ⏳ RAG-06
 ├── tests/
 │   ├── unit/
 │   ├── integration/
@@ -140,9 +157,10 @@ OPENCLAW/
 │   └── docker-compose.qdrant.yml
 ├── docs/
 │   ├── 04_MEM/                 ← operational memory
-│   │   ├── current_state.md
-│   │   ├── decisions.md
-│   │   └── next_actions.md
+│   │   ├── AGENT_CONTEXT.md    ← ★ SHARED: Claude + ChatGPT + Codex
+│   │   ├── current_state.md    ← live sprint state
+│   │   ├── decisions.md        ← architectural decisions log
+│   │   └── next_actions.md     ← immediate next steps
 │   └── ADR/
 ├── Knowledge/
 ├── LIBERDADE FINANCEIRA/
@@ -162,6 +180,11 @@ docker compose -f docker/docker-compose.qdrant.yml up -d
 ollama pull qwen3:14b
 ollama pull nomic-embed-text
 
+# Verify services
+ollama ps
+curl -fsS http://localhost:11434/api/tags
+curl -fsS http://localhost:6333/healthz
+
 # Tests
 uv run pytest tests/unit/ -v
 uv run pytest tests/integration/ -m integration -v
@@ -171,9 +194,10 @@ uv run pytest tests/smoke/ -m smoke -v
 uv run mypy backend/ --strict
 uv run pyright backend/
 
-# RAG pipeline (after PR7)
+# RAG pipeline (after RAG-06)
 python scripts/rag_ingest_synthetic.py
 python scripts/rag_ask_local.py "Qual a projeção da Selic?"
+python scripts/rag_ask_local.py "Análise macro" --thinking  # qwen3 /think mode
 
 # Git discipline
 git status --short
@@ -186,7 +210,7 @@ gh pr list --state open
 ## GitHub Workflow
 
 ```
-Issue → branch → implementation → PR → review → merge → update docs/04_MEM
+Issue → branch → implement → pytest → mypy → pyright → PR → review → merge → update docs/04_MEM
 ```
 
 - One issue per session.
@@ -205,4 +229,4 @@ Issue → branch → implementation → PR → review → merge → update docs/
 - Do NOT integrate brokerage APIs.
 - Do NOT add LiteLLM before Gateway-0.
 - Do NOT use FastAPI before it's explicitly planned in a sprint.
-- Do NOT create `docs/04_MEM` entries from memory — read the actual state first.
+- Do NOT create `docs/04_MEM` entries from memory — read the actual files first.
