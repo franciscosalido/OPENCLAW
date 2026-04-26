@@ -133,8 +133,8 @@ Near-term PR sequence:
 | RAG-02 | `feat/rag-embeddings` | Ollama embeddings + tests | Merged ✅ |
 | RAG-03 | `feat/rag-qdrant-store` | Qdrant store + integration tests | Merged ✅ |
 | RAG-04 | `feat/rag-retriever-context` | Retriever + ContextPacker | Merged ✅ |
-| RAG-05 | `feat/rag-local-pipeline-smoke` | PromptBuilder + LocalGenerator + fake smoke | Active PR prep |
-| RAG-06 | `feat/rag-cli-smoke` | Synthetic ingest/query CLI + smoke | Planned |
+| RAG-05 | `feat/rag-local-pipeline-smoke` | PromptBuilder + LocalGenerator + fake smoke | Merged ✅ |
+| RAG-06 | `feat/rag-cli-smoke` | Synthetic ingest/query CLI + smoke | Active PR prep |
 | RAG-07 | `feat/rag-docs-runbook` | Runbook + ADR + final checklist | Planned |
 
 Before starting a PR, confirm actual state with:
@@ -341,3 +341,37 @@ Append or paste this at the end of substantial sessions:
 
 ### Risks
 - Real Ollama + real Qdrant end-to-end remains for a later smoke/CLI PR.
+
+---
+
+## Handoff — 2026-04-26
+
+**Agent:** Codex
+**Branch:** `feat/rag-cli-smoke`
+**Issue/PR:** #14 / PR pending
+**Task:** RAG-06 — executable synthetic ingest/query scripts plus smoke/integration coverage for local RAG proof of life.
+
+### Changed
+- `backend/rag/synthetic_documents.py`: five fictional PT-BR finance documents and Qdrant-ready chunk conversion.
+- `scripts/rag_ingest_synthetic.py`: async synthetic ingest script for chunk -> embed -> Qdrant upsert, with `--dry-run`.
+- `scripts/rag_ask_local.py`: local RAG CLI for question -> retrieval -> prompt -> generation, with `--top-k`, `--thinking`, `--model`, `--verbose`.
+- `tests/integration/test_rag_pipeline.py`: complete deterministic pipeline with in-memory Qdrant and fakes.
+- `tests/smoke/test_rag_smoke.py`: three-query smoke plus `thinking_mode=True` and empty retrieval paths.
+- `docs/04_MEM/current_state.md`: RAG-06 status and RAG-07 validation debt.
+
+### Validation
+- Targeted RAG-06 tests passed: 5 passed.
+- `rag_ingest_synthetic.py --dry-run` passed.
+- `rag_ask_local.py --help` passed.
+- mypy strict and pyright on new files passed.
+
+### Not Changed
+- `CLAUDE.md`, `.claude/`, `.env`, dependencies, real data, and remote AI untouched.
+- No LiteLLM, Redis, FastAPI, LangChain, or sentence-transformers.
+
+### Next Action
+- Run full validation, commit, push, and open draft PR for Claude independent testing.
+
+### Risks
+- Real Ollama + Docker Qdrant script execution should be checked by Claude/human when local services are running.
+- `_validate_question` is intentionally duplicated in RAG-06; extraction to `backend/rag/_validation.py` is registered for RAG-07.
