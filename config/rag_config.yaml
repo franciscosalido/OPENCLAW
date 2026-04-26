@@ -1,0 +1,47 @@
+# RAG Pipeline Configuration — OPENCLAW RAG-0
+# All runtime values live here. Never hardcode in Python files.
+
+rag:
+  chunking:
+    max_tokens: 400
+    overlap_tokens: 80
+    split_strategy: "paragraph_then_sentence"
+
+  embedding:
+    model: "nomic-embed-text"
+    endpoint: "http://localhost:11434"
+    timeout_seconds: 30
+    batch_size: 10
+    expected_dimensions: 768
+
+  qdrant:
+    host: "localhost"
+    port: 6333
+    grpc_port: 6334
+    collection: "openclaw_knowledge"
+    vector_size: 768
+    distance: "Cosine"
+
+  retrieval:
+    top_k: 5
+    score_threshold: 0.3
+    max_context_tokens: 8000
+    dedup_similarity_threshold: 0.92
+
+  generation:
+    model: "qwen3:14b"
+    endpoint: "http://localhost:11434"
+    temperature: 0.2
+    max_tokens: 2048
+    thinking_mode: false  # /no_think by default for factual RAG
+    stream: false         # simplified for V1
+
+  system_prompt: |
+    You are the local assistant for OPENCLAW.
+    Answer ONLY based on the RETRIEVED CONTEXT provided.
+    Do not use external knowledge for specific facts.
+    If the context does not support the answer, say:
+    "Não há contexto local suficiente para responder com segurança."
+    Cite sources in the format [doc_id#chunk_index].
+    For calculations, use deterministic Python logic.
+    Never request or reveal real portfolio data, credentials, or private documents.
