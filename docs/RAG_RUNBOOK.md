@@ -81,6 +81,12 @@ Forbidden import scan:
 rg -n "LangChain|sentence_transformers|from openai|import openai|anthropic|LiteLLM|Redis|FastAPI|remote" backend scripts tests || true
 ```
 
+Duplicated validation check (looks for the old private function definition, not test method names):
+
+```bash
+rg -n "^def _validate_question" backend/ tests/ || echo "OK — no duplicates"
+```
+
 ## Troubleshooting
 
 Qdrant unavailable:
