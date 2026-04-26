@@ -1,0 +1,4 @@
+# DEPRECATED: This file is superseded by pyproject.toml
+# All dependencies are managed via uv + pyproject.toml
+# Run: uv sync
+# This file can be safely deleted.
