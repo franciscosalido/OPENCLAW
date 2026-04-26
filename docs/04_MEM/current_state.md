@@ -1,108 +1,147 @@
 # current_state.md — OPENCLAW Operational Memory
 
-> Update this file at the end of every session. Claude Code reads this before starting work.
+> Volatile project state for Codex, Claude Code, ChatGPT Thinking, and human review.
+> Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of meaningful sessions.
 
-**Last updated:** 2026-04-25
-**Updated by:** Claude (Cowork) — ops/memory-foundation branch
+**Last updated:** 2026-04-26
+**Updated by:** Codex — PR #10 preparation
 
 ---
 
 ## Active Sprint: RAG-0
 
-**Goal:** Full pipeline local: chunk → embed → Qdrant → retrieve → prompt → Qwen3 answer with citations.
-**Constraint:** Ollama only. No LiteLLM, no remote APIs, no FastAPI, no LangChain.
+**Goal:** Full local pipeline: chunk -> embed -> Qdrant -> retrieve -> pack context -> prompt -> Qwen3 answer with citations.
+
+**Hard constraints:**
+- Local only for RAG-0.
+- Ollama only for embeddings/generation.
+- Qdrant local for vector storage.
+- No LiteLLM, remote providers, FastAPI, LangChain, sentence-transformers, real portfolio data, or private documents.
 
 ---
 
-## PR Status
+## GitHub State
 
-| # | Branch | State | What |
+| RAG step | Branch | State | Scope |
 |---|---|---|---|
-| 1 | sprint/RAG-PR1 | ✅ MERGED | `chunking.py` + `test_chunking.py` (types, config, overlap) |
-| 2 | sprint/LF-S01 | ✅ MERGED | 30 knowledge files `LIBERDADE FINANCEIRA/` |
-| ops | ops/memory-foundation | 🔄 OPEN | CLAUDE.md, pyproject.toml, config/, docs/04_MEM/ |
-| 3 | feat/rag-ollama-embeddings | ⏳ NEXT | `embeddings.py` + 5 unit tests (mocked) |
+| RAG-01 | `feat/rag-chunking-*` | Merged | `chunking.py` + unit tests |
+| RAG-02 | `feat/rag-embeddings` | Merged | `OllamaEmbedder` + mocked unit tests |
+| RAG-03 | `feat/rag-qdrant-store` | Merged | `QdrantVectorStore` + integration tests |
+| RAG-04 | `feat/rag-retriever-context` | In review prep | `ContextPacker` + `Retriever` + unit tests |
+| RAG-05 | `feat/rag-prompt-generator` | Next | Prompt builder + local generator |
+| RAG-06 | `feat/rag-cli-smoke` | Planned | Synthetic ingest/query CLI + smoke tests |
+| RAG-07 | `feat/rag-docs-runbook` | Planned | Runbook + ADR + final checklist |
+
+Current issue for active work: <https://github.com/franciscosalido/OPENCLAW/issues/10>
 
 ---
 
-## What Exists in `main` Right Now
+## What Exists in `main` Now
 
-```
+```text
 backend/rag/
-  __init__.py       ✅
-  chunking.py       ✅  pure Python, paragraph→sentence, overlap
-tests/unit/
-  test_chunking.py  ✅
-scripts/
-  setup-claude-mem.sh
-.claude/
-  settings.json
-  hooks.json
-Knowledge/
-LIBERDADE FINANCEIRA/   ← 30 files added in PR#2
-Projects/ Research/ Workflows/
-```
+  __init__.py
+  chunking.py
+  embeddings.py
+  qdrant_store.py
 
-**Not yet in main:**
-`embeddings.py`, `qdrant_store.py`, `retriever.py`, `context_packer.py`,
-`prompt_builder.py`, `generator.py`, `pyproject.toml`, `config/`, `docker/`
+tests/
+  unit/test_chunking.py
+  unit/test_embeddings.py
+  integration/test_qdrant_store.py
+
+config/rag_config.yaml
+docker/docker-compose.qdrant.yml
+docs/04_MEM/AGENT_CONTEXT.md
+docs/04_MEM/current_state.md
+docs/04_MEM/decisions.md
+docs/04_MEM/next_actions.md
+```
 
 ---
 
-## Local Worktree Warning
+## Active Branch: `feat/rag-retriever-context`
 
-During branch creation, git reported untracked files:
+Planned files for PR #10:
+
+```text
+backend/rag/context_packer.py
+backend/rag/retriever.py
+tests/unit/test_context_packer.py
+tests/unit/test_retriever.py
+docs/04_MEM/current_state.md
 ```
-backend/rag/__init__.py
-backend/rag/chunking.py
-tests/unit/test_chunking.py
-```
-These exist locally but git treats them as untracked on the `ops/memory-foundation` branch.
-After merging this PR, run:
+
+Current implementation summary:
+
+- `ContextPacker` is pure Python and deterministic.
+- It deduplicates retrieved chunks with Jaccard similarity over tokens.
+- It keeps the higher-scoring chunk when two chunks are near-duplicates.
+- It truncates context by token budget.
+- It reorders final chunks by document id and chunk index for prompt readability.
+- `Retriever` orchestrates query embedding, vector search, result conversion, packing, and latency logging.
+- Retriever dependencies are injected and testable with fakes.
+- No Ollama or Qdrant real service is required for unit tests.
+
+---
+
+## Latest Local Validation
+
+Run on 2026-04-26 from `/Users/fas/projetos/OPENCLAW`:
+
 ```bash
-git checkout main && git pull
+uv run pytest -v
 ```
-to realign local and remote.
+
+Result:
+
+```text
+31 passed, 3 subtests passed
+```
+
+```bash
+uv run mypy --explicit-package-bases --strict backend/rag tests/unit tests/integration
+```
+
+Result:
+
+```text
+Success: no issues found in 11 source files
+```
+
+```bash
+uv run pyright backend/rag tests/unit tests/integration
+```
+
+Result:
+
+```text
+0 errors, 0 warnings, 0 informations
+```
 
 ---
 
-## PR#3 Contract (Ready to Execute)
+## Next Action
 
-**Branch:** `feat/rag-ollama-embeddings`
+Claude should review and independently test PR #10 after Codex opens it.
 
-**File 1 — `backend/rag/embeddings.py`**
+Suggested Claude commands:
+
+```bash
+git fetch --prune
+git checkout feat/rag-retriever-context
+git pull --ff-only
+uv run pytest -v
+uv run mypy --explicit-package-bases --strict backend/rag tests/unit tests/integration
+uv run pyright backend/rag tests/unit tests/integration
+uv run python -m py_compile backend/rag/*.py tests/unit/*.py tests/integration/*.py
+rg -n "LangChain|sentence_transformers|openai|anthropic|remote" backend tests || true
 ```
-class OllamaEmbedder:
-  endpoint: POST http://localhost:11434/api/embed
-  body:     {"model": "nomic-embed-text", "input": [texts]}
-  response: {"embeddings": [[float, ...], ...]}
-  validate: len(embedding) == 768  (config.embedding.expected_dimensions)
-  retry:    3x backoff 1s → 2s → 4s
-  client:   httpx.AsyncClient, async, close() in destructor
-  raises:   EmbeddingError on wrong dimensions or persistent failure
-```
-
-**File 2 — `tests/unit/test_embeddings.py`** (5 tests, ALL mocked)
-1. `test_embed_returns_correct_dimensions`
-2. `test_embed_batch_multiple_texts`
-3. `test_embed_retry_on_timeout`
-4. `test_embed_raises_on_wrong_dimensions`
-5. `test_embed_empty_text`
-
-**Merge criteria:**
-- `pytest tests/unit/test_embeddings.py` → 5/5 (no Ollama needed)
-- `mypy backend/rag/embeddings.py --strict` → 0 errors
-- No `sentence_transformers` import
-- `httpx.AsyncClient` with proper `close()`
 
 ---
 
-## Environment
+## Remaining Risks
 
-| Service | Status |
-|---|---|
-| Ollama | ✅ installed — qwen3:14b + nomic-embed-text pulled |
-| Qdrant | ⚠️ needs `docker compose up` (docker-compose.qdrant.yml added in this PR) |
-| Python | 3.12 via uv |
-| mypy + pyright | ✅ installed in .venv |
-| httpx | ⚠️ will be available after `uv sync` (pyproject.toml added in this PR) |
+- PR #10 has not yet been reviewed by Claude.
+- Smoke tests with real Ollama + Docker Qdrant remain for later RAG-0 PRs.
+- No real data has been used or accessed.
