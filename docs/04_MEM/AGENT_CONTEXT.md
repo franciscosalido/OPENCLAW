@@ -132,8 +132,8 @@ Near-term PR sequence:
 | RAG-01 | `feat/rag-chunking-*` | Chunking + tests | Merged ✅ |
 | RAG-02 | `feat/rag-embeddings` | Ollama embeddings + tests | Merged ✅ |
 | RAG-03 | `feat/rag-qdrant-store` | Qdrant store + integration tests | Merged ✅ |
-| RAG-04 | `feat/rag-retriever-context` | Retriever + ContextPacker | PR #11 — ready to merge |
-| RAG-05 | `feat/rag-prompt-generator` | PromptBuilder + LocalGenerator | Next |
+| RAG-04 | `feat/rag-retriever-context` | Retriever + ContextPacker | Merged ✅ |
+| RAG-05 | `feat/rag-local-pipeline-smoke` | PromptBuilder + LocalGenerator + fake smoke | Active PR prep |
 | RAG-06 | `feat/rag-cli-smoke` | Synthetic ingest/query CLI + smoke | Planned |
 | RAG-07 | `feat/rag-docs-runbook` | Runbook + ADR + final checklist | Planned |
 
@@ -309,3 +309,35 @@ Append or paste this at the end of substantial sessions:
 ### Risks
 - Smoke tests with real Ollama + Docker Qdrant remain for RAG-06.
 - None known for this PR.
+
+---
+
+## Handoff — 2026-04-26
+
+**Agent:** Codex
+**Branch:** `feat/rag-local-pipeline-smoke`
+**Issue/PR:** #12 / PR pending
+**Task:** RAG-05 — close local RAG path with prompt, local generator, pipeline, and fake smoke test.
+
+### Changed
+- `backend/rag/prompt_builder.py`: builds local RAG chat messages with `/no_think`, context blocks, and citations.
+- `backend/rag/generator.py`: adds local Ollama `/api/chat` client with `stream=false`, timeout, temperature, and `<think>` stripping when thinking mode is off.
+- `backend/rag/pipeline.py`: orchestrates retriever -> prompt builder -> generator and returns answer, chunks, citations, messages, and latency.
+- `tests/unit/test_prompt_builder.py`: prompt formatting tests.
+- `tests/unit/test_generator.py`: mocked Ollama chat tests.
+- `tests/smoke/test_rag_pipeline_smoke.py`: fake end-to-end smoke test with no Ollama/Qdrant requirement.
+- `AGENTS.md`: compact OpenAI/Codex memory entrypoint.
+
+### Validation
+- Targeted PR tests passed: 12 passed.
+- mypy strict on new files passed.
+- pyright on new files passed.
+
+### Not Changed
+- `CLAUDE.md`, `.claude/`, `.env`, dependencies, real data, and remote AI untouched.
+
+### Next Action
+- Run full validation, commit, push, and open draft PR for Claude independent testing.
+
+### Risks
+- Real Ollama + real Qdrant end-to-end remains for a later smoke/CLI PR.
