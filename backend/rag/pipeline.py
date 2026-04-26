@@ -9,6 +9,7 @@ from typing import Any, Protocol
 
 from loguru import logger
 
+from backend.rag._validation import validate_question
 from backend.rag.context_packer import RetrievedChunk
 from backend.rag.prompt_builder import PromptBuilder
 
@@ -74,7 +75,7 @@ class LocalRagPipeline:
     ) -> RagPipelineResult:
         """Run retrieval, build a prompt, and generate a local answer."""
 
-        clean_question = _validate_question(question)
+        clean_question = validate_question(question)
         total_start = time.perf_counter()
 
         retrieval_start = time.perf_counter()
@@ -120,16 +121,5 @@ class LocalRagPipeline:
             messages=messages,
             latency_ms=latency,
         )
-
-
-def _validate_question(question: str) -> str:
-    if not isinstance(question, str):
-        raise TypeError("question must be a string")
-    clean_question = question.strip()
-    if not clean_question:
-        raise ValueError("question cannot be empty or whitespace")
-    return clean_question
-
-
 def _elapsed_ms(start: float) -> float:
     return (time.perf_counter() - start) * 1000

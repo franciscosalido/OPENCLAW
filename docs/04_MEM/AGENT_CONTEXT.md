@@ -134,8 +134,8 @@ Near-term PR sequence:
 | RAG-03 | `feat/rag-qdrant-store` | Qdrant store + integration tests | Merged ✅ |
 | RAG-04 | `feat/rag-retriever-context` | Retriever + ContextPacker | Merged ✅ |
 | RAG-05 | `feat/rag-local-pipeline-smoke` | PromptBuilder + LocalGenerator + fake smoke | Merged ✅ |
-| RAG-06 | `feat/rag-cli-smoke` | Synthetic ingest/query CLI + smoke | Active PR prep |
-| RAG-07 | `feat/rag-docs-runbook` | Runbook + ADR + final checklist | Planned |
+| RAG-06 | `feat/rag-cli-smoke` | Synthetic ingest/query CLI + smoke | Merged ✅ |
+| RAG-07 | `feat/rag-docs-runbook` | Runbook + ADR + validation cleanup | Active PR prep |
 
 Before starting a PR, confirm actual state with:
 
@@ -375,3 +375,34 @@ Append or paste this at the end of substantial sessions:
 ### Risks
 - Real Ollama + Docker Qdrant script execution should be checked by Claude/human when local services are running.
 - `_validate_question` is intentionally duplicated in RAG-06; extraction to `backend/rag/_validation.py` is registered for RAG-07.
+
+---
+
+## Handoff — 2026-04-26
+
+**Agent:** Codex
+**Branch:** `feat/rag-docs-runbook`
+**Issue/PR:** #18 / PR pending
+**Task:** RAG-07 — runbook, ADR, shared question validation, and health tests.
+
+### Changed
+- `backend/rag/_validation.py`: shared `validate_question`.
+- `backend/rag/prompt_builder.py`, `backend/rag/pipeline.py`, `backend/rag/retriever.py`: use shared validation.
+- `tests/unit/test_validation.py`: shared validation tests.
+- `tests/unit/test_health.py`: health preflight tests with mocked httpx.
+- `docs/RAG_RUNBOOK.md`: local RAG operation guide.
+- `docs/ADR/001-rag-local-only.md`: local-only RAG ADR.
+
+### Validation
+- `.venv/bin/python -m unittest tests.unit.test_validation tests.unit.test_health -v` passed.
+- `.venv/bin/python -m py_compile backend/rag/*.py scripts/*.py tests/unit/*.py tests/integration/*.py tests/smoke/*.py` passed.
+- `git diff --check` passed.
+
+### Not Changed
+- `CLAUDE.md`, `.claude/`, `.env`, dependencies, real data, and remote AI untouched.
+
+### Next Action
+- Reinstall/sync dev tooling if needed, then run full pytest/mypy/pyright and open PR.
+
+### Risks
+- Current `.venv` lacks pytest, mypy, and pyright after manual environment sync, so full validation is pending.

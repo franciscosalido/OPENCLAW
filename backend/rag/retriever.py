@@ -10,6 +10,7 @@ from typing import Any, Protocol, TypeVar, cast
 
 from loguru import logger
 
+from backend.rag._validation import validate_question
 from backend.rag.context_packer import ContextPacker, RetrievedChunk
 
 
@@ -97,7 +98,7 @@ class Retriever:
         testable with fakes and mocks.
         """
 
-        clean_question = _validate_question(question)
+        clean_question = validate_question(question)
         effective_top_k = self.top_k if top_k is None else top_k
         _validate_top_k(effective_top_k)
 
@@ -146,17 +147,6 @@ async def _maybe_await(value: T | Awaitable[T]) -> T:
     if inspect.isawaitable(value):
         return await cast(Awaitable[T], value)
     return value
-
-
-def _validate_question(question: str) -> str:
-    if not isinstance(question, str):
-        raise TypeError("question must be a string")
-    clean_question = question.strip()
-    if not clean_question:
-        raise ValueError("question cannot be empty or whitespace")
-    return clean_question
-
-
 def _validate_top_k(top_k: int) -> None:
     if isinstance(top_k, bool) or not isinstance(top_k, int):
         raise TypeError("top_k must be an integer")

@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+from backend.rag._validation import validate_question
 from backend.rag.context_packer import RetrievedChunk
 
 
@@ -38,7 +39,7 @@ class PromptBuilder:
     ) -> list[dict[str, str]]:
         """Return chat messages with recovered context and citation rules."""
 
-        clean_question = _validate_question(question)
+        clean_question = validate_question(question)
         context = self._format_context(chunks)
         thinking_directive = "/think" if thinking_mode else "/no_think"
         user_content = (
@@ -72,12 +73,3 @@ class PromptBuilder:
                 )
             )
         return "\n\n---\n\n".join(blocks)
-
-
-def _validate_question(question: str) -> str:
-    if not isinstance(question, str):
-        raise TypeError("question must be a string")
-    clean_question = question.strip()
-    if not clean_question:
-        raise ValueError("question cannot be empty or whitespace")
-    return clean_question
