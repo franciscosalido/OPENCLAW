@@ -1,4 +1,4 @@
-"""Local answer generation via Ollama chat API."""
+"""Local answer generation through the LiteLLM gateway."""
 
 from __future__ import annotations
 
@@ -6,14 +6,21 @@ import re
 import time
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any, cast
 
 import httpx
 from loguru import logger
 
+from backend.gateway.client import (
+    DEFAULT_LLM_BASE_URL,
+    DEFAULT_LLM_MODEL,
+    GatewayChatClient,
+    GatewayRuntimeConfig,
+)
+from backend.gateway.messages import validate_chat_messages
 
-DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434"
-DEFAULT_GENERATION_MODEL = "qwen3:14b"
+
+DEFAULT_GENERATION_BASE_URL = DEFAULT_LLM_BASE_URL
+DEFAULT_GENERATION_MODEL = DEFAULT_LLM_MODEL
 DEFAULT_GENERATION_TIMEOUT_SECONDS = 120.0
 DEFAULT_TEMPERATURE = 0.2
 DEFAULT_MAX_TOKENS = 2048
@@ -27,19 +34,19 @@ class GenerationError(Exception):
 
 @dataclass
 class LocalGenerator:
-    """Small async client for local Ollama `/api/chat` generation."""
+    """Small async generator backed by the local LiteLLM gateway."""
 
     model: str = DEFAULT_GENERATION_MODEL
-    base_url: str = DEFAULT_OLLAMA_BASE_URL
+    base_url: str = DEFAULT_GENERATION_BASE_URL
+    api_key: str | None = None
     timeout_seconds: float = DEFAULT_GENERATION_TIMEOUT_SECONDS
     temperature: float = DEFAULT_TEMPERATURE
     max_tokens: int = DEFAULT_MAX_TOKENS
     client: httpx.AsyncClient | None = None
+    gateway_client: GatewayChatClient | None = None
     _owns_client: bool = field(init=False, default=False)
 
     def __post_init__(self) -> None:
-        if not self.model.strip():
-            raise ValueError("model cannot be empty")
         if self.timeout_seconds <= 0:
             raise ValueError("timeout_seconds must be greater than zero")
         if not 0.0 <= self.temperature <= 2.0:
@@ -47,13 +54,42 @@ class LocalGenerator:
         if self.max_tokens <= 0:
             raise ValueError("max_tokens must be greater than zero")
 
-        self.base_url = self.base_url.rstrip("/")
-        if self.client is None:
-            self.client = httpx.AsyncClient(
+        env_config = GatewayRuntimeConfig.from_env()
+        effective_model = (
+            env_config.default_model
+            if self.model == DEFAULT_GENERATION_MODEL
+            else self.model
+        )
+        effective_base_url = (
+            env_config.base_url
+            if self.base_url == DEFAULT_GENERATION_BASE_URL
+            else self.base_url
+        )
+        if not effective_model.strip():
+            raise ValueError("model cannot be empty")
+
+        # Validate BEFORE creating any HTTP resource so that a bad api_key
+        # raises GatewayAuthenticationError immediately — no client leaks.
+        runtime_config = GatewayRuntimeConfig(
+            base_url=effective_base_url,
+            api_key=self.api_key if self.api_key is not None else env_config.api_key,
+            default_model=effective_model,
+            timeout_seconds=self.timeout_seconds,
+        ).validated()
+
+        if self.gateway_client is None:
+            self.model = runtime_config.default_model
+            self.base_url = runtime_config.base_url  # already normalised by validated()
+            active_client = self.client or httpx.AsyncClient(
                 base_url=self.base_url,
                 timeout=httpx.Timeout(self.timeout_seconds),
             )
-            self._owns_client = True
+            self.gateway_client = GatewayChatClient(
+                config=runtime_config,
+                client=active_client,
+            )
+            self._owns_client = self.client is None
+            self.client = active_client
 
     async def __aenter__(self) -> LocalGenerator:
         return self
@@ -64,7 +100,9 @@ class LocalGenerator:
     async def aclose(self) -> None:
         """Close the owned HTTP client."""
 
-        if self._owns_client and self.client is not None:
+        if self.gateway_client is not None:
+            await self.gateway_client.aclose()
+        elif self._owns_client and self.client is not None:
             await self.client.aclose()
 
     async def chat(
@@ -73,30 +111,23 @@ class LocalGenerator:
         temperature: float | None = None,
         thinking_mode: bool = False,
     ) -> str:
-        """Generate one local answer with Ollama chat API."""
+        """Generate one local answer through LiteLLM chat completions."""
 
-        if self.client is None:
-            raise RuntimeError("HTTP client is not initialized")
+        if self.gateway_client is None:
+            raise RuntimeError("Gateway client is not initialized")
 
-        clean_messages = _validate_messages(messages)
+        clean_messages = validate_chat_messages(messages)
         effective_temperature = self.temperature if temperature is None else temperature
         if not 0.0 <= effective_temperature <= 2.0:
             raise ValueError("temperature must be between 0.0 and 2.0")
 
-        payload: dict[str, Any] = {
-            "model": self.model,
-            "messages": clean_messages,
-            "stream": False,
-            "options": {
-                "temperature": effective_temperature,
-                "num_predict": self.max_tokens,
-            },
-        }
         start = time.perf_counter()
-        response = await self.client.post("/api/chat", json=payload)
-        response.raise_for_status()
-        body = cast(dict[str, Any], response.json())
-        answer = _extract_answer(body)
+        answer = await self.gateway_client.chat_completion(
+            clean_messages,
+            model=self.model,
+            temperature=effective_temperature,
+            max_tokens=self.max_tokens,
+        )
         if not thinking_mode:
             answer = _strip_thinking(answer)
 
@@ -107,33 +138,6 @@ class LocalGenerator:
             (time.perf_counter() - start) * 1000,
         )
         return answer
-
-
-def _validate_messages(messages: Sequence[dict[str, str]]) -> list[dict[str, str]]:
-    if not messages:
-        raise ValueError("messages cannot be empty")
-
-    clean_messages: list[dict[str, str]] = []
-    for message in messages:
-        role = message.get("role", "").strip()
-        content = message.get("content", "").strip()
-        if role not in {"system", "user", "assistant"}:
-            raise ValueError("message role must be system, user, or assistant")
-        if not content:
-            raise ValueError("message content cannot be empty")
-        clean_messages.append({"role": role, "content": content})
-    return clean_messages
-
-
-def _extract_answer(body: dict[str, Any]) -> str:
-    message = body.get("message")
-    if not isinstance(message, dict):
-        raise GenerationError("Ollama response did not include message")
-
-    content = message.get("content")
-    if not isinstance(content, str) or not content.strip():
-        raise GenerationError("Ollama response message content is empty")
-    return content.strip()
 
 
 def _strip_thinking(answer: str) -> str:

@@ -29,8 +29,11 @@ rag:
     dedup_similarity_threshold: 0.92
 
   generation:
-    model: "qwen3:14b"
-    endpoint: "http://localhost:11434"
+    model: "local_rag"
+    reasoning_model: "local_think"
+    json_model: "local_json"
+    endpoint: "http://127.0.0.1:4000/v1"
+    # api_key read from env: QUIMERA_LLM_API_KEY (not loaded from YAML — set via shell export)
     temperature: 0.2
     max_tokens: 2048
     thinking_mode: false  # /no_think by default for factual RAG

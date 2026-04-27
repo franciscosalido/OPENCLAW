@@ -26,7 +26,7 @@ NO_CONTEXT_MESSAGE = (
 
 @dataclass(frozen=True)
 class PromptBuilder:
-    """Build Ollama chat messages from retrieved local context."""
+    """Build chat messages from retrieved local context."""
 
     system_prompt: str = DEFAULT_SYSTEM_PROMPT
     no_context_message: str = NO_CONTEXT_MESSAGE

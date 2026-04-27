@@ -65,6 +65,7 @@ logs/
 *.claude_session
 .claude/todos/
 .claude/cache/
+.claude/worktrees/
 
 # claude-mem — banco de dados e estado local (ficam em ~/.claude-mem/, nunca no repo)
 claude-mem.db

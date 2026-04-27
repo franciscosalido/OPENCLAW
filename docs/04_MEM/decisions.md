@@ -93,3 +93,23 @@
 **Decision:** Level 0 = local only (never remote). Level 1 = sanitized before remote. Level 2 = blocked (credentials, real portfolio).
 
 **Why:** Previous 3-level taxonomy had "Level 2 = remote sensitive" which created a dangerous ambiguity. Renamed: blocked = never leaves machine under any circumstance.
+
+---
+
+## ADR-010 — GitHub Issue/PR Workflow Is Mandatory
+
+**Date:** 2026-04-26 | **Status:** Accepted
+
+**Decision:** GitHub is the operational source of truth for tracked work. Every
+PR-sized task must start from synced `main`, have a GitHub Issue before
+implementation, use a feature branch from updated `main`, push that branch, open
+a GitHub PR, link the PR to the issue, and merge only through GitHub after
+approval.
+
+**Why:** Local-only integration created ambiguity around Gateway PR1-PR3 status.
+The project needs durable issue/PR history, review state, and merge tracking
+that survives agent handoffs and local worktree drift.
+
+**Consequence:** Agents must not treat the local project directory as the final
+integration point. If local state is dirty or contains unsplit work, preserve it
+first, then normalize GitHub records before starting the next feature.
