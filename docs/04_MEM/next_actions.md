@@ -2,103 +2,50 @@
 
 > This file drives the next session. Check it off as you complete items.
 
-**Last updated:** 2026-04-25
+**Last updated:** 2026-04-26
 
 ---
 
-## Right Now — Merge ops/memory-foundation
+## Right Now — Normalize Gateway GitHub Workflow
 
-- [ ] Review PR: https://github.com/franciscosalido/OPENCLAW/pull/new/ops/memory-foundation
-- [ ] Merge to main
-- [ ] Locally: `git checkout main && git pull && uv sync`
-- [ ] Start Qdrant: `docker compose -f docker/docker-compose.qdrant.yml up -d`
-- [ ] Verify: `curl localhost:6333/healthz` → OK
+- [ ] Read `docs/sprints/GATEWAY_SPRINT_HANDOFF.md`.
+- [ ] Run `git status --short --branch`.
+- [ ] Verify GitHub issues and PRs for GW-01, GW-02, GW-03, and GW-04.
+- [ ] Backfill missing issues before implementation or PR work.
+- [ ] Preserve current local Gateway work before switching branches.
+- [ ] Sync local `main` with `git pull --ff-only origin main` only after the
+      current work is preserved or intentionally split.
 
 ---
 
-## PR#3 — feat/rag-ollama-embeddings
+## Required Issue Records
 
-### Step 1 — Create branch and open issue
+| PR | Issue title | Branch |
+|---|---|---|
+| GW-01 | `[Gateway-01] LiteLLM gateway contracts and semantic aliases` | `feat/gateway-prep-contracts` |
+| GW-02 | `[Gateway-02] Local-only LiteLLM install and health scripts` | `feat/gateway-install-health` |
+| GW-03 | `[Gateway-03] Route OpenClaw runtime chat through LiteLLM` | `feat/gateway-route-opencraw-litellm` |
+| GW-04 | `[Gateway-04] Optional LiteLLM runtime smoke and observability` | `feat/gateway-runtime-smoke` |
+
+---
+
+## Mandatory Workflow Reminder
+
 ```bash
-gh issue create --title "[RAG-03] OllamaEmbedder — embeddings.py" \
-  --body "Implement OllamaEmbedder class per docs/04_MEM/current_state.md PR#3 contract"
-git checkout -b feat/rag-ollama-embeddings
+cd /Users/fas/projetos/OPENCLAW
+git checkout main
+git pull --ff-only origin main
+gh issue create ...
+git checkout -b <feature-branch>
+# implement
+# validate
+git commit -m "<atomic message>"
+git push -u origin <feature-branch>
+gh pr create --base main --head <feature-branch> ...
 ```
 
-### Step 2 — Claude Code implements these exact files
+Do not merge locally into `main` as the final integration step. Final merge
+belongs in GitHub after review approval.
 
-**`backend/rag/embeddings.py`**
-```python
-"""Embedding client for OPENCLAW RAG pipeline.
-
-Calls Ollama /api/embed endpoint. No sentence-transformers.
-All config from rag_config.yaml via RAGConfig.
-"""
-from __future__ import annotations
-import asyncio
-from dataclasses import dataclass
-import httpx
-from loguru import logger
-
-
-class EmbeddingError(Exception):
-    """Raised when embedding fails after all retries or dimensions mismatch."""
-
-
-class OllamaEmbedder:
-    """Async embedding client backed by Ollama /api/embed."""
-    # POST {endpoint}/api/embed
-    # body: {"model": model, "input": [text, ...]}
-    # response: {"embeddings": [[float, ...], ...]}
-    # validate: len(each_vector) == expected_dimensions
-    # retry: up to 3 times, backoff 1s → 2s → 4s
-    # always call close() or use as async context manager
-    ...
-```
-
-**`tests/unit/test_embeddings.py`** — 5 tests, ALL mocked, no Ollama
-1. `test_embed_returns_correct_dimensions` — mock → 768d vector ✓
-2. `test_embed_batch_multiple_texts` — 3 texts → 3 vectors ✓
-3. `test_embed_retry_on_timeout` — 1st call timeout, 2nd succeeds ✓
-4. `test_embed_raises_on_wrong_dimensions` — 512d response → EmbeddingError ✓
-5. `test_embed_empty_text` — empty string → EmbeddingError ✓
-
-### Step 3 — Verify before PR
-```bash
-uv run pytest tests/unit/test_embeddings.py -v
-uv run mypy backend/rag/embeddings.py --strict
-grep -r 'sentence_transformers' backend/  # must return nothing
-```
-
-### Step 4 — PR
-```bash
-gh pr create \
-  --title "[RAG-03] feat/rag-ollama-embeddings: OllamaEmbedder + 5 unit tests" \
-  --body "Adds OllamaEmbedder (httpx async, retry, dimension validation). 5 mocked unit tests. No Ollama required to run tests."
-```
-
----
-
-## PR#4 (queue — do not start until PR#3 merged)
-
-**Branch:** `feat/rag-qdrant-store`
-
-`backend/rag/qdrant_store.py` — `QdrantVectorStore`:
-- `ensure_collection()` — idempotent
-- `upsert(chunks, vectors)` — payload: doc_id, chunk_index, text, ingested_at, security_level
-- `delete_document(document_id)` — filter delete
-- `search(vector, top_k, score_threshold, filters)` → `list[dict]`
-- `count()` → `int`
-
-`tests/integration/test_qdrant_store.py` — 6 tests, temp collection, cleanup on teardown.
-
----
-
-## Workflow Reminder
-
-```
-gh issue create → git checkout -b branch → implement → pytest → mypy → gh pr create → review → merge → update current_state.md
-```
-
-Use `/compact` in Claude Code after each PR.
-Use `/cost` periodically to monitor token usage.
+Use `/compact` in Claude Code after each PR. Use `/cost` periodically to monitor
+token usage.

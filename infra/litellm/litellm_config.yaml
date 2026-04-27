@@ -1,0 +1,73 @@
+# Quimera/OpenClaw LiteLLM local gateway config.
+#
+# This operational config is local-only. It intentionally does not define
+# OpenAI, Anthropic, Gemini, or any remote provider.
+#
+# LiteLLM supports os.environ/VAR_NAME for whole config values. Because model
+# names need an "ollama/" prefix, start_litellm.sh derives:
+# - LITELLM_LOCAL_CHAT_MODEL=ollama/${QWEN_MODEL}
+# - LITELLM_LOCAL_EMBED_MODEL=ollama/${EMBED_MODEL}
+
+model_list:
+  - model_name: local_chat
+    litellm_params:
+      model: os.environ/LITELLM_LOCAL_CHAT_MODEL
+      api_base: os.environ/OLLAMA_API_BASE
+      timeout: 60
+      temperature: 0.2
+    model_info:
+      provider: ollama
+      purpose: default local chat
+      thinking_mode: false
+
+  - model_name: local_think
+    litellm_params:
+      model: os.environ/LITELLM_LOCAL_CHAT_MODEL
+      api_base: os.environ/OLLAMA_API_BASE
+      timeout: 120
+      temperature: 0.2
+    model_info:
+      provider: ollama
+      purpose: local reasoning calls
+      thinking_mode: true
+
+  - model_name: local_rag
+    litellm_params:
+      model: os.environ/LITELLM_LOCAL_CHAT_MODEL
+      api_base: os.environ/OLLAMA_API_BASE
+      timeout: 60
+      temperature: 0.1
+    model_info:
+      provider: ollama
+      purpose: RAG answer synthesis from Qdrant context
+      thinking_mode: false
+
+  - model_name: local_json
+    litellm_params:
+      model: os.environ/LITELLM_LOCAL_CHAT_MODEL
+      api_base: os.environ/OLLAMA_API_BASE
+      timeout: 60
+      temperature: 0.0
+    model_info:
+      provider: ollama
+      purpose: structured local JSON responses
+      response_contract: json
+      thinking_mode: false
+
+  - model_name: local_embed
+    litellm_params:
+      model: os.environ/LITELLM_LOCAL_EMBED_MODEL
+      api_base: os.environ/OLLAMA_API_BASE
+      timeout: 30
+    model_info:
+      provider: ollama
+      purpose: local embeddings for Qdrant RAG
+      output_dimensions: 768
+
+litellm_settings:
+  drop_params: true
+  set_verbose: false
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  disable_spend_logs: true

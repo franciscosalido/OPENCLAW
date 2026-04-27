@@ -16,7 +16,8 @@ from typing import Any
 
 from backend.rag.context_packer import ContextPacker
 from backend.rag.embeddings import OllamaEmbedder
-from backend.rag.generator import DEFAULT_GENERATION_MODEL, LocalGenerator
+from backend.gateway.client import DEFAULT_LLM_RAG_MODEL, DEFAULT_LLM_REASONING_MODEL
+from backend.rag.generator import LocalGenerator
 from backend.rag.health import check_local_services
 from backend.rag.pipeline import LocalRagPipeline, RagPipelineResult
 from backend.rag.prompt_builder import PromptBuilder
@@ -28,12 +29,15 @@ async def ask_local(
     question: str,
     top_k: int = 5,
     thinking_mode: bool = False,
-    model: str = DEFAULT_GENERATION_MODEL,
+    model: str | None = None,
     filters: Mapping[str, Any] | None = None,
 ) -> RagPipelineResult:
-    """Run one local RAG question with default Ollama + Qdrant components."""
+    """Run one local RAG question with Qdrant retrieval and LiteLLM generation."""
 
-    async with OllamaEmbedder() as embedder, LocalGenerator(model=model) as generator:
+    effective_model = model or (
+        DEFAULT_LLM_REASONING_MODEL if thinking_mode else DEFAULT_LLM_RAG_MODEL
+    )
+    async with OllamaEmbedder() as embedder, LocalGenerator(model=effective_model) as generator:
         store = QdrantVectorStore()
         try:
             retriever = Retriever(
@@ -83,7 +87,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("question", help="Pergunta em linguagem natural.")
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--thinking", action="store_true")
-    parser.add_argument("--model", default=DEFAULT_GENERATION_MODEL)
+    parser.add_argument(
+        "--model",
+        default=None,
+        help=(
+            "LiteLLM semantic alias. Defaults to local_rag, or local_think "
+            "when --thinking is set."
+        ),
+    )
     parser.add_argument("--verbose", action="store_true")
     return parser.parse_args()
 

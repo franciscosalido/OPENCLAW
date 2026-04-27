@@ -99,45 +99,79 @@ RAG-0 is **local only**. No remote AI fallback in this sprint.
 
 - Product name: Quimera.
 - Repository name: OpenClaw.
-- Local LLM runtime: Ollama.
-- Primary local generation model: `qwen3:14b`.
-- Embedding model: `nomic-embed-text`.
+- Model gateway: LiteLLM at `http://127.0.0.1:4000/v1` (Gateway-0 — local only).
+- Semantic aliases: `local_chat`, `local_think`, `local_rag`, `local_json`, `local_embed`.
+- Local LLM runtime: Ollama (via LiteLLM gateway for chat; direct for embeddings until Gateway-1).
+- Primary local generation model: `qwen3:14b` (vendor name confined to LiteLLM config — application code uses aliases).
+- Embedding model: `nomic-embed-text` (direct Ollama until a tested embedding-gateway PR).
 - Vector database: Qdrant.
 - Mathematical co-processor: deterministic Python modules.
-- Remote AI: sanitized fallback only in a future Gateway sprint.
+- Remote AI: disabled. Sanitized fallback only after explicit sprint approval.
 - GitHub is the source of truth for issues, branches, PRs, and merge state.
+
+Runtime env vars (must be set locally before running OpenClaw):
+
+| Var | Default | Notes |
+|---|---|---|
+| `QUIMERA_LLM_BASE_URL` | `http://127.0.0.1:4000/v1` | Local LiteLLM only |
+| `QUIMERA_LLM_API_KEY` | — | Must match `LITELLM_MASTER_KEY` |
+| `QUIMERA_LLM_MODEL` | `local_chat` | Semantic alias |
+| `QUIMERA_LLM_REASONING_MODEL` | `local_think` | Semantic alias |
+| `QUIMERA_LLM_RAG_MODEL` | `local_rag` | Semantic alias |
+| `QUIMERA_LLM_JSON_MODEL` | `local_json` | Semantic alias |
 
 ---
 
-## 4. Sprint RAG-0 Direction
+## 4. Sprint History and Current State
+
+### Sprint RAG-0 — COMPLETE ✅
 
 Canonical pipeline:
 
 ```text
 SyntheticDocument
   -> Chunker
-  -> Ollama Embeddings
+  -> Ollama Embeddings (direct)
   -> Qdrant VectorStore
   -> Retriever
   -> ContextPacker
   -> PromptBuilder
-  -> LocalGenerator
+  -> LocalGenerator  ← now routes through LiteLLM gateway
   -> AnswerWithCitations
 ```
 
-Near-term PR sequence:
+| PR | Branch | Scope | Status |
+|---|---|---|---|
+| RAG-01 | `feat/rag-chunking-*` | Chunking + tests | ✅ Merged |
+| RAG-02 | `feat/rag-embeddings` | Ollama embeddings + tests | ✅ Merged |
+| RAG-03 | `feat/rag-qdrant-store` | Qdrant store + integration tests | ✅ Merged |
+| RAG-04 | `feat/rag-retriever-context` | Retriever + ContextPacker | ✅ Merged |
+| RAG-05 | `feat/rag-local-pipeline-smoke` | PromptBuilder + LocalGenerator + fake smoke | ✅ Merged |
+| RAG-06 | `feat/rag-cli-smoke` | Synthetic ingest/query CLI + preflight + smoke | ✅ Merged |
+| RAG-07 | `feat/rag-docs-runbook` | Runbook + ADR + shared validation + health tests | ✅ Merged |
+
+### Sprint Gateway-0 — IN PROGRESS
 
 | PR | Branch | Scope | Status |
 |---|---|---|---|
-| RAG-01 | `feat/rag-chunking-*` | Chunking + tests | Merged ✅ |
-| RAG-02 | `feat/rag-embeddings` | Ollama embeddings + tests | Merged ✅ |
-| RAG-03 | `feat/rag-qdrant-store` | Qdrant store + integration tests | Merged ✅ |
-| RAG-04 | `feat/rag-retriever-context` | Retriever + ContextPacker | Merged ✅ |
-| RAG-05 | `feat/rag-local-pipeline-smoke` | PromptBuilder + LocalGenerator + fake smoke | Merged ✅ |
-| RAG-06 | `feat/rag-cli-smoke` | Synthetic ingest/query CLI + smoke | Merged ✅ |
-| RAG-07 | `feat/rag-docs-runbook` | Runbook + ADR + validation cleanup | Active PR prep |
+| GW-01 | `feat/gateway-prep-contracts` | ADR, Blueprint V3.0, config schema, semantic health checks | User-reported merged; GitHub normalization pending |
+| GW-02 | `feat/gateway-install-health` | infra/litellm/, start/healthcheck/test scripts, regression tests | User-reported merged; GitHub normalization pending |
+| GW-03 | `feat/gateway-route-opencraw-litellm` | `GatewayChatClient`, route `LocalGenerator` → LiteLLM | User-reported merged; GitHub normalization pending |
+| GW-04 | `feat/gateway-runtime-smoke` | Optional live smoke + observability + validation cleanup | Local changes present; PR workflow pending |
 
-Before starting a PR, confirm actual state with:
+**ATENÇÃO — estado do working tree:** the local checkout contains mixed Gateway
+PR1-PR4 changes. Preserve or split the work before branch switching, syncing, or
+replaying PRs.
+
+### Acceptance criteria pendentes para GW-04
+
+- Optional smoke tests are skipped by default and enabled with `RUN_LITELLM_SMOKE=1`.
+- Script smoke covers `local_chat`, `local_think`, `local_rag`, and `local_json`.
+- `_validate_messages` duplication is consolidated without broad refactors.
+- Embeddings, RAG retrieval, Qdrant, FastAPI, MCP, remote providers, and quant
+  tools remain unchanged.
+
+Before starting a new PR:
 
 ```bash
 git status --short --branch
@@ -174,10 +208,23 @@ Do not read `.env`, `.env.*`, `.claude/`, or large generated directories.
 ## 6. Branch and PR Discipline
 
 - Use one branch per issue.
-- Prefer clean worktrees based on `origin/main`.
+- GitHub is the source of truth for issue, branch, PR, review, and merge state.
+- Start every tracked task by syncing `main` with GitHub:
+
+```bash
+cd /Users/fas/projetos/OPENCLAW
+git checkout main
+git pull --ff-only origin main
+```
+
+- Open or update a GitHub Issue before implementation.
+- Create the feature branch only after `main` is updated.
 - Keep diffs small enough to review in one pass.
-- Do not commit or push unless explicitly instructed.
-- Do not merge unless explicitly instructed.
+- Commit locally, push the feature branch, and open a GitHub PR before review.
+- Do not push directly to `main`.
+- Do not merge locally into `main` as the final integration step.
+- Final merge happens in GitHub after approval.
+- After GitHub merge, sync local `main` with `git pull --ff-only origin main`.
 - If a branch depends on an open PR, say so before implementing.
 
 Recommended branch shape:
@@ -187,6 +234,22 @@ feat/rag-<small-scope>
 docs/<small-scope>
 fix/<small-scope>
 ```
+
+Required deliverables per tracked PR:
+
+1. Issue title and issue description.
+2. Branch name.
+3. PR title and PR description.
+4. Validation commands and results.
+5. Merge readiness status.
+
+### Current Gateway Workflow Warning
+
+As of 2026-04-26, the local checkout contains combined, uncommitted Gateway
+PR1-PR4 changes on `feat/gateway-runtime-smoke`. Do not reset, clean, rebase, or
+checkout away from this state until the changes are intentionally preserved or
+split. The next cycle should read `docs/sprints/GATEWAY_SPRINT_HANDOFF.md`
+before touching Git.
 
 ---
 
@@ -406,3 +469,81 @@ Append or paste this at the end of substantial sessions:
 
 ### Risks
 - Current `.venv` lacks pytest, mypy, and pyright after manual environment sync, so full validation is pending.
+
+---
+
+## Handoff — 2026-04-26
+
+**Agent:** Claude (Cowork)
+**Branch:** `feat/gateway-route-opencraw-litellm` (GW-03) + `feat/gateway-install-health` (GW-02) + `feat/gateway-prep-contracts` (GW-01)
+**Issue/PR:** GW-01 / GW-02 / GW-03 — all pending commit via user terminal (git index.lock held by Claude Code process)
+**Task:** Gateway-0 — architectural review, risk resolution, and all corrections for GW-01/02/03.
+
+### Changed
+
+**GW-01 — `feat/gateway-prep-contracts`**
+- `backend/gateway/config.py`: Pydantic v2 schema for `litellm_config.yaml`; `LiteLLMParams.must_be_local` rejects non-localhost `api_base`; `GatewayConfig.required_aliases_present` enforces all 5 aliases at load time; `load_gateway_config()` wraps failures in `GatewayConfigurationError`; `get_alias()` raises `GatewayModelAliasError`.
+- `backend/gateway/health.py`: `check_gateway_services()` fetches Ollama `/api/tags`, verifies `qwen3:14b` and `nomic-embed-text` loaded (base-name matching for quantised variants); exits status 1 with actionable `ollama pull` hint on failure.
+- `tests/unit/test_gateway_config.py`: 25 tests — schema validation, alias enforcement, contract tests against real `config/litellm_config.yaml`.
+- `tests/unit/test_gateway_health.py`: 10 tests — mocked httpx, quantised variant acceptance, connect error, missing models, 503 response.
+- `backend/gateway/errors.py`: stable 8-error taxonomy; all subclass `GatewayError` with `alias`/`provider` kwargs and `to_log_context()`; added `GatewayConnectionError` and `GatewayAuthenticationError`.
+
+**GW-02 — `feat/gateway-install-health`**
+- `infra/litellm/litellm_config.yaml`: operational runtime config using `os.environ/OLLAMA_API_BASE` (not hardcoded); 5 aliases; `general_settings.master_key: os.environ/LITELLM_MASTER_KEY`.
+- `infra/litellm/start_litellm.sh`: refuses missing `LITELLM_MASTER_KEY`, `LITELLM_HOST != 127.0.0.1`, remote `OLLAMA_API_BASE`, remote model override; `set -euo pipefail`.
+- `infra/litellm/requirements.txt`: `litellm[proxy]>=1.83.0,<2.0.0,!=1.82.7,!=1.82.8` (supply-chain exclusions).
+- `infra/litellm/README.md`: added "Future Directions" section documenting MCP integration sequence.
+
+**GW-03 — `feat/gateway-route-opencraw-litellm`**
+- `backend/gateway/client.py`: `GatewayRuntimeConfig` (frozen dataclass, `.from_env()`, `.validated()` rejects non-localhost and empty api_key); `GatewayChatClient` (async httpx, maps errors to domain exceptions; api_key NOT in exception messages).
+- `backend/rag/generator.py`: routes through `GatewayChatClient`; **critical fix applied** — `.validated()` called before `httpx.AsyncClient` creation to prevent resource leaks on bad config.
+- `config/rag_config.yaml`: `generation.endpoint` → `http://127.0.0.1:4000/v1`; `generation.model` → `local_rag` (semantic alias); `api_key_env` field converted to comment (key set via shell export only).
+- `docs/guides/OPENCLAW_LITELLM_RUNTIME.md`: all 6 env vars, start sequence, troubleshooting guide.
+- `tests/unit/test_gateway_client.py`: 4 tests — alias/constant purity, rag_config.yaml contract, auth failure without key leak.
+- `backend/gateway/__init__.py`: exports all public symbols (client, config, health, all 8 errors).
+- `.gitignore`: added `.claude/worktrees/`.
+- `docs/04_MEM/AGENT_CONTEXT.md`: sections 3 and 4 updated (LiteLLM gateway assumptions, env vars table, complete sprint history).
+
+### Validation
+- `uv run pytest` — **98/98 passed** (all unit + integration + smoke).
+- `uv run mypy backend/ --strict --explicit-package-bases` — **0 errors** (35 files checked).
+- `uv run pyright backend/` — **0 errors**.
+- `git diff --check` — passed.
+- No LangChain, sentence-transformers, remote AI, real data, or forbidden files touched.
+
+### Not Changed
+- `CLAUDE.md`, `.claude/`, `.env`, `uv.lock`, real portfolio data untouched.
+- Embeddings still use direct Ollama (`http://localhost:11434`) — gateway routing for embeddings is GW-04.
+- `_validate_messages` duplication between `generator.py` and `GatewayChatClient` intentionally deferred to GW-04.
+- FastAPI, Redis, multi-agent production workflows, brokerage integrations: untouched.
+
+### Next Action
+- **User must commit via terminal** (git index.lock prevents sandbox git operations):
+  ```bash
+  # GW-01
+  git checkout feat/gateway-prep-contracts
+  git add backend/gateway/config.py backend/gateway/health.py backend/gateway/errors.py \
+          tests/unit/test_gateway_config.py tests/unit/test_gateway_health.py \
+          backend/gateway/__init__.py .gitignore
+  git commit -m "feat(gateway): GW-01 — schema validation, health checks, stable error taxonomy"
+
+  # GW-02
+  git checkout feat/gateway-install-health
+  git add infra/litellm/litellm_config.yaml infra/litellm/start_litellm.sh \
+          infra/litellm/requirements.txt infra/litellm/README.md
+  git commit -m "feat(gateway): GW-02 — LiteLLM operational config and startup scripts"
+
+  # GW-03
+  git checkout feat/gateway-route-opencraw-litellm
+  git add backend/gateway/client.py backend/rag/generator.py config/rag_config.yaml \
+          docs/guides/OPENCLAW_LITELLM_RUNTIME.md tests/unit/test_gateway_client.py \
+          docs/04_MEM/AGENT_CONTEXT.md
+  git commit -m "feat(gateway): GW-03 — route OpenClaw runtime through LiteLLM gateway"
+  ```
+- Open PRs for GW-01, GW-02, GW-03 via `gh pr create`.
+- Plan GW-04: consolidate `_validate_messages`, per-alias timeout config, embed routing via `local_embed`.
+
+### Risks
+- All git operations pending user terminal execution (index.lock).
+- `local_think` timeout (120s) is in litellm_config.yaml but `GatewayChatClient` uses global timeout — per-alias timeout is GW-04 scope.
+- Real Ollama + Docker Qdrant E2E with live LiteLLM not yet smoke-tested in this environment.

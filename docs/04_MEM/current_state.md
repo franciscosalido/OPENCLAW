@@ -1,92 +1,124 @@
 # current_state.md — OPENCLAW Operational Memory
 
-> Volatile project state for Codex, Claude Code, ChatGPT Thinking, and human review.
-> Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of meaningful sessions.
+> Volatile project state for Codex, Claude Code, ChatGPT Thinking, and human
+> review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
+> meaningful sessions.
 
 **Last updated:** 2026-04-26
-**Updated by:** Codex — RAG-07 runbook/validation prep
+**Updated by:** Codex — Gateway workflow normalization handoff
 
 ---
 
-## Active Sprint: RAG-0
+## Active Sprint: Gateway-0 / LiteLLM
 
-**Goal:** Full local pipeline: chunk -> embed -> Qdrant -> retrieve -> pack context -> prompt -> Qwen3 answer with citations.
+**Goal:** make LiteLLM the local-only model gateway for OpenClaw runtime model
+calls while preserving existing RAG/Qdrant behavior.
 
 **Hard constraints:**
-- Local only for RAG-0.
-- Ollama only for embeddings/generation.
-- Qdrant local for vector storage.
-- No LiteLLM, remote providers, FastAPI, LangChain, sentence-transformers, Redis, real portfolio data, or private documents.
+
+- Local only.
+- No remote providers.
+- No FastAPI.
+- No MCP.
+- No quant tools.
+- No secrets or real portfolio data.
+- No final local merge into `main`; GitHub PR approval is the integration path.
 
 ---
 
-## GitHub State
+## Mandatory GitHub Workflow
 
-| RAG step | Branch | State | Scope |
-|---|---|---|---|
-| RAG-01 | `feat/rag-chunking-*` | Merged | Chunking + unit tests |
-| RAG-02 | `feat/rag-embeddings` | Merged | Ollama embeddings + mocked unit tests |
-| RAG-03 | `feat/rag-qdrant-store` | Merged | Qdrant store + integration tests |
-| RAG-04 | `feat/rag-retriever-context` | Merged | Retriever + ContextPacker |
-| RAG-05 | `feat/rag-local-pipeline-smoke` | Merged | PromptBuilder + LocalGenerator + LocalRagPipeline |
-| RAG-06 | `feat/rag-cli-smoke` | Merged | Synthetic ingest/query scripts + smoke |
-| RAG-07 | `feat/rag-docs-runbook` | Active PR prep | Runbook + ADR + validation cleanup |
+For every tracked task:
 
-Current issue for active work: <https://github.com/franciscosalido/OPENCLAW/issues/18>
+1. Sync local `main` with GitHub.
+2. Open or update a GitHub Issue before implementation.
+3. Create a feature branch from updated `main`.
+4. Implement locally.
+5. Run validation locally.
+6. Commit atomic changes.
+7. Push the feature branch.
+8. Open a GitHub PR to `main`.
+9. Link the PR to the issue.
+10. Address review on the same branch.
+11. Merge only in GitHub after approval.
+12. After merge, pull `main` with `--ff-only` and delete branches only when safe.
+
+Do not push directly to `main`. Do not use `git push --force`; if a rebase is
+unavoidable, use `git push --force-with-lease`.
 
 ---
 
-## Active Branch: `feat/rag-docs-runbook`
+## Current Local State Warning
 
-Planned files:
+Current observed branch:
 
 ```text
-backend/rag/_validation.py
-backend/rag/prompt_builder.py
-backend/rag/pipeline.py
-backend/rag/retriever.py
-tests/unit/test_validation.py
-tests/unit/test_health.py
-docs/RAG_RUNBOOK.md
-docs/ADR/001-rag-local-only.md
-docs/04_MEM/AGENT_CONTEXT.md
-docs/04_MEM/current_state.md
+feat/gateway-runtime-smoke
 ```
 
-Current implementation summary:
+Current observed risk:
 
-- `_validate_question` duplication was removed.
-- `validate_question` now lives in `backend/rag/_validation.py`.
-- PromptBuilder, LocalRagPipeline, and Retriever use the shared helper.
-- `health.py` has mocked unit coverage for healthy services, missing Qdrant, missing embedding model, and skipped checks.
-- `docs/RAG_RUNBOOK.md` documents local setup, ingest, query, validation, troubleshooting, and thinking-mode policy.
-- `docs/ADR/001-rag-local-only.md` records the local-only RAG decision.
+- The working tree contains mixed Gateway PR1-PR4 modifications and untracked
+  files.
+- Local `main`/`origin/main` may not reflect the user-reported manual Gateway
+  merges yet.
+- Do not run `git reset`, `git clean`, destructive checkout, or broad stash
+  commands until the Gateway changes are intentionally preserved or split.
+- `uv.lock` is untracked; decide deliberately whether dependency lock changes
+  belong in a PR.
+- `.gitignore` is modified; decide deliberately whether the `.claude/worktrees/`
+  ignore rule belongs in a PR.
+
+Read `docs/sprints/GATEWAY_SPRINT_HANDOFF.md` before the next Gateway action.
 
 ---
 
-## Validation Status
+## Gateway PR Tracking
 
-Passed in current environment:
+| PR | Branch | User-reported state | Local verification state | Next action |
+|---|---|---|---|---|
+| GW-01 | `feat/gateway-prep-contracts` | Merged manually | Backfill issue/PR status in GitHub | Normalize records |
+| GW-02 | `feat/gateway-install-health` | Merged manually | Backfill issue/PR status in GitHub | Normalize records |
+| GW-03 | `feat/gateway-route-opencraw-litellm` | Merged manually | Backfill issue/PR status in GitHub | Normalize records |
+| GW-04 | `feat/gateway-runtime-smoke` | In progress | Local changes present | Preserve/split, then open PR |
 
-```bash
-.venv/bin/python -m unittest tests.unit.test_validation tests.unit.test_health -v
-.venv/bin/python -m py_compile backend/rag/*.py scripts/*.py tests/unit/*.py tests/integration/*.py tests/smoke/*.py
-git diff --check
-```
+Proposed issue and PR titles are recorded in
+`docs/sprints/GATEWAY_SPRINT_HANDOFF.md`.
 
-Pending because current `.venv` lacks dev tools after manual sync:
+---
+
+## Last Known Validation
+
+Before this documentation handoff, the Gateway PR4 local work had passed:
 
 ```bash
 uv run pytest -v
-uv run mypy --explicit-package-bases --strict backend/rag scripts tests/unit tests/integration tests/smoke
-uv run pyright backend/rag scripts tests/unit tests/integration tests/smoke
+uv run mypy --strict . || true
+uv run pyright || true
+uv run python -m compileall backend scripts infra tests || true
+git diff --check
 ```
 
-Do not install dependencies without explicit human approval.
+Observed result from the prior local run:
+
+```text
+115 passed, 2 skipped, 35 subtests passed
+mypy: success
+pyright: 0 errors
+compileall: success
+git diff --check: success
+```
+
+Live LiteLLM smoke was attempted with a fake local key and failed clearly because
+LiteLLM was not running at `127.0.0.1:4000`. No secrets were printed.
 
 ---
 
-## Remaining Risks
+## Next Recommended Move
 
-- Full pytest/mypy/pyright validation is pending until dev tools are restored.
-- No real data has been used or accessed.
+1. Preserve the current Gateway work before any branch switch.
+2. Backfill GitHub issues for GW-01 through GW-04.
+3. Verify whether the manual merges are actually present on GitHub `main`.
+4. If not, split or replay the local Gateway changes into the required PR chain.
+5. Do not begin a new feature PR until GW-01 through GW-03 are represented in
+   GitHub and local `main` is synchronized.

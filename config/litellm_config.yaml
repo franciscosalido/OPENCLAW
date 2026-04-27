@@ -1,0 +1,73 @@
+# LiteLLM Gateway Configuration — Quimera/OpenClaw Gateway-0
+#
+# Local-only MVP:
+# - LiteLLM is the single future gateway for model calls.
+# - This file defines semantic aliases only; existing runtime code is not wired
+#   to LiteLLM in this PR.
+# - Remote providers stay absent until an explicit sanitized fallback sprint.
+# - Do not place API keys, tokens, passwords, or private endpoints in this file.
+
+x-ollama-base-url: &ollama_base_url "http://localhost:11434"
+x-local-chat-model: &local_chat_model "ollama_chat/qwen3:14b"
+x-local-embed-model: &local_embed_model "ollama/nomic-embed-text"
+
+model_list:
+  - model_name: local_chat
+    litellm_params:
+      model: *local_chat_model
+      api_base: *ollama_base_url
+      timeout: 60
+    model_info:
+      provider: ollama
+      purpose: "default local chat"
+      thinking_mode: false
+
+  - model_name: local_think
+    litellm_params:
+      model: *local_chat_model
+      api_base: *ollama_base_url
+      timeout: 120
+    model_info:
+      provider: ollama
+      purpose: "local reasoning calls for approved agents"
+      thinking_mode: true
+
+  - model_name: local_rag
+    litellm_params:
+      model: *local_chat_model
+      api_base: *ollama_base_url
+      timeout: 60
+    model_info:
+      provider: ollama
+      purpose: "RAG answer synthesis from Qdrant context"
+      thinking_mode: false
+
+  - model_name: local_json
+    litellm_params:
+      model: *local_chat_model
+      api_base: *ollama_base_url
+      timeout: 60
+    model_info:
+      provider: ollama
+      purpose: "structured local JSON responses"
+      response_contract: json
+      thinking_mode: false
+
+  - model_name: local_embed
+    litellm_params:
+      model: *local_embed_model
+      api_base: *ollama_base_url
+      timeout: 30
+    model_info:
+      provider: ollama
+      purpose: "local embeddings for Qdrant RAG"
+      output_dimensions: 768
+
+litellm_settings:
+  drop_params: true
+  set_verbose: false
+
+# Future sanitized remote fallback placeholder:
+# - Remote provider aliases must be added only by explicit architecture approval.
+# - Remote calls must pass sanitization, audit logging, and budget controls first.
+# - No remote provider is enabled in Gateway-0.
