@@ -161,6 +161,8 @@ operation is proven there. PR 3 routes OpenClaw runtime chat generation through
 LiteLLM while preserving Qdrant retrieval and existing embedding behavior.
 PR 4 proves the live route with optional smoke tests and minimal gateway
 observability.
+GW-05a adds runtime request timeout budgets per semantic alias without changing
+RAG, Qdrant, embeddings, or prompt construction.
 
 Application runtime environment:
 
@@ -172,6 +174,16 @@ export QUIMERA_LLM_REASONING_MODEL="local_think"
 export QUIMERA_LLM_RAG_MODEL="local_rag"
 export QUIMERA_LLM_JSON_MODEL="local_json"
 ```
+
+Runtime timeout contract:
+
+| Alias | Timeout | Notes |
+|---|---:|---|
+| `local_chat` | 30.0s | Default chat calls |
+| `local_think` | 120.0s | Longer local reasoning calls |
+| `local_rag` | 60.0s | RAG answer synthesis |
+| `local_json` | 30.0s | Structured local responses |
+| `local_embed` | 30.0s | Placeholder only; embeddings remain direct/local |
 
 See `docs/guides/OPENCLAW_LITELLM_RUNTIME.md` for runtime troubleshooting.
 

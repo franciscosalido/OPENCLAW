@@ -2,6 +2,7 @@
 
 PR 3 routes OpenClaw runtime chat generation through the local LiteLLM gateway.
 PR 4 adds optional live smoke tests for that route.
+GW-05a adds per-alias request timeout budgets for semantic local aliases.
 The default runtime path is:
 
 ```text
@@ -82,6 +83,9 @@ providers.
 - Gateway calls emit minimal debug observability: alias, base URL host, latency,
   success/failure status, and error category. API keys and prompt text are not
   logged.
+- GW-05a resolves request timeouts per alias: `local_chat` 30s, `local_think`
+  120s, `local_rag` 60s, `local_json` 30s, and `local_embed` 30s placeholder.
+  Unknown aliases and `None` still fall back to the global `timeout_seconds`.
 
 ## What Did Not Change
 
@@ -90,9 +94,14 @@ providers.
   unchanged.
 - Embeddings still use the existing local Ollama embedder until a separate,
   tested embedding-gateway PR is approved.
+- `local_embed` has a reserved timeout value only. GW-05a does not route
+  embeddings through LiteLLM.
 - Remote providers remain disabled.
 - FastAPI remains postponed.
-- MCP and tooling integration are not implemented in PR 3 or PR 4.
+- MCP and tooling integration remain future direction, not implemented in
+  Gateway-0.
+- Live smoke expansion belongs to GW-05b (PR 6). GW-05a does not modify smoke
+  test scope or activation behavior.
 
 ## Troubleshooting
 

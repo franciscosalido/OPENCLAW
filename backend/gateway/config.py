@@ -65,6 +65,14 @@ class LiteLLMParams(BaseModel):
             )
         return v
 
+    @field_validator("timeout")
+    @classmethod
+    def timeout_must_be_positive(cls, v: int) -> int:
+        """Reject invalid LiteLLM alias timeout values."""
+        if v <= 0:
+            raise ValueError("timeout must be greater than zero")
+        return v
+
 
 class ModelInfo(BaseModel):
     """Semantic metadata attached to a gateway alias.
