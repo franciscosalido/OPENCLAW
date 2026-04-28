@@ -209,6 +209,7 @@ class GatewayChatClient:
                 model_alias=model_alias,
                 base_url_host=base_url_host,
                 started_at=start,
+                timeout_s=request_timeout,
                 status="failure",
                 error_category="timeout",
             )
@@ -221,6 +222,7 @@ class GatewayChatClient:
                 model_alias=model_alias,
                 base_url_host=base_url_host,
                 started_at=start,
+                timeout_s=request_timeout,
                 status="failure",
                 error_category="connection",
             )
@@ -235,6 +237,7 @@ class GatewayChatClient:
                 model_alias=model_alias,
                 base_url_host=base_url_host,
                 started_at=start,
+                timeout_s=request_timeout,
                 status="failure",
                 error_category="authentication",
             )
@@ -248,6 +251,7 @@ class GatewayChatClient:
                 model_alias=model_alias,
                 base_url_host=base_url_host,
                 started_at=start,
+                timeout_s=request_timeout,
                 status="failure",
                 error_category=f"http_{response.status_code}",
             )
@@ -268,6 +272,7 @@ class GatewayChatClient:
             model_alias=model_alias,
             base_url_host=base_url_host,
             started_at=start,
+            timeout_s=request_timeout,
             status="success",
             error_category=None,
         )
@@ -322,15 +327,17 @@ def _log_gateway_call(
     model_alias: str,
     base_url_host: str,
     started_at: float,
+    timeout_s: float,
     status: str,
     error_category: str | None,
 ) -> None:
     logger.debug(
         "gateway_call | model_alias={} base_url_host={} latency_ms={:.1f} "
-        "status={} error_category={}",
+        "timeout_s={:.1f} status={} error_category={}",
         model_alias,
         base_url_host,
         (time.perf_counter() - started_at) * 1000,
+        timeout_s,
         status,
         error_category or "none",
     )

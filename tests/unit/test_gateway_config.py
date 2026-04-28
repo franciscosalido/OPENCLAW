@@ -265,6 +265,19 @@ class TestActualGatewayConfig(unittest.TestCase):
             "local_think timeout must exceed local_chat timeout",
         )
 
+    def test_alias_timeouts_match_gateway_runtime_contract(self) -> None:
+        expected = {
+            "local_chat": 30,
+            "local_think": 120,
+            "local_rag": 60,
+            "local_json": 30,
+            "local_embed": 30,
+        }
+        for name, timeout in expected.items():
+            with self.subTest(alias=name):
+                alias = self.config.get_alias(name)
+                self.assertEqual(alias.litellm_params.timeout, timeout)
+
     def test_all_alias_timeouts_are_positive(self) -> None:
         for alias in self.config.model_list:
             with self.subTest(alias=alias.model_name):

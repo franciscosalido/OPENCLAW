@@ -4,8 +4,8 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Last updated:** 2026-04-27
-**Updated by:** Codex — Gateway GW-05a per-alias timeout prep
+**Last updated:** 2026-04-28
+**Updated by:** Codex — Gateway GW-05b live smoke timeout observability
 
 ---
 
@@ -64,12 +64,13 @@ unavoidable, use `git push --force-with-lease`.
 | GW-02 | `feat/gateway-install-health` | Local-only LiteLLM operational setup | Done / merged |
 | GW-03 | `feat/gateway-route-opencraw-litellm` | Runtime chat/generation through LiteLLM | Done / merged |
 | GW-04 | `feat/gateway-runtime-smoke` | Shared message validation, optional smoke, observability | Done / merged |
-| GW-05a | `feat/gateway-per-alias-timeouts` | Per-alias timeout configuration | Current |
-| GW-05b | TBD | Expanded live smoke with real local services | Planned |
+| GW-05a | `feat/gateway-per-alias-timeouts` | Per-alias timeout configuration | Done / merged |
+| GW-05b | `feat/gateway-live-smoke-timeouts` | Live smoke with effective timeout observability | Current |
 | GW-06 | TBD | Evaluate embeddings via `local_embed` | Planned |
 | GW-07 | TBD | Synthetic RAG E2E through gateway path | Planned |
 
 GW-05a issue: <https://github.com/franciscosalido/OPENCLAW/issues/25>
+GW-05b issue: <https://github.com/franciscosalido/OPENCLAW/issues/28>
 
 ---
 
@@ -93,9 +94,24 @@ Unknown aliases and `None` fall back to the global `timeout_seconds`.
 
 GW-05b:
 
-- Run expanded live smoke with LiteLLM and Ollama actually running.
-- Keep smoke opt-in and synthetic-only.
-- Do not introduce remote providers or real data.
+- Add `timeout_s` to gateway call debug logs.
+- Run expanded live smoke with LiteLLM and Ollama actually running when
+  `RUN_LITELLM_SMOKE=1` is explicitly set.
+- Validate `local_chat`, `local_think`, `local_rag`, and `local_json` against
+  their effective timeout budgets.
+- Keep smoke synthetic-only and local-only.
+- Do not introduce remote providers, real data, RAG E2E, or embeddings through
+  LiteLLM.
+
+Live smoke status for GW-05b:
+
+- Not run successfully yet.
+- 2026-04-28 local preflight: `QUIMERA_LLM_API_KEY` was not set, LiteLLM was
+  not reachable on `127.0.0.1:4000`, and Ollama was reachable on
+  `127.0.0.1:11434`.
+- No live smoke latencies are available yet.
+- Do not weaken assertions to force a green result; run again when local
+  LiteLLM and the local key are available.
 
 GW-06:
 
@@ -109,7 +125,7 @@ GW-07:
 
 ---
 
-## Validation Expectations For GW-05a
+## Validation Expectations For GW-05b
 
 Before opening PR:
 
@@ -125,3 +141,12 @@ uv run pytest tests/smoke/ -v
 ```
 
 Smoke tests should skip by default unless `RUN_LITELLM_SMOKE=1` is set.
+
+Optional live validation when local services are already running:
+
+```bash
+export RUN_LITELLM_SMOKE=1
+scripts/test_opencraw_litellm_runtime.sh
+uv run pytest tests/smoke/ -v
+RUN_LITELLM_SMOKE=1 RUN_LITELLM_SMOKE_REPEAT=3 uv run pytest tests/smoke/ -v
+```

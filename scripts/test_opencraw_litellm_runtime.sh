@@ -58,10 +58,14 @@ import asyncio
 import json
 import os
 import time
+from urllib.parse import urlparse
 
 import httpx
 
 from backend.gateway.client import GatewayChatClient, GatewayRuntimeConfig
+
+MAX_REPEAT = 5
+OVERHEAD_SECONDS = 2.0
 
 
 ALIASES = [
@@ -91,32 +95,68 @@ ALIASES = [
 ]
 
 
+def smoke_repeat_count() -> int:
+    raw = os.environ.get("RUN_LITELLM_SMOKE_REPEAT", "1")
+    try:
+        repeat = int(raw)
+    except ValueError as exc:
+        raise SystemExit(
+            f"ERROR: RUN_LITELLM_SMOKE_REPEAT must be an integer from 1 to {MAX_REPEAT}"
+        ) from exc
+    if repeat < 1:
+        raise SystemExit("ERROR: RUN_LITELLM_SMOKE_REPEAT must be greater than zero")
+    return min(repeat, MAX_REPEAT)
+
+
+def base_url_host(base_url: str) -> str:
+    return urlparse(base_url).netloc or "unknown"
+
+
 async def main() -> None:
     config = GatewayRuntimeConfig.from_env().validated()
+    repeat_count = smoke_repeat_count()
+    host = base_url_host(config.base_url)
     async with GatewayChatClient(config=config) as client:
         for alias, prompt, response_format in ALIASES:
-            start = time.perf_counter()
-            try:
-                answer = await client.chat_completion(
-                    [{"role": "user", "content": prompt}],
-                    model=alias,
-                    temperature=0.0,
-                    max_tokens=96,
-                    response_format=response_format,
-                )
-                if alias == os.environ.get("QUIMERA_LLM_JSON_MODEL", "local_json"):
-                    json.loads(answer)
-            except httpx.HTTPStatusError as exc:
-                raise SystemExit(
-                    f"ERROR: alias {alias} failed with HTTP {exc.response.status_code}"
-                ) from exc
-            except Exception as exc:
-                raise SystemExit(f"ERROR: alias {alias} failed: {exc}") from exc
+            timeout_budget = config.resolve_timeout(alias)
+            allowed_elapsed = timeout_budget + OVERHEAD_SECONDS
+            for attempt in range(1, repeat_count + 1):
+                start = time.perf_counter()
+                try:
+                    answer = await client.chat_completion(
+                        [{"role": "user", "content": prompt}],
+                        model=alias,
+                        temperature=0.0,
+                        max_tokens=96,
+                        response_format=response_format,
+                    )
+                    if alias == os.environ.get("QUIMERA_LLM_JSON_MODEL", "local_json"):
+                        json.loads(answer)
+                except httpx.HTTPStatusError as exc:
+                    raise SystemExit(
+                        f"ERROR: alias {alias} failed with HTTP "
+                        f"{exc.response.status_code} at {host}"
+                    ) from exc
+                except Exception as exc:
+                    raise SystemExit(
+                        f"ERROR: alias {alias} failed at {host}: {exc}"
+                    ) from exc
 
-            latency_ms = (time.perf_counter() - start) * 1000
-            # Print truncated response (synthetic output only — no real portfolio data)
-            compact = " ".join(answer.split())[:120]
-            print(f"OK: {alias} responded in {latency_ms:.1f}ms: {compact}")
+                elapsed_s = time.perf_counter() - start
+                if elapsed_s >= allowed_elapsed:
+                    raise SystemExit(
+                        f"ERROR: alias {alias} exceeded timeout budget at {host}: "
+                        f"elapsed_s={elapsed_s:.2f} timeout_s={timeout_budget:.1f} "
+                        f"allowed_s={allowed_elapsed:.1f}"
+                    )
+
+                # Print truncated response (synthetic output only; no real portfolio data)
+                compact = " ".join(answer.split())[:120]
+                print(
+                    f"OK: alias={alias} attempt={attempt}/{repeat_count} "
+                    f"elapsed_s={elapsed_s:.2f} timeout_s={timeout_budget:.1f}: "
+                    f"{compact}"
+                )
 
 
 asyncio.run(main())

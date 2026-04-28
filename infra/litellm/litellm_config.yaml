@@ -13,7 +13,7 @@ model_list:
     litellm_params:
       model: os.environ/LITELLM_LOCAL_CHAT_MODEL
       api_base: os.environ/OLLAMA_API_BASE
-      timeout: 60
+      timeout: 30
       temperature: 0.2
     model_info:
       provider: ollama
@@ -46,7 +46,7 @@ model_list:
     litellm_params:
       model: os.environ/LITELLM_LOCAL_CHAT_MODEL
       api_base: os.environ/OLLAMA_API_BASE
-      timeout: 60
+      timeout: 30
       temperature: 0.0
     model_info:
       provider: ollama

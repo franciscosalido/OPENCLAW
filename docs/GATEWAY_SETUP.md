@@ -163,6 +163,8 @@ PR 4 proves the live route with optional smoke tests and minimal gateway
 observability.
 GW-05a adds runtime request timeout budgets per semantic alias without changing
 RAG, Qdrant, embeddings, or prompt construction.
+GW-05b adds live smoke timing validation and `timeout_s` gateway observability
+without changing RAG, Qdrant, embeddings, or prompt construction.
 
 Application runtime environment:
 
@@ -184,6 +186,12 @@ Runtime timeout contract:
 | `local_rag` | 60.0s | RAG answer synthesis |
 | `local_json` | 30.0s | Structured local responses |
 | `local_embed` | 30.0s | Placeholder only; embeddings remain direct/local |
+
+Live smoke repeat is opt-in:
+
+```bash
+RUN_LITELLM_SMOKE=1 RUN_LITELLM_SMOKE_REPEAT=3 uv run pytest tests/smoke -v
+```
 
 See `docs/guides/OPENCLAW_LITELLM_RUNTIME.md` for runtime troubleshooting.
 
