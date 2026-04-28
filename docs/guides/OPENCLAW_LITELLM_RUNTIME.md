@@ -100,6 +100,8 @@ providers.
 - FastAPI remains postponed.
 - MCP and tooling integration remain future direction, not implemented in
   Gateway-0.
+- Live smoke expansion belongs to GW-05b (PR 6). GW-05a does not modify smoke
+  test scope or activation behavior.
 
 ## Troubleshooting
 

@@ -57,14 +57,20 @@ Current issue:
 https://github.com/franciscosalido/OPENCLAW/issues/25
 ```
 
+Gateway baseline already merged:
+
+```text
+GW-01 through GW-04 are merged in 92c0ec5.
+```
+
 Gateway PR state:
 
 | PR | Branch | Scope | Status |
 |---|---|---|---|
-| GW-01 | `feat/gateway-prep-contracts` | Gateway contracts, ADR, Blueprint, semantic aliases | Done / merged |
-| GW-02 | `feat/gateway-install-health` | Local-only LiteLLM install and health scripts | Done / merged |
-| GW-03 | `feat/gateway-route-opencraw-litellm` | OpenClaw runtime chat through LiteLLM | Done / merged |
-| GW-04 | `feat/gateway-runtime-smoke` | Shared validation, optional smoke, observability | Done / merged |
+| GW-01 | `feat/gateway-prep-contracts` | Gateway contracts, ADR, Blueprint, semantic aliases | Merged in `92c0ec5` |
+| GW-02 | `feat/gateway-install-health` | Local-only LiteLLM install and health scripts | Merged in `92c0ec5` |
+| GW-03 | `feat/gateway-route-opencraw-litellm` | OpenClaw runtime chat through LiteLLM | Merged in `92c0ec5` |
+| GW-04 | `feat/gateway-runtime-smoke` | Shared validation, optional smoke, observability | Merged in `92c0ec5` |
 | GW-05a | `feat/gateway-per-alias-timeouts` | Per-alias timeout configuration | Current |
 | GW-05b | TBD | Expanded live smoke with real local services | Planned |
 | GW-06 | TBD | Evaluate embeddings via `local_embed` | Planned |
