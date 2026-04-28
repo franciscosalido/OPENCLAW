@@ -54,6 +54,8 @@ During changes:
 - Work one issue per session.
 - Prefer small branches and small diffs.
 - Use `rg` before opening files.
+- Do not use `print()` for diagnostics, scripts, tests, or runtime code. Prefer
+  `loguru` logging with secret-safe, prompt-safe messages.
 - Stage only intended files.
 - Do not touch unrelated dirty worktree files.
 

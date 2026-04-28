@@ -7,6 +7,7 @@ from urllib.parse import urlparse
 
 import httpx
 import pytest
+from loguru import logger
 
 from backend.gateway.client import (
     DEFAULT_LLM_JSON_MODEL,
@@ -131,7 +132,7 @@ async def test_litellm_runtime_aliases_respond() -> None:
                             f"parseable JSON at {base_url_host}."
                         ) from exc
             compact_latencies = ", ".join(f"{latency:.2f}s" for latency in latencies)
-            print(
+            logger.info(
                 f"smoke alias={alias} host={base_url_host} repeat={repeat_count} "
                 f"timeout_s={timeout_budget:.1f} latencies=[{compact_latencies}]"
             )
