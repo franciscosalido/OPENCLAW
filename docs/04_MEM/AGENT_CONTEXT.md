@@ -150,26 +150,39 @@ SyntheticDocument
 | RAG-06 | `feat/rag-cli-smoke` | Synthetic ingest/query CLI + preflight + smoke | ✅ Merged |
 | RAG-07 | `feat/rag-docs-runbook` | Runbook + ADR + shared validation + health tests | ✅ Merged |
 
-### Sprint Gateway-0 — IN PROGRESS
+### Sprint Gateway-0 — IN PROGRESS 🔄
 
-| PR | Branch | Scope | Status |
+Runtime path base merged to `main`:
+
+```text
+OpenClaw / LocalGenerator
+  -> GatewayChatClient
+  -> http://127.0.0.1:4000/v1 (LiteLLM)
+  -> Ollama / Qwen local
+```
+
+| PR | Commit | Scope | Status |
 |---|---|---|---|
-| GW-01 | `feat/gateway-prep-contracts` | ADR, Blueprint V3.0, config schema, semantic health checks | User-reported merged; GitHub normalization pending |
-| GW-02 | `feat/gateway-install-health` | infra/litellm/, start/healthcheck/test scripts, regression tests | User-reported merged; GitHub normalization pending |
-| GW-03 | `feat/gateway-route-opencraw-litellm` | `GatewayChatClient`, route `LocalGenerator` → LiteLLM | User-reported merged; GitHub normalization pending |
-| GW-04 | `feat/gateway-runtime-smoke` | Optional live smoke + observability + validation cleanup | Local changes present; PR workflow pending |
+| GW-01 | `e7509fa` | Pydantic schema, health checks, stable error taxonomy | ✅ Merged (#23) |
+| GW-02 | `8b62e21` | infra/litellm/, start script, supply-chain guards | ✅ Merged (#23) |
+| GW-03 | `10708fa` | `GatewayChatClient`, route `LocalGenerator` → LiteLLM, validation-before-resource fix | ✅ Merged (#23) |
+| GW-04 | `b5947bd` | `validate_chat_messages`, observability, optional smoke (skipado) | ✅ Merged (#23) |
+| fix | `2d8a8b5` | `test_litellm_infra_scripts.py` follow-up | ✅ Merged (#24) |
+| GW-05 | — | Live smoke real com LiteLLM + Ollama rodando | ⏳ Próximo |
+| GW-06 | — | Embeddings via LiteLLM / `local_embed` | ⏳ Planejado |
+| GW-07 | — | RAG E2E sintético completo via gateway | ⏳ Planejado |
+| GW-08 | — | Runbook hardening para gateway | ⏳ Planejado |
+| GW-09 | — | MCP/tooling evaluation | ⏳ Planejado |
 
-**ATENÇÃO — estado do working tree:** the local checkout contains mixed Gateway
-PR1-PR4 changes. Preserve or split the work before branch switching, syncing, or
-replaying PRs.
+**Base validada:** 115/115 pytest, 2 skipped (smoke live — intencionalmente skipado sem serviços), mypy 0, pyright 0.
+**Working tree:** limpo. Todos os branches Gateway deletados.
 
-### Acceptance criteria pendentes para GW-04
+### GW-05 — Acceptance criteria (próximo PR)
 
-- Optional smoke tests are skipped by default and enabled with `RUN_LITELLM_SMOKE=1`.
-- Script smoke covers `local_chat`, `local_think`, `local_rag`, and `local_json`.
-- `_validate_messages` duplication is consolidated without broad refactors.
-- Embeddings, RAG retrieval, Qdrant, FastAPI, MCP, remote providers, and quant
-  tools remain unchanged.
+- Smoke real: `RUN_LITELLM_SMOKE=1` com LiteLLM + Ollama ativos deve passar os 4 aliases.
+- `scripts/test_opencraw_litellm_runtime.sh` executado end-to-end com serviços locais.
+- Per-alias timeout: `local_think` (120s) separado de `local_chat` (30s) — hoje compartilham `timeout_seconds` global.
+- Nenhum dado real, sem remote, sem FastAPI, sem MCP.
 
 Before starting a new PR:
 
@@ -242,14 +255,6 @@ Required deliverables per tracked PR:
 3. PR title and PR description.
 4. Validation commands and results.
 5. Merge readiness status.
-
-### Current Gateway Workflow Warning
-
-As of 2026-04-26, the local checkout contains combined, uncommitted Gateway
-PR1-PR4 changes on `feat/gateway-runtime-smoke`. Do not reset, clean, rebase, or
-checkout away from this state until the changes are intentionally preserved or
-split. The next cycle should read `docs/sprints/GATEWAY_SPRINT_HANDOFF.md`
-before touching Git.
 
 ---
 
