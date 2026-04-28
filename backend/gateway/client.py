@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from math import isfinite
 import os
 import time
 from collections.abc import Mapping, Sequence
@@ -28,6 +29,14 @@ DEFAULT_LLM_REASONING_MODEL = "local_think"
 DEFAULT_LLM_RAG_MODEL = "local_rag"
 DEFAULT_LLM_JSON_MODEL = "local_json"
 DEFAULT_LLM_TIMEOUT_SECONDS = 120.0
+DEFAULT_LLM_EMBED_MODEL = "local_embed"
+DEFAULT_LLM_ALIAS_TIMEOUTS: Mapping[str, float] = {
+    DEFAULT_LLM_MODEL: 30.0,
+    DEFAULT_LLM_REASONING_MODEL: 120.0,
+    DEFAULT_LLM_RAG_MODEL: 60.0,
+    DEFAULT_LLM_JSON_MODEL: 30.0,
+    DEFAULT_LLM_EMBED_MODEL: 30.0,
+}
 
 ENV_LLM_BASE_URL = "QUIMERA_LLM_BASE_URL"
 ENV_LLM_API_KEY = "QUIMERA_LLM_API_KEY"
@@ -50,6 +59,9 @@ class GatewayRuntimeConfig:
     rag_model: str = DEFAULT_LLM_RAG_MODEL
     json_model: str = DEFAULT_LLM_JSON_MODEL
     timeout_seconds: float = DEFAULT_LLM_TIMEOUT_SECONDS
+    per_alias_timeouts: Mapping[str, float] = field(
+        default_factory=lambda: dict(DEFAULT_LLM_ALIAS_TIMEOUTS)
+    )
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> GatewayRuntimeConfig:
@@ -70,6 +82,16 @@ class GatewayRuntimeConfig:
     def validated(self) -> GatewayRuntimeConfig:
         """Return a normalized config or raise a clear setup error."""
         base_url = self.base_url.rstrip("/")
+        global_timeout = _validate_timeout(
+            self.timeout_seconds,
+            label="timeout_seconds",
+        )
+        validated_alias_timeouts = {
+            alias.strip(): _validate_timeout(timeout, label=f"timeout for {alias!r}")
+            for alias, timeout in self.per_alias_timeouts.items()
+        }
+        if any(not alias for alias in validated_alias_timeouts):
+            raise GatewayConfigurationError("Gateway timeout alias cannot be empty")
         if not any(base_url.startswith(prefix) for prefix in _LOCAL_BASE_PREFIXES):
             raise GatewayConfigurationError(
                 "QUIMERA_LLM_BASE_URL must point to the local LiteLLM gateway "
@@ -96,8 +118,16 @@ class GatewayRuntimeConfig:
             reasoning_model=self.reasoning_model.strip(),
             rag_model=self.rag_model.strip(),
             json_model=self.json_model.strip(),
-            timeout_seconds=self.timeout_seconds,
+            timeout_seconds=global_timeout,
+            per_alias_timeouts=validated_alias_timeouts,
         )
+
+    def resolve_timeout(self, model_alias: str | None) -> float:
+        """Return the request timeout for *model_alias* or the global fallback."""
+        if model_alias is None:
+            return self.timeout_seconds
+        alias = model_alias.strip()
+        return self.per_alias_timeouts.get(alias, self.timeout_seconds)
 
 
 @dataclass
@@ -166,11 +196,13 @@ class GatewayChatClient:
 
         start = time.perf_counter()
         base_url_host = _base_url_host(self.config.base_url)
+        request_timeout = self.config.resolve_timeout(model_alias)
         try:
             response = await self.client.post(
                 "/chat/completions",
                 json=payload,
                 headers={"Authorization": f"Bearer {self.config.api_key}"},
+                timeout=request_timeout,
             )
         except httpx.TimeoutException as exc:
             _log_gateway_call(
@@ -270,6 +302,19 @@ def _extract_assistant_text(body: dict[str, Any], *, alias: str) -> str:
 def _base_url_host(base_url: str) -> str:
     parsed = urlparse(base_url)
     return parsed.netloc or "unknown"
+
+
+def _validate_timeout(value: float, *, label: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise GatewayConfigurationError(
+            f"Gateway {label} must be a finite number greater than zero"
+        )
+    timeout = float(value)
+    if not isfinite(timeout) or timeout <= 0:
+        raise GatewayConfigurationError(
+            f"Gateway {label} must be a finite number greater than zero"
+        )
+    return timeout
 
 
 def _log_gateway_call(

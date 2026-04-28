@@ -86,6 +86,17 @@ class TestLiteLLMParamsValidator(unittest.TestCase):
             LiteLLMParams(model="gpt-4", api_base=_REMOTE, timeout=60)
         self.assertIn("remote host", str(ctx.exception))
 
+    def test_timeout_must_be_positive(self) -> None:
+        for timeout in (0, -1):
+            with self.subTest(timeout=timeout):
+                with self.assertRaises(ValidationError) as ctx:
+                    LiteLLMParams(
+                        model="ollama_chat/qwen3:14b",
+                        api_base=_LOCALHOST,
+                        timeout=timeout,
+                    )
+                self.assertIn("greater than zero", str(ctx.exception))
+
     def test_https_localhost_rejected(self) -> None:
         """TLS termination proxy on localhost is also out of Gateway-0 scope."""
         with self.assertRaises(ValidationError):
@@ -253,6 +264,11 @@ class TestActualGatewayConfig(unittest.TestCase):
             chat.litellm_params.timeout,
             "local_think timeout must exceed local_chat timeout",
         )
+
+    def test_all_alias_timeouts_are_positive(self) -> None:
+        for alias in self.config.model_list:
+            with self.subTest(alias=alias.model_name):
+                self.assertGreater(alias.litellm_params.timeout, 0)
 
     def test_drop_params_enabled(self) -> None:
         self.assertTrue(
