@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from math import isfinite
 import os
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from math import isfinite
 from typing import Any, cast
 from urllib.parse import urlparse
 
@@ -30,6 +30,8 @@ DEFAULT_LLM_RAG_MODEL = "local_rag"
 DEFAULT_LLM_JSON_MODEL = "local_json"
 DEFAULT_LLM_TIMEOUT_SECONDS = 120.0
 DEFAULT_LLM_EMBED_MODEL = "local_embed"
+# Python-side HTTPX timeouts are the first line of defense. LiteLLM-side
+# timeouts in config/litellm_config.yaml may differ intentionally.
 DEFAULT_LLM_ALIAS_TIMEOUTS: Mapping[str, float] = {
     DEFAULT_LLM_MODEL: 30.0,
     DEFAULT_LLM_REASONING_MODEL: 120.0,
@@ -142,8 +144,6 @@ class GatewayChatClient:
 
     def __post_init__(self) -> None:
         self.config = self.config.validated()
-        if self.config.timeout_seconds <= 0:
-            raise GatewayConfigurationError("Gateway timeout must be greater than zero")
         if self.client is None:
             self.client = httpx.AsyncClient(
                 base_url=self.config.base_url,
