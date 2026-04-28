@@ -61,6 +61,8 @@ Gateway baseline already merged:
 
 ```text
 GW-01 through GW-04 are merged in 92c0ec5.
+GW-05a is merged in 96278f6.
+GW-05b branches from the post-GW-05a baseline.
 ```
 
 Gateway PR state:
@@ -71,7 +73,7 @@ Gateway PR state:
 | GW-02 | `feat/gateway-install-health` | Local-only LiteLLM install and health scripts | Merged in `92c0ec5` |
 | GW-03 | `feat/gateway-route-opencraw-litellm` | OpenClaw runtime chat through LiteLLM | Merged in `92c0ec5` |
 | GW-04 | `feat/gateway-runtime-smoke` | Shared validation, optional smoke, observability | Merged in `92c0ec5` |
-| GW-05a | `feat/gateway-per-alias-timeouts` | Per-alias timeout configuration | Done / merged |
+| GW-05a | `feat/gateway-per-alias-timeouts` | Per-alias timeout configuration | Merged in `96278f6` |
 | GW-05b | `feat/gateway-live-smoke-timeouts` | Live smoke with effective timeout observability | Current |
 | GW-06 | TBD | Evaluate embeddings via `local_embed` | Planned |
 | GW-07 | TBD | Synthetic RAG E2E through gateway path | Planned |
