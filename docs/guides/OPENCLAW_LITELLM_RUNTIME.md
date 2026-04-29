@@ -5,6 +5,8 @@ PR 4 adds optional live smoke tests for that route.
 GW-05a adds per-alias request timeout budgets for semantic local aliases.
 GW-05b adds live smoke timing validation and logs the effective timeout budget
 used by each gateway call.
+GW-06 evaluates `local_embed` embeddings through LiteLLM without changing the
+default RAG embedding path.
 The default runtime path is:
 
 ```text
@@ -20,6 +22,7 @@ export QUIMERA_LLM_MODEL="local_chat"
 export QUIMERA_LLM_REASONING_MODEL="local_think"
 export QUIMERA_LLM_RAG_MODEL="local_rag"
 export QUIMERA_LLM_JSON_MODEL="local_json"
+export QUIMERA_LLM_EMBED_MODEL="local_embed"
 ```
 
 `QUIMERA_LLM_API_KEY` should match the local `LITELLM_MASTER_KEY` used to start
@@ -94,6 +97,51 @@ providers.
 Smoke is skipped by default. `RUN_LITELLM_SMOKE=1` is required so normal unit
 test runs do not depend on local services.
 
+## Optional Embedding Evaluation
+
+GW-06 evaluates the reserved `local_embed` alias through LiteLLM. This is an
+evaluation path only:
+
+```text
+GatewayEmbedClient -> LiteLLM /v1/embeddings -> Ollama/nomic-embed-text
+```
+
+The current RAG embedding path remains unchanged:
+
+```text
+RAG / OllamaEmbedder -> Ollama direct /api/embed
+```
+
+Run the guarded pytest smoke when LiteLLM and Ollama are already running:
+
+```bash
+export QUIMERA_LLM_API_KEY="${LITELLM_MASTER_KEY}"
+RUN_LITELLM_EMBED_SMOKE=1 uv run pytest tests/smoke/test_gateway_embed_smoke.py -v
+```
+
+Run the compact script smoke:
+
+```bash
+scripts/test_local_embed_litellm.sh
+```
+
+The embedding evaluation uses synthetic text only. It does not require Qdrant,
+does not reindex any collection, does not read real documents, and does not use
+real portfolio data.
+
+Interpretation:
+
+- `dims=768` means the expected `nomic-embed-text` vector shape is present.
+- Batch success means LiteLLM accepts a small list of synthetic inputs.
+- Direct Ollama parity checks compare dimensions and log cosine similarity as
+  evidence; they do not require byte-identical vectors.
+- Latency should be recorded before any future migration decision.
+- GW-06 live evidence recorded 768-dimensional vectors, batch support, and
+  cosine similarity `1.000000` against direct Ollama for the synthetic probe.
+- Decision status is **Approved for future migration**, but the default RAG
+  embedder remains direct Ollama until a future migration PR preserves or
+  replaces retry/backoff/concurrency behavior.
+
 ## What Changed
 
 - `backend.rag.generator.LocalGenerator` now sends OpenAI-compatible
@@ -118,6 +166,7 @@ test runs do not depend on local services.
   tested embedding-gateway PR is approved.
 - `local_embed` has a reserved timeout value only. GW-05a does not route
   embeddings through LiteLLM.
+- GW-06 evaluates `local_embed` but does not wire it into default RAG behavior.
 - Remote providers remain disabled.
 - FastAPI remains postponed.
 - MCP and tooling integration remain future direction, not implemented in

@@ -5,7 +5,7 @@
 > meaningful sessions.
 
 **Last updated:** 2026-04-28
-**Updated by:** Codex — Gateway GW-05b live smoke timeout observability
+**Updated by:** Codex — Gateway GW-06 local_embed evaluation
 
 ---
 
@@ -20,6 +20,21 @@ Current runtime path:
 OpenClaw / runtime generation
   -> LiteLLM at http://127.0.0.1:4000/v1
   -> Ollama / Qwen local
+```
+
+Current embedding path:
+
+```text
+RAG / OllamaEmbedder
+  -> Ollama direct at http://127.0.0.1:11434/api/embed
+```
+
+GW-06 adds an experimental evaluation-only path:
+
+```text
+GatewayEmbedClient
+  -> LiteLLM at http://127.0.0.1:4000/v1/embeddings
+  -> Ollama / nomic-embed-text local
 ```
 
 Hard constraints remain:
@@ -65,12 +80,13 @@ unavoidable, use `git push --force-with-lease`.
 | GW-03 | `feat/gateway-route-opencraw-litellm` | Runtime chat/generation through LiteLLM | Done / merged |
 | GW-04 | `feat/gateway-runtime-smoke` | Shared message validation, optional smoke, observability | Done / merged |
 | GW-05a | `feat/gateway-per-alias-timeouts` | Per-alias timeout configuration | Done / merged |
-| GW-05b | `feat/gateway-live-smoke-timeouts` | Live smoke with effective timeout observability | Current |
-| GW-06 | TBD | Evaluate embeddings via `local_embed` | Planned |
+| GW-05b | `feat/gateway-live-smoke-timeouts` | Live smoke with effective timeout observability | Done / merged |
+| GW-06 | `feat/gateway-local-embed-evaluation` | Evaluate embeddings via `local_embed` | Current |
 | GW-07 | TBD | Synthetic RAG E2E through gateway path | Planned |
 
 GW-05a issue: <https://github.com/franciscosalido/OPENCLAW/issues/25>
 GW-05b issue: <https://github.com/franciscosalido/OPENCLAW/issues/28>
+GW-06 issue: <https://github.com/franciscosalido/OPENCLAW/issues/30>
 
 ---
 
@@ -122,7 +138,25 @@ Observed latencies (macOS, qwen3:14b Q4_K_M):
 GW-06:
 
 - Evaluate whether embeddings should route through `local_embed`.
-- Keep existing direct/local embedding behavior until a tested PR changes it.
+- Add an experimental `GatewayEmbedClient` for OpenAI-compatible
+  `/embeddings` calls through LiteLLM.
+- Keep existing direct/local embedding behavior as the default RAG path.
+- Do not reindex Qdrant or touch real documents.
+- Use only synthetic smoke inputs.
+- Live evaluation on 2026-04-28 passed against local LiteLLM + Ollama.
+- Decision status: **Approved for future migration**.
+- Migration is still not performed in GW-06; a future PR must preserve or
+  replace the current Ollama embedder's retry/backoff/concurrency behavior.
+
+Observed local_embed results (2026-04-28):
+
+| Check | Result |
+|---|---|
+| LiteLLM single embedding | 768 dimensions, 0.08s |
+| LiteLLM batch embedding | 2 vectors, 768 dimensions each, 0.05s |
+| Direct Ollama parity | 768 dimensions |
+| Cosine similarity | 1.000000 |
+| Script smoke | 768 dimensions, 0.70s |
 
 GW-07:
 
@@ -131,7 +165,7 @@ GW-07:
 
 ---
 
-## Validation Expectations For GW-05b
+## Validation Expectations For GW-06
 
 Before opening PR:
 
@@ -141,18 +175,17 @@ uv run pytest -v
 uv run mypy --strict .
 uv run pyright
 uv run python -m compileall backend tests scripts infra
-uv run pytest tests/unit/test_gateway_config.py -v
-uv run pytest tests/unit/test_gateway_client.py -v
+uv run pytest tests/unit/test_gateway_embed_client.py -v
 uv run pytest tests/smoke/ -v
 ```
 
-Smoke tests should skip by default unless `RUN_LITELLM_SMOKE=1` is set.
+Embedding smoke tests should skip by default unless
+`RUN_LITELLM_EMBED_SMOKE=1` is set.
 
 Optional live validation when local services are already running:
 
 ```bash
-export RUN_LITELLM_SMOKE=1
-scripts/test_opencraw_litellm_runtime.sh
-uv run pytest tests/smoke/ -v
-RUN_LITELLM_SMOKE=1 RUN_LITELLM_SMOKE_REPEAT=3 uv run pytest tests/smoke/ -v
+export QUIMERA_LLM_API_KEY="${LITELLM_MASTER_KEY}"
+RUN_LITELLM_EMBED_SMOKE=1 uv run pytest tests/smoke/test_gateway_embed_smoke.py -v
+scripts/test_local_embed_litellm.sh
 ```
