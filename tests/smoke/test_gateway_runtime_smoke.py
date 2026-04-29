@@ -3,9 +3,11 @@ from __future__ import annotations
 import json
 import os
 import time
+from urllib.parse import urlparse
 
 import httpx
 import pytest
+from loguru import logger
 
 from backend.gateway.client import (
     DEFAULT_LLM_JSON_MODEL,
@@ -16,6 +18,15 @@ from backend.gateway.client import (
     GatewayChatClient,
     GatewayRuntimeConfig,
 )
+
+_SMOKE_OVERHEAD_SECONDS = 2.0
+_MAX_SMOKE_REPEAT = 5
+# local_think needs a larger token budget: the thinking block consumes hundreds of
+# tokens before the visible answer appears in message.content.  Other aliases have
+# thinking disabled in litellm_config.yaml (extra_body.think=false) so 96 tokens
+# is sufficient for a short smoke response.
+_MAX_TOKENS_THINKING = 2048
+_MAX_TOKENS_DEFAULT = 96
 
 
 pytestmark = pytest.mark.skipif(
@@ -30,10 +41,30 @@ def _runtime_config() -> GatewayRuntimeConfig:
     return GatewayRuntimeConfig.from_env().validated()
 
 
+def _smoke_repeat_count() -> int:
+    raw = os.environ.get("RUN_LITELLM_SMOKE_REPEAT", "1")
+    try:
+        repeat = int(raw)
+    except ValueError as exc:
+        raise AssertionError(
+            "RUN_LITELLM_SMOKE_REPEAT must be an integer between 1 and "
+            f"{_MAX_SMOKE_REPEAT}."
+        ) from exc
+    if repeat < 1:
+        raise AssertionError("RUN_LITELLM_SMOKE_REPEAT must be greater than zero.")
+    return min(repeat, _MAX_SMOKE_REPEAT)
+
+
+def _base_url_host(base_url: str) -> str:
+    return urlparse(base_url).netloc or "unknown"
+
+
 @pytest.mark.smoke
 @pytest.mark.asyncio
 async def test_litellm_runtime_aliases_respond() -> None:
     config = _runtime_config()
+    repeat_count = _smoke_repeat_count()
+    base_url_host = _base_url_host(config.base_url)
     cases = [
         (
             os.environ.get("QUIMERA_LLM_MODEL", DEFAULT_LLM_MODEL),
@@ -60,41 +91,70 @@ async def test_litellm_runtime_aliases_respond() -> None:
         ),
     ]
 
+    reasoning_alias = os.environ.get(
+        "QUIMERA_LLM_REASONING_MODEL", DEFAULT_LLM_REASONING_MODEL
+    )
     async with GatewayChatClient(config=config) as client:
         for alias, prompt, response_format in cases:
-            start = time.perf_counter()
-            try:
-                answer = await client.chat_completion(
-                    [{"role": "user", "content": prompt}],
-                    model=alias,
-                    temperature=0.0,
-                    max_tokens=96,
-                    response_format=response_format,
-                )
-            except Exception as exc:
-                raise AssertionError(
-                    f"LiteLLM alias {alias!r} failed. Check LiteLLM, Ollama, "
-                    "QUIMERA_LLM_API_KEY, and configured aliases."
-                ) from exc
-
-            assert answer.strip(), f"LiteLLM alias {alias!r} returned an empty answer"
-            assert (time.perf_counter() - start) < 120, (
-                f"LiteLLM alias {alias!r} exceeded the smoke timeout"
+            timeout_budget = config.resolve_timeout(alias)
+            allowed_elapsed = timeout_budget + _SMOKE_OVERHEAD_SECONDS
+            max_tokens = (
+                _MAX_TOKENS_THINKING if alias == reasoning_alias else _MAX_TOKENS_DEFAULT
             )
-            if alias == os.environ.get("QUIMERA_LLM_JSON_MODEL", DEFAULT_LLM_JSON_MODEL):
+            latencies: list[float] = []
+            for attempt in range(1, repeat_count + 1):
+                start = time.perf_counter()
                 try:
-                    json.loads(answer)
-                except json.JSONDecodeError as exc:
+                    answer = await client.chat_completion(
+                        [{"role": "user", "content": prompt}],
+                        model=alias,
+                        temperature=0.0,
+                        max_tokens=max_tokens,
+                        response_format=response_format,
+                    )
+                except Exception as exc:
                     raise AssertionError(
-                        f"LiteLLM JSON alias {alias!r} did not return parseable JSON: "
-                        f"{answer[:120]!r}"
+                        f"LiteLLM alias {alias!r} failed at {base_url_host}. "
+                        "Check LiteLLM, Ollama, QUIMERA_LLM_API_KEY, and "
+                        "configured aliases."
                     ) from exc
+
+                elapsed = time.perf_counter() - start
+                latencies.append(elapsed)
+                assert answer.strip(), (
+                    f"LiteLLM alias {alias!r} returned an empty answer at "
+                    f"{base_url_host}."
+                )
+                assert elapsed < allowed_elapsed, (
+                    f"LiteLLM alias {alias!r} exceeded timeout budget at "
+                    f"{base_url_host}: elapsed={elapsed:.2f}s "
+                    f"timeout_budget={timeout_budget:.1f}s "
+                    f"allowed={allowed_elapsed:.1f}s attempt={attempt}/"
+                    f"{repeat_count}."
+                )
+                if alias == os.environ.get(
+                    "QUIMERA_LLM_JSON_MODEL",
+                    DEFAULT_LLM_JSON_MODEL,
+                ):
+                    try:
+                        json.loads(answer)
+                    except json.JSONDecodeError as exc:
+                        raise AssertionError(
+                            f"LiteLLM JSON alias {alias!r} did not return "
+                            f"parseable JSON at {base_url_host}."
+                        ) from exc
+            compact_latencies = ", ".join(f"{latency:.2f}s" for latency in latencies)
+            logger.info(
+                f"smoke alias={alias} host={base_url_host} repeat={repeat_count} "
+                f"timeout_s={timeout_budget:.1f} latencies=[{compact_latencies}]"
+            )
 
 
 @pytest.mark.smoke
 def test_litellm_models_endpoint_exposes_runtime_aliases() -> None:
     config = _runtime_config()
     models_url = f"{config.base_url.rstrip('/')}/models"
+    base_url_host = _base_url_host(config.base_url)
     try:
         response = httpx.get(
             models_url,
@@ -108,11 +168,14 @@ def test_litellm_models_endpoint_exposes_runtime_aliases() -> None:
                 "LiteLLM authentication failed. QUIMERA_LLM_API_KEY should match "
                 "LITELLM_MASTER_KEY."
             ) from exc
-        raise AssertionError(f"LiteLLM /models returned HTTP {exc.response.status_code}") from exc
+        raise AssertionError(
+            f"LiteLLM /models returned HTTP {exc.response.status_code} at "
+            f"{base_url_host}."
+        ) from exc
     except httpx.RequestError as exc:
         raise AssertionError(
-            f"LiteLLM /models is not reachable at {models_url}. "
-            "Start infra/litellm/start_litellm.sh."
+            f"LiteLLM /models is not reachable at {base_url_host}. Start "
+            "infra/litellm/start_litellm.sh."
         ) from exc
 
     body = response.json()

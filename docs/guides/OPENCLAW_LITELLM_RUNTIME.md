@@ -3,6 +3,8 @@
 PR 3 routes OpenClaw runtime chat generation through the local LiteLLM gateway.
 PR 4 adds optional live smoke tests for that route.
 GW-05a adds per-alias request timeout budgets for semantic local aliases.
+GW-05b adds live smoke timing validation and logs the effective timeout budget
+used by each gateway call.
 The default runtime path is:
 
 ```text
@@ -22,6 +24,17 @@ export QUIMERA_LLM_JSON_MODEL="local_json"
 
 `QUIMERA_LLM_API_KEY` should match the local `LITELLM_MASTER_KEY` used to start
 LiteLLM. Do not commit either value.
+
+## Start Ollama
+
+Ensure Ollama is running and the local models are available:
+
+```bash
+ollama serve
+ollama pull qwen3:14b
+ollama pull nomic-embed-text
+ollama list
+```
 
 ## Start LiteLLM
 
@@ -62,6 +75,12 @@ Run the pytest smoke:
 RUN_LITELLM_SMOKE=1 uv run pytest tests/smoke -v
 ```
 
+Repeat each live alias probe up to a small capped count:
+
+```bash
+RUN_LITELLM_SMOKE=1 RUN_LITELLM_SMOKE_REPEAT=3 uv run pytest tests/smoke -v
+```
+
 The live smoke tests exercise only synthetic prompts and these local aliases:
 
 - `local_chat`
@@ -72,6 +91,9 @@ The live smoke tests exercise only synthetic prompts and these local aliases:
 They do not require Qdrant, embeddings, real portfolio data, or remote
 providers.
 
+Smoke is skipped by default. `RUN_LITELLM_SMOKE=1` is required so normal unit
+test runs do not depend on local services.
+
 ## What Changed
 
 - `backend.rag.generator.LocalGenerator` now sends OpenAI-compatible
@@ -81,8 +103,8 @@ providers.
 - RAG CLI calls use `local_rag` by default and `local_think` when `--thinking`
   is selected.
 - Gateway calls emit minimal debug observability: alias, base URL host, latency,
-  success/failure status, and error category. API keys and prompt text are not
-  logged.
+  effective timeout budget, success/failure status, and error category. API
+  keys and prompt text are not logged.
 - GW-05a resolves request timeouts per alias: `local_chat` 30s, `local_think`
   120s, `local_rag` 60s, `local_json` 30s, and `local_embed` 30s placeholder.
   Unknown aliases and `None` still fall back to the global `timeout_seconds`.
@@ -102,6 +124,21 @@ providers.
   Gateway-0.
 - Live smoke expansion belongs to GW-05b (PR 6). GW-05a does not modify smoke
   test scope or activation behavior.
+
+## Timeout Failures
+
+A live smoke timeout failure means the alias exceeded its effective timeout
+budget plus a small test harness overhead margin. Check:
+
+- LiteLLM is running on `127.0.0.1:4000`.
+- Ollama is running on `127.0.0.1:11434`.
+- Qwen is pulled and not still loading.
+- The machine has enough memory for the local model.
+- `local_think` may legitimately need more wall time on slower hardware.
+
+Do not hide a `local_think` overrun by weakening assertions silently. Record the
+observed latency and decide in review whether to keep the contract, use a
+smaller local model, or adjust the timeout in a follow-up.
 
 ## Troubleshooting
 

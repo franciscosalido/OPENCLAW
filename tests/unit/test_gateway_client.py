@@ -8,6 +8,7 @@ from typing import cast
 
 import httpx
 import yaml
+from loguru import logger
 
 from backend.gateway.client import (
     DEFAULT_LLM_ALIAS_TIMEOUTS,
@@ -230,6 +231,39 @@ class GatewayChatClientTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(seen_timeouts[0]["read"], 120.0)
         self.assertEqual(seen_timeouts[1]["read"], 60.0)
+
+    async def test_gateway_log_includes_timeout_without_prompt_or_secret(self) -> None:
+        logs: list[str] = []
+        sink_id = logger.add(
+            lambda message: logs.append(str(message)),
+            format="{message}",
+        )
+        try:
+            async with httpx.AsyncClient(
+                base_url=DEFAULT_LLM_BASE_URL,
+                transport=httpx.MockTransport(
+                    lambda _request: httpx.Response(
+                        200,
+                        json={"choices": [{"message": {"content": "ok"}}]},
+                    )
+                ),
+            ) as client:
+                gateway = GatewayChatClient(
+                    config=GatewayRuntimeConfig(api_key="secret-test-key"),
+                    client=client,
+                )
+                await gateway.chat_completion(
+                    [{"role": "user", "content": "prompt sintetico secreto"}],
+                    model=DEFAULT_LLM_RAG_MODEL,
+                )
+        finally:
+            logger.remove(sink_id)
+
+        joined = "\n".join(logs)
+        self.assertIn("timeout_s=60.0", joined)
+        self.assertIn("model_alias=local_rag", joined)
+        self.assertNotIn("secret-test-key", joined)
+        self.assertNotIn("prompt sintetico secreto", joined)
 
     async def test_authentication_failure_does_not_print_api_key(self) -> None:
         async with httpx.AsyncClient(
