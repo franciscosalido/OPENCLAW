@@ -4,6 +4,18 @@
 
 ---
 
+## Agent Permission Matrix
+
+| Agent | Can modify CLAUDE.md | Can modify .claude/ | Notes |
+|---|---|---|---|
+| **Claude (Code / Cowork)** | ✅ Yes | ✅ Yes | Principal implementer — full write access |
+| **Codex / ChatGPT** | ❌ No | ❌ No | Read-only on these files — see AGENTS.md |
+| **Human** | ✅ Yes | ✅ Yes | Owner — always authorized |
+
+> **ERRATA 2026-04-29:** The prohibition on modifying `CLAUDE.md` and `.claude/` applies only to Codex and ChatGPT (see `AGENTS.md`). Claude (Code and Cowork) is authorized to read, edit, and save these files.
+
+---
+
 ## Shared Agent Context File
 
 > **`docs/04_MEM/AGENT_CONTEXT.md` is the shared context file between Claude, Claude Code, Codex, and ChatGPT Thinking.**
@@ -32,6 +44,7 @@ cat docs/04_MEM/current_state.md
 | LLM local | qwen3:14b via Ollama (localhost:11434) |
 | Embedding | nomic-embed-text via Ollama (localhost:11434) |
 | Vector DB | Qdrant v1.13.2 via Docker (localhost:6333/6334) |
+| Gateway | LiteLLM at localhost:4000/v1 (Gateway-0) |
 | Memory | claude-mem (~/.claude-mem/claude-mem.db) |
 
 ---
@@ -64,11 +77,11 @@ Do not read the whole repo. Do not open node_modules, .venv, dist, caches, or la
 
 - **Never** commit `.env` files, API keys, or credentials.
 - **Never** connect to brokerage APIs or execute trades automatically.
-- **Never** use LangChain for chunking or any RAG operation — pure Python only.
-- **Never** use `sentence-transformers` — embedding is via Ollama API (`/api/embed`).
+- **Never** use LangChain for chunking or any RAG operation — pure Python only. *(sprint-bound — see ADR-002)*
+- **Never** use `sentence-transformers` — embedding is via Ollama API (`/api/embed`). *(sprint-bound — see ADR-003)*
 - **Never** use `print()` — use `loguru` for all logging.
 - **Never** hardcode endpoints, ports, or model names — everything via `config/rag_config.yaml`.
-- **Never** call remote LLM providers (Claude API, OpenAI) in RAG-0 — local only.
+- **Never** call remote LLM providers with Level 0 data — local only for sensitive data.
 - **Never** open files larger than 500KB without asking first.
 
 ---
@@ -88,20 +101,13 @@ Do not read the whole repo. Do not open node_modules, .venv, dist, caches, or la
 
 ---
 
-## Current Sprint: RAG-0 — Local Synthetic RAG
+## Current Sprint: Gateway-0 — LiteLLM Local Gateway
 
-**Goal:** Prove the full pipeline: chunk → embed → Qdrant → retrieve → prompt → Qwen3 response with citations.
+**Goal:** Route all OpenClaw runtime model calls through LiteLLM at `localhost:4000/v1` while preserving existing RAG/Qdrant behavior.
 
-**Stack for this sprint:**
-- Ollama direct (no LiteLLM yet)
-- Qdrant v1.13.2 Docker
-- nomic-embed-text (768d)
-- qwen3:14b — `/no_think` by default for RAG, `/think` only for analytical mode
-- Python + httpx + qdrant-client
+**Semantic aliases:** `local_chat` (30s) · `local_think` (120s) · `local_rag` (60s) · `local_json` (30s) · `local_embed` (30s placeholder)
 
-**LiteLLM enters in Gateway-0 (next sprint).**
-
-### PR Sequence
+### RAG-0 Sprint — COMPLETE ✅
 
 | PR | Branch | Status | Scope |
 |---|---|---|---|
@@ -110,17 +116,32 @@ Do not read the whole repo. Do not open node_modules, .venv, dist, caches, or la
 | OPS | ops/memory-foundation | ✅ MERGED | CLAUDE.md + pyproject + docs/04_MEM |
 | RAG-02 | feat/rag-embeddings | ✅ MERGED | OllamaEmbedder + 7 unit tests |
 | RAG-03 | feat/rag-qdrant-store | ✅ MERGED | QdrantVectorStore + 6 integration tests |
-| RAG-04 | feat/rag-retriever-context | ⏳ NEXT | context_packer.py + retriever.py + tests |
-| RAG-05 | feat/rag-prompt-generator | ⏳ TODO | prompt_builder.py + generator.py |
-| RAG-06 | feat/rag-cli-smoke | ⏳ TODO | scripts + smoke test E2E |
-| RAG-07 | feat/rag-docs-runbook | ⏳ TODO | ADR + runbook + acceptance checklist |
+| RAG-04 | feat/rag-retriever-context | ✅ MERGED | context_packer.py + retriever.py + tests |
+| RAG-05 | feat/rag-local-pipeline-smoke | ✅ MERGED | PromptBuilder + LocalGenerator + fake smoke |
+| RAG-06 | feat/rag-cli-smoke | ✅ MERGED | synthetic ingest/query CLI + preflight + smoke |
+| RAG-07 | feat/rag-docs-runbook | ✅ MERGED | ADR + runbook + shared validation + health tests |
+
+### Gateway-0 Sprint — IN PROGRESS 🔄
+
+| PR | Branch | Status | Scope |
+|---|---|---|---|
+| GW-01 | feat/gateway-prep-contracts | ✅ MERGED | Pydantic schema, health checks, error taxonomy |
+| GW-02 | feat/gateway-install-health | ✅ MERGED | infra/litellm/, start script, supply-chain guards |
+| GW-03 | feat/gateway-route-opencraw-litellm | ✅ MERGED | GatewayChatClient + routing + validation fix |
+| GW-04 | feat/gateway-runtime-smoke | ✅ MERGED | validate_chat_messages, observability, optional smoke |
+| GW-05a | feat/gateway-per-alias-timeouts | ✅ MERGED | Per-alias timeout configuration |
+| GW-05b | feat/gateway-live-smoke-timeouts | ✅ MERGED | Live smoke + timeout observability (128/128, 7/7 smoke) |
+| GW-06 | TBD | ⏳ NEXT | Evaluate embeddings via local_embed |
+| GW-07 | TBD | ⏳ Planned | Synthetic RAG E2E through gateway |
+| GW-08 | TBD | ⏳ Planned | Runbook hardening |
+| GW-09 | TBD | ⏳ Planned | MCP/tooling evaluation |
 
 ### Merge Criteria (every PR)
 
 1. `pytest tests/` passes (unit + integration when applicable)
 2. `mypy backend/ --strict` → 0 errors
 3. `pyright backend/` → 0 errors
-4. No imports of LangChain, sentence-transformers, or remote LLM APIs
+4. No imports of LangChain, sentence-transformers, or remote LLM APIs (unless sprint-authorized)
 5. No hardcoded endpoints or model names
 6. Docstrings present on all public functions
 7. `loguru` used, not `print()`
@@ -132,23 +153,17 @@ Do not read the whole repo. Do not open node_modules, .venv, dist, caches, or la
 ```
 OPENCLAW/
 ├── CLAUDE.md                   ← you are here
-├── AGENTS.md                   ← multi-agent contracts (future)
+├── AGENTS.md                   ← Codex/OpenAI contracts
 ├── pyproject.toml              ← Python deps (uv)
 ├── config/
-│   └── rag_config.yaml         ← all RAG configuration
+│   ├── rag_config.yaml         ← RAG configuration
+│   └── litellm_config.yaml     ← gateway alias contracts
 ├── backend/
-│   └── rag/
-│       ├── __init__.py
-│       ├── chunking.py         ← ✅ DONE
-│       ├── embeddings.py       ← ✅ DONE
-│       ├── qdrant_store.py     ← ✅ DONE
-│       ├── context_packer.py   ← ⏳ RAG-04
-│       ├── retriever.py        ← ⏳ RAG-04
-│       ├── prompt_builder.py   ← ⏳ RAG-05
-│       └── generator.py        ← ⏳ RAG-05
+│   ├── gateway/                ← ✅ DONE (GW-01–05b)
+│   └── rag/                    ← ✅ DONE (RAG-01–07)
+├── infra/
+│   └── litellm/                ← operational LiteLLM setup
 ├── scripts/
-│   ├── rag_ingest_synthetic.py ← ⏳ RAG-06
-│   └── rag_ask_local.py        ← ⏳ RAG-06
 ├── tests/
 │   ├── unit/
 │   ├── integration/
@@ -159,9 +174,12 @@ OPENCLAW/
 │   ├── 04_MEM/                 ← operational memory
 │   │   ├── AGENT_CONTEXT.md    ← ★ SHARED: Claude + ChatGPT + Codex
 │   │   ├── current_state.md    ← live sprint state
-│   │   ├── decisions.md        ← architectural decisions log
-│   │   └── next_actions.md     ← immediate next steps
-│   └── ADR/
+│   │   ├── decisions.md        ← architectural decisions log (ADR-001–017)
+│   │   ├── next_actions.md     ← immediate next steps
+│   │   └── GATEWAY0_STATUS.md  ← gateway sprint status
+│   ├── ADR/
+│   ├── GATEWAY_SETUP.md
+│   └── RAG_RUNBOOK.md
 ├── Knowledge/
 ├── LIBERDADE FINANCEIRA/
 ├── Projects/
@@ -184,17 +202,24 @@ ollama pull nomic-embed-text
 ollama ps
 curl -fsS http://localhost:11434/api/tags
 curl -fsS http://localhost:6333/healthz
+curl -fsS http://localhost:4000/health  # LiteLLM gateway
 
 # Tests
 uv run pytest tests/unit/ -v
 uv run pytest tests/integration/ -m integration -v
 uv run pytest tests/smoke/ -m smoke -v
+RUN_LITELLM_SMOKE=1 uv run pytest tests/smoke/ -v
 
 # Type checking
 uv run mypy backend/ --strict
 uv run pyright backend/
 
-# RAG pipeline (after RAG-06)
+# Gateway
+cd infra/litellm && source .venv/bin/activate && ./start_litellm.sh
+scripts/check_litellm_gateway.sh
+scripts/test_opencraw_litellm_runtime.sh
+
+# RAG pipeline
 python scripts/rag_ingest_synthetic.py
 python scripts/rag_ask_local.py "Qual a projeção da Selic?"
 python scripts/rag_ask_local.py "Análise macro" --thinking  # qwen3 /think mode
@@ -210,7 +235,7 @@ gh pr list --state open
 ## GitHub Workflow
 
 ```
-Issue → branch → implement → pytest → mypy → pyright → PR → review → merge → update docs/04_MEM
+Issue → branch → implement → pytest → mypy → pyright → PR → CI → review → merge on GitHub → update docs/04_MEM
 ```
 
 - One issue per session.
@@ -224,9 +249,9 @@ Issue → branch → implement → pytest → mypy → pyright → PR → review
 ## What NOT to do
 
 - Do NOT read the whole repo blindly.
-- Do NOT install Redis in V1.
 - Do NOT build multi-agent production workflows until base repo is stable.
-- Do NOT integrate brokerage APIs.
-- Do NOT add LiteLLM before Gateway-0.
+- Do NOT integrate brokerage APIs (ADR-007 — non-revisable).
 - Do NOT use FastAPI before it's explicitly planned in a sprint.
+- Do NOT add remote AI providers without sanitization review and sprint authorization.
 - Do NOT create `docs/04_MEM` entries from memory — read the actual files first.
+- Do NOT merge locally into `main` as the final integration step (ADR-011).
