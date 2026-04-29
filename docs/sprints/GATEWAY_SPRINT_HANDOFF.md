@@ -133,11 +133,29 @@ GW-05b:
 
 Current live smoke status:
 
-- Not run successfully yet.
-- 2026-04-28 local preflight: `QUIMERA_LLM_API_KEY` was not set, LiteLLM was
-  not reachable on `127.0.0.1:4000`, and Ollama was reachable on
-  `127.0.0.1:11434`.
-- No alias latencies have been recorded yet.
+- **2026-04-28: PASSED** — all 4 aliases responded within budget.
+- Ollama: `127.0.0.1:11434` — qwen3:14b (9.3 GB Q4_K_M), nomic-embed-text.
+- LiteLLM: `127.0.0.1:4000` — provider `ollama_chat/qwen3:14b`.
+
+Observed latencies (2026-04-28, macOS, qwen3:14b Q4_K_M):
+
+| Alias | elapsed_s | timeout_s | margin |
+|---|---:|---:|---|
+| `local_chat` | 2.20 | 30.0 | 27.8s |
+| `local_think` | 12.44 | 120.0 | 107.6s |
+| `local_rag` | 2.23 | 60.0 | 57.8s |
+| `local_json` | 1.72 | 30.0 | 28.3s |
+
+`RUN_LITELLM_SMOKE_REPEAT=3` passed (7/7 tests, 54s wall time).
+
+Config fixes applied in GW-05b to make smoke pass:
+
+- `start_litellm.sh`: default provider changed from `ollama/` to `ollama_chat/`
+  (uses `/api/chat` endpoint — required for Qwen3 chat format).
+- `litellm_config.yaml`: `extra_body: {think: false}` added to `local_chat`,
+  `local_rag`, `local_json` to prevent thinking tokens exhausting max_tokens
+  before visible content is produced. `local_think` keeps thinking active.
+- Smoke scripts: `max_tokens=2048` for `local_think`; 96 for other aliases.
 
 GW-06:
 

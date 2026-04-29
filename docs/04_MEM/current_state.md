@@ -105,13 +105,19 @@ GW-05b:
 
 Live smoke status for GW-05b:
 
-- Not run successfully yet.
-- 2026-04-28 local preflight: `QUIMERA_LLM_API_KEY` was not set, LiteLLM was
-  not reachable on `127.0.0.1:4000`, and Ollama was reachable on
-  `127.0.0.1:11434`.
-- No live smoke latencies are available yet.
-- Do not weaken assertions to force a green result; run again when local
-  LiteLLM and the local key are available.
+- **2026-04-28: PASSED** — Cenário A completo.
+- 128/128 unit+integration tests passed. mypy 0. pyright 0.
+- `RUN_LITELLM_SMOKE=1 pytest tests/smoke/` — 7/7 passed.
+- `RUN_LITELLM_SMOKE=1 RUN_LITELLM_SMOKE_REPEAT=3 pytest tests/smoke/` — 7/7 passed (54s).
+
+Observed latencies (macOS, qwen3:14b Q4_K_M):
+
+| Alias | elapsed_s | timeout_s |
+|---|---:|---:|
+| `local_chat` | 2.20 | 30.0 |
+| `local_think` | 12.44 | 120.0 |
+| `local_rag` | 2.23 | 60.0 |
+| `local_json` | 1.72 | 30.0 |
 
 GW-06:
 

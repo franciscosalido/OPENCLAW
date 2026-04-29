@@ -21,6 +21,12 @@ from backend.gateway.client import (
 
 _SMOKE_OVERHEAD_SECONDS = 2.0
 _MAX_SMOKE_REPEAT = 5
+# local_think needs a larger token budget: the thinking block consumes hundreds of
+# tokens before the visible answer appears in message.content.  Other aliases have
+# thinking disabled in litellm_config.yaml (extra_body.think=false) so 96 tokens
+# is sufficient for a short smoke response.
+_MAX_TOKENS_THINKING = 2048
+_MAX_TOKENS_DEFAULT = 96
 
 
 pytestmark = pytest.mark.skipif(
@@ -85,10 +91,16 @@ async def test_litellm_runtime_aliases_respond() -> None:
         ),
     ]
 
+    reasoning_alias = os.environ.get(
+        "QUIMERA_LLM_REASONING_MODEL", DEFAULT_LLM_REASONING_MODEL
+    )
     async with GatewayChatClient(config=config) as client:
         for alias, prompt, response_format in cases:
             timeout_budget = config.resolve_timeout(alias)
             allowed_elapsed = timeout_budget + _SMOKE_OVERHEAD_SECONDS
+            max_tokens = (
+                _MAX_TOKENS_THINKING if alias == reasoning_alias else _MAX_TOKENS_DEFAULT
+            )
             latencies: list[float] = []
             for attempt in range(1, repeat_count + 1):
                 start = time.perf_counter()
@@ -97,7 +109,7 @@ async def test_litellm_runtime_aliases_respond() -> None:
                         [{"role": "user", "content": prompt}],
                         model=alias,
                         temperature=0.0,
-                        max_tokens=96,
+                        max_tokens=max_tokens,
                         response_format=response_format,
                     )
                 except Exception as exc:

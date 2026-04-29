@@ -66,6 +66,13 @@ from backend.gateway.client import GatewayChatClient, GatewayRuntimeConfig
 
 MAX_REPEAT = 5
 OVERHEAD_SECONDS = 2.0
+# local_think needs a larger token budget: the thinking block itself can consume
+# hundreds of tokens before the visible answer appears in message.content.
+# Other aliases have thinking disabled in litellm_config.yaml (extra_body.think=false)
+# so 96 tokens is sufficient for a short smoke response.
+_REASONING_ALIAS = os.environ.get("QUIMERA_LLM_REASONING_MODEL", "local_think")
+_MAX_TOKENS_THINKING = 2048
+_MAX_TOKENS_DEFAULT = 96
 
 
 ALIASES = [
@@ -123,11 +130,16 @@ async def main() -> None:
             for attempt in range(1, repeat_count + 1):
                 start = time.perf_counter()
                 try:
+                    max_tokens = (
+                        _MAX_TOKENS_THINKING
+                        if alias == _REASONING_ALIAS
+                        else _MAX_TOKENS_DEFAULT
+                    )
                     answer = await client.chat_completion(
                         [{"role": "user", "content": prompt}],
                         model=alias,
                         temperature=0.0,
-                        max_tokens=96,
+                        max_tokens=max_tokens,
                         response_format=response_format,
                     )
                     if alias == os.environ.get("QUIMERA_LLM_JSON_MODEL", "local_json"):
