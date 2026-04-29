@@ -24,9 +24,16 @@ from backend.gateway.errors import GatewayConfigurationError, GatewayModelAliasE
 
 # ─── Contract constants ───────────────────────────────────────────────────────
 
-#: All five aliases must be present in every valid gateway config.
+#: All semantic aliases must be present in every valid gateway config.
 REQUIRED_ALIASES: frozenset[str] = frozenset(
-    {"local_chat", "local_think", "local_rag", "local_json", "local_embed"}
+    {
+        "local_chat",
+        "local_think",
+        "local_rag",
+        "local_json",
+        "quimera_embed",
+        "local_embed",
+    }
 )
 
 #: Permitted ``api_base`` prefixes. Any other prefix is treated as a remote
@@ -131,7 +138,7 @@ class GatewayConfig(BaseModel):
         if missing:
             raise ValueError(
                 f"Gateway config is missing required aliases: {missing}. "
-                "All five semantic aliases must be defined before wiring."
+                "All semantic aliases must be defined before wiring."
             )
         return self
 

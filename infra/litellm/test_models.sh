@@ -25,7 +25,14 @@ python3 -c '
 import json
 import sys
 
-expected = {"local_chat", "local_think", "local_rag", "local_json", "local_embed"}
+expected = {
+    "local_chat",
+    "local_think",
+    "local_rag",
+    "local_json",
+    "quimera_embed",
+    "local_embed",
+}
 raw = sys.stdin.read()
 try:
     body = json.loads(raw)
@@ -45,5 +52,5 @@ missing = sorted(expected - seen)
 if missing:
     raise SystemExit(f"ERROR: Missing LiteLLM aliases: {missing}. Seen: {sorted(seen)}")
 
-print("OK: /v1/models exposes local gateway aliases.")
+sys.stdout.write("OK: /v1/models exposes local gateway aliases.\n")
 ' <<< "${RESPONSE}"

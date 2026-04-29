@@ -246,11 +246,11 @@ class GatewayEmbedClientTests(unittest.IsolatedAsyncioTestCase):
 
         joined = "\n".join(logs)
         self.assertIn("gateway_embed", joined)
-        self.assertIn("model_alias=local_embed", joined)
+        self.assertIn("model_alias=quimera_embed", joined)
         self.assertNotIn("secret-test-key", joined)
         self.assertNotIn("texto sintetico que nao deve aparecer", joined)
 
-    async def test_request_timeout_uses_local_embed_alias_budget(self) -> None:
+    async def test_request_timeout_uses_canonical_embed_alias_budget(self) -> None:
         seen_timeouts: list[dict[str, float]] = []
 
         def handler(request: httpx.Request) -> httpx.Response:

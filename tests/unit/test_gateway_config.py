@@ -117,11 +117,11 @@ class TestGatewayConfigValidator(unittest.TestCase):
         aliases = [
             _alias(name)
             for name in REQUIRED_ALIASES
-            if name != "local_embed"
+            if name != "quimera_embed"
         ]
         with self.assertRaises(ValidationError) as ctx:
             GatewayConfig.model_validate({"model_list": aliases})
-        self.assertIn("local_embed", str(ctx.exception))
+        self.assertIn("quimera_embed", str(ctx.exception))
 
     def test_missing_multiple_aliases_rejected(self) -> None:
         raw = {"model_list": [_alias("local_chat")]}
@@ -130,7 +130,7 @@ class TestGatewayConfigValidator(unittest.TestCase):
         self.assertIn("missing required aliases", str(ctx.exception))
 
     def test_extra_alias_permitted(self) -> None:
-        """Additional aliases beyond the required five must not cause failures."""
+        """Additional aliases beyond the required set must not cause failures."""
         aliases = _all_required_aliases() + [_alias("local_extra")]
         config = GatewayConfig.model_validate({"model_list": aliases})
         self.assertIn("local_extra", config.alias_names)
@@ -204,11 +204,11 @@ class TestActualGatewayConfig(unittest.TestCase):
     def setUp(self) -> None:
         self.config = load_gateway_config(_YAML_PATH)
 
-    def test_all_five_required_aliases_present(self) -> None:
+    def test_all_required_aliases_present(self) -> None:
         self.assertEqual(
             self.config.alias_names,
             REQUIRED_ALIASES,
-            "All five required aliases must be defined in litellm_config.yaml",
+            "All required aliases must be defined in litellm_config.yaml",
         )
 
     def test_all_aliases_use_local_api_base(self) -> None:
@@ -239,12 +239,15 @@ class TestActualGatewayConfig(unittest.TestCase):
                     f"'{name}' must have thinking_mode=false",
                 )
 
-    def test_local_embed_maps_to_nomic_embed_text(self) -> None:
-        embed = self.config.get_alias("local_embed")
+    def test_embedding_aliases_map_to_same_nomic_embed_backend(self) -> None:
+        canonical = self.config.get_alias("quimera_embed")
+        compat = self.config.get_alias("local_embed")
+        self.assertEqual(canonical.litellm_params.model, compat.litellm_params.model)
+        self.assertEqual(canonical.litellm_params.api_base, compat.litellm_params.api_base)
         self.assertIn(
             "nomic-embed-text",
-            embed.litellm_params.model,
-            "local_embed must map to the nomic-embed-text model",
+            canonical.litellm_params.model,
+            "quimera_embed must map to the nomic-embed-text model",
         )
 
     def test_local_chat_maps_to_qwen(self) -> None:
@@ -271,6 +274,7 @@ class TestActualGatewayConfig(unittest.TestCase):
             "local_think": 120,
             "local_rag": 60,
             "local_json": 30,
+            "quimera_embed": 30,
             "local_embed": 30,
         }
         for name, timeout in expected.items():

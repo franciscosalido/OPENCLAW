@@ -5,7 +5,7 @@
 > meaningful sessions.
 
 **Last updated:** 2026-04-28
-**Updated by:** Codex — Gateway GW-06 local_embed evaluation
+**Updated by:** Codex — GW06C embeddings contract addendum
 
 ---
 
@@ -36,6 +36,18 @@ GatewayEmbedClient
   -> LiteLLM at http://127.0.0.1:4000/v1/embeddings
   -> Ollama / nomic-embed-text local
 ```
+
+GW06C standardizes the internal embedding contract:
+
+```text
+Application caller
+  -> quimera_embed (canonical alias)
+  -> OpenAI-compatible /v1/embeddings
+  -> LiteLLM compatibility layer
+  -> Ollama / nomic-embed-text local
+```
+
+`local_embed` remains as a compatibility alias during transition.
 
 Hard constraints remain:
 
@@ -82,11 +94,13 @@ unavoidable, use `git push --force-with-lease`.
 | GW-05a | `feat/gateway-per-alias-timeouts` | Per-alias timeout configuration | Done / merged |
 | GW-05b | `feat/gateway-live-smoke-timeouts` | Live smoke with effective timeout observability | Done / merged |
 | GW-06 | `feat/gateway-local-embed-evaluation` | Evaluate embeddings via `local_embed` | Current |
+| GW06C | `feat/adr-openai-compatible-embeddings-contract` | ADR and config contract for OpenAI-compatible embeddings | Current addendum |
 | GW-07 | TBD | Synthetic RAG E2E through gateway path | Planned |
 
 GW-05a issue: <https://github.com/franciscosalido/OPENCLAW/issues/25>
 GW-05b issue: <https://github.com/franciscosalido/OPENCLAW/issues/28>
 GW-06 issue: <https://github.com/franciscosalido/OPENCLAW/issues/30>
+GW06C issue: <https://github.com/franciscosalido/OPENCLAW/issues/32>
 
 ---
 
@@ -157,6 +171,25 @@ Observed local_embed results (2026-04-28):
 | Direct Ollama parity | 768 dimensions |
 | Cosine similarity | 1.000000 |
 | Script smoke | 768 dimensions, 0.70s |
+
+GW06C:
+
+- ADR-0002 accepted OpenAI-compatible `/v1/embeddings` as the internal
+  embeddings contract.
+- Canonical application-facing alias: `quimera_embed`.
+- Compatibility alias: `local_embed`.
+- Concrete backend remains local Ollama with `nomic-embed-text` behind LiteLLM.
+- Current production RAG embeddings remain direct Ollama.
+- Vector collection metadata must persist real embedding identity:
+  `embedding_provider`, `embedding_model`, `embedding_dimensions`, and
+  `embedding_version`.
+- Future embedding model/provider changes require explicit
+  reembedding/reindexing.
+- Vectors from different embedding models/providers must not be mixed in one
+  collection.
+- Anthropic may be chat/reasoning later, but is not a native embeddings
+  provider; Voyage or another provider must be represented by its own provider
+  identity and require reindexing.
 
 GW-07:
 

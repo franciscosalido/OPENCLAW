@@ -100,10 +100,16 @@ RAG-0 is **local only**. No remote AI fallback in this sprint.
 - Product name: Quimera.
 - Repository name: OpenClaw.
 - Model gateway: LiteLLM at `http://127.0.0.1:4000/v1` (Gateway-0 — local only).
-- Semantic aliases: `local_chat`, `local_think`, `local_rag`, `local_json`, `local_embed`.
+- Semantic aliases: `local_chat`, `local_think`, `local_rag`, `local_json`,
+  `quimera_embed`, `local_embed`.
 - Local LLM runtime: Ollama (via LiteLLM gateway for chat; direct for embeddings until Gateway-1).
 - Primary local generation model: `qwen3:14b` (vendor name confined to LiteLLM config — application code uses aliases).
-- Embedding model: `nomic-embed-text` (direct Ollama until a tested embedding-gateway PR).
+- Embedding contract: OpenAI-compatible `/v1/embeddings`.
+- Canonical embedding alias: `quimera_embed`.
+- Compatibility embedding alias: `local_embed`.
+- Embedding model: `nomic-embed-text`; current production RAG path remains
+  direct Ollama until an explicit migration PR preserves retry/backoff and
+  concurrency behavior.
 - Vector database: Qdrant.
 - Mathematical co-processor: deterministic Python modules.
 - Remote AI: disabled. Sanitized fallback only after explicit sprint approval.

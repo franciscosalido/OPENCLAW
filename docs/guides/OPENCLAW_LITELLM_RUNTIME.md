@@ -7,6 +7,9 @@ GW-05b adds live smoke timing validation and logs the effective timeout budget
 used by each gateway call.
 GW-06 evaluates `local_embed` embeddings through LiteLLM without changing the
 default RAG embedding path.
+GW06C accepts OpenAI-compatible `/v1/embeddings` as the internal embeddings
+contract and introduces `quimera_embed` as the canonical application-facing
+embedding alias.
 The default runtime path is:
 
 ```text
@@ -22,7 +25,7 @@ export QUIMERA_LLM_MODEL="local_chat"
 export QUIMERA_LLM_REASONING_MODEL="local_think"
 export QUIMERA_LLM_RAG_MODEL="local_rag"
 export QUIMERA_LLM_JSON_MODEL="local_json"
-export QUIMERA_LLM_EMBED_MODEL="local_embed"
+export QUIMERA_LLM_EMBED_MODEL="quimera_embed"
 ```
 
 `QUIMERA_LLM_API_KEY` should match the local `LITELLM_MASTER_KEY` used to start
@@ -99,11 +102,12 @@ test runs do not depend on local services.
 
 ## Optional Embedding Evaluation
 
-GW-06 evaluates the reserved `local_embed` alias through LiteLLM. This is an
-evaluation path only:
+GW-06 evaluated the reserved embedding alias through LiteLLM. GW06C makes
+`quimera_embed` the canonical application-facing alias and keeps `local_embed`
+as a compatibility alias. This remains an evaluation path only:
 
 ```text
-GatewayEmbedClient -> LiteLLM /v1/embeddings -> Ollama/nomic-embed-text
+GatewayEmbedClient -> LiteLLM /v1/embeddings -> quimera_embed -> Ollama/nomic-embed-text
 ```
 
 The current RAG embedding path remains unchanged:
@@ -142,6 +146,21 @@ Interpretation:
   embedder remains direct Ollama until a future migration PR preserves or
   replaces retry/backoff/concurrency behavior.
 
+Embedding contract rules:
+
+- OpenAI-compatible `/v1/embeddings` is the internal contract.
+- LiteLLM is the compatibility layer.
+- Ollama local with `nomic-embed-text` is the initial backend.
+- Application callers should use `quimera_embed`, not `nomic-embed-text`.
+- `local_embed` remains available as a compatibility alias.
+- Vector metadata must preserve the real provider/model/dimensions/version.
+- Future embedding model/provider changes require explicit reindexing.
+- Vectors from different embedding models/providers must not be mixed in one
+  collection.
+- Anthropic may be used for chat/reasoning in a future approved sprint, but it
+  is not a native embeddings provider. Voyage or another embeddings provider
+  must be modeled as its own provider identity.
+
 ## What Changed
 
 - `backend.rag.generator.LocalGenerator` now sends OpenAI-compatible
@@ -167,6 +186,8 @@ Interpretation:
 - `local_embed` has a reserved timeout value only. GW-05a does not route
   embeddings through LiteLLM.
 - GW-06 evaluates `local_embed` but does not wire it into default RAG behavior.
+- GW06C adds the `quimera_embed` contract alias but does not migrate production
+  RAG embeddings.
 - Remote providers remain disabled.
 - FastAPI remains postponed.
 - MCP and tooling integration remain future direction, not implemented in

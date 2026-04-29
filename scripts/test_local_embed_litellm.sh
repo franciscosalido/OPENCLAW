@@ -9,7 +9,7 @@ fail() {
 [ -n "${QUIMERA_LLM_API_KEY:-}" ] || fail "QUIMERA_LLM_API_KEY is required and should match LITELLM_MASTER_KEY."
 
 QUIMERA_LLM_BASE_URL="${QUIMERA_LLM_BASE_URL:-http://127.0.0.1:4000/v1}"
-QUIMERA_LLM_EMBED_MODEL="${QUIMERA_LLM_EMBED_MODEL:-local_embed}"
+QUIMERA_LLM_EMBED_MODEL="${QUIMERA_LLM_EMBED_MODEL:-quimera_embed}"
 
 case "${QUIMERA_LLM_BASE_URL}" in
   http://127.0.0.1:*|http://localhost:*) ;;
@@ -40,7 +40,7 @@ from backend.gateway.embed_client import (
 )
 
 
-SYNTHETIC_TEXT = "Texto sintetico para validar local_embed."
+SYNTHETIC_TEXT = "Texto sintetico para validar quimera_embed."
 
 
 def host(base_url: str) -> str:
@@ -53,17 +53,17 @@ async def main() -> None:
         async with GatewayEmbedClient() as client:
             vector = await client.embed(SYNTHETIC_TEXT)
     except Exception as exc:
-        raise SystemExit(f"ERROR: local_embed failed: {exc}") from exc
+        raise SystemExit(f"ERROR: quimera_embed failed: {exc}") from exc
 
     elapsed = time.perf_counter() - start
     if len(vector) != DEFAULT_EMBEDDING_DIMENSIONS:
         raise SystemExit(
-            "ERROR: local_embed returned "
+            "ERROR: quimera_embed returned "
             f"{len(vector)} dimensions; expected {DEFAULT_EMBEDDING_DIMENSIONS}"
         )
     sys.stdout.write(
         "OK: alias="
-        f"{os.environ.get('QUIMERA_LLM_EMBED_MODEL', 'local_embed')} "
+        f"{os.environ.get('QUIMERA_LLM_EMBED_MODEL', 'quimera_embed')} "
         f"host={host(os.environ.get('QUIMERA_LLM_BASE_URL', 'http://127.0.0.1:4000/v1'))} "
         f"dims={len(vector)} elapsed_s={elapsed:.2f}\n"
     )

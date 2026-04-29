@@ -2,7 +2,8 @@
 
 This directory contains the operational Gateway-0 layer for Quimera/OpenClaw.
 It starts LiteLLM as a local-only proxy in front of Ollama. OpenClaw runtime
-calls are not routed through LiteLLM yet.
+chat/generation calls route through LiteLLM; production RAG embeddings remain
+direct Ollama until an explicit migration PR.
 
 ## Security Contract
 
@@ -77,7 +78,8 @@ source .venv/bin/activate
 Expected checks:
 
 - `/v1/models` responds.
-- All five local aliases are visible.
+- All local aliases are visible, including `quimera_embed` and compatibility
+  alias `local_embed`.
 - `local_chat` returns a compact answer through LiteLLM.
 - Ollama is reachable.
 - No active remote provider appears in the LiteLLM config.

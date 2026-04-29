@@ -48,13 +48,13 @@ unavoidable, use `git push --force-with-lease`.
 Current active branch:
 
 ```text
-feat/gateway-local-embed-evaluation
+feat/adr-openai-compatible-embeddings-contract
 ```
 
 Current issue:
 
 ```text
-https://github.com/franciscosalido/OPENCLAW/issues/30
+https://github.com/franciscosalido/OPENCLAW/issues/32
 ```
 
 Gateway baseline already merged:
@@ -64,6 +64,7 @@ GW-01 through GW-04 are merged in 92c0ec5.
 GW-05a is merged in 96278f6.
 GW-05b live smoke fixes are merged through 5c42547.
 GW-06 branches from the post-GW-05b baseline.
+GW06C branches from GW-06 before merge as an architectural contract addendum.
 ```
 
 Gateway PR state:
@@ -77,6 +78,7 @@ Gateway PR state:
 | GW-05a | `feat/gateway-per-alias-timeouts` | Per-alias timeout configuration | Merged in `96278f6` |
 | GW-05b | `feat/gateway-live-smoke-timeouts` | Live smoke with effective timeout observability | Merged through `5c42547` |
 | GW-06 | `feat/gateway-local-embed-evaluation` | Evaluate embeddings via `local_embed` | Current |
+| GW06C | `feat/adr-openai-compatible-embeddings-contract` | OpenAI-compatible embeddings contract ADR | Current addendum |
 | GW-07 | TBD | Synthetic RAG E2E through gateway path | Planned |
 
 ---
@@ -170,6 +172,46 @@ Environment:
 - Embed alias: `local_embed`.
 - Direct model: `nomic-embed-text`.
 
+## GW06C Current Addendum
+
+Objective:
+
+Standardize OpenAI-compatible `/v1/embeddings` as the internal embeddings
+contract without migrating production RAG embeddings.
+
+Decision:
+
+- `quimera_embed` is the canonical application-facing embedding alias.
+- `local_embed` remains as a compatibility alias.
+- Both aliases currently route to the same local Ollama `nomic-embed-text`
+  backend through LiteLLM.
+- Concrete model identity is hidden from application callers but preserved in
+  config metadata, collection metadata, and audit/migration docs.
+- Any future embedding model/provider change requires explicit
+  reembedding/reindexing.
+
+Collection metadata requirements:
+
+- Required: `embedding_provider`, `embedding_model`, `embedding_dimensions`,
+  `embedding_version`.
+- Recommended: `embedding_contract`, `embedding_alias`, `embedding_backend`,
+  `created_at`, `source_corpus_id`, `reindex_required_on_model_change`.
+
+Out of scope:
+
+- Production RAG embedding migration.
+- Qdrant reindexing or vector collection mutation.
+- Retrieval, chunking, prompt-builder changes.
+- FastAPI, MCP, remote embeddings providers, quant tools.
+- Real documents or portfolio data.
+
+Anthropic clarification:
+
+- Anthropic may be used later for chat/reasoning, but not as a native
+  embeddings provider because Anthropic does not offer its own embedding model.
+- Voyage or another future embeddings provider must be represented as its own
+  provider and must require explicit collection reindexing.
+
 ## Previous Work
 
 GW-05b:
@@ -228,6 +270,7 @@ uv run pytest -v
 uv run mypy --strict .
 uv run pyright
 uv run python -m compileall backend tests scripts infra
+uv run pytest tests/unit/test_embedding_contract_config.py -v
 uv run pytest tests/unit/test_gateway_embed_client.py -v
 uv run pytest tests/smoke/ -v
 ```
