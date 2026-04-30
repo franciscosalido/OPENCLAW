@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import unittest
 from typing import cast
@@ -13,7 +14,10 @@ from backend.gateway.client import (
     GatewayRuntimeConfig,
 )
 from backend.gateway.embed_client import (
+    DEFAULT_EMBED_BACKOFF_SECONDS,
     DEFAULT_EMBEDDING_DIMENSIONS,
+    DEFAULT_EMBED_MAX_CONCURRENCY,
+    DEFAULT_EMBED_MAX_RETRIES,
     GatewayEmbedClient,
 )
 from backend.gateway.errors import (
@@ -71,7 +75,7 @@ class GatewayEmbedClientTests(unittest.IsolatedAsyncioTestCase):
 
         def handler(request: httpx.Request) -> httpx.Response:
             seen_payloads.append(json.loads(request.content.decode("utf-8")))
-            return httpx.Response(200, json=_embedding_response(count=2))
+            return httpx.Response(200, json=_embedding_response())
 
         async with httpx.AsyncClient(
             base_url=DEFAULT_LLM_BASE_URL,
@@ -88,12 +92,86 @@ class GatewayEmbedClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             seen_payloads,
             [
-                {
-                    "model": DEFAULT_LLM_EMBED_MODEL,
-                    "input": ["texto um", "texto dois"],
-                }
+                {"model": DEFAULT_LLM_EMBED_MODEL, "input": "texto um"},
+                {"model": DEFAULT_LLM_EMBED_MODEL, "input": "texto dois"},
             ],
         )
+
+    async def test_default_reliability_settings_match_ollama_embedder_contract(
+        self,
+    ) -> None:
+        async with httpx.AsyncClient(
+            base_url=DEFAULT_LLM_BASE_URL,
+            transport=httpx.MockTransport(
+                lambda _request: httpx.Response(200, json=_embedding_response())
+            ),
+        ) as client:
+            gateway = GatewayEmbedClient(
+                config=GatewayRuntimeConfig(api_key="dev-key"),
+                client=client,
+            )
+
+        self.assertEqual(gateway.max_retries, DEFAULT_EMBED_MAX_RETRIES)
+        self.assertEqual(gateway.backoff_seconds, DEFAULT_EMBED_BACKOFF_SECONDS)
+        self.assertEqual(gateway.max_concurrency, DEFAULT_EMBED_MAX_CONCURRENCY)
+        self.assertEqual(gateway.expected_dimensions, DEFAULT_EMBEDDING_DIMENSIONS)
+
+    async def test_retries_transient_http_failures_with_backoff(self) -> None:
+        calls = 0
+        sleeps: list[float] = []
+
+        async def fake_sleep(seconds: float) -> None:
+            sleeps.append(seconds)
+
+        def handler(_request: httpx.Request) -> httpx.Response:
+            nonlocal calls
+            calls += 1
+            if calls < 3:
+                return httpx.Response(503)
+            return httpx.Response(200, json=_embedding_response())
+
+        async with httpx.AsyncClient(
+            base_url=DEFAULT_LLM_BASE_URL,
+            transport=httpx.MockTransport(handler),
+        ) as client:
+            gateway = GatewayEmbedClient(
+                config=GatewayRuntimeConfig(api_key="dev-key"),
+                client=client,
+                sleep=fake_sleep,
+            )
+            vector = await gateway.embed("texto sintetico")
+
+        self.assertEqual(len(vector), DEFAULT_EMBEDDING_DIMENSIONS)
+        self.assertEqual(calls, 3)
+        self.assertEqual(sleeps, [1.0, 2.0])
+
+    async def test_embed_batch_enforces_max_concurrency(self) -> None:
+        active = 0
+        max_seen = 0
+
+        async def handler(_request: httpx.Request) -> httpx.Response:
+            nonlocal active, max_seen
+            active += 1
+            max_seen = max(max_seen, active)
+            await asyncio.sleep(0)
+            active -= 1
+            return httpx.Response(200, json=_embedding_response())
+
+        async with httpx.AsyncClient(
+            base_url=DEFAULT_LLM_BASE_URL,
+            transport=httpx.MockTransport(handler),
+        ) as client:
+            gateway = GatewayEmbedClient(
+                config=GatewayRuntimeConfig(api_key="dev-key"),
+                client=client,
+                max_concurrency=2,
+            )
+            vectors = await gateway.embed_batch(
+                ["texto um", "texto dois", "texto tres", "texto quatro"]
+            )
+
+        self.assertEqual(len(vectors), 4)
+        self.assertLessEqual(max_seen, 2)
 
     async def test_empty_batch_returns_empty_list_without_http_call(self) -> None:
         def handler(_request: httpx.Request) -> httpx.Response:

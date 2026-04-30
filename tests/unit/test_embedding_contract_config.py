@@ -104,10 +104,11 @@ class EmbeddingContractConfigTests(unittest.TestCase):
         self.assertEqual(embedding["embedding_dimensions"], 768)
         self.assertEqual(embedding["embedding_version"], "local-ollama-current")
 
-    def test_rag_config_records_gateway_contract_without_migrating_default(self) -> None:
+    def test_rag_config_records_controlled_gateway_migration_with_rollback(self) -> None:
         raw = _load_yaml(RAG_CONFIG)
         embedding = raw["rag"]["embedding"]
 
+        self.assertEqual(embedding["active_backend"], "gateway_litellm")
         self.assertEqual(
             embedding["embedding_contract"],
             "openai_compatible_v1_embeddings",
@@ -117,9 +118,13 @@ class EmbeddingContractConfigTests(unittest.TestCase):
         self.assertEqual(embedding["gateway_compatibility_alias"], "local_embed")
         self.assertEqual(
             embedding["gateway_embedding_status"],
-            "evaluated_for_future_migration",
+            "controlled_migration_current",
         )
-        self.assertEqual(embedding["embedding_backend"], "direct_ollama_current")
+        self.assertEqual(embedding["embedding_backend"], "gateway_litellm_current")
+        self.assertEqual(embedding["legacy_embedding_backend"], "direct_ollama")
+        self.assertEqual(embedding["max_retries"], 3)
+        self.assertEqual(embedding["backoff_seconds"], 1.0)
+        self.assertEqual(embedding["max_concurrency"], 4)
         self.assertTrue(embedding["reindex_required_on_model_change"])
         self.assertEqual(embedding["model"], "nomic-embed-text")
         self.assertEqual(embedding["endpoint"], "http://localhost:11434")

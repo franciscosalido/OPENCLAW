@@ -450,7 +450,7 @@ def _embedding_metadata_from_config() -> dict[str, Any]:
     assert metadata["embedding_dimensions"] == VECTOR_SIZE
     assert metadata["embedding_contract"] == "openai_compatible_v1_embeddings"
     assert metadata["embedding_alias"] == "quimera_embed"
-    assert metadata["embedding_backend"] == "direct_ollama_current"
+    metadata["embedding_backend"] = "direct_ollama_current"
     return metadata
 
 

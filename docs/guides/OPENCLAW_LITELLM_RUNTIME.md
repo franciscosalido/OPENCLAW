@@ -9,6 +9,8 @@ GW-06 evaluates `local_embed` embeddings through LiteLLM without changing the
 default RAG embedding path.
 GW-07 adds optional synthetic RAG E2E smoke for the current production-safe path:
 direct Ollama embeddings, temporary Qdrant collection, and LiteLLM generation.
+GW-08 adds controlled RAG embedding migration for new ingest/test paths through
+`quimera_embed` and keeps `direct_ollama` as rollback.
 The default runtime path is:
 
 ```text
@@ -206,6 +208,63 @@ The run used 3 synthetic PT-BR documents, generated 14 chunks, used 5 retrieved
 chunks, and completed cleanup of the temporary collection without reported
 errors. Future interrupted runs may still require manual prefix-only cleanup.
 
+## Controlled Embedding Migration
+
+GW-08 routes new controlled RAG embedding generation through the factory:
+
+```text
+RagEmbedder factory
+  -> gateway_litellm
+  -> GatewayEmbedClient
+  -> LiteLLM /v1/embeddings
+  -> quimera_embed
+  -> Ollama / nomic-embed-text
+```
+
+Rollback remains available:
+
+```bash
+export QUIMERA_RAG_EMBEDDING_BACKEND="direct_ollama"
+```
+
+The concrete embedding model remains `nomic-embed-text`. Existing collections
+are not reindexed automatically, and `openclaw_knowledge` is not touched by
+GW-08. Mixing vectors from different embedding backends, models, providers, or
+dimensions in the same collection remains forbidden.
+
+Run the guarded GW-08 live smoke only with local Qdrant, Ollama, and LiteLLM:
+
+```bash
+export QUIMERA_LLM_API_KEY="${LITELLM_MASTER_KEY}"
+scripts/test_gw08_embedding_migration.sh
+```
+
+Or run pytest directly:
+
+```bash
+RUN_GW08_EMBEDDING_MIGRATION_SMOKE=1 \
+RUN_GW08_EMBEDDING_PARITY_SMOKE=1 \
+uv run pytest tests/smoke/test_rag_gateway_embedding_migration_smoke.py -v -s
+```
+
+GW-08 live result recorded on 2026-04-30:
+
+- `scripts/test_gw08_embedding_migration.sh`: passed.
+- Embedding alias: `quimera_embed`.
+- Temporary Qdrant collection prefix: `gw08_embedding_migration_`.
+- Synthetic chunks: 4 indexed, 4 retrieved/used.
+- Embedding/indexing latency: 314.7 ms.
+- Retrieval latency: 27.4 ms.
+- Generation latency: 4951.7 ms.
+- Total pipeline latency: 4979.1 ms.
+- Direct Ollama vs gateway cosine similarity: 1.000000.
+- Vector dimensions: 768.
+
+If `/v1/embeddings` returns HTTP 400 for `quimera_embed`, check `/v1/models`.
+The LiteLLM process may need to be restarted so it reloads
+`infra/litellm/litellm_config.yaml` with both `quimera_embed` and
+`local_embed`.
+
 ## What Changed
 
 - `backend.rag.generator.LocalGenerator` now sends OpenAI-compatible
@@ -224,16 +283,16 @@ errors. Future interrupted runs may still require manual prefix-only cleanup.
 ## What Did Not Change
 
 - Qdrant remains the vector store.
-- RAG chunking, embeddings, retrieval, context packing, and citation logic are
-  unchanged.
-- Embeddings still use the existing local Ollama embedder until a separate,
-  tested embedding-gateway PR is approved.
+- RAG chunking, retrieval, context packing, and citation logic are unchanged.
+- Existing collections are not reindexed automatically.
+- `OllamaEmbedder` remains available for `direct_ollama` rollback.
 - `local_embed` has a reserved timeout value only. GW-05a does not route
   embeddings through LiteLLM.
 - GW-06 evaluates `local_embed` but does not wire it into default RAG behavior.
 - GW-07 does not migrate embeddings; it keeps direct Ollama embeddings and uses
   LiteLLM only for answer generation.
 - GW-07 does not touch production Qdrant collections or `openclaw_knowledge`.
+- GW-08 does not touch production Qdrant collections or `openclaw_knowledge`.
 - Remote providers remain disabled.
 - FastAPI remains postponed.
 - MCP and tooling integration remain future direction, not implemented in

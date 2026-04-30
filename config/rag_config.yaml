@@ -8,17 +8,22 @@ rag:
     split_strategy: "paragraph_then_sentence"
 
   embedding:
+    active_backend: "gateway_litellm"
     model: "nomic-embed-text"
     endpoint: "http://localhost:11434"
     timeout_seconds: 30
     batch_size: 10
+    max_retries: 3
+    backoff_seconds: 1.0
+    max_concurrency: 4
     expected_dimensions: 768
     embedding_contract: "openai_compatible_v1_embeddings"
     embedding_alias: "quimera_embed"
     gateway_embedding_alias: "quimera_embed"
     gateway_compatibility_alias: "local_embed"
-    gateway_embedding_status: "evaluated_for_future_migration"
-    embedding_backend: "direct_ollama_current"
+    gateway_embedding_status: "controlled_migration_current"
+    embedding_backend: "gateway_litellm_current"
+    legacy_embedding_backend: "direct_ollama"
     embedding_provider: "ollama"
     embedding_model: "nomic-embed-text"
     embedding_dimensions: 768
