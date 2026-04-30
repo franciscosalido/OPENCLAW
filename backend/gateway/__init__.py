@@ -13,6 +13,7 @@ Runtime chat calls route through the local LiteLLM gateway. Gateway-0 establishe
 
 from backend.gateway.client import (
     DEFAULT_LLM_BASE_URL,
+    DEFAULT_LLM_EMBED_MODEL,
     DEFAULT_LLM_JSON_MODEL,
     DEFAULT_LLM_MODEL,
     DEFAULT_LLM_RAG_MODEL,
@@ -21,6 +22,11 @@ from backend.gateway.client import (
     GatewayRuntimeConfig,
 )
 from backend.gateway.config import GatewayConfig, load_gateway_config
+from backend.gateway.embed_client import (
+    DEFAULT_EMBEDDING_DIMENSIONS,
+    ENV_LLM_EMBED_MODEL,
+    GatewayEmbedClient,
+)
 from backend.gateway.errors import (
     GatewayAuthenticationError,
     GatewayConnectionError,
@@ -37,12 +43,16 @@ from backend.gateway.health import check_gateway_services, check_litellm_gateway
 __all__ = [
     # Config
     "DEFAULT_LLM_BASE_URL",
+    "DEFAULT_LLM_EMBED_MODEL",
     "DEFAULT_LLM_JSON_MODEL",
     "DEFAULT_LLM_MODEL",
     "DEFAULT_LLM_RAG_MODEL",
     "DEFAULT_LLM_REASONING_MODEL",
+    "DEFAULT_EMBEDDING_DIMENSIONS",
+    "ENV_LLM_EMBED_MODEL",
     "GatewayChatClient",
     "GatewayConfig",
+    "GatewayEmbedClient",
     "GatewayRuntimeConfig",
     "load_gateway_config",
     # Health
