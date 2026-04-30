@@ -60,6 +60,18 @@ model_list:
       response_contract: json
       thinking_mode: false
 
+  - model_name: quimera_embed
+    litellm_params:
+      model: os.environ/LITELLM_LOCAL_EMBED_MODEL
+      api_base: os.environ/OLLAMA_API_BASE
+      timeout: 30
+    model_info:
+      provider: ollama
+      purpose: canonical Quimera embedding alias for Qdrant RAG
+      embedding_contract: openai_compatible_v1_embeddings
+      compatibility_alias: local_embed
+      output_dimensions: 768
+
   - model_name: local_embed
     litellm_params:
       model: os.environ/LITELLM_LOCAL_EMBED_MODEL
@@ -67,7 +79,9 @@ model_list:
       timeout: 30
     model_info:
       provider: ollama
-      purpose: local embeddings for Qdrant RAG
+      purpose: compatibility alias for local embeddings
+      embedding_contract: openai_compatible_v1_embeddings
+      canonical_alias: quimera_embed
       output_dimensions: 768
 
 litellm_settings:

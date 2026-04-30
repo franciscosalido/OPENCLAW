@@ -254,3 +254,32 @@ Level 0 data must never be:
 **Decision:** The system may produce analysis, options, and checklists, but must not represent itself as fiduciary, discretionary, or autonomous execution software.
 
 **Why:** Legal, ethical, and regulatory boundary. OPENCLAW / QUIMERA is a decision-support and intelligence tool, not a financial advisor or execution engine.
+
+---
+
+## ADR-018 — OpenAI-Compatible Embeddings as the Internal Contract
+
+**Date:** 2026-04-29 | **Status:** Accepted | **File:** `docs/ADR/0002-openai-compatible-embeddings-contract.md`
+
+**Decision:** OpenAI-compatible `/v1/embeddings` is the internal embeddings
+contract. LiteLLM is the compatibility layer. `quimera_embed` is the canonical
+application-facing alias and `local_embed` remains as a compatibility alias.
+Ollama with `nomic-embed-text` is the initial backend. Any future backend change
+requires an explicit migration ADR and collection re-embedding.
+
+**Why:** Uniform client behavior — one parser, one error contract, one test
+surface. Decouples callers from backend provider choice. Enables future
+substitution without rewriting the caller layer.
+
+**Enforcement:**
+- New gateway-based embedding clients use `/v1/embeddings`; the current direct
+  `OllamaEmbedder` remains active until a future migration PR preserves or
+  replaces retry/backoff/concurrency behavior.
+- Every vector collection must persist `embedding_provider`, `embedding_model`,
+  `embedding_dimensions`, and `embedding_version`.
+- Mixing vectors from different models in the same collection is forbidden.
+- Anthropic is not a valid embeddings provider for this project.
+
+**Consequence:** GW-06 evaluation (cosine similarity 1.0, 768d parity)
+provides the evidence base for a future migration, but GW06C does not migrate
+production RAG embeddings and does not reindex Qdrant.

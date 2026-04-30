@@ -13,6 +13,17 @@ rag:
     timeout_seconds: 30
     batch_size: 10
     expected_dimensions: 768
+    embedding_contract: "openai_compatible_v1_embeddings"
+    embedding_alias: "quimera_embed"
+    gateway_embedding_alias: "quimera_embed"
+    gateway_compatibility_alias: "local_embed"
+    gateway_embedding_status: "evaluated_for_future_migration"
+    embedding_backend: "direct_ollama_current"
+    embedding_provider: "ollama"
+    embedding_model: "nomic-embed-text"
+    embedding_dimensions: 768
+    embedding_version: "local-ollama-current"
+    reindex_required_on_model_change: true
 
   qdrant:
     host: "localhost"
