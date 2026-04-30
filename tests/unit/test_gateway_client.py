@@ -11,6 +11,7 @@ import yaml
 from loguru import logger
 
 from backend.gateway.client import (
+    COMPAT_LLM_EMBED_MODEL,
     DEFAULT_LLM_ALIAS_TIMEOUTS,
     DEFAULT_LLM_BASE_URL,
     DEFAULT_LLM_EMBED_MODEL,
@@ -85,6 +86,7 @@ class GatewayRuntimeConfigTests(unittest.TestCase):
                 DEFAULT_LLM_RAG_MODEL: 60.0,
                 DEFAULT_LLM_JSON_MODEL: 30.0,
                 DEFAULT_LLM_EMBED_MODEL: 30.0,
+                COMPAT_LLM_EMBED_MODEL: 30.0,
             },
         )
 

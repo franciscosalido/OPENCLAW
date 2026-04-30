@@ -7,6 +7,8 @@ GW-05b adds live smoke timing validation and logs the effective timeout budget
 used by each gateway call.
 GW-06 evaluates `local_embed` embeddings through LiteLLM without changing the
 default RAG embedding path.
+GW-07 adds optional synthetic RAG E2E smoke for the current production-safe path:
+direct Ollama embeddings, temporary Qdrant collection, and LiteLLM generation.
 The default runtime path is:
 
 ```text
@@ -142,6 +144,68 @@ Interpretation:
   embedder remains direct Ollama until a future migration PR preserves or
   replaces retry/backoff/concurrency behavior.
 
+## Optional Synthetic RAG E2E Smoke
+
+GW-07 proves the current RAG path end to end with synthetic data only:
+
+```text
+synthetic docs
+  -> chunking
+  -> OllamaEmbedder direct /api/embed
+  -> Qdrant temporary collection
+  -> Retriever / ContextPacker / PromptBuilder
+  -> LocalGenerator / GatewayChatClient
+  -> LiteLLM /v1/chat/completions
+  -> Ollama / Qwen local
+```
+
+Embeddings remain direct through `OllamaEmbedder` in GW-07. The test records
+the GW06C embedding metadata contract in the temporary chunks, including
+`quimera_embed`, but it does not route production embeddings through LiteLLM.
+
+Run the compact script when Qdrant, Ollama, LiteLLM, and the local gateway key
+are already available:
+
+```bash
+export QUIMERA_LLM_API_KEY="${LITELLM_MASTER_KEY}"
+scripts/test_rag_e2e_gateway.sh
+```
+
+Run pytest directly:
+
+```bash
+RUN_RAG_E2E_SMOKE=1 uv run pytest tests/smoke/test_rag_e2e_gateway_smoke.py -v
+```
+
+GW-07 smoke is skipped by default. It uses a unique temporary Qdrant collection
+named `gw07_synthetic_rag_<short_uuid>` and deletes it during teardown. It never
+uses or deletes `openclaw_knowledge`.
+
+If a run is interrupted, clean up manually only by deleting collections whose
+names start with `gw07_synthetic_rag_`.
+
+The synthetic corpus is PT-BR and fictitious. It contains no real portfolio
+data, no real tickers, no private documents, no patient data, and no remote
+provider calls.
+
+Qdrant creates the temporary collection with vector size `768` and cosine
+distance, matching the local `nomic-embed-text` embedding metadata. Collection
+payloads include provider, model, dimensions, version, contract, alias, and
+backend so future reindexing decisions can be audited.
+
+GW-07 live result recorded on 2026-04-30:
+
+| Stage | Latency |
+|---|---:|
+| embedding/indexing | 117.9 ms |
+| retrieval | 19.5 ms |
+| generation through `local_rag` | 2938.8 ms |
+| total pipeline | 2958.4 ms |
+
+The run used 3 synthetic PT-BR documents, generated 7 chunks, used 5 retrieved
+chunks, and completed cleanup of the temporary collection without reported
+errors.
+
 ## What Changed
 
 - `backend.rag.generator.LocalGenerator` now sends OpenAI-compatible
@@ -167,6 +231,9 @@ Interpretation:
 - `local_embed` has a reserved timeout value only. GW-05a does not route
   embeddings through LiteLLM.
 - GW-06 evaluates `local_embed` but does not wire it into default RAG behavior.
+- GW-07 does not migrate embeddings; it keeps direct Ollama embeddings and uses
+  LiteLLM only for answer generation.
+- GW-07 does not touch production Qdrant collections or `openclaw_knowledge`.
 - Remote providers remain disabled.
 - FastAPI remains postponed.
 - MCP and tooling integration remain future direction, not implemented in

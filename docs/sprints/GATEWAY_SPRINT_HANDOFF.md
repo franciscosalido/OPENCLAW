@@ -2,7 +2,7 @@
 
 > Start each Gateway cycle by reading this file before touching Git.
 
-**Last updated:** 2026-04-28
+**Last updated:** 2026-04-30
 **Repository:** OpenClaw
 **Product:** Quimera
 **Sprint:** Gateway-0 / LiteLLM
@@ -48,13 +48,13 @@ unavoidable, use `git push --force-with-lease`.
 Current active branch:
 
 ```text
-feat/gateway-local-embed-evaluation
+feat/gateway-rag-e2e-synthetic
 ```
 
 Current issue:
 
 ```text
-https://github.com/franciscosalido/OPENCLAW/issues/30
+https://github.com/franciscosalido/OPENCLAW/issues/38
 ```
 
 Gateway baseline already merged:
@@ -63,7 +63,8 @@ Gateway baseline already merged:
 GW-01 through GW-04 are merged in 92c0ec5.
 GW-05a is merged in 96278f6.
 GW-05b live smoke fixes are merged through 5c42547.
-GW-06 branches from the post-GW-05b baseline.
+GW-06 local_embed evaluation and GW06C embeddings contract are merged.
+GW-07 branches from the post-GW06C baseline.
 ```
 
 Gateway PR state:
@@ -76,8 +77,9 @@ Gateway PR state:
 | GW-04 | `feat/gateway-runtime-smoke` | Shared validation, optional smoke, observability | Merged in `92c0ec5` |
 | GW-05a | `feat/gateway-per-alias-timeouts` | Per-alias timeout configuration | Merged in `96278f6` |
 | GW-05b | `feat/gateway-live-smoke-timeouts` | Live smoke with effective timeout observability | Merged through `5c42547` |
-| GW-06 | `feat/gateway-local-embed-evaluation` | Evaluate embeddings via `local_embed` | Current |
-| GW-07 | TBD | Synthetic RAG E2E through gateway path | Planned |
+| GW-06 | `feat/gateway-local-embed-evaluation` | Evaluate embeddings via `local_embed` | Merged |
+| GW06C | `feat/adr-openai-compatible-embeddings-contract` | ADR for OpenAI-compatible embeddings contract and `quimera_embed` | Merged |
+| GW-07 | `feat/gateway-rag-e2e-synthetic` | Synthetic RAG E2E through gateway path | Current |
 
 ---
 
@@ -119,7 +121,7 @@ Out of scope:
 
 ---
 
-## GW-06 Current Work
+## GW-06 Completed Work
 
 Objective:
 
@@ -213,12 +215,96 @@ GW-07:
 
 - Run synthetic RAG E2E over the approved gateway path.
 - Keep all data fictitious and local.
+- Use `OllamaEmbedder` direct to Ollama for embeddings.
+- Use Qdrant only through a temporary collection named
+  `gw07_synthetic_rag_<short_uuid>`.
+- Use `GatewayChatClient`/`LocalGenerator` through LiteLLM for generation.
+- Do not touch `openclaw_knowledge`.
+
+## GW-07 Current Work
+
+Objective:
+
+Prove the current production-safe RAG path end to end using only synthetic data:
+
+```text
+synthetic docs
+  -> chunking
+  -> OllamaEmbedder direct at Ollama /api/embed
+  -> Qdrant temporary collection
+  -> Retriever
+  -> ContextPacker
+  -> PromptBuilder
+  -> LocalGenerator / GatewayChatClient
+  -> LiteLLM /v1/chat/completions
+  -> Ollama / Qwen local
+  -> answer with citations
+```
+
+Scope:
+
+- Add optional live smoke guarded by `RUN_RAG_E2E_SMOKE=1`.
+- Create a unique temporary Qdrant collection per run using prefix
+  `gw07_synthetic_rag_`.
+- Delete only collections with that prefix during cleanup.
+- Persist GW06C embedding metadata in synthetic chunk payloads:
+  provider, model, dimensions, version, contract, alias, and backend.
+- Keep embeddings direct via Ollama; `quimera_embed` is metadata/contract only.
+- Generate the final answer through LiteLLM using `local_rag`.
+
+Out of scope:
+
+- Production RAG embedding migration.
+- Qdrant reindexing.
+- Touching `openclaw_knowledge`.
+- Real documents, real portfolio data, private files, or patient data.
+- FastAPI, MCP, remote providers, quant tools, and autoprogramming.
+
+Manual run:
+
+```bash
+export QUIMERA_LLM_API_KEY="${LITELLM_MASTER_KEY}"
+scripts/test_rag_e2e_gateway.sh
+```
+
+Direct pytest run:
+
+```bash
+RUN_RAG_E2E_SMOKE=1 uv run pytest tests/smoke/test_rag_e2e_gateway_smoke.py -v
+```
+
+Cleanup rule:
+
+If a run is interrupted and a temporary collection remains, delete only Qdrant
+collections whose names start with `gw07_synthetic_rag_`.
+
+Live result:
+
+- **2026-04-30: PASSED** — synthetic RAG E2E over local Qdrant, Ollama, and
+  LiteLLM.
+- Command: `RUN_RAG_E2E_SMOKE=1 uv run pytest tests/smoke/test_rag_e2e_gateway_smoke.py -v -s`.
+- Corpus: 3 PT-BR synthetic documents, 7 chunks, 5 chunks used.
+- Temporary collection pattern: `gw07_synthetic_rag_<short_uuid>`.
+- Collection cleanup: implemented with prefix guard and completed without
+  reported cleanup errors.
+- Generation alias: `local_rag`.
+- Embedding path: direct `OllamaEmbedder` / Ollama `/api/embed`.
+- Embedding metadata: GW06C fields persisted in synthetic payloads.
+
+Observed latencies (2026-04-30, macOS local):
+
+| Stage | Latency |
+|---|---:|
+| embedding/indexing | 117.9 ms |
+| retrieval | 19.5 ms |
+| generation | 2938.8 ms |
+| total pipeline | 2958.4 ms |
 
 ---
 
 ## Validation Checklist
 
-Before opening GW-06 PR:
+Before opening GW-07 PR:
 
 ```bash
 git status --short --branch
@@ -232,8 +318,8 @@ uv run pytest tests/unit/test_gateway_embed_client.py -v
 uv run pytest tests/smoke/ -v
 ```
 
-Expected embedding smoke behavior without `RUN_LITELLM_EMBED_SMOKE=1`: smoke
-tests skip, not fail.
+Expected smoke behavior without guards: live gateway, embedding, and RAG E2E
+smoke tests skip, not fail.
 
 Optional live checks when local services and credentials are already available:
 
@@ -241,4 +327,12 @@ Optional live checks when local services and credentials are already available:
 export QUIMERA_LLM_API_KEY="${LITELLM_MASTER_KEY}"
 RUN_LITELLM_EMBED_SMOKE=1 uv run pytest tests/smoke/test_gateway_embed_smoke.py -v
 scripts/test_local_embed_litellm.sh
+```
+
+Optional GW-07 live check when Qdrant, Ollama, LiteLLM, and credentials are
+already available:
+
+```bash
+export QUIMERA_LLM_API_KEY="${LITELLM_MASTER_KEY}"
+scripts/test_rag_e2e_gateway.sh
 ```

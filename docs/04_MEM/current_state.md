@@ -4,8 +4,8 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Last updated:** 2026-04-28
-**Updated by:** Codex — Gateway GW-06 local_embed evaluation
+**Last updated:** 2026-04-30
+**Updated by:** Codex — Gateway GW-07 synthetic RAG E2E
 
 ---
 
@@ -35,6 +35,19 @@ GW-06 adds an experimental evaluation-only path:
 GatewayEmbedClient
   -> LiteLLM at http://127.0.0.1:4000/v1/embeddings
   -> Ollama / nomic-embed-text local
+```
+
+GW-07 proves the current RAG E2E path without migrating embeddings:
+
+```text
+synthetic docs
+  -> chunking
+  -> OllamaEmbedder direct at http://127.0.0.1:11434/api/embed
+  -> Qdrant temporary collection gw07_synthetic_rag_<short_uuid>
+  -> Retriever / ContextPacker / PromptBuilder
+  -> LocalGenerator / GatewayChatClient
+  -> LiteLLM at http://127.0.0.1:4000/v1/chat/completions
+  -> Ollama / Qwen local
 ```
 
 Hard constraints remain:
@@ -81,12 +94,14 @@ unavoidable, use `git push --force-with-lease`.
 | GW-04 | `feat/gateway-runtime-smoke` | Shared message validation, optional smoke, observability | Done / merged |
 | GW-05a | `feat/gateway-per-alias-timeouts` | Per-alias timeout configuration | Done / merged |
 | GW-05b | `feat/gateway-live-smoke-timeouts` | Live smoke with effective timeout observability | Done / merged |
-| GW-06 | `feat/gateway-local-embed-evaluation` | Evaluate embeddings via `local_embed` | Current |
-| GW-07 | TBD | Synthetic RAG E2E through gateway path | Planned |
+| GW-06 | `feat/gateway-local-embed-evaluation` | Evaluate embeddings via `local_embed` | Done / merged |
+| GW06C | `feat/adr-openai-compatible-embeddings-contract` | OpenAI-compatible embeddings ADR and `quimera_embed` | Done / merged |
+| GW-07 | `feat/gateway-rag-e2e-synthetic` | Synthetic RAG E2E through gateway path | Current |
 
 GW-05a issue: <https://github.com/franciscosalido/OPENCLAW/issues/25>
 GW-05b issue: <https://github.com/franciscosalido/OPENCLAW/issues/28>
 GW-06 issue: <https://github.com/franciscosalido/OPENCLAW/issues/30>
+GW-07 issue: <https://github.com/franciscosalido/OPENCLAW/issues/38>
 
 ---
 
@@ -162,10 +177,53 @@ GW-07:
 
 - Prove a synthetic RAG end-to-end flow against the gateway path.
 - Keep Qdrant data synthetic and local.
+- Use a unique temporary collection named `gw07_synthetic_rag_<short_uuid>`.
+- Delete only temporary collections with the `gw07_synthetic_rag_` prefix.
+- Never touch `openclaw_knowledge`.
+- Keep embeddings direct through `OllamaEmbedder`; `quimera_embed` appears only
+  as embedding contract metadata in this PR.
+- Generate the final answer through LiteLLM using `local_rag`.
+- Run only when explicitly enabled with `RUN_RAG_E2E_SMOKE=1`.
+
+Manual live command:
+
+```bash
+export QUIMERA_LLM_API_KEY="${LITELLM_MASTER_KEY}"
+scripts/test_rag_e2e_gateway.sh
+```
+
+Direct pytest command:
+
+```bash
+RUN_RAG_E2E_SMOKE=1 uv run pytest tests/smoke/test_rag_e2e_gateway_smoke.py -v
+```
+
+If cleanup is interrupted, manually delete only Qdrant collections whose names
+start with `gw07_synthetic_rag_`.
+
+Live status:
+
+- **2026-04-30: PASSED** — Cenário A completo for GW-07.
+- Command: `RUN_RAG_E2E_SMOKE=1 uv run pytest tests/smoke/test_rag_e2e_gateway_smoke.py -v -s`.
+- Corpus: 3 PT-BR synthetic documents, 7 chunks, 5 chunks retrieved/used.
+- Temporary collection: `gw07_synthetic_rag_<short_uuid>` with prefix-guarded
+  cleanup.
+- Embedding path: direct `OllamaEmbedder` to Ollama `/api/embed`.
+- Generation path: `LocalGenerator` / `GatewayChatClient` through LiteLLM
+  `local_rag`.
+
+Observed GW-07 latencies (2026-04-30):
+
+| Stage | Latency |
+|---|---:|
+| embedding/indexing | 117.9 ms |
+| retrieval | 19.5 ms |
+| generation | 2938.8 ms |
+| total pipeline | 2958.4 ms |
 
 ---
 
-## Validation Expectations For GW-06
+## Validation Expectations For GW-07
 
 Before opening PR:
 
@@ -179,8 +237,8 @@ uv run pytest tests/unit/test_gateway_embed_client.py -v
 uv run pytest tests/smoke/ -v
 ```
 
-Embedding smoke tests should skip by default unless
-`RUN_LITELLM_EMBED_SMOKE=1` is set.
+Live smoke tests should skip by default unless their explicit guards are set.
+GW-07 requires `RUN_RAG_E2E_SMOKE=1`.
 
 Optional live validation when local services are already running:
 
@@ -188,4 +246,12 @@ Optional live validation when local services are already running:
 export QUIMERA_LLM_API_KEY="${LITELLM_MASTER_KEY}"
 RUN_LITELLM_EMBED_SMOKE=1 uv run pytest tests/smoke/test_gateway_embed_smoke.py -v
 scripts/test_local_embed_litellm.sh
+```
+
+Optional GW-07 live validation when Qdrant, Ollama, LiteLLM, and credentials are
+already running locally:
+
+```bash
+export QUIMERA_LLM_API_KEY="${LITELLM_MASTER_KEY}"
+scripts/test_rag_e2e_gateway.sh
 ```
