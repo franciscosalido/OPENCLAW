@@ -204,11 +204,15 @@ class TestActualGatewayConfig(unittest.TestCase):
     def setUp(self) -> None:
         self.config = load_gateway_config(_YAML_PATH)
 
-    def test_all_five_required_aliases_present(self) -> None:
-        self.assertEqual(
+    def test_all_required_aliases_present(self) -> None:
+        self.assertTrue(
+            REQUIRED_ALIASES.issubset(self.config.alias_names),
+            "All required aliases must be defined in litellm_config.yaml",
+        )
+        self.assertIn(
+            "quimera_embed",
             self.config.alias_names,
-            REQUIRED_ALIASES,
-            "All five required aliases must be defined in litellm_config.yaml",
+            "quimera_embed must remain available as the canonical embedding alias",
         )
 
     def test_all_aliases_use_local_api_base(self) -> None:

@@ -95,7 +95,14 @@ class LiteLLMInfraScriptTests(unittest.TestCase):
 
         self.assertEqual(
             aliases,
-            {"local_chat", "local_think", "local_rag", "local_json", "local_embed"},
+            {
+                "local_chat",
+                "local_think",
+                "local_rag",
+                "local_json",
+                "quimera_embed",
+                "local_embed",
+            },
         )
         for item in model_list:
             params = item["litellm_params"]
