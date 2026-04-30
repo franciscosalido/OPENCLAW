@@ -178,11 +178,11 @@ RUN_RAG_E2E_SMOKE=1 uv run pytest tests/smoke/test_rag_e2e_gateway_smoke.py -v
 ```
 
 GW-07 smoke is skipped by default. It uses a unique temporary Qdrant collection
-named `gw07_synthetic_rag_<short_uuid>` and deletes it during teardown. It never
-uses or deletes `openclaw_knowledge`.
+named `gw07_synthetic_rag_<short_uuid>` and attempts prefix-guarded deletion
+during teardown. It never uses or deletes `openclaw_knowledge`.
 
-If a run is interrupted, clean up manually only by deleting collections whose
-names start with `gw07_synthetic_rag_`.
+If a run is interrupted, teardown may not complete. Clean up manually only by
+deleting collections whose names start with `gw07_synthetic_rag_`.
 
 The synthetic corpus is PT-BR and fictitious. It contains no real portfolio
 data, no real tickers, no private documents, no patient data, and no remote
@@ -197,14 +197,14 @@ GW-07 live result recorded on 2026-04-30:
 
 | Stage | Latency |
 |---|---:|
-| embedding/indexing | 117.9 ms |
-| retrieval | 19.5 ms |
-| generation through `local_rag` | 2938.8 ms |
-| total pipeline | 2958.4 ms |
+| embedding/indexing | 178.1 ms |
+| retrieval | 18.4 ms |
+| generation through `local_rag` | 3621.2 ms |
+| total pipeline | 3639.6 ms |
 
-The run used 3 synthetic PT-BR documents, generated 7 chunks, used 5 retrieved
+The run used 3 synthetic PT-BR documents, generated 14 chunks, used 5 retrieved
 chunks, and completed cleanup of the temporary collection without reported
-errors.
+errors. Future interrupted runs may still require manual prefix-only cleanup.
 
 ## What Changed
 

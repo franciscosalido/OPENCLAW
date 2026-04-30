@@ -178,7 +178,8 @@ GW-07:
 - Prove a synthetic RAG end-to-end flow against the gateway path.
 - Keep Qdrant data synthetic and local.
 - Use a unique temporary collection named `gw07_synthetic_rag_<short_uuid>`.
-- Delete only temporary collections with the `gw07_synthetic_rag_` prefix.
+- Attempt prefix-guarded cleanup and delete only temporary collections with the
+  `gw07_synthetic_rag_` prefix.
 - Never touch `openclaw_knowledge`.
 - Keep embeddings direct through `OllamaEmbedder`; `quimera_embed` appears only
   as embedding contract metadata in this PR.
@@ -198,16 +199,17 @@ Direct pytest command:
 RUN_RAG_E2E_SMOKE=1 uv run pytest tests/smoke/test_rag_e2e_gateway_smoke.py -v
 ```
 
-If cleanup is interrupted, manually delete only Qdrant collections whose names
-start with `gw07_synthetic_rag_`.
+Cleanup is attempted in teardown. If cleanup is interrupted, manually delete
+only Qdrant collections whose names start with `gw07_synthetic_rag_`.
 
 Live status:
 
 - **2026-04-30: PASSED** — Cenário A completo for GW-07.
 - Command: `RUN_RAG_E2E_SMOKE=1 uv run pytest tests/smoke/test_rag_e2e_gateway_smoke.py -v -s`.
-- Corpus: 3 PT-BR synthetic documents, 7 chunks, 5 chunks retrieved/used.
+- Corpus: 3 PT-BR synthetic documents, 14 chunks, 5 chunks retrieved/used.
 - Temporary collection: `gw07_synthetic_rag_<short_uuid>` with prefix-guarded
-  cleanup.
+  cleanup for the recorded run; interrupted runs may require manual cleanup by
+  prefix.
 - Embedding path: direct `OllamaEmbedder` to Ollama `/api/embed`.
 - Generation path: `LocalGenerator` / `GatewayChatClient` through LiteLLM
   `local_rag`.
@@ -216,10 +218,10 @@ Observed GW-07 latencies (2026-04-30):
 
 | Stage | Latency |
 |---|---:|
-| embedding/indexing | 117.9 ms |
-| retrieval | 19.5 ms |
-| generation | 2938.8 ms |
-| total pipeline | 2958.4 ms |
+| embedding/indexing | 178.1 ms |
+| retrieval | 18.4 ms |
+| generation | 3621.2 ms |
+| total pipeline | 3639.6 ms |
 
 ---
 

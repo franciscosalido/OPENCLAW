@@ -246,7 +246,7 @@ Scope:
 - Add optional live smoke guarded by `RUN_RAG_E2E_SMOKE=1`.
 - Create a unique temporary Qdrant collection per run using prefix
   `gw07_synthetic_rag_`.
-- Delete only collections with that prefix during cleanup.
+- Attempt prefix-guarded cleanup and delete only collections with that prefix.
 - Persist GW06C embedding metadata in synthetic chunk payloads:
   provider, model, dimensions, version, contract, alias, and backend.
 - Keep embeddings direct via Ollama; `quimera_embed` is metadata/contract only.
@@ -275,18 +275,20 @@ RUN_RAG_E2E_SMOKE=1 uv run pytest tests/smoke/test_rag_e2e_gateway_smoke.py -v
 
 Cleanup rule:
 
-If a run is interrupted and a temporary collection remains, delete only Qdrant
-collections whose names start with `gw07_synthetic_rag_`.
+Cleanup is attempted in teardown. If a run is interrupted and a temporary
+collection remains, delete only Qdrant collections whose names start with
+`gw07_synthetic_rag_`.
 
 Live result:
 
 - **2026-04-30: PASSED** — synthetic RAG E2E over local Qdrant, Ollama, and
   LiteLLM.
 - Command: `RUN_RAG_E2E_SMOKE=1 uv run pytest tests/smoke/test_rag_e2e_gateway_smoke.py -v -s`.
-- Corpus: 3 PT-BR synthetic documents, 7 chunks, 5 chunks used.
+- Corpus: 3 PT-BR synthetic documents, 14 chunks, 5 chunks used.
 - Temporary collection pattern: `gw07_synthetic_rag_<short_uuid>`.
 - Collection cleanup: implemented with prefix guard and completed without
-  reported cleanup errors.
+  reported cleanup errors for the recorded run. Interrupted runs may require
+  manual prefix-only cleanup.
 - Generation alias: `local_rag`.
 - Embedding path: direct `OllamaEmbedder` / Ollama `/api/embed`.
 - Embedding metadata: GW06C fields persisted in synthetic payloads.
@@ -295,10 +297,10 @@ Observed latencies (2026-04-30, macOS local):
 
 | Stage | Latency |
 |---|---:|
-| embedding/indexing | 117.9 ms |
-| retrieval | 19.5 ms |
-| generation | 2938.8 ms |
-| total pipeline | 2958.4 ms |
+| embedding/indexing | 178.1 ms |
+| retrieval | 18.4 ms |
+| generation | 3621.2 ms |
+| total pipeline | 3639.6 ms |
 
 ---
 
