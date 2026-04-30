@@ -29,7 +29,8 @@ DEFAULT_LLM_REASONING_MODEL = "local_think"
 DEFAULT_LLM_RAG_MODEL = "local_rag"
 DEFAULT_LLM_JSON_MODEL = "local_json"
 DEFAULT_LLM_TIMEOUT_SECONDS = 120.0
-DEFAULT_LLM_EMBED_MODEL = "local_embed"
+DEFAULT_LLM_EMBED_MODEL = "quimera_embed"
+COMPAT_LLM_EMBED_MODEL = "local_embed"
 # Python-side HTTPX timeouts are the first line of defense. LiteLLM-side
 # timeouts in config/litellm_config.yaml may differ intentionally.
 DEFAULT_LLM_ALIAS_TIMEOUTS: Mapping[str, float] = {
@@ -38,6 +39,7 @@ DEFAULT_LLM_ALIAS_TIMEOUTS: Mapping[str, float] = {
     DEFAULT_LLM_RAG_MODEL: 60.0,
     DEFAULT_LLM_JSON_MODEL: 30.0,
     DEFAULT_LLM_EMBED_MODEL: 30.0,
+    COMPAT_LLM_EMBED_MODEL: 30.0,
 }
 
 ENV_LLM_BASE_URL = "QUIMERA_LLM_BASE_URL"
