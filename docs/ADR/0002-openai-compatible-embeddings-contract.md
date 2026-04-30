@@ -122,6 +122,10 @@ Every vector collection must persist at least:
 - `embedding_dimensions`
 - `embedding_version`
 
+Collection metadata must accurately reflect the actual embedding source.
+Recording a model or provider that was not used to generate the vectors is
+forbidden.
+
 Recommended metadata:
 
 - `embedding_contract`

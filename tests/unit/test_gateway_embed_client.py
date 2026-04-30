@@ -156,13 +156,10 @@ class GatewayEmbedClientTests(unittest.IsolatedAsyncioTestCase):
                 await gateway.embed("texto sintetico")
 
     async def test_missing_api_key_fails_clearly(self) -> None:
-        async with httpx.AsyncClient(base_url=DEFAULT_LLM_BASE_URL) as client:
-            with self.assertRaises(GatewayAuthenticationError) as ctx:
-                GatewayEmbedClient(
-                    config=GatewayRuntimeConfig(api_key=None),
-                    client=client,
-                )
-
+        # GatewayRuntimeConfig.validated() raises GatewayAuthenticationError
+        # before any HTTP client is constructed — no real httpx.AsyncClient needed.
+        with self.assertRaises(GatewayAuthenticationError) as ctx:
+            GatewayEmbedClient(config=GatewayRuntimeConfig(api_key=None))
         self.assertIn("QUIMERA_LLM_API_KEY", str(ctx.exception))
 
     async def test_auth_error_maps_to_gateway_authentication_error(self) -> None:
