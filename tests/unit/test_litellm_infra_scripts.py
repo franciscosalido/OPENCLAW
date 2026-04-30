@@ -44,6 +44,7 @@ class LiteLLMInfraScriptTests(unittest.TestCase):
             INFRA_DIR / "test_local_chat.sh",
             REPO_ROOT / "scripts" / "check_litellm_gateway.sh",
             REPO_ROOT / "scripts" / "test_opencraw_litellm_runtime.sh",
+            REPO_ROOT / "scripts" / "test_gw08_embedding_migration.sh",
         ):
             with self.subTest(path=path):
                 mode = path.stat().st_mode

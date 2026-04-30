@@ -1,10 +1,11 @@
-"""Experimental OpenAI-compatible embeddings client for the LiteLLM gateway."""
+"""OpenAI-compatible embeddings client for the local LiteLLM gateway."""
 
 from __future__ import annotations
 
+import asyncio
 import os
 import time
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any, cast
 
@@ -26,15 +27,17 @@ from backend.gateway.errors import (
 
 ENV_LLM_EMBED_MODEL = "QUIMERA_LLM_EMBED_MODEL"
 DEFAULT_EMBEDDING_DIMENSIONS = 768
+DEFAULT_EMBED_MAX_RETRIES = 3
+DEFAULT_EMBED_BACKOFF_SECONDS = 1.0
+DEFAULT_EMBED_MAX_CONCURRENCY = 4
+TRANSIENT_STATUS_CODES = {408, 409, 425, 429, 500, 502, 503, 504}
+
+SleepFn = Callable[[float], Awaitable[None]]
 
 
 @dataclass
 class GatewayEmbedClient:
-    """Small experimental client for LiteLLM ``/embeddings`` calls.
-
-    This client is evaluation-only in GW-06. It is not wired as the default RAG
-    embedder and does not replace ``backend.rag.embeddings.OllamaEmbedder``.
-    """
+    """Small async client for LiteLLM ``/embeddings`` calls."""
 
     config: GatewayRuntimeConfig = field(
         default_factory=lambda: GatewayRuntimeConfig.from_env().validated()
@@ -46,7 +49,11 @@ class GatewayEmbedClient:
         )
     )
     expected_dimensions: int = DEFAULT_EMBEDDING_DIMENSIONS
+    max_retries: int = DEFAULT_EMBED_MAX_RETRIES
+    backoff_seconds: float = DEFAULT_EMBED_BACKOFF_SECONDS
+    max_concurrency: int = DEFAULT_EMBED_MAX_CONCURRENCY
     client: httpx.AsyncClient | None = None
+    sleep: SleepFn = asyncio.sleep
     _owns_client: bool = field(init=False, default=False)
 
     def __post_init__(self) -> None:
@@ -58,6 +65,12 @@ class GatewayEmbedClient:
             raise GatewayConfigurationError(
                 "expected_dimensions must be greater than zero"
             )
+        if self.max_retries < 0:
+            raise GatewayConfigurationError("max_retries cannot be negative")
+        if self.backoff_seconds < 0:
+            raise GatewayConfigurationError("backoff_seconds cannot be negative")
+        if self.max_concurrency <= 0:
+            raise GatewayConfigurationError("max_concurrency must be greater than zero")
         if self.client is None:
             self.client = httpx.AsyncClient(
                 base_url=self.config.base_url,
@@ -92,13 +105,20 @@ class GatewayEmbedClient:
         clean_texts = [_validate_text(text) for text in texts]
         if not clean_texts:
             return []
-        vectors = await self._embed_payload(clean_texts)
-        if len(vectors) != len(clean_texts):
-            raise GatewayResponseError(
-                "LiteLLM embedding response count did not match input count.",
-                alias=self.model,
-            )
-        return vectors
+
+        semaphore = asyncio.Semaphore(self.max_concurrency)
+
+        async def _embed_one(text: str) -> list[float]:
+            async with semaphore:
+                vectors = await self._embed_payload(text)
+                if len(vectors) != 1:
+                    raise GatewayResponseError(
+                        "LiteLLM embedding response did not contain exactly one vector.",
+                        alias=self.model,
+                    )
+                return vectors[0]
+
+        return list(await asyncio.gather(*(_embed_one(text) for text in clean_texts)))
 
     async def _embed_payload(self, input_value: str | list[str]) -> list[list[float]]:
         if self.client is None:
@@ -108,86 +128,111 @@ class GatewayEmbedClient:
         payload: dict[str, object] = {"model": self.model, "input": input_value}
         start = time.perf_counter()
 
-        try:
-            response = await self.client.post(
-                "/embeddings",
-                json=payload,
-                headers={"Authorization": f"Bearer {self.config.api_key}"},
-                timeout=request_timeout,
-            )
-        except httpx.TimeoutException as exc:
-            _log_embed_call(
-                model_alias=self.model,
-                started_at=start,
-                timeout_s=request_timeout,
-                status="failure",
-                error_category="timeout",
-            )
-            raise GatewayTimeoutError(
-                "Timed out calling local LiteLLM embeddings gateway.",
-                alias=self.model,
-            ) from exc
-        except httpx.RequestError as exc:
-            _log_embed_call(
-                model_alias=self.model,
-                started_at=start,
-                timeout_s=request_timeout,
-                status="failure",
-                error_category="connection",
-            )
-            raise GatewayConnectionError(
-                "Could not reach local LiteLLM embeddings gateway. "
-                "Start infra/litellm/start_litellm.sh and verify /v1/models.",
-                alias=self.model,
-            ) from exc
+        for attempt in range(self.max_retries + 1):
+            try:
+                response = await self.client.post(
+                    "/embeddings",
+                    json=payload,
+                    headers={"Authorization": f"Bearer {self.config.api_key}"},
+                    timeout=request_timeout,
+                )
+            except httpx.TimeoutException as exc:
+                if attempt < self.max_retries:
+                    await self._sleep_before_retry(attempt)
+                    continue
+                _log_embed_call(
+                    model_alias=self.model,
+                    started_at=start,
+                    timeout_s=request_timeout,
+                    status="failure",
+                    error_category="timeout",
+                )
+                raise GatewayTimeoutError(
+                    "Timed out calling local LiteLLM embeddings gateway.",
+                    alias=self.model,
+                ) from exc
+            except httpx.RequestError as exc:
+                if attempt < self.max_retries:
+                    await self._sleep_before_retry(attempt)
+                    continue
+                _log_embed_call(
+                    model_alias=self.model,
+                    started_at=start,
+                    timeout_s=request_timeout,
+                    status="failure",
+                    error_category="connection",
+                )
+                raise GatewayConnectionError(
+                    "Could not reach local LiteLLM embeddings gateway. "
+                    "Start infra/litellm/start_litellm.sh and verify /v1/models.",
+                    alias=self.model,
+                ) from exc
 
-        if response.status_code in {401, 403}:
+            if response.status_code in {401, 403}:
+                _log_embed_call(
+                    model_alias=self.model,
+                    started_at=start,
+                    timeout_s=request_timeout,
+                    status="failure",
+                    error_category="authentication",
+                )
+                raise GatewayAuthenticationError(
+                    "LiteLLM embeddings gateway authentication failed. "
+                    "QUIMERA_LLM_API_KEY should match LITELLM_MASTER_KEY.",
+                    alias=self.model,
+                )
+            if response.status_code >= 400:
+                if (
+                    response.status_code in TRANSIENT_STATUS_CODES
+                    and attempt < self.max_retries
+                ):
+                    await self._sleep_before_retry(attempt)
+                    continue
+                _log_embed_call(
+                    model_alias=self.model,
+                    started_at=start,
+                    timeout_s=request_timeout,
+                    status="failure",
+                    error_category=f"http_{response.status_code}",
+                )
+                raise GatewayResponseError(
+                    f"LiteLLM embeddings gateway returned HTTP {response.status_code}.",
+                    alias=self.model,
+                )
+
+            try:
+                body = cast(dict[str, Any], response.json())
+            except ValueError as exc:
+                raise GatewayResponseError(
+                    "LiteLLM embeddings gateway returned invalid JSON.",
+                    alias=self.model,
+                ) from exc
+
+            vectors = _extract_embeddings(
+                body,
+                expected_dimensions=self.expected_dimensions,
+                alias=self.model,
+            )
             _log_embed_call(
                 model_alias=self.model,
                 started_at=start,
                 timeout_s=request_timeout,
-                status="failure",
-                error_category="authentication",
+                status="success",
+                error_category=None,
             )
-            raise GatewayAuthenticationError(
-                "LiteLLM embeddings gateway authentication failed. "
-                "QUIMERA_LLM_API_KEY should match LITELLM_MASTER_KEY.",
-                alias=self.model,
-            )
-        if response.status_code >= 400:
-            _log_embed_call(
-                model_alias=self.model,
-                started_at=start,
-                timeout_s=request_timeout,
-                status="failure",
-                error_category=f"http_{response.status_code}",
-            )
-            raise GatewayResponseError(
-                f"LiteLLM embeddings gateway returned HTTP {response.status_code}.",
-                alias=self.model,
-            )
+            return vectors
 
-        try:
-            body = cast(dict[str, Any], response.json())
-        except ValueError as exc:
-            raise GatewayResponseError(
-                "LiteLLM embeddings gateway returned invalid JSON.",
-                alias=self.model,
-            ) from exc
+        raise RuntimeError("unreachable retry state")  # pragma: no cover
 
-        vectors = _extract_embeddings(
-            body,
-            expected_dimensions=self.expected_dimensions,
-            alias=self.model,
+    async def _sleep_before_retry(self, attempt: int) -> None:
+        wait_seconds = self.backoff_seconds * (2**attempt)
+        logger.debug(
+            "gateway_embed_retry | model_alias={} attempt={} wait_s={:.2f}",
+            self.model,
+            attempt + 1,
+            wait_seconds,
         )
-        _log_embed_call(
-            model_alias=self.model,
-            started_at=start,
-            timeout_s=request_timeout,
-            status="success",
-            error_category=None,
-        )
-        return vectors
+        await self.sleep(wait_seconds)
 
 
 def _validate_text(text: str) -> str:

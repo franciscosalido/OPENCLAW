@@ -48,13 +48,13 @@ unavoidable, use `git push --force-with-lease`.
 Current active branch:
 
 ```text
-feat/gateway-rag-e2e-synthetic
+feat/rag-controlled-embedding-migration
 ```
 
 Current issue:
 
 ```text
-https://github.com/franciscosalido/OPENCLAW/issues/38
+https://github.com/franciscosalido/OPENCLAW/issues/40
 ```
 
 Gateway baseline already merged:
@@ -64,7 +64,8 @@ GW-01 through GW-04 are merged in 92c0ec5.
 GW-05a is merged in 96278f6.
 GW-05b live smoke fixes are merged through 5c42547.
 GW-06 local_embed evaluation and GW06C embeddings contract are merged.
-GW-07 branches from the post-GW06C baseline.
+GW-07 synthetic RAG E2E is merged in 814b59d.
+GW-08 branches from the post-GW07 baseline.
 ```
 
 Gateway PR state:
@@ -79,7 +80,8 @@ Gateway PR state:
 | GW-05b | `feat/gateway-live-smoke-timeouts` | Live smoke with effective timeout observability | Merged through `5c42547` |
 | GW-06 | `feat/gateway-local-embed-evaluation` | Evaluate embeddings via `local_embed` | Merged |
 | GW06C | `feat/adr-openai-compatible-embeddings-contract` | ADR for OpenAI-compatible embeddings contract and `quimera_embed` | Merged |
-| GW-07 | `feat/gateway-rag-e2e-synthetic` | Synthetic RAG E2E through gateway path | Current |
+| GW-07 | `feat/gateway-rag-e2e-synthetic` | Synthetic RAG E2E through gateway path | Merged |
+| GW-08 | `feat/rag-controlled-embedding-migration` | Controlled RAG embedding migration to `quimera_embed` | Current |
 
 ---
 
@@ -338,3 +340,78 @@ already available:
 export QUIMERA_LLM_API_KEY="${LITELLM_MASTER_KEY}"
 scripts/test_rag_e2e_gateway.sh
 ```
+
+## GW-08 Current Work
+
+Objective:
+
+Create a controlled, reversible migration path for new RAG embeddings:
+
+```text
+RagEmbedder factory
+  -> gateway_litellm
+  -> GatewayEmbedClient
+  -> LiteLLM /v1/embeddings
+  -> quimera_embed
+  -> Ollama / nomic-embed-text
+```
+
+Rollback:
+
+```text
+RagEmbedder factory
+  -> direct_ollama
+  -> OllamaEmbedder
+  -> Ollama /api/embed
+```
+
+Scope:
+
+- `rag.embedding.active_backend: gateway_litellm` for new controlled paths.
+- `QUIMERA_RAG_EMBEDDING_BACKEND=direct_ollama` rollback override.
+- Retry/backoff/concurrency parity: `max_retries=3`,
+  `backoff_seconds=1.0`, `max_concurrency=4`.
+- Optional GW-08 smoke with temporary `gw08_embedding_migration_` collection.
+- Optional parity smoke requiring cosine similarity `>= 0.9999`.
+
+Out of scope:
+
+- Reindexing `openclaw_knowledge`.
+- Modifying existing Qdrant collections.
+- Mixing vectors from different backends/models/providers/dimensions.
+- Real documents, real portfolio data, remote providers, FastAPI, MCP, and
+  quant tools.
+
+Manual run:
+
+```bash
+export QUIMERA_LLM_API_KEY="${LITELLM_MASTER_KEY}"
+scripts/test_gw08_embedding_migration.sh
+```
+
+Live status:
+
+- **2026-04-30: PASSED** — GW-08 controlled migration smoke and parity smoke
+  passed locally.
+- Command: `QUIMERA_LLM_API_KEY=<local-placeholder> scripts/test_gw08_embedding_migration.sh`.
+- Operational note: an already-running LiteLLM process must be restarted after
+  adding `quimera_embed`; otherwise `/v1/embeddings` can return HTTP 400
+  because the old process still exposes only `local_embed`.
+- Temporary Qdrant collection prefix: `gw08_embedding_migration_`.
+- Synthetic chunks: 4 indexed, 4 retrieved/used.
+- Embedding path: `gateway_litellm` through `GatewayEmbedClient` and
+  `quimera_embed`.
+- Generation path: `LocalGenerator` / `GatewayChatClient` through `local_rag`.
+- Rollback remains `direct_ollama`.
+- `openclaw_knowledge` was not touched.
+
+Observed results:
+
+| Check | Result |
+|---|---:|
+| embedding/indexing | 314.7 ms |
+| retrieval | 27.4 ms |
+| generation | 4951.7 ms |
+| total pipeline | 4979.1 ms |
+| cosine similarity vs direct Ollama | 1.000000 |
+| vector dimensions | 768 |

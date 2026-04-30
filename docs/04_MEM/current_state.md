@@ -5,7 +5,7 @@
 > meaningful sessions.
 
 **Last updated:** 2026-04-30
-**Updated by:** Codex — Gateway GW-07 synthetic RAG E2E
+**Updated by:** Codex — Gateway GW-08 controlled embedding migration
 
 ---
 
@@ -22,19 +22,24 @@ OpenClaw / runtime generation
   -> Ollama / Qwen local
 ```
 
-Current embedding path:
+Current controlled embedding path:
 
 ```text
-RAG / OllamaEmbedder
-  -> Ollama direct at http://127.0.0.1:11434/api/embed
+RagEmbedder factory
+  -> gateway_litellm
+  -> GatewayEmbedClient
+  -> LiteLLM at http://127.0.0.1:4000/v1/embeddings
+  -> quimera_embed
+  -> Ollama / nomic-embed-text local
 ```
 
-GW-06 adds an experimental evaluation-only path:
+Rollback embedding path:
 
 ```text
-GatewayEmbedClient
-  -> LiteLLM at http://127.0.0.1:4000/v1/embeddings
-  -> Ollama / nomic-embed-text local
+RagEmbedder factory
+  -> direct_ollama
+  -> OllamaEmbedder
+  -> Ollama direct at http://127.0.0.1:11434/api/embed
 ```
 
 GW-07 proves the current RAG E2E path without migrating embeddings:
@@ -96,12 +101,14 @@ unavoidable, use `git push --force-with-lease`.
 | GW-05b | `feat/gateway-live-smoke-timeouts` | Live smoke with effective timeout observability | Done / merged |
 | GW-06 | `feat/gateway-local-embed-evaluation` | Evaluate embeddings via `local_embed` | Done / merged |
 | GW06C | `feat/adr-openai-compatible-embeddings-contract` | OpenAI-compatible embeddings ADR and `quimera_embed` | Done / merged |
-| GW-07 | `feat/gateway-rag-e2e-synthetic` | Synthetic RAG E2E through gateway path | Current |
+| GW-07 | `feat/gateway-rag-e2e-synthetic` | Synthetic RAG E2E through gateway path | Done / merged |
+| GW-08 | `feat/rag-controlled-embedding-migration` | Controlled RAG embedding migration to `quimera_embed` | Current |
 
 GW-05a issue: <https://github.com/franciscosalido/OPENCLAW/issues/25>
 GW-05b issue: <https://github.com/franciscosalido/OPENCLAW/issues/28>
 GW-06 issue: <https://github.com/franciscosalido/OPENCLAW/issues/30>
 GW-07 issue: <https://github.com/franciscosalido/OPENCLAW/issues/38>
+GW-08 issue: <https://github.com/franciscosalido/OPENCLAW/issues/40>
 
 ---
 
@@ -257,3 +264,75 @@ already running locally:
 export QUIMERA_LLM_API_KEY="${LITELLM_MASTER_KEY}"
 scripts/test_rag_e2e_gateway.sh
 ```
+
+## GW-08 Current Work
+
+GW-08 aligns new controlled RAG embedding generation with the accepted
+OpenAI-compatible embeddings contract:
+
+```text
+RagEmbedder factory
+  -> gateway_litellm
+  -> GatewayEmbedClient
+  -> LiteLLM /v1/embeddings
+  -> quimera_embed
+  -> Ollama / nomic-embed-text
+```
+
+Rollback remains explicit:
+
+```bash
+export QUIMERA_RAG_EMBEDDING_BACKEND="direct_ollama"
+```
+
+Key rules:
+
+- `OllamaEmbedder` remains available.
+- `direct_ollama` remains the rollback backend.
+- Existing collections are not reindexed automatically.
+- `openclaw_knowledge` is not touched.
+- Vectors from different embedding backends, models, providers, or dimensions
+  must not be mixed silently in one collection.
+- GW-08 smoke uses temporary collections with prefix
+  `gw08_embedding_migration_`.
+
+Validation expectations:
+
+```bash
+git diff --check
+uv run pytest -v
+uv run mypy --strict .
+uv run pyright
+uv run pytest tests/smoke/ -v
+```
+
+Optional live validation:
+
+```bash
+export QUIMERA_LLM_API_KEY="${LITELLM_MASTER_KEY}"
+scripts/test_gw08_embedding_migration.sh
+```
+
+Live status:
+
+- **2026-04-30: PASSED** — controlled migration smoke and parity smoke passed.
+- Required operational note: restart LiteLLM after adding `quimera_embed`; an
+  old LiteLLM process may still expose only `local_embed`.
+- Command: `QUIMERA_LLM_API_KEY=<local-placeholder> scripts/test_gw08_embedding_migration.sh`.
+- Temporary collection prefix: `gw08_embedding_migration_`.
+- Synthetic chunks: 4 indexed, 4 retrieved/used.
+- Embedding path: `RagEmbedder factory -> gateway_litellm -> GatewayEmbedClient -> LiteLLM /v1/embeddings -> quimera_embed`.
+- Generation path: `LocalGenerator / GatewayChatClient -> LiteLLM local_rag`.
+- Rollback path remains: `QUIMERA_RAG_EMBEDDING_BACKEND=direct_ollama`.
+- `openclaw_knowledge` was not touched.
+
+Observed GW-08 latencies and parity (2026-04-30):
+
+| Check | Result |
+|---|---:|
+| embedding/indexing | 314.7 ms |
+| retrieval | 27.4 ms |
+| generation | 4951.7 ms |
+| total pipeline | 4979.1 ms |
+| cosine similarity vs direct Ollama | 1.000000 |
+| vector dimensions | 768 |

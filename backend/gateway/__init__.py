@@ -23,7 +23,10 @@ from backend.gateway.client import (
 )
 from backend.gateway.config import GatewayConfig, load_gateway_config
 from backend.gateway.embed_client import (
+    DEFAULT_EMBED_BACKOFF_SECONDS,
     DEFAULT_EMBEDDING_DIMENSIONS,
+    DEFAULT_EMBED_MAX_CONCURRENCY,
+    DEFAULT_EMBED_MAX_RETRIES,
     ENV_LLM_EMBED_MODEL,
     GatewayEmbedClient,
 )
@@ -49,6 +52,9 @@ __all__ = [
     "DEFAULT_LLM_RAG_MODEL",
     "DEFAULT_LLM_REASONING_MODEL",
     "DEFAULT_EMBEDDING_DIMENSIONS",
+    "DEFAULT_EMBED_BACKOFF_SECONDS",
+    "DEFAULT_EMBED_MAX_CONCURRENCY",
+    "DEFAULT_EMBED_MAX_RETRIES",
     "ENV_LLM_EMBED_MODEL",
     "GatewayChatClient",
     "GatewayConfig",
