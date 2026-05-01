@@ -48,13 +48,13 @@ unavoidable, use `git push --force-with-lease`.
 Current active branch:
 
 ```text
-feat/rag-collection-metadata-guard
+feat/rag-run-trace-provenance
 ```
 
 Current issue:
 
 ```text
-https://github.com/franciscosalido/OPENCLAW/issues/42
+https://github.com/franciscosalido/OPENCLAW/issues/44
 ```
 
 Gateway baseline already merged:
@@ -66,7 +66,8 @@ GW-05b live smoke fixes are merged through 5c42547.
 GW-06 local_embed evaluation and GW06C embeddings contract are merged.
 GW-07 synthetic RAG E2E is merged in 814b59d.
 GW-08 controlled embedding migration is merged in 1a3bf32.
-GW-09 branches from the post-GW08 baseline.
+GW-09 collection metadata guard is merged in 254a840.
+GW-10 branches from the post-GW09 baseline.
 ```
 
 Gateway PR state:
@@ -83,7 +84,8 @@ Gateway PR state:
 | GW06C | `feat/adr-openai-compatible-embeddings-contract` | ADR for OpenAI-compatible embeddings contract and `quimera_embed` | Merged |
 | GW-07 | `feat/gateway-rag-e2e-synthetic` | Synthetic RAG E2E through gateway path | Merged |
 | GW-08 | `feat/rag-controlled-embedding-migration` | Controlled RAG embedding migration to `quimera_embed` | Merged in `1a3bf32` |
-| GW-09 | `feat/rag-collection-metadata-guard` | Collection metadata drift guard for embedding traceability | Current |
+| GW-09 | `feat/rag-collection-metadata-guard` | Collection metadata drift guard for embedding traceability | Merged in `254a840` |
+| GW-10 | `feat/rag-run-trace-provenance` | Safe per-query RAG provenance trace | Current |
 
 ---
 
@@ -452,3 +454,33 @@ Safety notes:
   `with_vectors=False`.
 - It must not log payload text, vectors, prompts, secrets, or Authorization
   headers.
+
+## GW-10 Current Work
+
+Objective:
+
+Add a safe `RagRunTrace` provenance record for each RAG query execution.
+
+Scope:
+
+- Frozen `RagRunTrace` dataclass.
+- Safe `to_log_dict()` serialization.
+- `rag.tracing.enabled` and `rag.tracing.log_level` config.
+- Minimal `LocalRagPipeline` log emission through
+  `logger.bind(trace=...).log(...)`.
+- Unit tests with mocks only.
+
+Out of scope:
+
+- OpenTelemetry, Prometheus, Grafana, dashboards, soak tests, and profiling.
+- GW-11 structured observability lifecycle events.
+- GW-12 memory/resource baseline.
+- Qdrant mutation, reindexing, collection updates, and `openclaw_knowledge`.
+
+Safety notes:
+
+- Trace contains only safe provenance metadata.
+- Trace must not contain query text, prompt text, answer text, chunk text,
+  vectors, payloads, portfolio data, private documents, API keys,
+  Authorization headers, or secrets.
+- Dimension mismatch raises `EmbeddingDimensionMismatchError`.

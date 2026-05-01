@@ -12,6 +12,11 @@ from loguru import logger
 from backend.rag._validation import validate_question
 from backend.rag.context_packer import RetrievedChunk
 from backend.rag.prompt_builder import PromptBuilder
+from backend.rag.run_trace import (
+    RagTracingConfig,
+    build_rag_run_trace,
+    load_rag_tracing_config,
+)
 
 
 class RetrieverProtocol(Protocol):
@@ -66,6 +71,11 @@ class LocalRagPipeline:
     prompt_builder: PromptBuilder
     temperature: float | None = None
     thinking_mode: bool = False
+    tracing_config: RagTracingConfig | None = None
+
+    def __post_init__(self) -> None:
+        if self.tracing_config is None:
+            self.tracing_config = load_rag_tracing_config()
 
     async def ask(
         self,
@@ -114,6 +124,13 @@ class LocalRagPipeline:
             [chunk.citation_id for chunk in chunks],
             latency,
         )
+        self._emit_trace(
+            retrieval_ms=retrieval_ms,
+            prompt_ms=prompt_ms,
+            generation_ms=generation_ms,
+            total_ms=latency["total_ms"],
+            chunk_count=len(chunks),
+        )
         return RagPipelineResult(
             question=clean_question,
             answer=answer,
@@ -121,5 +138,53 @@ class LocalRagPipeline:
             messages=messages,
             latency_ms=latency,
         )
+
+    def _emit_trace(
+        self,
+        *,
+        retrieval_ms: float,
+        prompt_ms: float,
+        generation_ms: float,
+        total_ms: float,
+        chunk_count: int,
+    ) -> None:
+        config = self.tracing_config
+        if config is None or not config.enabled:
+            return
+        collection_name = _infer_collection_name(self.retriever, config.collection_name)
+        gateway_alias = _infer_gateway_alias(self.generator)
+        trace = build_rag_run_trace(
+            collection_name=collection_name,
+            embedding_backend=config.embedding_backend,
+            embedding_model=config.embedding_model,
+            embedding_alias=config.embedding_alias,
+            embedding_dimensions=config.embedding_dimensions,
+            expected_dimensions=config.embedding_dimensions,
+            retrieval_latency_ms=retrieval_ms,
+            generation_latency_ms=generation_ms,
+            chunk_count=chunk_count,
+            gateway_alias=gateway_alias,
+            total_latency_ms=total_ms,
+            prompt_latency_ms=prompt_ms,
+            context_chunk_count=chunk_count,
+        )
+        logger.bind(trace=trace.to_log_dict()).log(config.log_level, "rag_run_trace")
+
+
+def _infer_collection_name(retriever: object, fallback: str) -> str:
+    store = getattr(retriever, "store", None)
+    collection_name = getattr(store, "collection_name", None)
+    if isinstance(collection_name, str) and collection_name.strip():
+        return collection_name.strip()
+    return fallback
+
+
+def _infer_gateway_alias(generator: object) -> str | None:
+    model = getattr(generator, "model", None)
+    if isinstance(model, str) and model.strip():
+        return model.strip()
+    return None
+
+
 def _elapsed_ms(start: float) -> float:
     return (time.perf_counter() - start) * 1000

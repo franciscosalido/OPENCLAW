@@ -38,6 +38,10 @@ rag:
     vector_size: 768
     distance: "Cosine"
 
+  tracing:
+    enabled: true
+    log_level: "INFO"
+
   retrieval:
     top_k: 5
     score_threshold: 0.3
