@@ -152,7 +152,7 @@ SyntheticDocument
 | RAG-06 | `feat/rag-cli-smoke` | Synthetic ingest/query CLI + preflight + smoke | ✅ Merged |
 | RAG-07 | `feat/rag-docs-runbook` | Runbook + ADR + shared validation + health tests | ✅ Merged |
 
-### Sprint Gateway-0 — FINAL READINESS 🔄
+### Sprint Gateway-0 — COMPLETE ✅
 
 Runtime path base merged to `main`:
 
@@ -178,7 +178,7 @@ OpenClaw / LocalGenerator
 | GW-09 | `feat/rag-collection-metadata-guard` | Collection metadata drift guard | ✅ Merged |
 | GW-10 | `feat/rag-run-trace-provenance` | `RagRunTrace` provenance | ✅ Merged |
 | GW-11 | `feat/rag-observability-events` | Local structured RAG lifecycle events | ✅ Merged |
-| GW-12 | `feat/gateway-operational-readiness` | Final runbook, readiness checks, ADR boundary | 🔄 Current final PR |
+| GW-12 | `feat/gateway-operational-readiness` | Final runbook, readiness checks, ADR boundary | ✅ Merged |
 
 **Gateway-0 final baseline:** local-only LiteLLM gateway, Qdrant vector store,
 `quimera_embed` canonical embedding alias, `RagRunTrace` provenance,
@@ -557,3 +557,41 @@ Append or paste this at the end of substantial sessions:
 - All git operations pending user terminal execution (index.lock).
 - `local_think` timeout (120s) is in litellm_config.yaml but `GatewayChatClient` uses global timeout — per-alias timeout is GW-04 scope.
 - Real Ollama + Docker Qdrant E2E with live LiteLLM not yet smoke-tested in this environment.
+
+---
+
+## Handoff — 2026-05-01
+
+**Agent:** Codex
+**Branch:** `feat/gateway-operational-readiness`
+**Issue/PR:** #48 / PR #49
+**Task:** GW-12 — Gateway-0 operational readiness close.
+
+### Changed
+- `docs/GATEWAY_FINAL_RUNBOOK.md`: boot order, start/stop, env vars, readiness/smoke/rollback commands, RagRunTrace + RagObservabilityEvent interpretation, troubleshooting matrix, security checklist.
+- `scripts/check_gateway_readiness.sh`: static default mode (7 checks) + `--live` opt-in (Qdrant/Ollama/LiteLLM + 768-dim quimera_embed verification).
+- `tests/unit/test_gateway_readiness_script.py`: 9 static readiness tests.
+- `tests/unit/test_gateway_final_baseline.py`: 7 baseline tests — alias coherence, no remote models, RAG config baseline, smoke guards, unified `FORBIDDEN_OBSERVABILITY_KEYS` audit across `RagRunTrace` and `RagObservabilityEvent`, supply chain exclusions.
+- `docs/ADR/0019-gateway-0-sprint-boundary.md`: delivered components, architectural boundaries, observability rules, future work list.
+- `CLAUDE.md`, `docs/04_MEM/AGENT_CONTEXT.md`, `docs/04_MEM/current_state.md`, `docs/04_MEM/decisions.md`, `docs/04_MEM/next_actions.md`, `docs/04_MEM/GATEWAY0_STATUS.md`, `docs/GATEWAY_SETUP.md`, `docs/guides/OPENCLAW_LITELLM_RUNTIME.md`, `docs/sprints/GATEWAY_SPRINT_HANDOFF.md`: sprint table and status updates.
+- `tests/unit/test_litellm_infra_scripts.py`: minor addition.
+
+### Validation
+- `uv run pytest tests/` — 231 passed (unit + integration + smoke).
+- `uv run mypy backend/ --strict` — 0 errors.
+- `uv run pyright backend/` — 0 errors.
+- `scripts/check_gateway_readiness.sh` static mode — passed.
+- No LangChain, sentence-transformers, remote AI, real data, or forbidden files.
+
+### Not Changed
+- No `backend/` module changed.
+- No remote providers introduced.
+- No Qdrant mutation, no reindexing, no `openclaw_knowledge` access.
+- Memory/resource baseline not implemented — deferred post-Gateway-0. See ADR-0019 Future Work.
+
+### Next Action
+- Gateway-0 sprint complete. Next sprint requires new issue + ADR/sprint plan.
+
+### Risks
+- Live readiness (`--live`) not run in this shell — requires `LITELLM_MASTER_KEY` export and local services running.
+- None known for static validation.

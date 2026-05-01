@@ -106,7 +106,7 @@ unavoidable, use `git push --force-with-lease`.
 | GW-09 | `feat/rag-collection-metadata-guard` | Collection metadata drift guard for embedding traceability | Done / merged |
 | GW-10 | `feat/rag-run-trace-provenance` | Safe per-query RAG provenance trace | Done / merged |
 | GW-11 | `feat/rag-observability-events` | Safe structured RAG lifecycle observability events | Done / merged |
-| GW-12 | `feat/gateway-operational-readiness` | Final runbook, readiness checks, ADR boundary, handoff | Current final PR |
+| GW-12 | `feat/gateway-operational-readiness` | Final runbook, readiness checks, ADR boundary, handoff | Done / merged |
 
 GW-05a issue: <https://github.com/franciscosalido/OPENCLAW/issues/25>
 GW-05b issue: <https://github.com/franciscosalido/OPENCLAW/issues/28>
@@ -118,7 +118,7 @@ GW-10 issue: <https://github.com/franciscosalido/OPENCLAW/issues/44>
 GW-11 issue: <https://github.com/franciscosalido/OPENCLAW/issues/46>
 GW-12 issue: <https://github.com/franciscosalido/OPENCLAW/issues/48>
 
-After GW-12 merges, Gateway-0 PRs GW-01 through GW-12 are complete on `main`.
+Gateway-0 sprint complete. GW-01 through GW-12 merged on `main`.
 The next sprint must start from a new explicit issue, ADR if architecture
 changes, and `git pull --ff-only origin main`.
 
@@ -140,9 +140,9 @@ Unknown aliases and `None` fall back to the global `timeout_seconds`.
 
 ---
 
-## GW-12 Current Work
+## GW-12 Completed Work
 
-GW-12 closes Gateway-0 as an operational readiness PR, not a feature PR.
+GW-12 closed Gateway-0 as an operational readiness PR, not a feature PR.
 
 Deliverables:
 
@@ -154,7 +154,7 @@ Deliverables:
 - `docs/ADR/0019-gateway-0-sprint-boundary.md`.
 - Final updates to shared context, setup, runtime and handoff docs.
 
-Rules:
+Rules respected:
 
 - No runtime architecture change.
 - No remote providers.
@@ -162,6 +162,7 @@ Rules:
   dashboards, profiling, or mandatory soak tests.
 - No Qdrant mutation, no reindexing, no `openclaw_knowledge` access.
 - Live proof remains opt-in and must not become CI.
+- Memory/resource baseline: not implemented in GW-12. Deferred to a future sprint. See ADR-0019 Future Work section.
 
 ## Historical Work
 
@@ -307,7 +308,7 @@ Trace scope:
 
 GW-11 current work remains separate from `RagRunTrace`: lifecycle events are
 local structured loguru records around embedding, retrieval, and generation.
-GW-12 remains the place for memory/resource baseline.
+Memory/resource baseline: not implemented in GW-12. Deferred to a future sprint. See ADR-0019 Future Work section.
 
 Live smoke tests should skip by default unless their explicit guards are set.
 GW-07 requires `RUN_RAG_E2E_SMOKE=1`.
@@ -468,4 +469,4 @@ Out of scope:
 
 - OpenTelemetry, Prometheus, Grafana, dashboards, distributed tracing,
   profiling, soak tests, and memory/resource baselines.
-- GW-12 remains the memory/resource baseline follow-up.
+- Memory/resource baseline: not implemented in GW-12. Deferred to a future sprint. See ADR-0019 Future Work section.
