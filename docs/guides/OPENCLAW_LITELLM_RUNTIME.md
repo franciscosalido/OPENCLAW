@@ -14,6 +14,8 @@ GW-08 adds controlled RAG embedding migration for new ingest/test paths through
 GW-09 adds read-only collection metadata drift detection.
 GW-10 adds the final safe per-query `RagRunTrace` provenance record.
 GW-11 adds local structured RAG lifecycle events with safe metadata only.
+GW-12 finalizes Gateway-0 operational readiness with the final runbook,
+readiness script, baseline tests and sprint boundary ADR.
 The default runtime path is:
 
 ```text
@@ -29,11 +31,37 @@ export QUIMERA_LLM_MODEL="local_chat"
 export QUIMERA_LLM_REASONING_MODEL="local_think"
 export QUIMERA_LLM_RAG_MODEL="local_rag"
 export QUIMERA_LLM_JSON_MODEL="local_json"
-export QUIMERA_LLM_EMBED_MODEL="local_embed"
+export QUIMERA_LLM_EMBED_MODEL="quimera_embed"
 ```
 
 `QUIMERA_LLM_API_KEY` should match the local `LITELLM_MASTER_KEY` used to start
 LiteLLM. Do not commit either value.
+
+## Final Gateway-0 Readiness
+
+Use the final runbook for day-to-day operation:
+
+```text
+docs/GATEWAY_FINAL_RUNBOOK.md
+```
+
+Run static readiness without live services:
+
+```bash
+scripts/check_gateway_readiness.sh
+```
+
+Run live readiness only when Ollama, Qdrant and LiteLLM are already running:
+
+```bash
+export LITELLM_MASTER_KEY="dev-local-key-change-me"
+export QUIMERA_LLM_API_KEY="${LITELLM_MASTER_KEY}"
+scripts/check_gateway_readiness.sh --live
+```
+
+Gateway-0 remains local-only. Remote providers, FastAPI, MCP, quant tools,
+OpenTelemetry, profiling, dashboards and production `openclaw_knowledge`
+ingestion require future explicit ADR/sprint approval.
 
 ## Start Ollama
 
@@ -387,8 +415,9 @@ behavior, Qdrant collections, or default embedding selection.
 - Gateway calls emit minimal debug observability: alias, base URL host, latency,
   effective timeout budget, success/failure status, and error category. API
   keys and prompt text are not logged.
-- GW-05a resolves request timeouts per alias: `local_chat` 30s, `local_think`
-  120s, `local_rag` 60s, `local_json` 30s, and `local_embed` 30s placeholder.
+- GW-05a/GW06C/GW-08 resolve request timeouts per alias: `local_chat` 30s,
+  `local_think` 120s, `local_rag` 60s, `local_json` 30s,
+  `quimera_embed` 30s, and `local_embed` 30s compatibility.
   Unknown aliases and `None` still fall back to the global `timeout_seconds`.
 
 ## What Did Not Change
@@ -407,6 +436,8 @@ behavior, Qdrant collections, or default embedding selection.
 - GW-08 does not touch production Qdrant collections or `openclaw_knowledge`.
 - GW-11 does not add OpenTelemetry, remote telemetry, distributed tracing,
   profiling, dashboards, or memory/resource baselines.
+- GW-12 does not change runtime behavior; it adds runbook, readiness checks,
+  final baseline tests and sprint boundary documentation.
 - Remote providers remain disabled.
 - FastAPI remains postponed.
 - MCP and tooling integration remain future direction, not implemented in

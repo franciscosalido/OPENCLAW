@@ -100,10 +100,10 @@ RAG-0 is **local only**. No remote AI fallback in this sprint.
 - Product name: Quimera.
 - Repository name: OpenClaw.
 - Model gateway: LiteLLM at `http://127.0.0.1:4000/v1` (Gateway-0 — local only).
-- Semantic aliases: `local_chat`, `local_think`, `local_rag`, `local_json`, `local_embed`.
-- Local LLM runtime: Ollama (via LiteLLM gateway for chat; direct for embeddings until Gateway-1).
+- Semantic aliases: `local_chat`, `local_think`, `local_rag`, `local_json`, `quimera_embed`, `local_embed`.
+- Local LLM runtime: Ollama through LiteLLM for chat and controlled gateway embeddings.
 - Primary local generation model: `qwen3:14b` (vendor name confined to LiteLLM config — application code uses aliases).
-- Embedding model: `nomic-embed-text` (direct Ollama until a tested embedding-gateway PR).
+- Embedding model: `nomic-embed-text`; application-facing alias is `quimera_embed`, with `direct_ollama` rollback retained.
 - Vector database: Qdrant.
 - Mathematical co-processor: deterministic Python modules.
 - Remote AI: disabled. Sanitized fallback only after explicit sprint approval.
@@ -119,6 +119,8 @@ Runtime env vars (must be set locally before running OpenClaw):
 | `QUIMERA_LLM_REASONING_MODEL` | `local_think` | Semantic alias |
 | `QUIMERA_LLM_RAG_MODEL` | `local_rag` | Semantic alias |
 | `QUIMERA_LLM_JSON_MODEL` | `local_json` | Semantic alias |
+| `QUIMERA_LLM_EMBED_MODEL` | `quimera_embed` | Canonical embedding alias |
+| `QUIMERA_RAG_EMBEDDING_BACKEND` | `gateway_litellm` | Use `direct_ollama` for rollback |
 
 ---
 
@@ -150,7 +152,7 @@ SyntheticDocument
 | RAG-06 | `feat/rag-cli-smoke` | Synthetic ingest/query CLI + preflight + smoke | ✅ Merged |
 | RAG-07 | `feat/rag-docs-runbook` | Runbook + ADR + shared validation + health tests | ✅ Merged |
 
-### Sprint Gateway-0 — IN PROGRESS 🔄
+### Sprint Gateway-0 — FINAL READINESS 🔄
 
 Runtime path base merged to `main`:
 
@@ -161,28 +163,31 @@ OpenClaw / LocalGenerator
   -> Ollama / Qwen local
 ```
 
-| PR | Commit | Scope | Status |
+| PR | Branch | Scope | Status |
 |---|---|---|---|
-| GW-01 | `e7509fa` | Pydantic schema, health checks, stable error taxonomy | ✅ Merged (#23) |
-| GW-02 | `8b62e21` | infra/litellm/, start script, supply-chain guards | ✅ Merged (#23) |
-| GW-03 | `10708fa` | `GatewayChatClient`, route `LocalGenerator` → LiteLLM, validation-before-resource fix | ✅ Merged (#23) |
-| GW-04 | `b5947bd` | `validate_chat_messages`, observability, optional smoke (skipado) | ✅ Merged (#23) |
-| fix | `2d8a8b5` | `test_litellm_infra_scripts.py` follow-up | ✅ Merged (#24) |
-| GW-05 | — | Live smoke real com LiteLLM + Ollama rodando | ⏳ Próximo |
-| GW-06 | — | Embeddings via LiteLLM / `local_embed` | ⏳ Planejado |
-| GW-07 | — | RAG E2E sintético completo via gateway | ⏳ Planejado |
-| GW-08 | — | Runbook hardening para gateway | ⏳ Planejado |
-| GW-09 | — | MCP/tooling evaluation | ⏳ Planejado |
+| GW-01 | `feat/gateway-prep-contracts` | Contracts, ADR, aliases | ✅ Merged |
+| GW-02 | `feat/gateway-install-health` | Local LiteLLM operational setup | ✅ Merged |
+| GW-03 | `feat/gateway-route-opencraw-litellm` | Runtime chat/generation through LiteLLM | ✅ Merged |
+| GW-04 | `feat/gateway-runtime-smoke` | Shared validation, optional smoke | ✅ Merged |
+| GW-05a | `feat/gateway-per-alias-timeouts` | Per-alias timeout contracts | ✅ Merged |
+| GW-05b | `feat/gateway-live-smoke-timeouts` | Live gateway smoke with timeout observability | ✅ Merged |
+| GW-06 | `feat/gateway-local-embed-evaluation` | `local_embed` evaluation | ✅ Merged |
+| GW06C | `feat/adr-openai-compatible-embeddings-contract` | `quimera_embed` ADR contract | ✅ Merged |
+| GW-07 | `feat/gateway-rag-e2e-synthetic` | Synthetic RAG E2E through gateway path | ✅ Merged |
+| GW-08 | `feat/rag-controlled-embedding-migration` | Controlled embedding migration to `quimera_embed` | ✅ Merged |
+| GW-09 | `feat/rag-collection-metadata-guard` | Collection metadata drift guard | ✅ Merged |
+| GW-10 | `feat/rag-run-trace-provenance` | `RagRunTrace` provenance | ✅ Merged |
+| GW-11 | `feat/rag-observability-events` | Local structured RAG lifecycle events | ✅ Merged |
+| GW-12 | `feat/gateway-operational-readiness` | Final runbook, readiness checks, ADR boundary | 🔄 Current final PR |
 
-**Base validada:** 115/115 pytest, 2 skipped (smoke live — intencionalmente skipado sem serviços), mypy 0, pyright 0.
-**Working tree:** limpo. Todos os branches Gateway deletados.
+**Gateway-0 final baseline:** local-only LiteLLM gateway, Qdrant vector store,
+`quimera_embed` canonical embedding alias, `RagRunTrace` provenance,
+`RagObservabilityEvent` lifecycle logs, and `scripts/check_gateway_readiness.sh`.
 
-### GW-05 — Acceptance criteria (próximo PR)
-
-- Smoke real: `RUN_LITELLM_SMOKE=1` com LiteLLM + Ollama ativos deve passar os 4 aliases.
-- `scripts/test_opencraw_litellm_runtime.sh` executado end-to-end com serviços locais.
-- Per-alias timeout: `local_think` (120s) separado de `local_chat` (30s) — hoje compartilham `timeout_seconds` global.
-- Nenhum dado real, sem remote, sem FastAPI, sem MCP.
+**Out of scope after Gateway-0:** remote providers, FastAPI, MCP, quant tools,
+OpenTelemetry, profiling, dashboards, production ingestion and
+`openclaw_knowledge` mutation. Each requires a new issue and explicit future
+ADR/sprint.
 
 Before starting a new PR:
 

@@ -1,5 +1,12 @@
 # Gateway-0 Sprint — Status para Retomada
 
+> **Superseded status note (2026-05-01):** this file preserves an old
+> recovery snapshot from 2026-04-26. The current Gateway-0 source of truth is
+> `docs/sprints/GATEWAY_SPRINT_HANDOFF.md`,
+> `docs/04_MEM/current_state.md`, and `docs/GATEWAY_FINAL_RUNBOOK.md`.
+> Gateway-0 is in GW-12 final operational readiness; GW-01 through GW-11 are
+> merged, and GW-12 closes the sprint with runbook/readiness/boundary docs.
+
 > Arquivo gerado ao fim da sessão 2026-04-26.
 > Leia este arquivo antes de qualquer operação git amanhã.
 

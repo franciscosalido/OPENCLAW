@@ -48,6 +48,7 @@ Both configs define these semantic aliases:
 - `local_think`
 - `local_rag`
 - `local_json`
+- `quimera_embed`
 - `local_embed`
 
 The operational aliases point only to local Ollama models. No remote provider is
@@ -175,6 +176,8 @@ GW-05a adds runtime request timeout budgets per semantic alias without changing
 RAG, Qdrant, embeddings, or prompt construction.
 GW-05b adds live smoke timing validation and `timeout_s` gateway observability
 without changing RAG, Qdrant, embeddings, or prompt construction.
+GW-12 closes the Gateway-0 sprint with `docs/GATEWAY_FINAL_RUNBOOK.md`,
+`scripts/check_gateway_readiness.sh`, static baseline tests and ADR-0019.
 
 Application runtime environment:
 
@@ -195,7 +198,34 @@ Runtime timeout contract:
 | `local_think` | 120.0s | Longer local reasoning calls |
 | `local_rag` | 60.0s | RAG answer synthesis |
 | `local_json` | 30.0s | Structured local responses |
-| `local_embed` | 30.0s | Placeholder only; embeddings remain direct/local |
+| `quimera_embed` | 30.0s | Canonical local embedding alias |
+| `local_embed` | 30.0s | Compatibility embedding alias |
+
+## Final Readiness
+
+Static readiness is CI-safe and requires no live services:
+
+```bash
+scripts/check_gateway_readiness.sh
+```
+
+Live readiness is explicit and local-only:
+
+```bash
+export LITELLM_MASTER_KEY="dev-local-key-change-me"
+export QUIMERA_LLM_API_KEY="${LITELLM_MASTER_KEY}"
+scripts/check_gateway_readiness.sh --live
+```
+
+The final runbook is:
+
+```text
+docs/GATEWAY_FINAL_RUNBOOK.md
+```
+
+Gateway-0 remains local-only. Remote providers require a future ADR. FastAPI,
+MCP, quant tools, OpenTelemetry/profiling and production
+`openclaw_knowledge` ingestion are out of scope for Gateway-0.
 
 Live smoke repeat is opt-in:
 

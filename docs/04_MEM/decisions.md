@@ -283,3 +283,15 @@ substitution without rewriting the caller layer.
 **Consequence:** GW-06 evaluation (cosine similarity 1.0, 768d parity)
 provides the evidence base for a future migration, but GW06C does not migrate
 production RAG embeddings and does not reindex Qdrant.
+
+---
+
+## ADR-019 — Gateway-0 Sprint Boundary
+
+**Date:** 2026-05-01 | **Status:** Accepted
+
+**Decision:** Gateway-0 closes as a local-only operational baseline: LiteLLM is the model gateway, Qdrant remains the vector store, `quimera_embed` is the canonical embedding alias, `RagRunTrace` is safe per-query provenance, and `RagObservabilityEvent` is local lifecycle logging.
+
+**Boundary:** No remote providers, FastAPI, MCP, quant tools, OpenTelemetry, profiling, dashboards, production ingestion, real portfolio data, or `openclaw_knowledge` mutation are included in Gateway-0.
+
+**Future rule:** remote providers, OpenTelemetry/profiling, and any production `openclaw_knowledge` ingestion require a new issue and explicit ADR/sprint.

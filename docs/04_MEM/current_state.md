@@ -5,11 +5,11 @@
 > meaningful sessions.
 
 **Last updated:** 2026-05-01
-**Updated by:** Codex — Gateway GW-11 RAG observability events
+**Updated by:** Codex — Gateway GW-12 operational readiness
 
 ---
 
-## Active Sprint: Gateway-0 / LiteLLM
+## Active Sprint: Gateway-0 / LiteLLM Final Readiness
 
 **Goal:** make LiteLLM the local-only model gateway for OpenClaw runtime model
 calls while preserving existing RAG/Qdrant behavior.
@@ -105,7 +105,8 @@ unavoidable, use `git push --force-with-lease`.
 | GW-08 | `feat/rag-controlled-embedding-migration` | Controlled RAG embedding migration to `quimera_embed` | Done / merged |
 | GW-09 | `feat/rag-collection-metadata-guard` | Collection metadata drift guard for embedding traceability | Done / merged |
 | GW-10 | `feat/rag-run-trace-provenance` | Safe per-query RAG provenance trace | Done / merged |
-| GW-11 | `feat/rag-observability-events` | Safe structured RAG lifecycle observability events | Current |
+| GW-11 | `feat/rag-observability-events` | Safe structured RAG lifecycle observability events | Done / merged |
+| GW-12 | `feat/gateway-operational-readiness` | Final runbook, readiness checks, ADR boundary, handoff | Current final PR |
 
 GW-05a issue: <https://github.com/franciscosalido/OPENCLAW/issues/25>
 GW-05b issue: <https://github.com/franciscosalido/OPENCLAW/issues/28>
@@ -115,6 +116,11 @@ GW-08 issue: <https://github.com/franciscosalido/OPENCLAW/issues/40>
 GW-09 issue: <https://github.com/franciscosalido/OPENCLAW/issues/42>
 GW-10 issue: <https://github.com/franciscosalido/OPENCLAW/issues/44>
 GW-11 issue: <https://github.com/franciscosalido/OPENCLAW/issues/46>
+GW-12 issue: <https://github.com/franciscosalido/OPENCLAW/issues/48>
+
+After GW-12 merges, Gateway-0 PRs GW-01 through GW-12 are complete on `main`.
+The next sprint must start from a new explicit issue, ADR if architecture
+changes, and `git pull --ff-only origin main`.
 
 ---
 
@@ -134,7 +140,30 @@ Unknown aliases and `None` fall back to the global `timeout_seconds`.
 
 ---
 
-## Next Planned Work
+## GW-12 Current Work
+
+GW-12 closes Gateway-0 as an operational readiness PR, not a feature PR.
+
+Deliverables:
+
+- `docs/GATEWAY_FINAL_RUNBOOK.md`.
+- `scripts/check_gateway_readiness.sh` with static default mode and explicit
+  `--live`.
+- `tests/unit/test_gateway_readiness_script.py`.
+- `tests/unit/test_gateway_final_baseline.py`.
+- `docs/ADR/0019-gateway-0-sprint-boundary.md`.
+- Final updates to shared context, setup, runtime and handoff docs.
+
+Rules:
+
+- No runtime architecture change.
+- No remote providers.
+- No FastAPI, MCP, quant tools, OpenTelemetry, Prometheus, Grafana,
+  dashboards, profiling, or mandatory soak tests.
+- No Qdrant mutation, no reindexing, no `openclaw_knowledge` access.
+- Live proof remains opt-in and must not become CI.
+
+## Historical Work
 
 GW-05b:
 
@@ -404,7 +433,7 @@ uv run pyright
 uv run pytest tests/smoke/ -v
 ```
 
-## GW-11 Current Work
+## GW-11 Completed Work
 
 GW-11 adds local structured RAG lifecycle observability events:
 
