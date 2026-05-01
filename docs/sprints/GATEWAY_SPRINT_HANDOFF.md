@@ -48,13 +48,13 @@ unavoidable, use `git push --force-with-lease`.
 Current active branch:
 
 ```text
-feat/rag-controlled-embedding-migration
+feat/rag-collection-metadata-guard
 ```
 
 Current issue:
 
 ```text
-https://github.com/franciscosalido/OPENCLAW/issues/40
+https://github.com/franciscosalido/OPENCLAW/issues/42
 ```
 
 Gateway baseline already merged:
@@ -65,7 +65,8 @@ GW-05a is merged in 96278f6.
 GW-05b live smoke fixes are merged through 5c42547.
 GW-06 local_embed evaluation and GW06C embeddings contract are merged.
 GW-07 synthetic RAG E2E is merged in 814b59d.
-GW-08 branches from the post-GW07 baseline.
+GW-08 controlled embedding migration is merged in 1a3bf32.
+GW-09 branches from the post-GW08 baseline.
 ```
 
 Gateway PR state:
@@ -81,7 +82,8 @@ Gateway PR state:
 | GW-06 | `feat/gateway-local-embed-evaluation` | Evaluate embeddings via `local_embed` | Merged |
 | GW06C | `feat/adr-openai-compatible-embeddings-contract` | ADR for OpenAI-compatible embeddings contract and `quimera_embed` | Merged |
 | GW-07 | `feat/gateway-rag-e2e-synthetic` | Synthetic RAG E2E through gateway path | Merged |
-| GW-08 | `feat/rag-controlled-embedding-migration` | Controlled RAG embedding migration to `quimera_embed` | Current |
+| GW-08 | `feat/rag-controlled-embedding-migration` | Controlled RAG embedding migration to `quimera_embed` | Merged in `1a3bf32` |
+| GW-09 | `feat/rag-collection-metadata-guard` | Collection metadata drift guard for embedding traceability | Current |
 
 ---
 
@@ -415,3 +417,38 @@ Observed results:
 | total pipeline | 4979.1 ms |
 | cosine similarity vs direct Ollama | 1.000000 |
 | vector dimensions | 768 |
+
+## GW-09 Current Work
+
+Objective:
+
+Add a lightweight collection metadata guard that samples Qdrant payload
+metadata and warns when stored embedding provenance diverges from the active
+configuration.
+
+Scope:
+
+- `backend/rag/collection_guard.py` policy helper.
+- Mocked unit tests only; no live Qdrant required.
+- Warnings for backend/model/contract/alias drift by default.
+- Hard error for embedding dimension mismatch.
+- `strict=True` raises on backend/model/contract/alias mismatch.
+- Documentation for traceability behavior and limitations.
+
+Out of scope:
+
+- Reindexing Qdrant.
+- Mutating, deleting, or recreating collections.
+- Touching `openclaw_knowledge`.
+- Changing `QdrantVectorStore` behavior.
+- Changing the active embedder/model.
+- Automatic healing.
+- `RagRunTrace` (GW-10).
+- Structured embedding observability events (GW-11).
+
+Safety notes:
+
+- The guard uses Qdrant `scroll` with `with_payload=True` and
+  `with_vectors=False`.
+- It must not log payload text, vectors, prompts, secrets, or Authorization
+  headers.

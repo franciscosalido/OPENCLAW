@@ -265,6 +265,37 @@ The LiteLLM process may need to be restarted so it reloads
 `infra/litellm/litellm_config.yaml` with both `quimera_embed` and
 `local_embed`.
 
+## Collection Metadata Guard
+
+GW-09 adds a collection metadata guard for embedding traceability. It samples
+existing Qdrant payload metadata and compares stored values against active RAG
+configuration:
+
+- `embedding_backend`
+- `embedding_model`
+- `embedding_dimensions`
+- `embedding_contract`
+- `embedding_alias`
+
+The guard requests payloads only; vectors are disabled with
+`with_vectors=False`.
+
+Default behavior:
+
+- Backend mismatch: structured warning, no automatic block.
+- Model mismatch: structured warning with `recommendation=reindex_required`.
+- Contract mismatch: structured warning, no automatic block.
+- Alias mismatch: structured warning, no automatic block.
+- Missing metadata: structured warning, usually a pre-GW08 collection.
+- Dimension mismatch: hard `EmbeddingDimensionMismatchError`.
+
+`strict=True` can raise on backend/model/contract/alias mismatch, but GW-09 does
+not make strict mode the default. The guard does not mutate collections, does
+not reindex Qdrant, and does not touch `openclaw_knowledge`.
+
+No chunk text, vectors, prompts, secrets, API keys, or Authorization headers are
+logged.
+
 ## What Changed
 
 - `backend.rag.generator.LocalGenerator` now sends OpenAI-compatible
@@ -285,6 +316,7 @@ The LiteLLM process may need to be restarted so it reloads
 - Qdrant remains the vector store.
 - RAG chunking, retrieval, context packing, and citation logic are unchanged.
 - Existing collections are not reindexed automatically.
+- GW-09 only detects collection metadata drift; it does not mutate collections.
 - `OllamaEmbedder` remains available for `direct_ollama` rollback.
 - `local_embed` has a reserved timeout value only. GW-05a does not route
   embeddings through LiteLLM.
