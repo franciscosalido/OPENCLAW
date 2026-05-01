@@ -98,7 +98,17 @@ The script defaults to `127.0.0.1:4000` and refuses any non-local bind address.
 
 ## Validate
 
-In another shell with the same exported environment:
+`healthcheck.sh` requires `LITELLM_MASTER_KEY` to be exported in the current
+shell. `QUIMERA_LLM_API_KEY` must equal `LITELLM_MASTER_KEY` — it is the Bearer
+token the runtime uses to authenticate against the gateway.
+
+```bash
+export LITELLM_MASTER_KEY="dev-local-key-change-me"
+export QUIMERA_LLM_API_KEY="${LITELLM_MASTER_KEY}"
+export QUIMERA_LLM_BASE_URL="http://127.0.0.1:4000/v1"
+```
+
+Then in the same shell:
 
 ```bash
 cd infra/litellm
