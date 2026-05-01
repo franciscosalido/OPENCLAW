@@ -16,6 +16,17 @@ from typing import Any, cast
 import httpx
 from loguru import logger
 
+from backend.rag.observability import (
+    RagErrorCategory,
+    RagEventKind,
+    RagObservabilityConfig,
+    RagObservabilityEvent,
+    categorize_exception,
+    emit_rag_event,
+    load_rag_observability_config,
+    utc_now_iso,
+)
+
 
 DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434"
 DEFAULT_EMBED_MODEL = "nomic-embed-text"
@@ -60,9 +71,12 @@ class OllamaEmbedder:
     expected_dimensions: int = DEFAULT_EXPECTED_DIMENSIONS
     client: httpx.AsyncClient | None = None
     sleep: SleepFn = asyncio.sleep
+    observability_config: RagObservabilityConfig | None = None
     _owns_client: bool = field(init=False, default=False)
 
     def __post_init__(self) -> None:
+        if self.observability_config is None:
+            self.observability_config = load_rag_observability_config()
         if not self.model.strip():
             raise ValueError("model cannot be empty")
         if self.timeout_seconds <= 0:
@@ -111,15 +125,30 @@ class OllamaEmbedder:
         """
         clean_text = _validate_text(text)
         t0 = time.monotonic()
+        self._emit_embedding_event(
+            RagEventKind.EMBEDDING_CALL_STARTED,
+            batch_size=1,
+            status="started",
+        )
 
-        response = await self._post_embed({"model": self.model, "input": clean_text})
-        vector = _extract_single_embedding(response)
+        try:
+            response = await self._post_embed({"model": self.model, "input": clean_text})
+            vector = _extract_single_embedding(response)
 
-        if len(vector) != self.expected_dimensions:
-            raise EmbeddingError(
-                f"Expected {self.expected_dimensions} dimensions, "
-                f"got {len(vector)} from model '{self.model}'"
+            if len(vector) != self.expected_dimensions:
+                raise EmbeddingError(
+                    f"Expected {self.expected_dimensions} dimensions, "
+                    f"got {len(vector)} from model '{self.model}'"
+                )
+        except Exception as exc:
+            self._emit_embedding_event(
+                RagEventKind.EMBEDDING_CALL_FAILED,
+                latency_ms=(time.monotonic() - t0) * 1000,
+                batch_size=1,
+                status="failed",
+                error_category=categorize_exception(exc),
             )
+            raise
 
         latency_ms = (time.monotonic() - t0) * 1000
         logger.debug(
@@ -127,6 +156,12 @@ class OllamaEmbedder:
             self.model,
             len(vector),
             latency_ms,
+        )
+        self._emit_embedding_event(
+            RagEventKind.EMBEDDING_CALL_FINISHED,
+            latency_ms=latency_ms,
+            batch_size=1,
+            status="success",
         )
         return vector
 
@@ -149,14 +184,29 @@ class OllamaEmbedder:
 
         semaphore = asyncio.Semaphore(self.max_concurrency)
         t0 = time.monotonic()
+        self._emit_embedding_event(
+            RagEventKind.EMBEDDING_CALL_STARTED,
+            batch_size=len(clean_texts),
+            status="started",
+        )
 
         async def _embed_one(text: str) -> list[float]:
             async with semaphore:
                 return await self.embed(text)
 
-        vectors = list(
-            await asyncio.gather(*(_embed_one(t) for t in clean_texts))
-        )
+        try:
+            vectors = list(
+                await asyncio.gather(*(_embed_one(t) for t in clean_texts))
+            )
+        except Exception as exc:
+            self._emit_embedding_event(
+                RagEventKind.EMBEDDING_CALL_FAILED,
+                latency_ms=(time.monotonic() - t0) * 1000,
+                batch_size=len(clean_texts),
+                status="failed",
+                error_category=categorize_exception(exc),
+            )
+            raise
 
         latency_ms = (time.monotonic() - t0) * 1000
         logger.debug(
@@ -164,6 +214,12 @@ class OllamaEmbedder:
             self.model,
             len(vectors),
             latency_ms,
+        )
+        self._emit_embedding_event(
+            RagEventKind.EMBEDDING_CALL_FINISHED,
+            latency_ms=latency_ms,
+            batch_size=len(clean_texts),
+            status="success",
         )
         return vectors
 
@@ -191,6 +247,36 @@ class OllamaEmbedder:
                 await self.sleep(wait)
 
         raise RuntimeError("unreachable retry state")  # pragma: no cover
+
+    def _emit_embedding_event(
+        self,
+        event_kind: RagEventKind,
+        *,
+        latency_ms: float | None = None,
+        batch_size: int | None = None,
+        status: str | None = None,
+        error_category: RagErrorCategory | None = None,
+    ) -> None:
+        config = self.observability_config
+        if (
+            config is None
+            or not config.enabled
+            or not config.embedding_events_enabled
+        ):
+            return
+        event = RagObservabilityEvent(
+            event_kind=event_kind,
+            timestamp_utc=utc_now_iso(),
+            backend="direct_ollama",
+            alias=self.model,
+            model=self.model,
+            dimensions=self.expected_dimensions,
+            latency_ms=latency_ms,
+            batch_size=batch_size,
+            status=status,
+            error_category=error_category,
+        )
+        emit_rag_event(event, config)
 
 
 def _validate_text(text: str) -> str:

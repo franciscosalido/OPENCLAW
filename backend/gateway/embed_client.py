@@ -23,6 +23,16 @@ from backend.gateway.errors import (
     GatewayResponseError,
     GatewayTimeoutError,
 )
+from backend.rag.observability import (
+    RagErrorCategory,
+    RagEventKind,
+    RagObservabilityConfig,
+    RagObservabilityEvent,
+    categorize_exception,
+    emit_rag_event,
+    load_rag_observability_config,
+    utc_now_iso,
+)
 
 
 ENV_LLM_EMBED_MODEL = "QUIMERA_LLM_EMBED_MODEL"
@@ -54,10 +64,13 @@ class GatewayEmbedClient:
     max_concurrency: int = DEFAULT_EMBED_MAX_CONCURRENCY
     client: httpx.AsyncClient | None = None
     sleep: SleepFn = asyncio.sleep
+    observability_config: RagObservabilityConfig | None = None
     _owns_client: bool = field(init=False, default=False)
 
     def __post_init__(self) -> None:
         self.config = self.config.validated()
+        if self.observability_config is None:
+            self.observability_config = load_rag_observability_config()
         self.model = self.model.strip()
         if not self.model:
             raise GatewayConfigurationError(f"{ENV_LLM_EMBED_MODEL} cannot be empty")
@@ -92,12 +105,34 @@ class GatewayEmbedClient:
     async def embed(self, text: str) -> list[float]:
         """Embed one synthetic/local text through LiteLLM ``/embeddings``."""
         clean_text = _validate_text(text)
-        vectors = await self._embed_payload(clean_text)
-        if len(vectors) != 1:
-            raise GatewayResponseError(
-                "LiteLLM embedding response did not contain exactly one vector.",
-                alias=self.model,
+        start = time.perf_counter()
+        self._emit_embedding_event(
+            RagEventKind.EMBEDDING_CALL_STARTED,
+            batch_size=1,
+            status="started",
+        )
+        try:
+            vectors = await self._embed_payload(clean_text)
+            if len(vectors) != 1:
+                raise GatewayResponseError(
+                    "LiteLLM embedding response did not contain exactly one vector.",
+                    alias=self.model,
+                )
+        except Exception as exc:
+            self._emit_embedding_event(
+                RagEventKind.EMBEDDING_CALL_FAILED,
+                latency_ms=_elapsed_ms(start),
+                batch_size=1,
+                status="failed",
+                error_category=categorize_exception(exc),
             )
+            raise
+        self._emit_embedding_event(
+            RagEventKind.EMBEDDING_CALL_FINISHED,
+            latency_ms=_elapsed_ms(start),
+            batch_size=1,
+            status="success",
+        )
         return vectors[0]
 
     async def embed_batch(self, texts: Sequence[str]) -> list[list[float]]:
@@ -106,6 +141,12 @@ class GatewayEmbedClient:
         if not clean_texts:
             return []
 
+        start = time.perf_counter()
+        self._emit_embedding_event(
+            RagEventKind.EMBEDDING_CALL_STARTED,
+            batch_size=len(clean_texts),
+            status="started",
+        )
         semaphore = asyncio.Semaphore(self.max_concurrency)
 
         async def _embed_one(text: str) -> list[float]:
@@ -118,7 +159,26 @@ class GatewayEmbedClient:
                     )
                 return vectors[0]
 
-        return list(await asyncio.gather(*(_embed_one(text) for text in clean_texts)))
+        try:
+            vectors = list(
+                await asyncio.gather(*(_embed_one(text) for text in clean_texts))
+            )
+        except Exception as exc:
+            self._emit_embedding_event(
+                RagEventKind.EMBEDDING_CALL_FAILED,
+                latency_ms=_elapsed_ms(start),
+                batch_size=len(clean_texts),
+                status="failed",
+                error_category=categorize_exception(exc),
+            )
+            raise
+        self._emit_embedding_event(
+            RagEventKind.EMBEDDING_CALL_FINISHED,
+            latency_ms=_elapsed_ms(start),
+            batch_size=len(clean_texts),
+            status="success",
+        )
+        return vectors
 
     async def _embed_payload(self, input_value: str | list[str]) -> list[list[float]]:
         if self.client is None:
@@ -234,6 +294,36 @@ class GatewayEmbedClient:
         )
         await self.sleep(wait_seconds)
 
+    def _emit_embedding_event(
+        self,
+        event_kind: RagEventKind,
+        *,
+        latency_ms: float | None = None,
+        batch_size: int | None = None,
+        status: str | None = None,
+        error_category: RagErrorCategory | None = None,
+    ) -> None:
+        config = self.observability_config
+        if (
+            config is None
+            or not config.enabled
+            or not config.embedding_events_enabled
+        ):
+            return
+        event = RagObservabilityEvent(
+            event_kind=event_kind,
+            timestamp_utc=utc_now_iso(),
+            backend="gateway_litellm",
+            alias=self.model,
+            model=self.model,
+            dimensions=self.expected_dimensions,
+            latency_ms=latency_ms,
+            batch_size=batch_size,
+            status=status,
+            error_category=error_category,
+        )
+        emit_rag_event(event, config)
+
 
 def _validate_text(text: str) -> str:
     if not isinstance(text, str):
@@ -319,3 +409,7 @@ def _log_embed_call(
         status,
         error_category or "none",
     )
+
+
+def _elapsed_ms(start: float) -> float:
+    return (time.perf_counter() - start) * 1000

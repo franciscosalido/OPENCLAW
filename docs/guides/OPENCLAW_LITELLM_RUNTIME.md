@@ -11,6 +11,9 @@ GW-07 adds optional synthetic RAG E2E smoke for the current production-safe path
 direct Ollama embeddings, temporary Qdrant collection, and LiteLLM generation.
 GW-08 adds controlled RAG embedding migration for new ingest/test paths through
 `quimera_embed` and keeps `direct_ollama` as rollback.
+GW-09 adds read-only collection metadata drift detection.
+GW-10 adds the final safe per-query `RagRunTrace` provenance record.
+GW-11 adds local structured RAG lifecycle events with safe metadata only.
 The default runtime path is:
 
 ```text
@@ -331,7 +334,47 @@ rag:
 ```
 
 Allowed log levels are `DEBUG`, `INFO`, and `WARNING`. GW-10 is provenance
-only; GW-11 is reserved for structured observability lifecycle events.
+only; GW-11 lifecycle events remain separate from `RagRunTrace`.
+
+## RAG Observability Events
+
+GW-11 adds local structured lifecycle events emitted with loguru:
+
+```text
+logger.bind(event=event.to_log_dict()).log(log_level, "rag_lifecycle_event")
+```
+
+Events cover embedding calls, retrieval, and generation. They are not
+OpenTelemetry, remote telemetry, distributed tracing, profiling, dashboards,
+Prometheus, Grafana, soak tests, or memory/resource baselines.
+
+Config:
+
+```yaml
+rag:
+  observability:
+    enabled: true
+    log_level: "INFO"
+    embedding_events_enabled: true
+    retrieval_events_enabled: true
+    generation_events_enabled: true
+    collection_guard_events_enabled: true
+```
+
+Allowed log levels are `DEBUG`, `INFO`, and `WARNING`.
+
+Event serialization uses an explicit allowlist and omits `None` values. Events
+may include safe metadata such as event kind, timestamp, backend, alias, model,
+dimensions, latency, chunk count, batch size, status, error category,
+collection name, query id, and gateway alias.
+
+Events never include query text, prompt text, final answer text, chunk or
+document text, vectors, embedding values, Qdrant payloads, portfolio data, API
+keys, Authorization headers, tokens, passwords, or secrets.
+
+`RagRunTrace` remains the final per-query provenance record. GW-11 lifecycle
+events are separate and do not change return values, retry/backoff/concurrency
+behavior, Qdrant collections, or default embedding selection.
 
 ## What Changed
 
@@ -362,6 +405,8 @@ only; GW-11 is reserved for structured observability lifecycle events.
   LiteLLM only for answer generation.
 - GW-07 does not touch production Qdrant collections or `openclaw_knowledge`.
 - GW-08 does not touch production Qdrant collections or `openclaw_knowledge`.
+- GW-11 does not add OpenTelemetry, remote telemetry, distributed tracing,
+  profiling, dashboards, or memory/resource baselines.
 - Remote providers remain disabled.
 - FastAPI remains postponed.
 - MCP and tooling integration remain future direction, not implemented in

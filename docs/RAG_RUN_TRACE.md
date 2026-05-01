@@ -73,5 +73,6 @@ semantics.
 
 ## Future Work
 
-- GW-11 will add structured observability lifecycle events.
+- GW-11 adds structured observability lifecycle events separately in
+  `RagObservabilityEvent`.
 - GW-12 will add memory/resource baseline work.
