@@ -48,13 +48,13 @@ unavoidable, use `git push --force-with-lease`.
 Current active branch:
 
 ```text
-feat/rag-observability-events
+feat/gateway-operational-readiness
 ```
 
 Current issue:
 
 ```text
-https://github.com/franciscosalido/OPENCLAW/issues/46
+https://github.com/franciscosalido/OPENCLAW/issues/48
 ```
 
 Gateway baseline already merged:
@@ -68,7 +68,8 @@ GW-07 synthetic RAG E2E is merged in 814b59d.
 GW-08 controlled embedding migration is merged in 1a3bf32.
 GW-09 collection metadata guard is merged in 254a840.
 GW-10 safe RagRunTrace provenance is merged in 7b2c81b.
-GW-11 branches from the post-GW10 baseline.
+GW-11 structured RAG observability events are merged in 2ba87b8.
+GW-12 final operational readiness branches from the post-GW11 baseline.
 ```
 
 Gateway PR state:
@@ -87,7 +88,8 @@ Gateway PR state:
 | GW-08 | `feat/rag-controlled-embedding-migration` | Controlled RAG embedding migration to `quimera_embed` | Merged in `1a3bf32` |
 | GW-09 | `feat/rag-collection-metadata-guard` | Collection metadata drift guard for embedding traceability | Merged in `254a840` |
 | GW-10 | `feat/rag-run-trace-provenance` | Safe per-query RAG provenance trace | Merged in `7b2c81b` |
-| GW-11 | `feat/rag-observability-events` | Safe structured RAG lifecycle observability events | Current |
+| GW-11 | `feat/rag-observability-events` | Safe structured RAG lifecycle observability events | Merged in `2ba87b8` |
+| GW-12 | `feat/gateway-operational-readiness` | Final runbook, readiness script, baseline tests, sprint boundary ADR | Current final PR |
 
 ---
 
@@ -476,7 +478,7 @@ Out of scope:
 
 - OpenTelemetry, Prometheus, Grafana, dashboards, soak tests, and profiling.
 - GW-11 adds structured observability lifecycle events separately.
-- GW-12 memory/resource baseline.
+- GW-12 final operational readiness and sprint boundary.
 - Qdrant mutation, reindexing, collection updates, and `openclaw_knowledge`.
 
 Safety notes:
@@ -487,7 +489,7 @@ Safety notes:
   Authorization headers, or secrets.
 - Dimension mismatch raises `EmbeddingDimensionMismatchError`.
 
-## GW-11 Current Work
+## GW-11 Completed Work
 
 Objective:
 
@@ -519,3 +521,34 @@ Safety notes:
   Authorization headers, tokens, passwords, or secrets.
 - `RagRunTrace` remains the final per-query provenance record; GW-11 lifecycle
   events are separate.
+
+## GW-12 Current Work
+
+Objective:
+
+Finalize Gateway-0 operational readiness, runbook, checks, sprint boundary ADR
+and handoff.
+
+Scope:
+
+- `docs/GATEWAY_FINAL_RUNBOOK.md`.
+- `scripts/check_gateway_readiness.sh`.
+- Static readiness checks by default; explicit `--live` for local services.
+- Final baseline tests across RAG config and LiteLLM configs.
+- Smoke skip-by-default audit.
+- Safe serialization audit for `RagRunTrace` and `RagObservabilityEvent`.
+- ADR-0019 documenting the Gateway-0 sprint boundary.
+
+Out of scope:
+
+- New runtime architecture.
+- OpenTelemetry, Prometheus, Grafana, dashboards, distributed tracing,
+  profiling, mandatory soak tests or new dependencies.
+- FastAPI, MCP, quant tools or remote providers.
+- Qdrant mutation, reindexing, `openclaw_knowledge` access or real data.
+
+Final rule:
+
+After GW-12 merges, Gateway-0 is complete on `main`. Any remote provider,
+OpenTelemetry/profiling, production ingestion or `openclaw_knowledge` work
+requires a new issue and explicit future ADR/sprint.

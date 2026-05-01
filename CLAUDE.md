@@ -101,11 +101,11 @@ Do not read the whole repo. Do not open node_modules, .venv, dist, caches, or la
 
 ---
 
-## Current Sprint: Gateway-0 — LiteLLM Local Gateway
+## Current Sprint: Gateway-0 — LiteLLM Local Gateway Final Readiness
 
 **Goal:** Route all OpenClaw runtime model calls through LiteLLM at `localhost:4000/v1` while preserving existing RAG/Qdrant behavior.
 
-**Semantic aliases:** `local_chat` (30s) · `local_think` (120s) · `local_rag` (60s) · `local_json` (30s) · `local_embed` (30s placeholder)
+**Semantic aliases:** `local_chat` (30s) · `local_think` (120s) · `local_rag` (60s) · `local_json` (30s) · `quimera_embed` (30s canonical embeddings) · `local_embed` (30s compatibility)
 
 ### RAG-0 Sprint — COMPLETE ✅
 
@@ -121,7 +121,7 @@ Do not read the whole repo. Do not open node_modules, .venv, dist, caches, or la
 | RAG-06 | feat/rag-cli-smoke | ✅ MERGED | synthetic ingest/query CLI + preflight + smoke |
 | RAG-07 | feat/rag-docs-runbook | ✅ MERGED | ADR + runbook + shared validation + health tests |
 
-### Gateway-0 Sprint — IN PROGRESS 🔄
+### Gateway-0 Sprint — FINAL READINESS 🔄
 
 | PR | Branch | Status | Scope |
 |---|---|---|---|
@@ -131,10 +131,18 @@ Do not read the whole repo. Do not open node_modules, .venv, dist, caches, or la
 | GW-04 | feat/gateway-runtime-smoke | ✅ MERGED | validate_chat_messages, observability, optional smoke |
 | GW-05a | feat/gateway-per-alias-timeouts | ✅ MERGED | Per-alias timeout configuration |
 | GW-05b | feat/gateway-live-smoke-timeouts | ✅ MERGED | Live smoke + timeout observability (128/128, 7/7 smoke) |
-| GW-06 | TBD | ⏳ NEXT | Evaluate embeddings via local_embed |
-| GW-07 | TBD | ⏳ Planned | Synthetic RAG E2E through gateway |
-| GW-08 | TBD | ⏳ Planned | Runbook hardening |
-| GW-09 | TBD | ⏳ Planned | MCP/tooling evaluation |
+| GW-06 | feat/gateway-local-embed-evaluation | ✅ MERGED | Evaluate embeddings via local_embed |
+| GW06C | feat/adr-openai-compatible-embeddings-contract | ✅ MERGED | quimera_embed canonical embeddings ADR |
+| GW-07 | feat/gateway-rag-e2e-synthetic | ✅ MERGED | Synthetic RAG E2E through gateway |
+| GW-08 | feat/rag-controlled-embedding-migration | ✅ MERGED | Controlled embedding migration to quimera_embed |
+| GW-09 | feat/rag-collection-metadata-guard | ✅ MERGED | Collection metadata drift guard |
+| GW-10 | feat/rag-run-trace-provenance | ✅ MERGED | RagRunTrace safe provenance |
+| GW-11 | feat/rag-observability-events | ✅ MERGED | Local structured RAG lifecycle events |
+| GW-12 | feat/gateway-operational-readiness | 🔄 CURRENT FINAL PR | Final runbook, readiness checks, ADR boundary |
+
+Gateway-0 remains local-only. Remote providers, FastAPI, MCP, quant tools,
+OpenTelemetry, profiling, dashboards, production ingestion and
+`openclaw_knowledge` mutation require a future issue and explicit ADR/sprint.
 
 ### Merge Criteria (every PR)
 
