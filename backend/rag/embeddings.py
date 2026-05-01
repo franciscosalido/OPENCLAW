@@ -192,7 +192,14 @@ class OllamaEmbedder:
 
         async def _embed_one(text: str) -> list[float]:
             async with semaphore:
-                return await self.embed(text)
+                response = await self._post_embed({"model": self.model, "input": text})
+                vector = _extract_single_embedding(response)
+                if len(vector) != self.expected_dimensions:
+                    raise EmbeddingError(
+                        f"Expected {self.expected_dimensions} dimensions, "
+                        f"got {len(vector)} from model '{self.model}'"
+                    )
+                return vector
 
         try:
             vectors = list(

@@ -80,6 +80,63 @@ class OllamaEmbedderObservabilityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(events[1]["error_category"], "invalid_response")
         self.assertNotIn("texto que nao pode aparecer", str(events))
 
+    async def test_ollama_embed_batch_emits_only_batch_level_events(self) -> None:
+        events: list[dict[str, object]] = []
+        requested_inputs: list[str] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            payload = request.read().decode("utf-8")
+            requested_inputs.append(payload)
+            value = float(len(requested_inputs))
+            return httpx.Response(200, json={"embeddings": [[value, value + 0.1]]})
+
+        def sink(message: Any) -> None:
+            event = message.record["extra"].get("event")
+            if isinstance(event, dict):
+                events.append(event)
+
+        sink_id = logger.add(sink, level="INFO")
+        try:
+            async with httpx.AsyncClient(
+                base_url="http://ollama.test",
+                transport=httpx.MockTransport(handler),
+            ) as client:
+                embedder = OllamaEmbedder(
+                    client=client,
+                    expected_dimensions=2,
+                    max_concurrency=1,
+                    observability_config=RagObservabilityConfig(enabled=True),
+                )
+                vectors = await embedder.embed_batch(
+                    [
+                        "texto um sigiloso",
+                        "texto dois sigiloso",
+                        "texto tres sigiloso",
+                    ]
+                )
+        finally:
+            logger.remove(sink_id)
+
+        self.assertEqual(vectors, [[1.0, 1.1], [2.0, 2.1], [3.0, 3.1]])
+        self.assertEqual(len(requested_inputs), 3)
+        self.assertEqual(len(events), 2)
+        self.assertEqual(
+            [event["event_kind"] for event in events],
+            ["embedding_call_started", "embedding_call_finished"],
+        )
+        self.assertEqual(events[0]["batch_size"], 3)
+        self.assertEqual(events[1]["batch_size"], 3)
+        joined = str(events)
+        self.assertNotIn("texto um sigiloso", joined)
+        self.assertNotIn("texto dois sigiloso", joined)
+        self.assertNotIn("texto tres sigiloso", joined)
+        self.assertNotIn("embeddings", joined.lower())
+        self.assertNotIn("authorization", joined.lower())
+        self.assertNotIn("api_key", joined.lower())
+        self.assertNotIn("prompt", joined.lower())
+        self.assertNotIn("answer", joined.lower())
+        self.assertNotIn("chunk", joined.lower())
+
     async def test_ollama_retry_behavior_remains_unchanged(self) -> None:
         attempts = 0
         sleeps: list[float] = []
