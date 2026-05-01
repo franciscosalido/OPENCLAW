@@ -5,7 +5,7 @@
 > meaningful sessions.
 
 **Last updated:** 2026-05-01
-**Updated by:** Codex — Gateway GW-10 RagRunTrace provenance
+**Updated by:** Codex — Gateway GW-11 RAG observability events
 
 ---
 
@@ -104,7 +104,8 @@ unavoidable, use `git push --force-with-lease`.
 | GW-07 | `feat/gateway-rag-e2e-synthetic` | Synthetic RAG E2E through gateway path | Done / merged |
 | GW-08 | `feat/rag-controlled-embedding-migration` | Controlled RAG embedding migration to `quimera_embed` | Done / merged |
 | GW-09 | `feat/rag-collection-metadata-guard` | Collection metadata drift guard for embedding traceability | Done / merged |
-| GW-10 | `feat/rag-run-trace-provenance` | Safe per-query RAG provenance trace | Current |
+| GW-10 | `feat/rag-run-trace-provenance` | Safe per-query RAG provenance trace | Done / merged |
+| GW-11 | `feat/rag-observability-events` | Safe structured RAG lifecycle observability events | Current |
 
 GW-05a issue: <https://github.com/franciscosalido/OPENCLAW/issues/25>
 GW-05b issue: <https://github.com/franciscosalido/OPENCLAW/issues/28>
@@ -113,6 +114,7 @@ GW-07 issue: <https://github.com/franciscosalido/OPENCLAW/issues/38>
 GW-08 issue: <https://github.com/franciscosalido/OPENCLAW/issues/40>
 GW-09 issue: <https://github.com/franciscosalido/OPENCLAW/issues/42>
 GW-10 issue: <https://github.com/franciscosalido/OPENCLAW/issues/44>
+GW-11 issue: <https://github.com/franciscosalido/OPENCLAW/issues/46>
 
 ---
 
@@ -250,7 +252,7 @@ uv run pytest tests/unit/test_gateway_embed_client.py -v
 uv run pytest tests/smoke/ -v
 ```
 
-## GW-10 Current Work
+## GW-10 Completed Work
 
 GW-10 adds `RagRunTrace`, a safe frozen dataclass for per-query provenance:
 
@@ -274,10 +276,9 @@ Trace scope:
   active expected dimensions.
 - Does not mutate Qdrant, reindex collections, or touch `openclaw_knowledge`.
 
-Future work remains separate:
-
-- GW-11: structured observability lifecycle events.
-- GW-12: memory/resource baseline.
+GW-11 current work remains separate from `RagRunTrace`: lifecycle events are
+local structured loguru records around embedding, retrieval, and generation.
+GW-12 remains the place for memory/resource baseline.
 
 Live smoke tests should skip by default unless their explicit guards are set.
 GW-07 requires `RUN_RAG_E2E_SMOKE=1`.
@@ -298,7 +299,7 @@ export QUIMERA_LLM_API_KEY="${LITELLM_MASTER_KEY}"
 scripts/test_rag_e2e_gateway.sh
 ```
 
-## GW-08 Current Work
+## GW-08 Completed Work
 
 GW-08 aligns new controlled RAG embedding generation with the accepted
 OpenAI-compatible embeddings contract:
@@ -370,7 +371,7 @@ Observed GW-08 latencies and parity (2026-04-30):
 | cosine similarity vs direct Ollama | 1.000000 |
 | vector dimensions | 768 |
 
-## GW-09 Current Work
+## GW-09 Completed Work
 
 GW-09 adds a traceability guard for Qdrant collection embedding metadata:
 
@@ -391,7 +392,7 @@ Key rules:
 - `strict=True` can raise on backend/model/contract/alias mismatch.
 - No chunk text, vectors, prompts, secrets, or Authorization headers are logged.
 - GW-10 remains the place for `RagRunTrace`.
-- GW-11 remains the place for structured embedding observability events.
+- GW-11 adds structured RAG observability lifecycle events separately.
 
 Validation expectations:
 
@@ -402,3 +403,40 @@ uv run mypy --strict .
 uv run pyright
 uv run pytest tests/smoke/ -v
 ```
+
+## GW-11 Current Work
+
+GW-11 adds local structured RAG lifecycle observability events:
+
+```text
+embedding/retrieval/generation stage
+  -> RagObservabilityEvent safe metadata only
+  -> logger.bind(event=...).log(...)
+```
+
+Scope:
+
+- `backend/rag/observability.py` defines event kinds, error categories, config,
+  safe serialization, emission, and exception categorization.
+- `GatewayEmbedClient` emits embedding started/finished/failed events for
+  `gateway_litellm`.
+- `OllamaEmbedder` emits embedding started/finished/failed events for
+  `direct_ollama`.
+- `LocalRagPipeline` emits retrieval and generation lifecycle events.
+- `config/rag_config.yaml` has `rag.observability` flags and log level.
+
+Safety rules:
+
+- Events contain only safe scalar metadata.
+- Events never include query text, prompt text, answer text, chunk text,
+  document text, vectors, Qdrant payloads, portfolio data, API keys,
+  Authorization headers, tokens, passwords, or secrets.
+- No return values change.
+- Retry/backoff/concurrency semantics are unchanged.
+- Qdrant is not mutated and `openclaw_knowledge` is not touched.
+
+Out of scope:
+
+- OpenTelemetry, Prometheus, Grafana, dashboards, distributed tracing,
+  profiling, soak tests, and memory/resource baselines.
+- GW-12 remains the memory/resource baseline follow-up.

@@ -42,6 +42,14 @@ rag:
     enabled: true
     log_level: "INFO"
 
+  observability:
+    enabled: true
+    log_level: "INFO"
+    embedding_events_enabled: true
+    retrieval_events_enabled: true
+    generation_events_enabled: true
+    collection_guard_events_enabled: true
+
   retrieval:
     top_k: 5
     score_threshold: 0.3

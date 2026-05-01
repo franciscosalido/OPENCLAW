@@ -2,7 +2,7 @@
 
 > Start each Gateway cycle by reading this file before touching Git.
 
-**Last updated:** 2026-04-30
+**Last updated:** 2026-05-01
 **Repository:** OpenClaw
 **Product:** Quimera
 **Sprint:** Gateway-0 / LiteLLM
@@ -48,13 +48,13 @@ unavoidable, use `git push --force-with-lease`.
 Current active branch:
 
 ```text
-feat/rag-run-trace-provenance
+feat/rag-observability-events
 ```
 
 Current issue:
 
 ```text
-https://github.com/franciscosalido/OPENCLAW/issues/44
+https://github.com/franciscosalido/OPENCLAW/issues/46
 ```
 
 Gateway baseline already merged:
@@ -67,7 +67,8 @@ GW-06 local_embed evaluation and GW06C embeddings contract are merged.
 GW-07 synthetic RAG E2E is merged in 814b59d.
 GW-08 controlled embedding migration is merged in 1a3bf32.
 GW-09 collection metadata guard is merged in 254a840.
-GW-10 branches from the post-GW09 baseline.
+GW-10 safe RagRunTrace provenance is merged in 7b2c81b.
+GW-11 branches from the post-GW10 baseline.
 ```
 
 Gateway PR state:
@@ -85,7 +86,8 @@ Gateway PR state:
 | GW-07 | `feat/gateway-rag-e2e-synthetic` | Synthetic RAG E2E through gateway path | Merged |
 | GW-08 | `feat/rag-controlled-embedding-migration` | Controlled RAG embedding migration to `quimera_embed` | Merged in `1a3bf32` |
 | GW-09 | `feat/rag-collection-metadata-guard` | Collection metadata drift guard for embedding traceability | Merged in `254a840` |
-| GW-10 | `feat/rag-run-trace-provenance` | Safe per-query RAG provenance trace | Current |
+| GW-10 | `feat/rag-run-trace-provenance` | Safe per-query RAG provenance trace | Merged in `7b2c81b` |
+| GW-11 | `feat/rag-observability-events` | Safe structured RAG lifecycle observability events | Current |
 
 ---
 
@@ -227,7 +229,7 @@ GW-07:
 - Use `GatewayChatClient`/`LocalGenerator` through LiteLLM for generation.
 - Do not touch `openclaw_knowledge`.
 
-## GW-07 Current Work
+## GW-07 Completed Work
 
 Objective:
 
@@ -345,7 +347,7 @@ export QUIMERA_LLM_API_KEY="${LITELLM_MASTER_KEY}"
 scripts/test_rag_e2e_gateway.sh
 ```
 
-## GW-08 Current Work
+## GW-08 Completed Work
 
 Objective:
 
@@ -420,7 +422,7 @@ Observed results:
 | cosine similarity vs direct Ollama | 1.000000 |
 | vector dimensions | 768 |
 
-## GW-09 Current Work
+## GW-09 Completed Work
 
 Objective:
 
@@ -446,7 +448,7 @@ Out of scope:
 - Changing the active embedder/model.
 - Automatic healing.
 - `RagRunTrace` (GW-10).
-- Structured embedding observability events (GW-11).
+- Structured RAG observability lifecycle events are handled in GW-11.
 
 Safety notes:
 
@@ -455,7 +457,7 @@ Safety notes:
 - It must not log payload text, vectors, prompts, secrets, or Authorization
   headers.
 
-## GW-10 Current Work
+## GW-10 Completed Work
 
 Objective:
 
@@ -473,7 +475,7 @@ Scope:
 Out of scope:
 
 - OpenTelemetry, Prometheus, Grafana, dashboards, soak tests, and profiling.
-- GW-11 structured observability lifecycle events.
+- GW-11 adds structured observability lifecycle events separately.
 - GW-12 memory/resource baseline.
 - Qdrant mutation, reindexing, collection updates, and `openclaw_knowledge`.
 
@@ -484,3 +486,36 @@ Safety notes:
   vectors, payloads, portfolio data, private documents, API keys,
   Authorization headers, or secrets.
 - Dimension mismatch raises `EmbeddingDimensionMismatchError`.
+
+## GW-11 Current Work
+
+Objective:
+
+Add safe local structured lifecycle events for RAG operations without changing
+runtime behavior.
+
+Scope:
+
+- New `backend/rag/observability.py` module.
+- Frozen `RagObservabilityEvent` dataclass with explicit allowlist
+  serialization.
+- `RagEventKind` and `RagErrorCategory` enums.
+- `RagObservabilityConfig` loaded from `rag.observability`.
+- Embedding lifecycle events in `GatewayEmbedClient` and `OllamaEmbedder`.
+- Retrieval and generation lifecycle events in `LocalRagPipeline`.
+
+Out of scope:
+
+- OpenTelemetry, Prometheus, Grafana, dashboards, distributed tracing,
+  profiling, soak tests, and memory/resource baseline.
+- Qdrant mutation, reindexing, collection updates, and `openclaw_knowledge`.
+- Any default embedder change or retry/backoff/concurrency change.
+
+Safety notes:
+
+- Events contain safe scalar metadata only.
+- Events must not include query text, prompt text, answer text, chunk text,
+  document text, vectors, Qdrant payloads, portfolio data, API keys,
+  Authorization headers, tokens, passwords, or secrets.
+- `RagRunTrace` remains the final per-query provenance record; GW-11 lifecycle
+  events are separate.
