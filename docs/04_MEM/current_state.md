@@ -5,14 +5,19 @@
 > meaningful sessions.
 
 **Last updated:** 2026-05-01
-**Updated by:** Codex — Gateway GW-12 operational readiness
+**Updated by:** Codex — Gateway GW-13 routing policy prelude
 
 ---
 
-## Active Sprint: Gateway-0 / LiteLLM Final Readiness
+## Active Sprint: Gateway-1 / Local-First Routing Prelude
 
-**Goal:** make LiteLLM the local-only model gateway for OpenClaw runtime model
-calls while preserving existing RAG/Qdrant behavior.
+**Goal:** add safe, offline local-first routing decision primitives and token
+economy records for future routing policy work. Remote providers remain
+disabled and no runtime model routing changes are made in GW-13.
+
+Gateway-0 is complete on `main`. Gateway-1 starts from issue
+[#51](https://github.com/franciscosalido/OPENCLAW/issues/51) and branch
+`feat/gateway1-routing-policy-prelude`.
 
 Current runtime path:
 
@@ -107,6 +112,7 @@ unavoidable, use `git push --force-with-lease`.
 | GW-10 | `feat/rag-run-trace-provenance` | Safe per-query RAG provenance trace | Done / merged |
 | GW-11 | `feat/rag-observability-events` | Safe structured RAG lifecycle observability events | Done / merged |
 | GW-12 | `feat/gateway-operational-readiness` | Final runbook, readiness checks, ADR boundary, handoff | Done / merged |
+| GW-13 | `feat/gateway1-routing-policy-prelude` | Gateway-1 local-first routing policy and token economy prelude | Current |
 
 GW-05a issue: <https://github.com/franciscosalido/OPENCLAW/issues/25>
 GW-05b issue: <https://github.com/franciscosalido/OPENCLAW/issues/28>
@@ -117,10 +123,36 @@ GW-09 issue: <https://github.com/franciscosalido/OPENCLAW/issues/42>
 GW-10 issue: <https://github.com/franciscosalido/OPENCLAW/issues/44>
 GW-11 issue: <https://github.com/franciscosalido/OPENCLAW/issues/46>
 GW-12 issue: <https://github.com/franciscosalido/OPENCLAW/issues/48>
+GW-13 issue: <https://github.com/franciscosalido/OPENCLAW/issues/51>
 
 Gateway-0 sprint complete. GW-01 through GW-12 merged on `main`.
 The next sprint must start from a new explicit issue, ADR if architecture
 changes, and `git pull --ff-only origin main`.
+
+## GW-13 Current Work
+
+GW-13 opens Gateway-1 with safe routing policy records only.
+
+Deliverables:
+
+- `backend/gateway/routing_policy.py` with frozen decision and token economy
+  dataclasses.
+- `config/rag_config.yaml` `gateway.routing` defaults with
+  `remote_enabled: false` and no allowed remote providers.
+- `docs/GATEWAY1_ROUTING_POLICY.md`.
+- `docs/ADR/0020-controlled-remote-escalation-policy.md` with status Proposed.
+- `docs/sprints/GATEWAY1_SPRINT_HANDOFF.md`.
+- `tests/unit/test_gateway_routing_policy.py`.
+
+Rules:
+
+- No remote providers.
+- No remote calls.
+- No API keys.
+- No runtime model routing change.
+- No Qdrant mutation, reindexing, ingestion, or `openclaw_knowledge` access.
+- Token economy is estimated only, not billed.
+- Remote escalation requires future sanitization and an explicit Accepted ADR.
 
 ---
 

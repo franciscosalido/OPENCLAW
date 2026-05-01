@@ -122,6 +122,15 @@ Runtime env vars (must be set locally before running OpenClaw):
 | `QUIMERA_LLM_EMBED_MODEL` | `quimera_embed` | Canonical embedding alias |
 | `QUIMERA_RAG_EMBEDDING_BACKEND` | `gateway_litellm` | Use `direct_ollama` for rollback |
 
+Gateway-1 routing policy defaults:
+
+| Field | Default | Notes |
+|---|---|---|
+| `gateway.routing.remote_enabled` | `false` | No remote calls allowed |
+| `gateway.routing.default_route` | `local` | Local-first baseline |
+| `gateway.routing.allowed_remote_providers` | `[]` | Empty until future ADR |
+| `gateway.routing.per_request_token_limit` | `0` | No budget gate enforced yet |
+
 ---
 
 ## 4. Sprint History and Current State
@@ -178,6 +187,30 @@ OpenClaw / LocalGenerator
 | GW-09 | `feat/rag-collection-metadata-guard` | Collection metadata drift guard | ✅ Merged |
 | GW-10 | `feat/rag-run-trace-provenance` | `RagRunTrace` provenance | ✅ Merged |
 | GW-11 | `feat/rag-observability-events` | Local structured RAG lifecycle events | ✅ Merged |
+
+### Sprint Gateway-1 — CURRENT
+
+Gateway-1 starts after Gateway-0 readiness. GW-13 adds routing policy
+primitives only:
+
+```text
+task metadata + token estimates
+  -> local-first routing policy
+  -> RouterDecision / TokenEconomyRecord
+  -> no remote call
+```
+
+| PR | Branch | Scope | Status |
+|---|---|---|---|
+| GW-13 | `feat/gateway1-routing-policy-prelude` | Local-first routing decision records and token economy prelude | 🚧 Current |
+
+GW-13 rules:
+
+- Remote providers remain disabled.
+- Remote candidates are metadata only, not execution.
+- No secrets, no API keys, no remote calls.
+- No runtime model routing change.
+- No Qdrant mutation or `openclaw_knowledge` access.
 | GW-12 | `feat/gateway-operational-readiness` | Final runbook, readiness checks, ADR boundary | ✅ Merged |
 
 **Gateway-0 final baseline:** local-only LiteLLM gateway, Qdrant vector store,
