@@ -5,7 +5,7 @@
 > meaningful sessions.
 
 **Last updated:** 2026-05-01
-**Updated by:** Codex — Gateway GW-09 collection metadata guard
+**Updated by:** Codex — Gateway GW-10 RagRunTrace provenance
 
 ---
 
@@ -103,7 +103,8 @@ unavoidable, use `git push --force-with-lease`.
 | GW06C | `feat/adr-openai-compatible-embeddings-contract` | OpenAI-compatible embeddings ADR and `quimera_embed` | Done / merged |
 | GW-07 | `feat/gateway-rag-e2e-synthetic` | Synthetic RAG E2E through gateway path | Done / merged |
 | GW-08 | `feat/rag-controlled-embedding-migration` | Controlled RAG embedding migration to `quimera_embed` | Done / merged |
-| GW-09 | `feat/rag-collection-metadata-guard` | Collection metadata drift guard for embedding traceability | Current |
+| GW-09 | `feat/rag-collection-metadata-guard` | Collection metadata drift guard for embedding traceability | Done / merged |
+| GW-10 | `feat/rag-run-trace-provenance` | Safe per-query RAG provenance trace | Current |
 
 GW-05a issue: <https://github.com/franciscosalido/OPENCLAW/issues/25>
 GW-05b issue: <https://github.com/franciscosalido/OPENCLAW/issues/28>
@@ -111,6 +112,7 @@ GW-06 issue: <https://github.com/franciscosalido/OPENCLAW/issues/30>
 GW-07 issue: <https://github.com/franciscosalido/OPENCLAW/issues/38>
 GW-08 issue: <https://github.com/franciscosalido/OPENCLAW/issues/40>
 GW-09 issue: <https://github.com/franciscosalido/OPENCLAW/issues/42>
+GW-10 issue: <https://github.com/franciscosalido/OPENCLAW/issues/44>
 
 ---
 
@@ -247,6 +249,35 @@ uv run python -m compileall backend tests scripts infra
 uv run pytest tests/unit/test_gateway_embed_client.py -v
 uv run pytest tests/smoke/ -v
 ```
+
+## GW-10 Current Work
+
+GW-10 adds `RagRunTrace`, a safe frozen dataclass for per-query provenance:
+
+```text
+LocalRagPipeline.ask(...)
+  -> retrieval/prompt/generation timings
+  -> RagRunTrace safe metadata only
+  -> logger.bind(trace=...).log(...)
+```
+
+Trace scope:
+
+- Records collection name, embedding backend/model/alias/dimensions, chunk
+  count, gateway alias, and latency metadata.
+- Does not record query text, chunk text, prompts, answer text, vectors,
+  payloads, real portfolio data, private documents, API keys, Authorization
+  headers, or secrets.
+- Uses `rag.tracing.enabled` and `rag.tracing.log_level` from
+  `config/rag_config.yaml`.
+- Raises `EmbeddingDimensionMismatchError` if trace dimensions diverge from
+  active expected dimensions.
+- Does not mutate Qdrant, reindex collections, or touch `openclaw_knowledge`.
+
+Future work remains separate:
+
+- GW-11: structured observability lifecycle events.
+- GW-12: memory/resource baseline.
 
 Live smoke tests should skip by default unless their explicit guards are set.
 GW-07 requires `RUN_RAG_E2E_SMOKE=1`.

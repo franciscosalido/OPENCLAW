@@ -296,6 +296,43 @@ not reindex Qdrant, and does not touch `openclaw_knowledge`.
 No chunk text, vectors, prompts, secrets, API keys, or Authorization headers are
 logged.
 
+## RAG Run Trace
+
+GW-10 adds safe per-query RAG provenance tracing. When
+`rag.tracing.enabled` is true, `LocalRagPipeline` emits a structured loguru
+record:
+
+```text
+rag_run_trace
+```
+
+The log is emitted with `logger.bind(trace=trace.to_log_dict())` and includes
+only safe metadata:
+
+- query id
+- timestamp
+- collection name
+- embedding backend/model/alias/dimensions
+- retrieval and generation latency
+- chunk count
+- optional generation gateway alias
+
+It does not include query text, prompt text, final answer text, chunks, vectors,
+payloads, portfolio data, private documents, API keys, Authorization headers,
+or secrets.
+
+Config:
+
+```yaml
+rag:
+  tracing:
+    enabled: true
+    log_level: "INFO"
+```
+
+Allowed log levels are `DEBUG`, `INFO`, and `WARNING`. GW-10 is provenance
+only; GW-11 is reserved for structured observability lifecycle events.
+
 ## What Changed
 
 - `backend.rag.generator.LocalGenerator` now sends OpenAI-compatible
