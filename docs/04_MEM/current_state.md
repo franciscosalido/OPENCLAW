@@ -4,8 +4,8 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Last updated:** 2026-04-30
-**Updated by:** Codex — Gateway GW-08 controlled embedding migration
+**Last updated:** 2026-05-01
+**Updated by:** Codex — Gateway GW-09 collection metadata guard
 
 ---
 
@@ -102,13 +102,15 @@ unavoidable, use `git push --force-with-lease`.
 | GW-06 | `feat/gateway-local-embed-evaluation` | Evaluate embeddings via `local_embed` | Done / merged |
 | GW06C | `feat/adr-openai-compatible-embeddings-contract` | OpenAI-compatible embeddings ADR and `quimera_embed` | Done / merged |
 | GW-07 | `feat/gateway-rag-e2e-synthetic` | Synthetic RAG E2E through gateway path | Done / merged |
-| GW-08 | `feat/rag-controlled-embedding-migration` | Controlled RAG embedding migration to `quimera_embed` | Current |
+| GW-08 | `feat/rag-controlled-embedding-migration` | Controlled RAG embedding migration to `quimera_embed` | Done / merged |
+| GW-09 | `feat/rag-collection-metadata-guard` | Collection metadata drift guard for embedding traceability | Current |
 
 GW-05a issue: <https://github.com/franciscosalido/OPENCLAW/issues/25>
 GW-05b issue: <https://github.com/franciscosalido/OPENCLAW/issues/28>
 GW-06 issue: <https://github.com/franciscosalido/OPENCLAW/issues/30>
 GW-07 issue: <https://github.com/franciscosalido/OPENCLAW/issues/38>
 GW-08 issue: <https://github.com/franciscosalido/OPENCLAW/issues/40>
+GW-09 issue: <https://github.com/franciscosalido/OPENCLAW/issues/42>
 
 ---
 
@@ -336,3 +338,36 @@ Observed GW-08 latencies and parity (2026-04-30):
 | total pipeline | 4979.1 ms |
 | cosine similarity vs direct Ollama | 1.000000 |
 | vector dimensions | 768 |
+
+## GW-09 Current Work
+
+GW-09 adds a traceability guard for Qdrant collection embedding metadata:
+
+```text
+Qdrant payload sample
+  -> embedding_backend/model/dimensions/contract/alias check
+  -> structured warning on drift
+  -> hard error only for dimension mismatch by default
+```
+
+Key rules:
+
+- The guard samples payloads with `with_payload=True` and `with_vectors=False`.
+- It does not mutate, delete, recreate, or reindex collections.
+- It does not touch `openclaw_knowledge`.
+- Backend, model, contract, alias, and missing metadata drift warn by default.
+- Dimension mismatch always raises `EmbeddingDimensionMismatchError`.
+- `strict=True` can raise on backend/model/contract/alias mismatch.
+- No chunk text, vectors, prompts, secrets, or Authorization headers are logged.
+- GW-10 remains the place for `RagRunTrace`.
+- GW-11 remains the place for structured embedding observability events.
+
+Validation expectations:
+
+```bash
+git diff --check
+uv run pytest -v
+uv run mypy --strict .
+uv run pyright
+uv run pytest tests/smoke/ -v
+```

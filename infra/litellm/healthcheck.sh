@@ -24,8 +24,23 @@ case "${OLLAMA_API_BASE}" in
   *) fail "OLLAMA_API_BASE must be local-only. Got '${OLLAMA_API_BASE}'." ;;
 esac
 
-if grep -v '^[[:space:]]*#' "${CONFIG_FILE}" | grep -Eiq 'openai|anthropic|gemini|api[_.-]?key'; then
-  fail "Remote provider or provider API key marker found in active LiteLLM config."
+# Strip full-line YAML comments before scanning for remote provider markers.
+# sed is used instead of a grep -v pipe so the stripped content can be reused
+# across multiple checks without re-reading the file.
+# LITELLM_MASTER_KEY and QUIMERA_LLM_API_KEY are local proxy credentials —
+# they are not remote provider keys and must not be rejected.
+ACTIVE_CONFIG="$(sed '/^[[:space:]]*#/d' "${CONFIG_FILE}")"
+
+# Reject provider-specific remote API key env markers.
+if printf '%s\n' "${ACTIVE_CONFIG}" | grep -Eiq \
+    'OPENAI_API_KEY|ANTHROPIC_API_KEY|GEMINI_API_KEY|GOOGLE_API_KEY|OPENROUTER_API_KEY|XAI_API_KEY|AZURE_API_KEY'; then
+  fail "Remote provider API key env marker found in active LiteLLM config."
+fi
+
+# Reject active remote model provider prefixes.
+if printf '%s\n' "${ACTIVE_CONFIG}" | grep -Eiq \
+    'model:[[:space:]]*(openai|anthropic|gemini|google|openrouter|xai|azure)/'; then
+  fail "Remote provider model found in active LiteLLM config."
 fi
 
 if ! curl -fsS --max-time 5 "${OLLAMA_API_BASE%/}/api/tags" >/dev/null; then
