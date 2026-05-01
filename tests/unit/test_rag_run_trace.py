@@ -89,6 +89,24 @@ def _trace(**overrides: Any) -> RagRunTrace:
     return RagRunTrace(**cast(Any, values))
 
 
+def _pipeline_with_dims(embedding_dimensions: int = 768) -> LocalRagPipeline:
+    """Return a pipeline with tracing enabled and the given configured dimensions."""
+    return LocalRagPipeline(
+        retriever=FakeRetriever(),
+        generator=FakeGenerator(),
+        prompt_builder=PromptBuilder(),
+        tracing_config=RagTracingConfig(
+            enabled=True,
+            log_level="INFO",
+            collection_name="collection",
+            embedding_backend="gateway_litellm_current",
+            embedding_model="nomic-embed-text",
+            embedding_alias="quimera_embed",
+            embedding_dimensions=embedding_dimensions,
+        ).validated(),
+    )
+
+
 class RagRunTraceTests(unittest.IsolatedAsyncioTestCase):
     def test_constructs_valid_frozen_trace(self) -> None:
         trace = _trace()
@@ -261,6 +279,39 @@ class RagRunTraceTests(unittest.IsolatedAsyncioTestCase):
     def test_invalid_log_level_raises(self) -> None:
         with self.assertRaises(ValueError):
             RagTracingConfig(log_level="TRACE").validated()
+
+    def test_emit_trace_with_actual_dimensions_mismatch_raises(self) -> None:
+        """actual_embedding_dimensions from an independent source triggers dimension guard.
+
+        When the runtime embedding source reports 1024 dimensions but config
+        expects 768, _emit_trace must raise EmbeddingDimensionMismatchError
+        before any log event is emitted.
+        """
+        pipeline = _pipeline_with_dims(768)
+
+        with self.assertRaises(EmbeddingDimensionMismatchError):
+            pipeline._emit_trace(
+                retrieval_ms=1.0,
+                prompt_ms=0.5,
+                generation_ms=2.0,
+                total_ms=3.5,
+                chunk_count=1,
+                actual_embedding_dimensions=1024,
+            )
+
+    def test_emit_trace_without_actual_dimensions_uses_config_path(self) -> None:
+        """actual_embedding_dimensions=None preserves the config-only path without error."""
+        pipeline = _pipeline_with_dims(768)
+
+        # Must not raise: both observed and expected dimensions come from config (768 == 768).
+        pipeline._emit_trace(
+            retrieval_ms=1.0,
+            prompt_ms=0.5,
+            generation_ms=2.0,
+            total_ms=3.5,
+            chunk_count=1,
+            actual_embedding_dimensions=None,
+        )
 
 
 if __name__ == "__main__":

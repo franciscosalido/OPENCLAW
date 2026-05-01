@@ -147,19 +147,37 @@ class LocalRagPipeline:
         generation_ms: float,
         total_ms: float,
         chunk_count: int,
+        actual_embedding_dimensions: int | None = None,
     ) -> None:
+        """Emit a RagRunTrace provenance record via loguru.
+
+        When *actual_embedding_dimensions* is provided it is used as the
+        observed dimension value and ``config.embedding_dimensions`` as the
+        expected value.  This allows drift between the runtime embedding
+        source and the configured contract to trigger
+        ``EmbeddingDimensionMismatchError`` before the trace is recorded.
+
+        When *actual_embedding_dimensions* is ``None`` both values come from
+        config (current default behaviour — no mismatch possible).
+        """
         config = self.tracing_config
         if config is None or not config.enabled:
             return
         collection_name = _infer_collection_name(self.retriever, config.collection_name)
         gateway_alias = _infer_gateway_alias(self.generator)
+        if actual_embedding_dimensions is not None:
+            observed_dims = actual_embedding_dimensions
+            expected_dims = config.embedding_dimensions
+        else:
+            observed_dims = config.embedding_dimensions
+            expected_dims = config.embedding_dimensions
         trace = build_rag_run_trace(
             collection_name=collection_name,
             embedding_backend=config.embedding_backend,
             embedding_model=config.embedding_model,
             embedding_alias=config.embedding_alias,
-            embedding_dimensions=config.embedding_dimensions,
-            expected_dimensions=config.embedding_dimensions,
+            embedding_dimensions=observed_dims,
+            expected_dimensions=expected_dims,
             retrieval_latency_ms=retrieval_ms,
             generation_latency_ms=generation_ms,
             chunk_count=chunk_count,
