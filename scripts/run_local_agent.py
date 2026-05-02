@@ -14,9 +14,7 @@ import sys
 import time
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
-from math import ceil
 from typing import Any, Protocol
-from typing import cast
 
 from backend.gateway.client import (
     DEFAULT_LLM_JSON_MODEL,
@@ -24,12 +22,13 @@ from backend.gateway.client import (
     DEFAULT_LLM_RAG_MODEL,
     GatewayChatClient,
 )
-from backend.gateway import routing_policy as routing_policy_module
 from backend.gateway.routing_policy import (
     RemoteEscalationPolicy,
     RouteDecisionKind,
     RouterDecision,
     decide_route,
+    estimate_prompt_tokens,
+    load_routing_policy,
 )
 from scripts.rag_ask_local import ask_local
 
@@ -170,7 +169,6 @@ async def run_agent(
     """Run one local Agent-0 request and return a safe result."""
     if use_rag and use_json:
         raise ValueError("--rag and --json cannot be used together")
-    start = time.perf_counter()
     alias = _select_alias(use_rag=use_rag, use_json=use_json)
     estimated_prompt_tokens = _estimate_prompt_token_count(question)
     estimated_completion_tokens = max_tokens or 512
@@ -192,7 +190,7 @@ async def run_agent(
             route=decision.route.value,
             alias=alias,
             used_rag=use_rag,
-            latency_ms=_elapsed_ms(start),
+            latency_ms=0.0,
             decision_id=decision.decision_id,
             estimated_remote_tokens_avoided=safe_avoided,
             error_category="blocked",
@@ -204,11 +202,12 @@ async def run_agent(
             route=decision.route.value,
             alias=alias,
             used_rag=use_rag,
-            latency_ms=_elapsed_ms(start),
+            latency_ms=0.0,
             decision_id=decision.decision_id,
             estimated_remote_tokens_avoided=safe_avoided,
         )
 
+    start = time.perf_counter()
     try:
         if use_rag:
             active_rag_call = _call_rag if rag_call is None else rag_call
@@ -321,23 +320,16 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 def _safe_policy() -> RemoteEscalationPolicy:
-    loader = getattr(routing_policy_module, "load_routing_policy", None)
-    if callable(loader):
-        try:
-            loaded = cast(Callable[[], object], loader)()
-        except Exception:
-            return RemoteEscalationPolicy(remote_enabled=False)
-        if isinstance(loaded, RemoteEscalationPolicy):
-            return loaded
-    return RemoteEscalationPolicy(remote_enabled=False)
+    """Load routing policy from config with safe fallback."""
+    try:
+        return load_routing_policy()
+    except Exception:
+        return RemoteEscalationPolicy(remote_enabled=False)
 
 
 def _estimate_prompt_token_count(question: str) -> int:
-    estimator = getattr(routing_policy_module, "estimate_prompt_tokens", None)
-    if callable(estimator):
-        return cast(Callable[[str], int], estimator)(question)
-    stripped = question.strip()
-    return max(ceil(len(stripped) / 4) if stripped else 0, 1)
+    """Estimate prompt token count using the local heuristic."""
+    return estimate_prompt_tokens(question)
 
 
 def _select_alias(*, use_rag: bool, use_json: bool) -> str:
