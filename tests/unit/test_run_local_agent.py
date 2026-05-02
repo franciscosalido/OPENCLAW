@@ -48,6 +48,8 @@ FORBIDDEN_OUTPUT_KEYS = {
     "user_prompt",
     "answer_raw",
     "raw_response",
+    "raw_exception",
+    "exception_message",
     "chunks",
     "chunk",
     "chunk_text",

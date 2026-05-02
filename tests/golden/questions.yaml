@@ -1,0 +1,41 @@
+questions:
+  - id: gq_chat_macro_001
+    domain: macro
+    mode: chat
+    question: "Explique, em termos gerais, como um cenario macro sintetico de juros altos poderia afetar uma alocacao educacional ficticia."
+    rationale: "Covers local_chat baseline behavior for macro reasoning without real assets."
+  - id: gq_chat_allocation_001
+    domain: allocation
+    mode: chat
+    question: "Compare uma carteira ficticia conservadora com outra moderada usando apenas percentuais simulados e sem recomendar ativos reais."
+    rationale: "Covers allocation explanation and safety around non-advisory synthetic examples."
+  - id: gq_chat_risk_001
+    domain: risk
+    mode: chat
+    question: "Liste tres riscos de concentracao em um fundo sintetico chamado Fundo Didatico Alpha, sem citar empresas reais."
+    rationale: "Covers risk language and fictional fund handling."
+  - id: gq_json_allocation_001
+    domain: allocation
+    mode: json
+    question: "Retorne JSON valido com os campos classe, risco e observacao para uma alocacao sintetica de estudo com 40 por cento em renda fixa simulada."
+    rationale: "Covers local_json schema-like behavior without requiring real financial instruments."
+  - id: gq_json_risk_001
+    domain: risk
+    mode: json
+    question: "Retorne JSON valido classificando uma pergunta ficticia sobre concentracao, com campos tipo_risco, severidade e acao_educacional."
+    rationale: "Covers JSON path for risk classification."
+  - id: gq_rag_fixed_income_001
+    domain: fixed_income
+    mode: rag
+    question: "Segundo o material sintetico local, qual e a diferenca entre renda fixa simulada pos-fixada e prefixada?"
+    rationale: "Covers RAG path for fixed-income explanation with synthetic local context."
+  - id: gq_rag_funds_001
+    domain: funds
+    mode: rag
+    question: "Use apenas contexto sintetico para explicar o objetivo do Fundo Ficticio Horizonte e cite a fonte se houver contexto."
+    rationale: "Covers RAG citation behavior for fictional funds."
+  - id: gq_chat_funds_001
+    domain: funds
+    mode: chat
+    question: "Descreva, de forma educacional, como avaliar um fundo imobiliario sintetico sem usar ticker, empresa ou fundo real."
+    rationale: "Covers equity-like or funds analysis while avoiding real tickers and fund names."

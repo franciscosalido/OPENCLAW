@@ -450,9 +450,9 @@ def _elapsed_ms(started_at: float) -> float:
 def _block_reason(decision: RouterDecision) -> str:
     """Return a safe block reason from routing policy metadata."""
     if decision.reason == RouteBlockReason.BUDGET_EXCEEDED.value:
-        return FallbackReason.BUDGET_EXCEEDED.value
+        return RouteBlockReason.BUDGET_EXCEEDED.value
     if decision.reason == RouteBlockReason.UNSUPPORTED_TASK.value:
-        return FallbackReason.UNSUPPORTED_TASK.value
+        return RouteBlockReason.UNSUPPORTED_TASK.value
     return decision.reason
 
 

@@ -60,6 +60,7 @@ Thumbs.db
 # Logs
 logs/
 *.log
+tests/golden/reports/
 
 # Claude Code — local session artifacts (NOT hooks.json/settings.json — esses são versionados)
 *.claude_session

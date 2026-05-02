@@ -173,6 +173,7 @@ The smoke script is opt-in and local-only. It requires
 ## Deferred
 
 - Progressive remote escalation remains out of scope.
-- Golden questions harness is deferred to GW-18.
-- Observability E2E validation is deferred to GW-18.
+- Golden questions harness is provided by GW-18 in
+  `scripts/run_golden_harness.py`.
+- Observability E2E validation remains deferred to a future explicit issue.
 - Remote providers remain disabled and require a future ADR.
