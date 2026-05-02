@@ -26,6 +26,20 @@ It is a compact runtime record of which safe RAG metadata was used for a query.
 - optional `prompt_latency_ms`
 - optional `context_chunk_count`
 
+G2-01 extends the trace with optional per-segment latency fields for
+measurement-only RAG baselining:
+
+- `routing_ms`
+- `embedding_ms`
+- `retrieval_ms`
+- `context_pack_ms`
+- `prompt_build_ms`
+- `generation_ms`
+- `total_ms`
+- `run_context`
+
+See `docs/RAG_LATENCY_BASELINE.md` for exact segment boundaries.
+
 ## Forbidden Content
 
 The trace must never contain:

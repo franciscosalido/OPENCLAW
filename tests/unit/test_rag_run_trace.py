@@ -15,21 +15,34 @@ from backend.rag.run_trace import (
     RagRunTrace,
     RagTracingConfig,
     build_rag_run_trace,
+    extract_ollama_metrics,
     load_rag_tracing_config,
 )
+from backend.rag.retriever import RetrievalTimings
 
 
 FORBIDDEN_KEYS = {
     "query",
     "question",
     "prompt",
+    "raw_user_input",
     "answer",
     "chunks",
+    "chunk_text",
     "vectors",
+    "embeddings",
     "payload",
+    "qdrant_payload",
     "api_key",
     "authorization",
+    "headers",
     "secret",
+    "password",
+    "raw_response",
+    "raw_exception",
+    "exception_message",
+    "traceback",
+    "model_weights_path",
 }
 
 
@@ -39,6 +52,7 @@ class FakeStore:
 
 class FakeRetriever:
     store = FakeStore()
+    last_timings: RetrievalTimings | None = None
 
     async def retrieve(
         self,
@@ -58,6 +72,23 @@ class FakeRetriever:
                 payload={"source": "synthetic", "secret": "do-not-log"},
             )
         ]
+
+
+class TimedFakeRetriever(FakeRetriever):
+    async def retrieve(
+        self,
+        question: str,
+        top_k: int | None = None,
+        filters: Mapping[str, Any] | None = None,
+    ) -> list[RetrievedChunk]:
+        chunks = await super().retrieve(question, top_k=top_k, filters=filters)
+        self.last_timings = RetrievalTimings(
+            embed_ms=1.25,
+            search_ms=2.5,
+            pack_ms=0.75,
+            total_ms=4.8,
+        )
+        return chunks
 
 
 class FakeGenerator:
@@ -135,6 +166,140 @@ class RagRunTraceTests(unittest.IsolatedAsyncioTestCase):
         lowered_keys = {key.lower() for key in data}
 
         self.assertTrue(FORBIDDEN_KEYS.isdisjoint(lowered_keys))
+
+    def test_segment_fields_are_optional(self) -> None:
+        trace = _trace()
+        data = trace.to_log_dict()
+
+        self.assertIsNone(trace.routing_ms)
+        self.assertIsNone(trace.embedding_ms)
+        self.assertIsNone(trace.retrieval_ms)
+        self.assertIsNone(trace.context_pack_ms)
+        self.assertIsNone(trace.prompt_build_ms)
+        self.assertIsNone(trace.generation_ms)
+        self.assertIsNone(trace.total_ms)
+        self.assertIsNone(trace.run_context)
+        self.assertFalse(trace.ollama_metrics_available)
+        self.assertTrue(FORBIDDEN_KEYS.isdisjoint({key.lower() for key in data}))
+
+    def test_to_log_dict_includes_segment_fields_when_present(self) -> None:
+        trace = _trace(
+            routing_ms=0.1,
+            embedding_ms=1.2,
+            retrieval_ms=2.3,
+            context_pack_ms=0.4,
+            prompt_build_ms=0.5,
+            generation_ms=31.0,
+            total_ms=35.0,
+            run_context="warm_model",
+        )
+
+        data = trace.to_log_dict()
+
+        self.assertEqual(data["routing_ms"], 0.1)
+        self.assertEqual(data["embedding_ms"], 1.2)
+        self.assertEqual(data["retrieval_ms"], 2.3)
+        self.assertEqual(data["context_pack_ms"], 0.4)
+        self.assertEqual(data["prompt_build_ms"], 0.5)
+        self.assertEqual(data["generation_ms"], 31.0)
+        self.assertEqual(data["total_ms"], 35.0)
+        self.assertEqual(data["run_context"], "warm_model")
+        self.assertTrue(FORBIDDEN_KEYS.isdisjoint({key.lower() for key in data}))
+
+    def test_total_ms_is_direct_field_not_sum_assumption(self) -> None:
+        trace = _trace(
+            routing_ms=1.0,
+            embedding_ms=2.0,
+            retrieval_ms=3.0,
+            context_pack_ms=4.0,
+            prompt_build_ms=5.0,
+            generation_ms=6.0,
+            total_ms=99.0,
+        )
+
+        data = trace.to_log_dict()
+
+        self.assertEqual(data["total_ms"], 99.0)
+        self.assertNotEqual(
+            data["total_ms"],
+            sum(
+                cast(
+                    float,
+                    data[key],
+                )
+                for key in (
+                    "routing_ms",
+                    "embedding_ms",
+                    "retrieval_ms",
+                    "context_pack_ms",
+                    "prompt_build_ms",
+                    "generation_ms",
+                )
+            ),
+        )
+
+    def test_ollama_metrics_none_when_unavailable(self) -> None:
+        trace = build_rag_run_trace(
+            collection_name="collection",
+            embedding_backend="gateway_litellm_current",
+            embedding_model="nomic-embed-text",
+            embedding_alias="quimera_embed",
+            embedding_dimensions=768,
+            expected_dimensions=768,
+            retrieval_latency_ms=1.0,
+            generation_latency_ms=2.0,
+            chunk_count=1,
+        )
+
+        data = trace.to_log_dict()
+
+        self.assertFalse(data["ollama_metrics_available"])
+        self.assertNotIn("ollama_total_duration_ms", data)
+        self.assertIsNone(trace.ollama_eval_duration_ms)
+
+    def test_ollama_metrics_convert_ns_to_ms_if_available(self) -> None:
+        metadata = {
+            "total_duration": 3_000_000,
+            "load_duration": 4_000_000,
+            "prompt_eval_count": 12,
+            "prompt_eval_duration": 5_000_000,
+            "eval_count": 34,
+            "eval_duration": 6_000_000,
+            "prompt": "must not be copied",
+        }
+        metrics = extract_ollama_metrics(metadata)
+        self.assertTrue(metrics["ollama_metrics_available"])
+        trace = build_rag_run_trace(
+            collection_name="collection",
+            embedding_backend="gateway_litellm_current",
+            embedding_model="nomic-embed-text",
+            embedding_alias="quimera_embed",
+            embedding_dimensions=768,
+            expected_dimensions=768,
+            retrieval_latency_ms=1.0,
+            generation_latency_ms=2.0,
+            chunk_count=1,
+            ollama_metrics=metadata,
+        )
+        data = trace.to_log_dict()
+
+        self.assertTrue(data["ollama_metrics_available"])
+        self.assertEqual(data["ollama_total_duration_ms"], 3.0)
+        self.assertEqual(data["ollama_load_duration_ms"], 4.0)
+        self.assertEqual(data["ollama_prompt_eval_count"], 12)
+        self.assertEqual(data["ollama_prompt_eval_duration_ms"], 5.0)
+        self.assertEqual(data["ollama_eval_count"], 34)
+        self.assertEqual(data["ollama_eval_duration_ms"], 6.0)
+        self.assertNotIn("must not be copied", str(data))
+
+    def test_degraded_run_context_is_serialized_safely(self) -> None:
+        trace = _trace(run_context="degraded_qdrant")
+
+        self.assertEqual(trace.to_log_dict()["run_context"], "degraded_qdrant")
+
+    def test_invalid_run_context_raises(self) -> None:
+        with self.assertRaises(ValueError):
+            _trace(run_context="free-form context")
 
     def test_build_helper_generates_query_id_when_absent(self) -> None:
         trace = build_rag_run_trace(
@@ -267,6 +432,53 @@ class RagRunTraceTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(FORBIDDEN_KEYS.isdisjoint({key.lower() for key in trace}))
         self.assertNotIn("synthetic chunk text", str(trace))
         self.assertNotIn("do-not-log", str(trace))
+
+    async def test_pipeline_trace_contains_generation_and_prompt_build_timings(self) -> None:
+        traces: list[dict[str, object]] = []
+
+        def sink(message: Any) -> None:
+            trace = message.record["extra"].get("trace")
+            if isinstance(trace, dict):
+                traces.append(trace)
+
+        sink_id = logger.add(sink, level="INFO")
+        try:
+            pipeline = LocalRagPipeline(
+                retriever=TimedFakeRetriever(),
+                generator=FakeGenerator(),
+                prompt_builder=PromptBuilder(),
+                tracing_config=RagTracingConfig(
+                    enabled=True,
+                    log_level="INFO",
+                    collection_name="configured_collection",
+                    embedding_backend="gateway_litellm_current",
+                    embedding_model="nomic-embed-text",
+                    embedding_alias="quimera_embed",
+                    embedding_dimensions=768,
+                ).validated(),
+            )
+            await pipeline.ask("Pergunta sintetica?")
+        finally:
+            logger.remove(sink_id)
+
+        self.assertEqual(len(traces), 1)
+        trace = traces[0]
+        for key in (
+            "routing_ms",
+            "embedding_ms",
+            "retrieval_ms",
+            "context_pack_ms",
+            "prompt_build_ms",
+            "generation_ms",
+            "total_ms",
+        ):
+            self.assertIsInstance(trace[key], int | float)
+            self.assertGreaterEqual(cast(float, trace[key]), 0.0)
+        self.assertEqual(trace["routing_ms"], 0.0)
+        self.assertEqual(trace["embedding_ms"], 1.25)
+        self.assertEqual(trace["retrieval_ms"], 2.5)
+        self.assertEqual(trace["context_pack_ms"], 0.75)
+        self.assertTrue(FORBIDDEN_KEYS.isdisjoint({key.lower() for key in trace}))
 
     def test_load_rag_tracing_config_reads_yaml_defaults(self) -> None:
         config = load_rag_tracing_config()

@@ -131,6 +131,7 @@ class LocalRagPipeline:
             )
             raise
         retrieval_ms = _elapsed_ms(retrieval_start)
+        retrieval_segments = _extract_retrieval_segments(self.retriever)
         self._emit_pipeline_event(
             RagEventKind.RETRIEVAL_FINISHED,
             query_id=query_id,
@@ -201,6 +202,9 @@ class LocalRagPipeline:
         )
         self._emit_trace(
             retrieval_ms=retrieval_ms,
+            embedding_ms=retrieval_segments.embedding_ms,
+            vector_search_ms=retrieval_segments.retrieval_ms,
+            context_pack_ms=retrieval_segments.context_pack_ms,
             prompt_ms=prompt_ms,
             generation_ms=generation_ms,
             total_ms=latency["total_ms"],
@@ -219,6 +223,9 @@ class LocalRagPipeline:
         self,
         *,
         retrieval_ms: float,
+        embedding_ms: float | None = None,
+        vector_search_ms: float | None = None,
+        context_pack_ms: float | None = None,
         prompt_ms: float,
         generation_ms: float,
         total_ms: float,
@@ -263,6 +270,13 @@ class LocalRagPipeline:
             total_latency_ms=total_ms,
             prompt_latency_ms=prompt_ms,
             context_chunk_count=chunk_count,
+            routing_ms=0.0,
+            embedding_ms=embedding_ms,
+            retrieval_ms=vector_search_ms,
+            context_pack_ms=context_pack_ms,
+            prompt_build_ms=prompt_ms,
+            generation_ms=generation_ms,
+            total_ms=total_ms,
         )
         logger.bind(trace=trace.to_log_dict()).log(config.log_level, "rag_run_trace")
 
@@ -317,6 +331,31 @@ def _infer_gateway_alias(generator: object) -> str | None:
     if isinstance(model, str) and model.strip():
         return model.strip()
     return None
+
+
+@dataclass(frozen=True)
+class _RetrievalSegments:
+    embedding_ms: float | None
+    retrieval_ms: float | None
+    context_pack_ms: float | None
+
+
+def _extract_retrieval_segments(retriever: object) -> _RetrievalSegments:
+    timings = getattr(retriever, "last_timings", None)
+    embed_ms = getattr(timings, "embed_ms", None)
+    search_ms = getattr(timings, "search_ms", None)
+    pack_ms = getattr(timings, "pack_ms", None)
+    return _RetrievalSegments(
+        embedding_ms=_optional_timing(embed_ms),
+        retrieval_ms=_optional_timing(search_ms),
+        context_pack_ms=_optional_timing(pack_ms),
+    )
+
+
+def _optional_timing(value: object) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value)
 
 
 def _elapsed_ms(start: float) -> float:

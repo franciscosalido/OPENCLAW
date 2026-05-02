@@ -497,7 +497,7 @@ class GatewayProofOfLifeUnitTests(unittest.IsolatedAsyncioTestCase):
             data = result.to_json_dict()
             latency = data["latency_ms"]
             self.assertIsInstance(latency, (int, float))
-            self.assertGreaterEqual(latency, 0.0)
+            self.assertTrue(float(cast(float, latency)) >= 0.0)
 
         # Edge case: early-return path (api_key=None) produces latency_ms=0.0
         zero_result = proof.ProbeResult(
@@ -506,7 +506,8 @@ class GatewayProofOfLifeUnitTests(unittest.IsolatedAsyncioTestCase):
             latency_ms=0.0,
             error_category="authentication",
         )
-        self.assertGreaterEqual(zero_result.to_json_dict()["latency_ms"], 0.0)
+        zero_latency = zero_result.to_json_dict()["latency_ms"]
+        self.assertTrue(float(cast(float, zero_latency)) >= 0.0)
 
     async def test_remote_url_guard_runs_before_async_probes(self) -> None:
         async def fail_probe(*args: object, **kwargs: object) -> proof.ProbeResult:

@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 from uuid import uuid4
 
 import yaml
@@ -32,6 +32,9 @@ SAFE_GUARD_RESULT_KEYS = frozenset(
         "alias_matches",
     }
 )
+RUN_CONTEXTS = frozenset({"cold_start", "warm_model", "degraded_qdrant"})
+
+RagRunContext = Literal["cold_start", "warm_model", "degraded_qdrant"]
 
 
 @dataclass(frozen=True)
@@ -105,6 +108,21 @@ class RagRunTrace:
     total_latency_ms: float | None = None
     prompt_latency_ms: float | None = None
     context_chunk_count: int | None = None
+    routing_ms: float | None = None
+    embedding_ms: float | None = None
+    retrieval_ms: float | None = None
+    context_pack_ms: float | None = None
+    prompt_build_ms: float | None = None
+    generation_ms: float | None = None
+    total_ms: float | None = None
+    run_context: RagRunContext | None = None
+    ollama_metrics_available: bool = False
+    ollama_total_duration_ms: float | None = None
+    ollama_load_duration_ms: float | None = None
+    ollama_prompt_eval_count: int | None = None
+    ollama_prompt_eval_duration_ms: float | None = None
+    ollama_eval_count: int | None = None
+    ollama_eval_duration_ms: float | None = None
 
     def __post_init__(self) -> None:
         _validate_non_empty(self.query_id, "query_id")
@@ -134,6 +152,47 @@ class RagRunTrace:
                 self.context_chunk_count,
                 "context_chunk_count",
             )
+        for field_name in (
+            "routing_ms",
+            "embedding_ms",
+            "retrieval_ms",
+            "context_pack_ms",
+            "prompt_build_ms",
+            "generation_ms",
+            "total_ms",
+            "ollama_total_duration_ms",
+            "ollama_load_duration_ms",
+            "ollama_prompt_eval_duration_ms",
+            "ollama_eval_duration_ms",
+        ):
+            value = getattr(self, field_name)
+            if value is not None:
+                _validate_non_negative_float(value, field_name)
+        for field_name in (
+            "ollama_prompt_eval_count",
+            "ollama_eval_count",
+        ):
+            value = getattr(self, field_name)
+            if value is not None:
+                _validate_non_negative_int(value, field_name)
+        if self.run_context is not None and self.run_context not in RUN_CONTEXTS:
+            raise ValueError(
+                f"run_context must be one of {sorted(RUN_CONTEXTS)}"
+            )
+        if self.ollama_metrics_available and not any(
+            value is not None
+            for value in (
+                self.ollama_total_duration_ms,
+                self.ollama_load_duration_ms,
+                self.ollama_prompt_eval_count,
+                self.ollama_prompt_eval_duration_ms,
+                self.ollama_eval_count,
+                self.ollama_eval_duration_ms,
+            )
+        ):
+            raise ValueError(
+                "ollama_metrics_available cannot be true without metric fields"
+            )
         if self.guard_result is not None:
             _summarize_guard_result(self.guard_result)
 
@@ -162,6 +221,26 @@ class RagRunTrace:
             values["prompt_latency_ms"] = self.prompt_latency_ms
         if self.context_chunk_count is not None:
             values["context_chunk_count"] = self.context_chunk_count
+        optional_segment_values: dict[str, object | None] = {
+            "routing_ms": self.routing_ms,
+            "embedding_ms": self.embedding_ms,
+            "retrieval_ms": self.retrieval_ms,
+            "context_pack_ms": self.context_pack_ms,
+            "prompt_build_ms": self.prompt_build_ms,
+            "generation_ms": self.generation_ms,
+            "total_ms": self.total_ms,
+            "run_context": self.run_context,
+            "ollama_total_duration_ms": self.ollama_total_duration_ms,
+            "ollama_load_duration_ms": self.ollama_load_duration_ms,
+            "ollama_prompt_eval_count": self.ollama_prompt_eval_count,
+            "ollama_prompt_eval_duration_ms": self.ollama_prompt_eval_duration_ms,
+            "ollama_eval_count": self.ollama_eval_count,
+            "ollama_eval_duration_ms": self.ollama_eval_duration_ms,
+        }
+        values["ollama_metrics_available"] = self.ollama_metrics_available
+        for key, value in optional_segment_values.items():
+            if value is not None:
+                values[key] = value
         return values
 
 
@@ -184,12 +263,22 @@ def build_rag_run_trace(
     total_latency_ms: float | None = None,
     prompt_latency_ms: float | None = None,
     context_chunk_count: int | None = None,
+    routing_ms: float | None = None,
+    embedding_ms: float | None = None,
+    retrieval_ms: float | None = None,
+    context_pack_ms: float | None = None,
+    prompt_build_ms: float | None = None,
+    generation_ms: float | None = None,
+    total_ms: float | None = None,
+    run_context: RagRunContext | None = None,
+    ollama_metrics: Mapping[str, object] | None = None,
 ) -> RagRunTrace:
     """Build a validated safe RAG provenance trace."""
     if embedding_dimensions != expected_dimensions:
         raise EmbeddingDimensionMismatchError(
             "RAG trace embedding dimensions do not match active configuration."
         )
+    safe_ollama_metrics = extract_ollama_metrics(ollama_metrics)
     return RagRunTrace(
         query_id=query_id or uuid4().hex,
         timestamp_utc=timestamp_utc or _utc_now_iso(),
@@ -207,7 +296,90 @@ def build_rag_run_trace(
         total_latency_ms=total_latency_ms,
         prompt_latency_ms=prompt_latency_ms,
         context_chunk_count=context_chunk_count,
+        routing_ms=routing_ms,
+        embedding_ms=embedding_ms,
+        retrieval_ms=retrieval_ms,
+        context_pack_ms=context_pack_ms,
+        prompt_build_ms=prompt_build_ms,
+        generation_ms=generation_ms,
+        total_ms=total_ms,
+        run_context=run_context,
+        ollama_metrics_available=bool(
+            safe_ollama_metrics["ollama_metrics_available"]
+        ),
+        ollama_total_duration_ms=_optional_float_metric(
+            safe_ollama_metrics,
+            "ollama_total_duration_ms",
+        ),
+        ollama_load_duration_ms=_optional_float_metric(
+            safe_ollama_metrics,
+            "ollama_load_duration_ms",
+        ),
+        ollama_prompt_eval_count=_optional_int_metric(
+            safe_ollama_metrics,
+            "ollama_prompt_eval_count",
+        ),
+        ollama_prompt_eval_duration_ms=_optional_float_metric(
+            safe_ollama_metrics,
+            "ollama_prompt_eval_duration_ms",
+        ),
+        ollama_eval_count=_optional_int_metric(
+            safe_ollama_metrics,
+            "ollama_eval_count",
+        ),
+        ollama_eval_duration_ms=_optional_float_metric(
+            safe_ollama_metrics,
+            "ollama_eval_duration_ms",
+        ),
     )
+
+
+def extract_ollama_metrics(metadata: Mapping[str, object] | None) -> dict[str, object]:
+    """Extract safe Ollama timing/count metrics from already available metadata.
+
+    Durations from Ollama are nanoseconds; trace fields store milliseconds.
+    The function never calls Ollama and never inspects prompt or answer text.
+    """
+    if metadata is None:
+        return {"ollama_metrics_available": False}
+    metrics: dict[str, object] = {}
+    duration_fields = {
+        "total_duration": "ollama_total_duration_ms",
+        "load_duration": "ollama_load_duration_ms",
+        "prompt_eval_duration": "ollama_prompt_eval_duration_ms",
+        "eval_duration": "ollama_eval_duration_ms",
+    }
+    count_fields = {
+        "prompt_eval_count": "ollama_prompt_eval_count",
+        "eval_count": "ollama_eval_count",
+    }
+    for source_key, target_key in duration_fields.items():
+        value = metadata.get(source_key)
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            metrics[target_key] = float(value) / 1_000_000.0
+    for source_key, target_key in count_fields.items():
+        value = metadata.get(source_key)
+        if isinstance(value, int) and not isinstance(value, bool):
+            metrics[target_key] = value
+    metrics["ollama_metrics_available"] = bool(metrics)
+    return metrics
+
+
+def _optional_float_metric(
+    metrics: Mapping[str, object],
+    key: str,
+) -> float | None:
+    value = metrics.get(key)
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return float(value)
+    return None
+
+
+def _optional_int_metric(metrics: Mapping[str, object], key: str) -> int | None:
+    value = metrics.get(key)
+    if isinstance(value, int) and not isinstance(value, bool):
+        return value
+    return None
 
 
 def load_rag_tracing_config(

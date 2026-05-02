@@ -111,6 +111,26 @@ class RetrieverTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([chunk.chunk_index for chunk in chunks], [0, 1])
         self.assertIsNotNone(retriever.last_timings)
 
+    async def test_retriever_timings_separate_embedding_search_pack(self) -> None:
+        retriever = Retriever(
+            embedder=FakeEmbedder(),
+            store=FakeStore(),
+            packer=FakePacker(),
+        )
+
+        await retriever.retrieve("pergunta sintetica")
+
+        self.assertIsNotNone(retriever.last_timings)
+        assert retriever.last_timings is not None
+        timings = retriever.last_timings.as_dict()
+        self.assertEqual(
+            set(timings),
+            {"embed_ms", "search_ms", "pack_ms", "total_ms"},
+        )
+        for value in timings.values():
+            self.assertIsInstance(value, float)
+            self.assertGreaterEqual(value, 0.0)
+
     async def test_retrieve_accepts_async_vector_store(self) -> None:
         retriever = Retriever(
             embedder=FakeEmbedder(),

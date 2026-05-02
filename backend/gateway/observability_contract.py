@@ -73,6 +73,22 @@ RAG_RUN_TRACE_KEYS = frozenset(
         "strict_mode",
         "prompt_latency_ms",
         "context_chunk_count",
+        # Gateway-2 per-segment latency baseline fields.
+        "routing_ms",
+        "embedding_ms",
+        "retrieval_ms",
+        "context_pack_ms",
+        "prompt_build_ms",
+        "generation_ms",
+        "total_ms",
+        "run_context",
+        "ollama_metrics_available",
+        "ollama_total_duration_ms",
+        "ollama_load_duration_ms",
+        "ollama_prompt_eval_count",
+        "ollama_prompt_eval_duration_ms",
+        "ollama_eval_count",
+        "ollama_eval_duration_ms",
     }
 )
 
