@@ -206,7 +206,12 @@ task metadata + token estimates
 | PR | Branch | Scope | Status |
 |---|---|---|---|
 | GW-13 | `feat/gateway1-routing-policy-prelude` | Local-first routing decision records and token economy prelude | ✅ Merged |
+<<<<<<< HEAD
 | GW-14 | `feat/gateway1-routing-audit-token-economy` | Config-driven routing audit and token economy calibration | 🚧 Current |
+=======
+| GW-14 | `feat/gateway1-routing-audit-token-economy` | Config-driven routing audit and token economy calibration | Open / separate PR |
+| GW-15 | `feat/agent0-local-runner` | Agent-0 local CLI runner MVP | 🚧 Current |
+>>>>>>> 8a17f34 (feat(agent): add Agent-0 local runner)
 
 GW-13 rules:
 
@@ -216,6 +221,7 @@ GW-13 rules:
 - No runtime model routing change.
 - No Qdrant mutation or `openclaw_knowledge` access.
 
+<<<<<<< HEAD
 GW-14 rules:
 
 - Config-driven routing audit and token economy calibration.
@@ -223,6 +229,20 @@ GW-14 rules:
 - Policy artifacts only — not billing, not runtime routing.
 - `remote_enabled` remains false. `allowed_remote_providers` remains empty.
 - No remote calls, no runtime routing change, no Qdrant mutation.
+=======
+GW-15 rules:
+
+- `scripts/run_local_agent.py` is a local CLI, not an API, daemon,
+  multi-agent system, FastAPI app or MCP server.
+- Default mode uses `local_chat`.
+- `--json` uses `local_json`.
+- `--rag` is explicit opt-in and uses the existing RAG path when available.
+- `--dry-run` must work without live services.
+- Output metadata must not include question, prompt, chunks, vectors, payloads,
+  raw responses, secrets or Authorization headers.
+- Progressive fallback is deferred to GW-16.
+- Golden questions harness is deferred to GW-17.
+>>>>>>> 8a17f34 (feat(agent): add Agent-0 local runner)
 
 **Gateway-0 final baseline:** local-only LiteLLM gateway, Qdrant vector store,
 `quimera_embed` canonical embedding alias, `RagRunTrace` provenance,
