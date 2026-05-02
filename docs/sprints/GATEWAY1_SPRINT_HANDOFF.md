@@ -1,8 +1,8 @@
 # Gateway-1 Sprint Handoff
 
 **Last updated:** 2026-05-02
-**Current branch:** `feat/agent0-local-failsafe-degradation`
-**Issue:** [#59](https://github.com/franciscosalido/OPENCLAW/issues/59)
+**Current branch:** `feat/agent0-golden-question-harness`
+**Issue:** [#61](https://github.com/franciscosalido/OPENCLAW/issues/61)
 
 Gateway-0 is complete. Gateway-1 starts with routing policy primitives and
 token economy records only.
@@ -42,7 +42,7 @@ Out of scope:
 |---|---|
 | GW-14 | Config-driven routing audit and token economy calibration |
 | GW-17 | Explicit local fail-safe degradation for Agent-0 runner |
-| GW-18 | Golden questions harness |
+| GW-18 | Golden question benchmark harness |
 
 ## GW-15 Current Work
 
@@ -127,3 +127,32 @@ Safety:
 - Fallback metadata excludes prompt/query/chunks/vectors/payloads/secrets.
 - Successful fallback exits `0`; policy block and unrecoverable local failure
   exit non-zero.
+
+## GW-18 Current Work
+
+Scope:
+
+- Add `tests/golden/questions.yaml` with fixed synthetic financial-domain
+  questions.
+- Add `scripts/run_golden_harness.py` with opt-in dry-run and optional live
+  execution.
+- Emit safe JSONL and summary JSON reports without answer text.
+- Add `scripts/compare_golden_runs.py` for summary-to-summary regression checks.
+- Add offline unit tests for registry, report schema, guard behavior and
+  comparison logic.
+
+Out of scope:
+
+- Remote providers or remote calls.
+- LLM-as-judge.
+- Dashboards, OpenTelemetry, Prometheus or Grafana.
+- Qdrant mutation, reindexing or `openclaw_knowledge` access.
+- Live baseline publication. First committed live baseline requires a future
+  explicit baseline-update decision.
+
+Safety:
+
+- Golden questions are synthetic-only.
+- Reports exclude prompt/question/chunks/vectors/payloads/secrets and do not
+  include answer text by default.
+- `tests/golden/reports/` is ignored by Git.

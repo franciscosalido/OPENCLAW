@@ -5,27 +5,29 @@
 > meaningful sessions.
 
 **Last updated:** 2026-05-02
-**Updated by:** Codex — Agent-0 GW-17 local fail-safe degradation
+**Updated by:** Codex — Agent-0 GW-18 golden question harness
 
 ---
 
 ## Active Sprint: Agent-0 / Local Runner MVP
 
-**Goal:** add explicit local fail-safe degradation for Agent-0 so recoverable
-local RAG/Qdrant failures can fall back once to `local_chat`, while policy
-blocks remain hard refusals with no model call.
+**Goal:** add the Agent-0 golden question benchmark harness: fixed synthetic
+financial-domain questions, offline dry-run reports, and summary comparison
+tools for future regression checks.
 
 Gateway-0 is complete on `main`. GW-13 is merged. GW-14 remains a separate
 open PR at the time GW-15 starts, so GW-15 uses compatibility helpers when the
 GW-14 token/config helpers are not present on `main`.
 
-GW-17 issue: <https://github.com/franciscosalido/OPENCLAW/issues/59>
-GW-17 branch: `feat/agent0-local-failsafe-degradation`
+GW-18 issue: <https://github.com/franciscosalido/OPENCLAW/issues/61>
+GW-18 branch: `feat/agent0-golden-question-harness`
 
 Note: local GitHub state on 2026-05-02 showed GW-15 merged and the GW-16
 hardening branch present, but the GW-16 commit was not on `origin/main`.
 GW-17 was therefore implemented as a stacked branch on the GW-16 branch and
 should be retargeted/rebased after GW-16 is integrated.
+GW-18 was implemented as a stacked branch on GW-17 for the same reason and
+should be retargeted/rebased after GW-16/GW-17 are integrated.
 
 Current runtime path:
 
@@ -124,7 +126,8 @@ unavoidable, use `git push --force-with-lease`.
 | GW-14 | `feat/gateway1-routing-audit-token-economy` | Config-driven routing audit and token economy calibration | Open / separate PR |
 | GW-15 | `feat/agent0-local-runner` | Agent-0 local CLI runner MVP | Done / merged |
 | GW-16 | `feat/agent0-runner-contract-hardening` | Agent-0 runner contract hardening | Dependency branch / not on `origin/main` |
-| GW-17 | `feat/agent0-local-failsafe-degradation` | Explicit local fail-safe degradation for Agent-0 | Current |
+| GW-17 | `feat/agent0-local-failsafe-degradation` | Explicit local fail-safe degradation for Agent-0 | Dependency branch / open PR |
+| GW-18 | `feat/agent0-golden-question-harness` | Golden question benchmark harness for Agent-0 | Current |
 
 GW-05a issue: <https://github.com/franciscosalido/OPENCLAW/issues/25>
 GW-05b issue: <https://github.com/franciscosalido/OPENCLAW/issues/28>
@@ -139,6 +142,7 @@ GW-13 issue: <https://github.com/franciscosalido/OPENCLAW/issues/51>
 GW-15 issue: <https://github.com/franciscosalido/OPENCLAW/issues/55>
 GW-16 issue: <https://github.com/franciscosalido/OPENCLAW/issues/57>
 GW-17 issue: <https://github.com/franciscosalido/OPENCLAW/issues/59>
+GW-18 issue: <https://github.com/franciscosalido/OPENCLAW/issues/61>
 
 Gateway-0 sprint complete. GW-01 through GW-12 merged on `main`.
 The next sprint must start from a new explicit issue, ADR if architecture
@@ -171,8 +175,8 @@ Rules:
 - `--dry-run` works without live services.
 - No remote providers, no remote calls, no API keys, no FastAPI, no MCP.
 - No Qdrant mutation, no reindexing, no ingestion, no real data.
-- Progressive fallback is deferred to GW-16.
-- Golden questions harness is deferred to GW-17.
+- Progressive fallback is handled by GW-17.
+- Golden questions harness is handled by GW-18.
 
 ## GW-16 Current Work
 
@@ -210,6 +214,31 @@ Rules:
   fallback occurs.
 - `local_think` timeout fallback is deferred because Agent-0 has no public
   think path yet.
+- No remote providers, no remote calls, no Qdrant mutation, no real data, and
+  no live services required for unit tests.
+
+## GW-18 Current Work
+
+GW-18 adds the reproducible Agent-0 golden question harness.
+
+Deliverables:
+
+- `tests/golden/questions.yaml` with 8 synthetic financial-domain questions.
+- `scripts/run_golden_harness.py` opt-in harness guarded by
+  `RUN_GOLDEN_HARNESS=1`.
+- Offline `--dry-run` mode that emits JSONL and summary JSON without live
+  services.
+- `scripts/compare_golden_runs.py` for summary-to-summary regression checks.
+- `docs/AGENT0_GOLDEN_HARNESS.md` and `tests/golden/README.md`.
+
+Rules:
+
+- No answer text is stored in JSONL by default; only `answer_length_chars`.
+- Reports exclude prompt/question/chunks/vectors/payloads/secrets and raw
+  exceptions.
+- Reports are written under `tests/golden/reports/`, which is ignored by Git.
+- Quality scoring is human-readable only; no LLM-as-judge and no external API.
+- Optional human scoring helper is deferred to a future issue.
 - No remote providers, no remote calls, no Qdrant mutation, no real data, and
   no live services required for unit tests.
 
