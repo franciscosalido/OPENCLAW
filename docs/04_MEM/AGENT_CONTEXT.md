@@ -726,3 +726,54 @@ Append or paste this at the end of substantial sessions:
 - Proof-of-life requires local services plus `QUIMERA_LLM_API_KEY` for full
   pass. Without the key, the summary is still written but G1-05 fails as
   `authentication`.
+
+---
+
+## Handoff — 2026-05-02
+
+**Agent:** Codex
+**Branch:** `feat/g2-rag-segment-timing-baseline`
+**Issue/PR:** #67 / pending PR
+**Task:** G2-01 — RAG per-segment latency baseline.
+
+### Changed
+- `backend/rag/run_trace.py`: optional segment fields on `RagRunTrace`,
+  validated `run_context`, safe Ollama metric extraction/conversion from
+  already-available metadata only.
+- `backend/rag/pipeline.py`: populates trace segment timings from existing
+  pipeline timers and `Retriever.last_timings`; `routing_ms` is `0.0` for
+  direct `LocalRagPipeline` because Agent routing lives outside the pipeline.
+- `backend/gateway/observability_contract.py`: allowlist extended for G2
+  trace fields.
+- `tests/unit/test_rag_run_trace.py`: optional field, serialization,
+  total-directness, Ollama metric, degraded context, and pipeline trace tests.
+- `tests/unit/test_retriever.py`: separate embed/search/pack timing test.
+- `docs/RAG_LATENCY_BASELINE.md`, `docs/RAG_RUN_TRACE.md`: segment boundary
+  contract and LiteLLM/Ollama metric limitation.
+- `tests/unit/test_gateway1_proof_of_life.py`: tiny typing-only fix for
+  existing mypy/pyright compatibility.
+
+### Validation
+- `git diff --check` — passed.
+- `uv run pytest tests/unit/test_rag_run_trace.py -v` — 23 passed.
+- `uv run pytest tests/unit/test_rag_observability_event.py -v` — 8 passed.
+- `uv run pytest tests/unit/test_rag_pipeline.py -v` — not applicable; file
+  does not exist in this branch. Used `tests/unit/test_rag_pipeline_observability.py`.
+- `uv run pytest tests/unit/test_rag_pipeline_observability.py -v` — 2 passed.
+- `uv run pytest tests/unit/test_retriever.py -v` — 6 passed.
+- `uv run pytest tests/unit/test_run_local_agent.py -v` — 32 passed.
+- `uv run pytest tests/unit/test_golden_harness.py -v` — 8 passed.
+- `uv run pytest -v` — 332 passed, 7 skipped, 139 subtests passed.
+- `uv run mypy --strict .` — 0 errors.
+- `uv run pyright` — 0 errors.
+
+### Not Changed
+- No prompt text, top-k, retrieval defaults, context packing, aliases, timeouts,
+  LiteLLM/Ollama/Qdrant config, or fallback behavior changed.
+- No Qdrant mutation, no reindex, no `openclaw_knowledge` access.
+- No remote providers, OpenTelemetry, dashboards, profiling framework or new
+  dependencies.
+
+### Deferred
+- `scripts/run_rag_latency_baseline.py` and the formal 3-run
+  cold/warm/degraded report are deferred to G2-02.

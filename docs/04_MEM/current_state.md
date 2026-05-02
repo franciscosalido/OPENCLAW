@@ -705,3 +705,41 @@ Observed live latencies:
 | Agent-0 `local_chat` | 8790.5 ms |
 | Agent-0 `local_rag` | 32162.8 ms |
 | forced degradation | 0.03 ms |
+
+## G2-01 Current Work
+
+G2-01 starts Gateway-2 with a measurement-only RAG latency baseline:
+
+```text
+LocalRagPipeline
+  -> RagRunTrace optional segment fields
+  -> embed/search/pack/prompt/generation/total timings
+  -> safe trace serialization only
+```
+
+Scope:
+
+- Extend `RagRunTrace` with optional per-segment fields:
+  `routing_ms`, `embedding_ms`, `retrieval_ms`, `context_pack_ms`,
+  `prompt_build_ms`, `generation_ms`, `total_ms`, and `run_context`.
+- Preserve old trace fields such as `retrieval_latency_ms`,
+  `generation_latency_ms`, `prompt_latency_ms`, and `total_latency_ms`.
+- Populate pipeline traces from existing `time.perf_counter()` wrappers and
+  `Retriever.last_timings`.
+- Keep `total_ms` as a directly measured outer timer, not a segment sum.
+- Add optional Ollama metric fields, but only when already available in
+  metadata. Current LiteLLM path does not expose native Ollama metrics, so
+  normal traces record `ollama_metrics_available=false`.
+
+Safety:
+
+- No optimization.
+- No prompt/top-k/model/timeout/alias/routing/fallback behavior change.
+- No Qdrant mutation, no reindex, no `openclaw_knowledge` access.
+- No prompt, question, chunks, answer, vectors, payloads, API keys,
+  Authorization headers, raw exceptions or tracebacks in trace serialization.
+
+Deferred:
+
+- Dedicated 3-run cold/warm/degraded baseline command is deferred to G2-02 to
+  keep G2-01 focused on trace schema and segment instrumentation.
