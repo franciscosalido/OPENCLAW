@@ -9,8 +9,10 @@ from typing import cast
 from unittest.mock import patch
 
 from backend.gateway.routing_policy import (
+    FallbackReason,
     RemoteEscalationPolicy,
     RouteDecisionKind,
+    RouteBlockReason,
     TaskRiskLevel,
     TokenBudgetClass,
     RouterDecision,
@@ -29,7 +31,15 @@ REQUIRED_KEYS = {
     "decision_id",
     "estimated_remote_tokens_avoided",
 }
-OPTIONAL_KEYS = {"error_category"}
+OPTIONAL_KEYS = {
+    "error_category",
+    "fallback_applied",
+    "fallback_from_alias",
+    "fallback_to_alias",
+    "fallback_reason",
+    "fallback_chain",
+    "block_reason",
+}
 FORBIDDEN_OUTPUT_KEYS = {
     "query",
     "question",
@@ -87,6 +97,19 @@ def _assert_safe_schema(
     test_case.assertIsInstance(data["decision_id"], str)
     test_case.assertTrue(data["decision_id"])
     test_case.assertTrue(FORBIDDEN_OUTPUT_KEYS.isdisjoint({key.lower() for key in data}))
+
+
+def _assert_fallback_metadata(
+    test_case: unittest.TestCase,
+    data: Mapping[str, object],
+    *,
+    reason: FallbackReason,
+) -> None:
+    test_case.assertEqual(data["fallback_applied"], True)
+    test_case.assertEqual(data["fallback_from_alias"], "local_rag")
+    test_case.assertEqual(data["fallback_to_alias"], "local_chat")
+    test_case.assertEqual(data["fallback_reason"], reason.value)
+    test_case.assertEqual(data["fallback_chain"], [reason.value])
 
 
 class RunLocalAgentCliTests(unittest.TestCase):
@@ -357,6 +380,8 @@ class RunLocalAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.route, "blocked")
         self.assertEqual(result.answer, BLOCKED_ANSWER)
         self.assertEqual(result.latency_ms, 0.0)
+        self.assertFalse(result.fallback_applied)
+        self.assertEqual(result.block_reason, FallbackReason.BUDGET_EXCEEDED.value)
         _assert_safe_schema(self, result.to_json_dict(), expect_error="blocked")
 
     async def test_chat_unavailable_produces_safe_error_category(self) -> None:
@@ -444,8 +469,8 @@ class RunLocalAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(data["alias"], "local_json")
         _assert_safe_schema(self, data)
 
-    async def test_rag_unavailable_produces_safe_error_category_without_chat_fallback(self) -> None:
-        chat_called = False
+    async def test_rag_unavailable_falls_back_once_to_local_chat(self) -> None:
+        calls: list[str] = []
 
         async def chat_call(
             question: str,
@@ -455,10 +480,9 @@ class RunLocalAgentTests(unittest.IsolatedAsyncioTestCase):
             temperature: float | None,
             response_format: Mapping[str, object] | None,
         ) -> str:
-            del question, alias, max_tokens, temperature, response_format
-            nonlocal chat_called
-            chat_called = True
-            return "should not be used"
+            del question, max_tokens, temperature, response_format
+            calls.append(alias)
+            return "fallback chat answer"
 
         async def rag_call(
             question: str,
@@ -477,12 +501,100 @@ class RunLocalAgentTests(unittest.IsolatedAsyncioTestCase):
         )
 
         data = result.to_json_dict()
-        self.assertEqual(data["error_category"], "rag_unavailable")
-        self.assertEqual(data["alias"], "local_rag")
-        self.assertTrue(data["used_rag"])
-        self.assertFalse(chat_called)
+        self.assertNotIn("error_category", data)
+        self.assertEqual(data["answer"], "fallback chat answer")
+        self.assertEqual(data["alias"], "local_chat")
+        self.assertFalse(data["used_rag"])
+        self.assertEqual(calls, ["local_chat"])
         self.assertNotIn("service down", json.dumps(data))
-        _assert_safe_schema(self, data, expect_error="rag_unavailable")
+        _assert_safe_schema(self, data)
+        _assert_fallback_metadata(
+            self,
+            data,
+            reason=FallbackReason.RAG_UNAVAILABLE,
+        )
+
+    async def test_qdrant_unavailable_fallback_reason_is_typed(self) -> None:
+        class QdrantUnavailableError(RuntimeError):
+            pass
+
+        async def chat_call(
+            question: str,
+            *,
+            alias: str,
+            max_tokens: int | None,
+            temperature: float | None,
+            response_format: Mapping[str, object] | None,
+        ) -> str:
+            del question, alias, max_tokens, temperature, response_format
+            return "fallback chat answer"
+
+        async def rag_call(
+            question: str,
+            *,
+            max_tokens: int | None,
+            temperature: float | None,
+        ) -> str:
+            del question, max_tokens, temperature
+            raise QdrantUnavailableError("private details")
+
+        result = await run_local_agent.run_agent(
+            question="pergunta",
+            use_rag=True,
+            chat_call=chat_call,
+            rag_call=rag_call,
+        )
+        data = result.to_json_dict()
+
+        _assert_fallback_metadata(
+            self,
+            data,
+            reason=FallbackReason.QDRANT_UNAVAILABLE,
+        )
+
+    async def test_rag_unavailable_and_fallback_chat_failure_has_no_double_fallback(self) -> None:
+        calls: list[str] = []
+
+        async def chat_call(
+            question: str,
+            *,
+            alias: str,
+            max_tokens: int | None,
+            temperature: float | None,
+            response_format: Mapping[str, object] | None,
+        ) -> str:
+            del question, max_tokens, temperature, response_format
+            calls.append(alias)
+            raise RuntimeError("fallback private failure")
+
+        async def rag_call(
+            question: str,
+            *,
+            max_tokens: int | None,
+            temperature: float | None,
+        ) -> str:
+            del question, max_tokens, temperature
+            raise RuntimeError("rag private failure")
+
+        result = await run_local_agent.run_agent(
+            question="pergunta",
+            use_rag=True,
+            chat_call=chat_call,
+            rag_call=rag_call,
+        )
+        data = result.to_json_dict()
+
+        self.assertEqual(calls, ["local_chat"])
+        self.assertEqual(data["alias"], "local_chat")
+        self.assertFalse(data["used_rag"])
+        self.assertNotIn("rag private failure", json.dumps(data))
+        self.assertNotIn("fallback private failure", json.dumps(data))
+        _assert_safe_schema(self, data, expect_error="fallback_alias_failed")
+        _assert_fallback_metadata(
+            self,
+            data,
+            reason=FallbackReason.RAG_UNAVAILABLE,
+        )
 
     async def test_debug_failure_includes_exception_class_only(self) -> None:
         async def chat_call(
@@ -505,6 +617,40 @@ class RunLocalAgentTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(data["error_category"], "chat_unavailable:RuntimeError")
         self.assertNotIn("sensitive message", json.dumps(data))
+
+    async def test_fallback_debug_failure_includes_exception_class_only(self) -> None:
+        async def chat_call(
+            question: str,
+            *,
+            alias: str,
+            max_tokens: int | None,
+            temperature: float | None,
+            response_format: Mapping[str, object] | None,
+        ) -> str:
+            del question, alias, max_tokens, temperature, response_format
+            raise RuntimeError("fallback sensitive message")
+
+        async def rag_call(
+            question: str,
+            *,
+            max_tokens: int | None,
+            temperature: float | None,
+        ) -> str:
+            del question, max_tokens, temperature
+            raise RuntimeError("rag sensitive message")
+
+        result = await run_local_agent.run_agent(
+            question="pergunta",
+            use_rag=True,
+            debug=True,
+            chat_call=chat_call,
+            rag_call=rag_call,
+        )
+        data = result.to_json_dict()
+
+        self.assertEqual(data["error_category"], "fallback_alias_failed:RuntimeError")
+        self.assertNotIn("fallback sensitive message", json.dumps(data))
+        self.assertNotIn("rag sensitive message", json.dumps(data))
 
     async def test_remote_provider_is_never_called(self) -> None:
         source = inspect.getsource(run_local_agent)
@@ -574,7 +720,7 @@ class RunLocalAgentTests(unittest.IsolatedAsyncioTestCase):
             decision_id="blocked-decision",
             timestamp_utc="2026-05-02T00:00:00Z",
             route=RouteDecisionKind.BLOCKED,
-            reason="policy_denied",
+            reason=RouteBlockReason.BUDGET_EXCEEDED.value,
             risk_level=TaskRiskLevel.LOW,
             token_budget_class=TokenBudgetClass.TINY,
             remote_allowed=False,
@@ -610,7 +756,149 @@ class RunLocalAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(data["decision_id"], "blocked-decision")
         self.assertEqual(data["answer"], BLOCKED_ANSWER)
         self.assertEqual(data["latency_ms"], 0.0)
+        self.assertEqual(data["fallback_applied"], False)
+        self.assertEqual(data["block_reason"], FallbackReason.BUDGET_EXCEEDED.value)
         _assert_safe_schema(self, data, expect_error="blocked")
+
+    async def test_policy_block_unsupported_task_never_fallbacks(self) -> None:
+        async def chat_call(
+            question: str,
+            *,
+            alias: str,
+            max_tokens: int | None,
+            temperature: float | None,
+            response_format: Mapping[str, object] | None,
+        ) -> str:
+            del question, alias, max_tokens, temperature, response_format
+            raise AssertionError("chat should not be called")
+
+        result = await run_local_agent.run_agent(
+            question="pergunta",
+            chat_call=chat_call,
+            policy_loader=lambda: RemoteEscalationPolicy(
+                blocked_task_types=("agent0_chat",),
+            ),
+        )
+        data = result.to_json_dict()
+
+        self.assertEqual(data["error_category"], "blocked")
+        self.assertEqual(data["fallback_applied"], False)
+        self.assertEqual(data["block_reason"], FallbackReason.UNSUPPORTED_TASK.value)
+        _assert_safe_schema(self, data, expect_error="blocked")
+
+    async def test_successful_fallback_exits_zero(self) -> None:
+        async def chat_call(
+            question: str,
+            *,
+            alias: str,
+            max_tokens: int | None,
+            temperature: float | None,
+            response_format: Mapping[str, object] | None,
+        ) -> str:
+            del question, alias, max_tokens, temperature, response_format
+            return "fallback answer"
+
+        async def rag_call(
+            question: str,
+            *,
+            max_tokens: int | None,
+            temperature: float | None,
+        ) -> str:
+            del question, max_tokens, temperature
+            raise RuntimeError("private")
+
+        with (
+            patch("scripts.run_local_agent._call_chat_alias", chat_call),
+            patch("scripts.run_local_agent._call_rag", rag_call),
+            patch("sys.stdout.write") as write_mock,
+        ):
+            exit_code = await run_local_agent.main_async(["pergunta", "--rag"])
+
+        self.assertEqual(exit_code, 0)
+        rendered = write_mock.call_args.args[0]
+        self.assertIn("fallback answer", rendered)
+
+    async def test_policy_block_exits_nonzero(self) -> None:
+        with (
+            patch(
+                "scripts.run_local_agent._safe_policy",
+                lambda: RemoteEscalationPolicy(per_request_token_limit=1),
+            ),
+            patch("sys.stdout.write"),
+        ):
+            exit_code = await run_local_agent.main_async(["pergunta"])
+
+        self.assertNotEqual(exit_code, 0)
+
+    async def test_fallback_event_is_safe_and_emitted_only_on_fallback(self) -> None:
+        events: list[dict[str, object]] = []
+
+        class BoundLogger:
+            def __init__(self, event: dict[str, object]) -> None:
+                self.event = event
+
+            def info(self, message: str) -> None:
+                self.event["message"] = message
+                events.append(self.event)
+
+        def fake_bind(**kwargs: object) -> BoundLogger:
+            event = kwargs["event"]
+            assert isinstance(event, dict)
+            return BoundLogger(event)
+
+        async def chat_call(
+            question: str,
+            *,
+            alias: str,
+            max_tokens: int | None,
+            temperature: float | None,
+            response_format: Mapping[str, object] | None,
+        ) -> str:
+            del question, alias, max_tokens, temperature, response_format
+            return "fallback answer"
+
+        async def rag_call(
+            question: str,
+            *,
+            max_tokens: int | None,
+            temperature: float | None,
+        ) -> str:
+            del question, max_tokens, temperature
+            raise RuntimeError("private prompt should not leak")
+
+        with patch("scripts.run_local_agent.logger.bind", fake_bind):
+            await run_local_agent.run_agent(
+                question="pergunta",
+                use_rag=True,
+                chat_call=chat_call,
+                rag_call=rag_call,
+            )
+
+        self.assertEqual(len(events), 1)
+        event = events[0]
+        self.assertEqual(event["event"], "agent_fallback")
+        self.assertEqual(event["fallback_reason"], FallbackReason.RAG_UNAVAILABLE.value)
+        self.assertEqual(event["original_alias"], "local_rag")
+        self.assertEqual(event["fallback_alias"], "local_chat")
+        self.assertTrue(event["fallback_succeeded"])
+        self.assertTrue(FORBIDDEN_OUTPUT_KEYS.isdisjoint({key.lower() for key in event}))
+
+    async def test_no_fallback_event_without_fallback(self) -> None:
+        async def chat_call(
+            question: str,
+            *,
+            alias: str,
+            max_tokens: int | None,
+            temperature: float | None,
+            response_format: Mapping[str, object] | None,
+        ) -> str:
+            del question, alias, max_tokens, temperature, response_format
+            return "answer"
+
+        with patch("scripts.run_local_agent.logger.bind") as bind_mock:
+            await run_local_agent.run_agent(question="pergunta", chat_call=chat_call)
+
+        bind_mock.assert_not_called()
 
 
 if __name__ == "__main__":

@@ -1,8 +1,8 @@
 # Gateway-1 Sprint Handoff
 
-**Last updated:** 2026-05-01  
-**Current branch:** `feat/agent0-runner-contract-hardening`
-**Issue:** [#57](https://github.com/franciscosalido/OPENCLAW/issues/57)
+**Last updated:** 2026-05-02
+**Current branch:** `feat/agent0-local-failsafe-degradation`
+**Issue:** [#59](https://github.com/franciscosalido/OPENCLAW/issues/59)
 
 Gateway-0 is complete. Gateway-1 starts with routing policy primitives and
 token economy records only.
@@ -41,7 +41,7 @@ Out of scope:
 | Item | Scope |
 |---|---|
 | GW-14 | Config-driven routing audit and token economy calibration |
-| GW-17 | Progressive local fallback on timeout/alias failure |
+| GW-17 | Explicit local fail-safe degradation for Agent-0 runner |
 | GW-18 | Golden questions harness |
 
 ## GW-15 Current Work
@@ -98,3 +98,32 @@ Safety:
 
 - Runner output still excludes prompt/query/chunks/vectors/payloads/secrets.
 - Live services are not required for GW-16 tests.
+
+## GW-17 Current Work
+
+Scope:
+
+- Add typed fallback reason vocabulary.
+- Add safe optional fallback metadata to Agent-0 runner output.
+- Fallback once from `local_rag` to `local_chat` when local RAG/Qdrant
+  infrastructure is unavailable.
+- Keep policy blocks as hard stops with no model call and no fallback.
+- Add a no-double-fallback guard when the fallback alias also fails.
+- Emit a sanitized local `agent_fallback` loguru event.
+- Add offline tests for fallback, policy blocks, schema stability and exit
+  codes.
+
+Out of scope:
+
+- Remote providers or remote calls.
+- FastAPI, MCP or multi-agent orchestration.
+- Qdrant mutation, reindexing, ingestion or `openclaw_knowledge` access.
+- Public `local_think` runner path. `local_think` timeout fallback remains
+  deferred until a think path exists.
+
+Safety:
+
+- Fallback reason codes are enum-derived.
+- Fallback metadata excludes prompt/query/chunks/vectors/payloads/secrets.
+- Successful fallback exits `0`; policy block and unrecoverable local failure
+  exit non-zero.

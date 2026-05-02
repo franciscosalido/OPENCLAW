@@ -45,6 +45,19 @@ class RouteBlockReason(str, Enum):
     UNKNOWN = "unknown"
 
 
+class FallbackReason(str, Enum):
+    """Safe local fallback reasons for Agent-0 degradation."""
+
+    QDRANT_UNAVAILABLE = "qdrant_unavailable"
+    RAG_UNAVAILABLE = "rag_unavailable"
+    THINK_TIMEOUT = "think_timeout"
+    ALIAS_UNAVAILABLE = "alias_unavailable"
+    BUDGET_EXCEEDED = "budget_exceeded"
+    UNSUPPORTED_TASK = "unsupported_task"
+    FALLBACK_ALIAS_FAILED = "fallback_alias_failed"
+    UNKNOWN_LOCAL_FAILURE = "unknown_local_failure"
+
+
 class TaskRiskLevel(str, Enum):
     """Coarse task risk levels used by routing policy."""
 
