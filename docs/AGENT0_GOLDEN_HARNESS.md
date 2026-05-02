@@ -89,6 +89,9 @@ It never stores question text, answer text, prompts, chunks, vectors, payloads,
 raw model responses, exception messages, API keys, Authorization headers or
 secrets.
 
+Skipped semantics are explicit: a result cannot be both skipped and failed. If
+`skipped` is `true`, `error_category` must be absent.
+
 ## Summary Schema
 
 The summary JSON includes:
