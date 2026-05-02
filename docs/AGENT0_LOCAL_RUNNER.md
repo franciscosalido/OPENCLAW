@@ -90,5 +90,4 @@ The smoke script is opt-in and local-only. It requires
 
 - Progressive fallback is deferred to GW-16.
 - Golden questions harness is deferred to GW-17.
-- Observability E2E validation is deferred to GW-18.
 - Remote providers remain disabled and require a future ADR.
