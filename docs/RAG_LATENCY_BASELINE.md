@@ -30,9 +30,9 @@ All durations use `time.perf_counter()` wrappers around existing calls.
 the sum of segment fields.
 
 The current `LocalRagPipeline` does not own Agent-0 route selection. Direct
-pipeline traces therefore record `routing_ms=0.0`. Agent-level routing
-correlation remains a future integration point and must preserve `decision_id`
-when added.
+pipeline traces record `routing_ms=None` — not measured at this layer, not
+zero. Agent-level routing correlation via `decision_id` is a future
+integration point in the Agent-0 runner.
 
 ## Trace Fields
 

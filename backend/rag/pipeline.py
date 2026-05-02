@@ -270,7 +270,7 @@ class LocalRagPipeline:
             total_latency_ms=total_ms,
             prompt_latency_ms=prompt_ms,
             context_chunk_count=chunk_count,
-            routing_ms=0.0,
+            routing_ms=None,
             embedding_ms=embedding_ms,
             retrieval_ms=vector_search_ms,
             context_pack_ms=context_pack_ms,
