@@ -8,10 +8,22 @@ any future remote provider is enabled by ADR.
 
 from __future__ import annotations
 
+import hashlib
+import json
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import Enum
+from math import ceil
+from pathlib import Path
+from typing import Any
 from uuid import uuid4
+
+import yaml
+
+
+DEFAULT_RAG_CONFIG_PATH = Path("config/rag_config.yaml")
+DEFAULT_BLOCKED_TASK_TYPES = ("trade_execution", "brokerage_login")
 
 
 class RouteDecisionKind(str, Enum):
@@ -62,6 +74,8 @@ class RemoteEscalationPolicy:
     monthly_budget_usd: float | None = None
     per_request_token_limit: int | None = None
     allowed_remote_providers: tuple[str, ...] = ()
+    blocked_task_types: tuple[str, ...] = DEFAULT_BLOCKED_TASK_TYPES
+    allowed_task_types: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if self.monthly_budget_usd is not None and self.monthly_budget_usd < 0:
@@ -73,6 +87,10 @@ class RemoteEscalationPolicy:
             raise ValueError("per_request_token_limit cannot be negative")
         for provider in self.allowed_remote_providers:
             _validate_non_empty(provider, "allowed_remote_providers")
+        for task_type in self.blocked_task_types:
+            _validate_non_empty(task_type, "blocked_task_types")
+        for task_type in self.allowed_task_types:
+            _validate_non_empty(task_type, "allowed_task_types")
 
 
 @dataclass(frozen=True)
@@ -88,6 +106,7 @@ class RouterDecision:
     remote_allowed: bool
     remote_candidate_provider: str | None
     requires_sanitization: bool
+    task_type: str | None = None
     estimated_prompt_tokens: int | None = None
     estimated_completion_tokens: int | None = None
     estimated_remote_tokens: int | None = None
@@ -102,6 +121,8 @@ class RouterDecision:
                 self.remote_candidate_provider,
                 "remote_candidate_provider",
             )
+        if self.task_type is not None:
+            _validate_non_empty(self.task_type, "task_type")
         _validate_optional_non_negative(
             self.estimated_prompt_tokens,
             "estimated_prompt_tokens",
@@ -133,6 +154,7 @@ class RouterDecision:
         }
         optional_values: dict[str, object | None] = {
             "remote_candidate_provider": self.remote_candidate_provider,
+            "task_type": self.task_type,
             "estimated_prompt_tokens": self.estimated_prompt_tokens,
             "estimated_completion_tokens": self.estimated_completion_tokens,
             "estimated_remote_tokens": self.estimated_remote_tokens,
@@ -142,6 +164,25 @@ class RouterDecision:
             if value is not None:
                 data[key] = value
         return data
+
+    def decision_fingerprint(self) -> str:
+        """Return a stable hash from safe policy-relevant fields only."""
+        payload: dict[str, object | None] = {
+            "route": self.route.value,
+            "reason": self.reason,
+            "risk_level": self.risk_level.value,
+            "token_budget_class": self.token_budget_class.value,
+            "remote_allowed": self.remote_allowed,
+            "remote_candidate_provider": self.remote_candidate_provider,
+            "requires_sanitization": self.requires_sanitization,
+            "task_type": self.task_type,
+            "estimated_prompt_tokens": self.estimated_prompt_tokens,
+            "estimated_completion_tokens": self.estimated_completion_tokens,
+            "estimated_remote_tokens": self.estimated_remote_tokens,
+            "estimated_remote_tokens_avoided": self.estimated_remote_tokens_avoided,
+        }
+        canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -194,6 +235,161 @@ class TokenEconomyRecord:
             if value is not None:
                 data[key] = value
         return data
+
+
+class TokenBudgetAccumulator:
+    """In-memory session token estimate accumulator."""
+
+    def __init__(self) -> None:
+        self._totals = {
+            "estimated_prompt_tokens": 0,
+            "estimated_completion_tokens": 0,
+            "estimated_remote_tokens": 0,
+            "estimated_remote_tokens_avoided": 0,
+        }
+
+    def add(self, decision: RouterDecision | TokenEconomyRecord) -> None:
+        """Add safe token estimate fields from one decision or record."""
+        if isinstance(decision, RouterDecision):
+            values = {
+                "estimated_prompt_tokens": decision.estimated_prompt_tokens,
+                "estimated_completion_tokens": decision.estimated_completion_tokens,
+                "estimated_remote_tokens": decision.estimated_remote_tokens,
+                "estimated_remote_tokens_avoided": (
+                    decision.estimated_remote_tokens_avoided
+                ),
+            }
+        else:
+            values = {
+                "estimated_prompt_tokens": None,
+                "estimated_completion_tokens": None,
+                "estimated_remote_tokens": decision.remote_tokens_estimated,
+                "estimated_remote_tokens_avoided": (
+                    decision.remote_tokens_avoided_estimated
+                ),
+            }
+        for key, value in values.items():
+            if value is None:
+                continue
+            _validate_non_negative(value, key)
+            self._totals[key] += value
+
+    def total(self) -> dict[str, int]:
+        """Return accumulated session totals."""
+        return dict(self._totals)
+
+    def reset(self) -> None:
+        """Reset accumulated session totals."""
+        for key in self._totals:
+            self._totals[key] = 0
+
+
+class RoutingDecisionLogger:
+    """Append safe routing decisions to a local JSONL audit file."""
+
+    def __init__(
+        self,
+        base_path: Path | str,
+        *,
+        rotate_daily: bool = True,
+        enabled: bool = True,
+    ) -> None:
+        self.base_path = Path(base_path)
+        self.rotate_daily = rotate_daily
+        self.enabled = enabled
+
+    def append(self, decision: RouterDecision | TokenEconomyRecord) -> Path | None:
+        """Append one safe JSON object and return the file path written."""
+        if not self.enabled:
+            return None
+        path = self._log_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        data = decision.to_log_dict()
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(data, sort_keys=True) + "\n")
+        return path
+
+    def _log_path(self) -> Path:
+        stem_path = self.base_path.with_suffix("")
+        if self.rotate_daily:
+            date = datetime.now(UTC).date().isoformat()
+            return stem_path.with_name(f"{stem_path.name}_{date}").with_suffix(
+                ".jsonl"
+            )
+        return stem_path.with_suffix(".jsonl")
+
+
+def load_routing_policy(
+    config_path: Path | str = DEFAULT_RAG_CONFIG_PATH,
+) -> RemoteEscalationPolicy:
+    """Load a safe local-first routing policy from ``config/rag_config.yaml``."""
+    raw = yaml.safe_load(Path(config_path).read_text(encoding="utf-8"))
+    if raw is None:
+        return RemoteEscalationPolicy()
+    if not isinstance(raw, Mapping):
+        raise ValueError("routing config root must be a mapping")
+    gateway = raw.get("gateway", {})
+    if gateway is None:
+        gateway = {}
+    if not isinstance(gateway, Mapping):
+        raise ValueError("gateway config must be a mapping")
+    routing = gateway.get("routing", {})
+    if routing is None:
+        routing = {}
+    if not isinstance(routing, Mapping):
+        raise ValueError("gateway.routing config must be a mapping")
+
+    remote_enabled = _read_bool(routing, "remote_enabled", default=False)
+    monthly_budget_usd = _read_optional_float(routing, "monthly_budget_usd")
+    per_request_token_limit = _read_optional_int(
+        routing,
+        "per_request_token_limit",
+    )
+    allowed_remote_providers = _read_string_tuple(
+        routing,
+        "allowed_remote_providers",
+        default=(),
+    )
+    blocked_task_types = _read_string_tuple(
+        routing,
+        "blocked_task_types",
+        default=DEFAULT_BLOCKED_TASK_TYPES,
+    )
+    allowed_task_types = _read_string_tuple(
+        routing,
+        "allowed_task_types",
+        default=(),
+    )
+
+    return RemoteEscalationPolicy(
+        remote_enabled=remote_enabled,
+        monthly_budget_usd=monthly_budget_usd,
+        per_request_token_limit=per_request_token_limit,
+        allowed_remote_providers=allowed_remote_providers,
+        blocked_task_types=blocked_task_types,
+        allowed_task_types=allowed_task_types,
+    )
+
+
+def estimate_prompt_tokens(
+    text: str,
+    *,
+    chars_per_token: int = 4,
+    min_tokens: int = 1,
+) -> int:
+    """Estimate prompt tokens using a conservative local heuristic.
+
+    This is an estimate for local policy decisions, not a billing record.
+    """
+    if not isinstance(text, str):
+        raise TypeError("text must be a string")
+    if chars_per_token <= 0:
+        raise ValueError("chars_per_token must be greater than zero")
+    if min_tokens < 0:
+        raise ValueError("min_tokens cannot be negative")
+    stripped = text.strip()
+    estimated = ceil(len(stripped) / chars_per_token) if stripped else 0
+    return max(estimated, min_tokens)
 
 
 def decide_route(
@@ -257,6 +453,7 @@ def decide_route(
             remote_allowed=False,
             remote_candidate_provider=None,
             requires_sanitization=contains_sensitive_context,
+            task_type=clean_task_type,
             estimated_prompt_tokens=estimated_prompt_tokens,
             estimated_completion_tokens=estimated_completion_tokens,
             estimated_remote_tokens=total_tokens,
@@ -272,13 +469,14 @@ def decide_route(
             remote_allowed=False,
             remote_candidate_provider=None,
             requires_sanitization=True,
+            task_type=clean_task_type,
             estimated_prompt_tokens=estimated_prompt_tokens,
             estimated_completion_tokens=estimated_completion_tokens,
             estimated_remote_tokens=total_tokens,
             estimated_remote_tokens_avoided=total_tokens,
         )
 
-    if _is_unsupported_task(clean_task_type):
+    if _is_unsupported_task(clean_task_type, policy):
         return _decision(
             route=RouteDecisionKind.BLOCKED,
             reason=RouteBlockReason.UNSUPPORTED_TASK.value,
@@ -287,6 +485,7 @@ def decide_route(
             remote_allowed=False,
             remote_candidate_provider=None,
             requires_sanitization=False,
+            task_type=clean_task_type,
             estimated_prompt_tokens=estimated_prompt_tokens,
             estimated_completion_tokens=estimated_completion_tokens,
             estimated_remote_tokens=total_tokens,
@@ -308,6 +507,7 @@ def decide_route(
                 remote_allowed=True,
                 remote_candidate_provider=provider,
                 requires_sanitization=True,
+                task_type=clean_task_type,
                 estimated_prompt_tokens=estimated_prompt_tokens,
                 estimated_completion_tokens=estimated_completion_tokens,
                 estimated_remote_tokens=total_tokens,
@@ -326,6 +526,7 @@ def decide_route(
             remote_allowed=False,
             remote_candidate_provider=provider,
             requires_sanitization=True,
+            task_type=clean_task_type,
             estimated_prompt_tokens=estimated_prompt_tokens,
             estimated_completion_tokens=estimated_completion_tokens,
             estimated_remote_tokens=total_tokens,
@@ -340,6 +541,7 @@ def decide_route(
         remote_allowed=False,
         remote_candidate_provider=None,
         requires_sanitization=False,
+        task_type=clean_task_type,
         estimated_prompt_tokens=estimated_prompt_tokens,
         estimated_completion_tokens=estimated_completion_tokens,
         estimated_remote_tokens=total_tokens,
@@ -386,6 +588,7 @@ def _decision(
     remote_allowed: bool,
     remote_candidate_provider: str | None,
     requires_sanitization: bool,
+    task_type: str,
     estimated_prompt_tokens: int,
     estimated_completion_tokens: int,
     estimated_remote_tokens: int | None,
@@ -401,6 +604,7 @@ def _decision(
         remote_allowed=remote_allowed,
         remote_candidate_provider=remote_candidate_provider,
         requires_sanitization=requires_sanitization,
+        task_type=task_type,
         estimated_prompt_tokens=estimated_prompt_tokens,
         estimated_completion_tokens=estimated_completion_tokens,
         estimated_remote_tokens=estimated_remote_tokens,
@@ -437,8 +641,13 @@ def _budget_exceeded(total_tokens: int, limit: int | None) -> bool:
     return limit is not None and limit > 0 and total_tokens > limit
 
 
-def _is_unsupported_task(task_type: str) -> bool:
-    return task_type.strip().lower() in {"trade_execution", "brokerage_login"}
+def _is_unsupported_task(task_type: str, policy: RemoteEscalationPolicy) -> bool:
+    clean_task_type = task_type.strip().lower()
+    blocked = {item.strip().lower() for item in policy.blocked_task_types}
+    allowed = {item.strip().lower() for item in policy.allowed_task_types}
+    if clean_task_type in blocked:
+        return True
+    return bool(allowed) and clean_task_type not in allowed
 
 
 def _sum_optional(left: int | None, right: int | None) -> int | None:
@@ -462,3 +671,50 @@ def _validate_non_negative(value: int, field_name: str) -> None:
 def _validate_optional_non_negative(value: int | None, field_name: str) -> None:
     if value is not None:
         _validate_non_negative(value, field_name)
+
+
+def _read_bool(
+    mapping: Mapping[str, Any],
+    key: str,
+    *,
+    default: bool,
+) -> bool:
+    value = mapping.get(key, default)
+    if not isinstance(value, bool):
+        raise ValueError(f"gateway.routing.{key} must be a boolean")
+    return value
+
+
+def _read_optional_int(mapping: Mapping[str, Any], key: str) -> int | None:
+    value = mapping.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise ValueError(f"gateway.routing.{key} must be an integer")
+    return value
+
+
+def _read_optional_float(mapping: Mapping[str, Any], key: str) -> float | None:
+    value = mapping.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, int | float) or isinstance(value, bool):
+        raise ValueError(f"gateway.routing.{key} must be a number")
+    return float(value)
+
+
+def _read_string_tuple(
+    mapping: Mapping[str, Any],
+    key: str,
+    *,
+    default: tuple[str, ...],
+) -> tuple[str, ...]:
+    value = mapping.get(key, list(default))
+    if not isinstance(value, list):
+        raise ValueError(f"gateway.routing.{key} must be a list")
+    result: list[str] = []
+    for item in value:
+        if not isinstance(item, str):
+            raise ValueError(f"gateway.routing.{key} must contain only strings")
+        result.append(_validate_non_empty(item, key))
+    return tuple(result)
