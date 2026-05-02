@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import tempfile
+import time
 import unittest
 from collections.abc import Mapping
 from pathlib import Path
@@ -438,6 +440,73 @@ class GatewayProofOfLifeUnitTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn(sentinel, serialized)
         self.assertNotIn("Authorization", serialized)
         proof.assert_sanitized(result.to_json_dict())
+
+    async def test_probes_run_concurrently_not_sequentially(self) -> None:
+        # Concurrency-shape test: wall time should be ~max(delays), not sum(delays).
+        # Each fake sleeps 50 ms; sequential would be ~150 ms, concurrent ~50 ms.
+        # Threshold is 120 ms — generous to avoid false failures on slow CI.
+        async def slow_probe_ollama(base_url: str) -> proof.ProbeResult:
+            del base_url
+            await asyncio.sleep(0.05)
+            return proof.ProbeResult(service="ollama", ok=True, latency_ms=50.0)
+
+        async def slow_probe_qdrant(base_url: str) -> proof.ProbeResult:
+            del base_url
+            await asyncio.sleep(0.05)
+            return proof.ProbeResult(service="qdrant", ok=True, latency_ms=50.0)
+
+        async def slow_probe_litellm(
+            base_url: str, *, api_key: str | None
+        ) -> proof.ProbeResult:
+            del base_url, api_key
+            await asyncio.sleep(0.05)
+            return proof.ProbeResult(service="litellm", ok=True, latency_ms=50.0)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with (
+                patch.dict(
+                    os.environ,
+                    {"RUN_GATEWAY1_PROOF_OF_LIFE": "1"},
+                    clear=True,
+                ),
+                patch.object(proof, "probe_ollama", slow_probe_ollama),
+                patch.object(proof, "probe_qdrant", slow_probe_qdrant),
+                patch.object(proof, "probe_litellm", slow_probe_litellm),
+                patch.object(proof, "run_local_chat_smoke", _fake_runner_smoke("local_chat", True)),
+                patch.object(proof, "run_rag_smoke", _fake_runner_smoke("rag", True)),
+            ):
+                wall_start = time.perf_counter()
+                await proof.run_proof_of_life(output_dir=temp_dir)
+                wall_elapsed = time.perf_counter() - wall_start
+
+        # Sequential would be ~0.15 s; concurrent finishes well under 0.12 s.
+        self.assertLess(
+            wall_elapsed,
+            0.12,
+            "Probes appear to run sequentially — asyncio.gather concurrency broken",
+        )
+
+    def test_probe_latency_ms_is_numeric_and_non_negative(self) -> None:
+        for ok, error_category in [(True, None), (False, "connection")]:
+            result = proof.ProbeResult(
+                service="ollama",
+                ok=ok,
+                latency_ms=12.5,
+                error_category=error_category,
+            )
+            data = result.to_json_dict()
+            latency = data["latency_ms"]
+            self.assertIsInstance(latency, (int, float))
+            self.assertGreaterEqual(latency, 0.0)
+
+        # Edge case: early-return path (api_key=None) produces latency_ms=0.0
+        zero_result = proof.ProbeResult(
+            service="litellm",
+            ok=False,
+            latency_ms=0.0,
+            error_category="authentication",
+        )
+        self.assertGreaterEqual(zero_result.to_json_dict()["latency_ms"], 0.0)
 
     async def test_remote_url_guard_runs_before_async_probes(self) -> None:
         async def fail_probe(*args: object, **kwargs: object) -> proof.ProbeResult:
