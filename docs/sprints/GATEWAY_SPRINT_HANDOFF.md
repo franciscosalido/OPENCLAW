@@ -552,3 +552,25 @@ Final rule:
 After GW-12 merges, Gateway-0 is complete on `main`. Any remote provider,
 OpenTelemetry/profiling, production ingestion or `openclaw_knowledge` work
 requires a new issue and explicit future ADR/sprint.
+
+## Gateway-1 Prelude
+
+GW-13 starts Gateway-1 on branch `feat/gateway1-routing-policy-prelude` and
+issue #51.
+
+Scope:
+
+- Local-first routing decision primitives.
+- Token economy estimate records.
+- Proposed ADR-0020 for controlled remote escalation policy.
+- Declarative config with remote disabled and no allowed providers.
+
+Out of scope:
+
+- Remote provider enablement.
+- Remote API calls.
+- Runtime model routing changes.
+- Sanitization implementation.
+- Qdrant mutation, reindexing, ingestion, or `openclaw_knowledge` access.
+
+Gateway-1 handoff continues in `docs/sprints/GATEWAY1_SPRINT_HANDOFF.md`.

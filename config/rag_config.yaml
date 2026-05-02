@@ -76,3 +76,15 @@ rag:
     Cite sources in the format [doc_id#chunk_index].
     For calculations, use deterministic Python logic.
     Never request or reveal real portfolio data, credentials, or private documents.
+
+gateway:
+  routing:
+    remote_enabled: false
+    default_route: "local"
+    log_decisions: true
+    # allow_remote_candidates: reserved for a future routing consumer.
+    # Not read by RemoteEscalationPolicy or decide_route() in Gateway-1.
+    # Enabling remote candidates requires an explicit ADR. See ADR-0020.
+    allow_remote_candidates: true
+    allowed_remote_providers: []
+    per_request_token_limit: 0
