@@ -6,8 +6,11 @@ import tempfile
 import unittest
 from collections.abc import Mapping
 from pathlib import Path
-from typing import cast
+from types import TracebackType
+from typing import Any, Self, cast
 from unittest.mock import patch
+
+import httpx
 
 from backend.gateway.routing_policy import FallbackReason
 from scripts import run_local_agent
@@ -299,9 +302,9 @@ class GatewayProofOfLifeUnitTests(unittest.IsolatedAsyncioTestCase):
                     {"RUN_GATEWAY1_PROOF_OF_LIFE": "1"},
                     clear=True,
                 ),
-                patch.object(proof, "probe_ollama", return_value=proof.ProbeResult("ollama", True, 1.0)),
-                patch.object(proof, "probe_qdrant", return_value=proof.ProbeResult("qdrant", True, 1.0)),
-                patch.object(proof, "probe_litellm", return_value=proof.ProbeResult("litellm", True, 1.0)),
+                patch.object(proof, "probe_ollama", _fake_probe("ollama", True)),
+                patch.object(proof, "probe_qdrant", _fake_probe("qdrant", True)),
+                patch.object(proof, "probe_litellm", _fake_litellm_probe(True)),
                 patch.object(proof, "run_local_chat_smoke", fake_local_chat),
                 patch.object(proof, "run_rag_smoke", fake_rag),
                 patch("sys.stdout.write"),
@@ -316,28 +319,189 @@ class GatewayProofOfLifeUnitTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(data["overall_passed"])
         proof.assert_sanitized(cast(dict[str, object], data))
 
+    async def test_async_probes_are_gathered_into_all_service_results(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with (
+                patch.dict(
+                    os.environ,
+                    {"RUN_GATEWAY1_PROOF_OF_LIFE": "1"},
+                    clear=True,
+                ),
+                patch.object(proof, "probe_ollama", _fake_probe("ollama", True)),
+                patch.object(proof, "probe_qdrant", _fake_probe("qdrant", True)),
+                patch.object(proof, "probe_litellm", _fake_litellm_probe(True)),
+                patch.object(proof, "run_local_chat_smoke", _fake_runner_smoke("local_chat", True)),
+                patch.object(proof, "run_rag_smoke", _fake_runner_smoke("rag", True)),
+            ):
+                summary, _ = await proof.run_proof_of_life(output_dir=temp_dir)
 
-class GatewayProofOfLifeProbeTests(unittest.TestCase):
-    def test_litellm_probe_reports_missing_aliases(self) -> None:
-        def fake_get(
-            url: str,
-            *,
-            headers: Mapping[str, str],
-            timeout: float,
-        ) -> object:
-            del url, headers, timeout
+        self.assertEqual(set(summary.service_probes), {"ollama", "qdrant", "litellm"})
+        self.assertTrue(summary.service_probes["ollama"].ok)
+        self.assertTrue(summary.service_probes["qdrant"].ok)
+        self.assertTrue(summary.service_probes["litellm"].ok)
 
-            class Response:
-                def raise_for_status(self) -> None:
-                    return None
+    async def test_async_probe_failure_is_converted_to_probe_result(self) -> None:
+        class RaisingAsyncClient:
+            def __init__(self, *args: object, **kwargs: object) -> None:
+                del args, kwargs
 
-                def json(self) -> dict[str, object]:
-                    return {"data": [{"id": "local_chat"}]}
+            async def __aenter__(self) -> Self:
+                return self
 
-            return Response()
+            async def __aexit__(
+                self,
+                exc_type: type[BaseException] | None,
+                exc: BaseException | None,
+                traceback: TracebackType | None,
+            ) -> None:
+                del exc_type, exc, traceback
 
-        with patch("scripts.test_gateway1_proof_of_life.httpx.get", fake_get):
-            result = proof.probe_litellm(
+            async def get(self, url: str, **kwargs: object) -> object:
+                del url, kwargs
+                raise httpx.ConnectError("FAKE_SECRET_MESSAGE")
+
+        with patch("scripts.test_gateway1_proof_of_life.httpx.AsyncClient", RaisingAsyncClient):
+            result = await proof.probe_ollama("http://127.0.0.1:11434")
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.error_category, "connection")
+        data = result.to_json_dict()
+        self.assertNotIn("FAKE_SECRET_MESSAGE", json.dumps(data))
+        proof.assert_sanitized(data)
+
+    async def test_failed_async_probe_does_not_hide_other_service_results(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with (
+                patch.dict(
+                    os.environ,
+                    {"RUN_GATEWAY1_PROOF_OF_LIFE": "1"},
+                    clear=True,
+                ),
+                patch.object(proof, "probe_ollama", _fake_probe("ollama", True)),
+                patch.object(proof, "probe_qdrant", _fake_probe("qdrant", False, "connection")),
+                patch.object(proof, "probe_litellm", _fake_litellm_probe(True)),
+            ):
+                summary, _ = await proof.run_proof_of_life(output_dir=temp_dir)
+
+        self.assertEqual(set(summary.service_probes), {"ollama", "qdrant", "litellm"})
+        self.assertTrue(summary.service_probes["ollama"].ok)
+        self.assertFalse(summary.service_probes["qdrant"].ok)
+        self.assertEqual(summary.service_probes["qdrant"].error_category, "connection")
+        self.assertTrue(summary.service_probes["litellm"].ok)
+
+    async def test_litellm_async_probe_does_not_leak_authorization(self) -> None:
+        sentinel = "FAKE_API_KEY_SHOULD_NOT_APPEAR"
+
+        class Response:
+            def raise_for_status(self) -> None:
+                return None
+
+            def json(self) -> dict[str, object]:
+                return {"data": [{"id": alias} for alias in proof.REQUIRED_ALIASES]}
+
+        class CapturingAsyncClient:
+            captured_headers: Mapping[str, str] | None = None
+
+            def __init__(self, *args: object, **kwargs: object) -> None:
+                del args, kwargs
+
+            async def __aenter__(self) -> Self:
+                return self
+
+            async def __aexit__(
+                self,
+                exc_type: type[BaseException] | None,
+                exc: BaseException | None,
+                traceback: TracebackType | None,
+            ) -> None:
+                del exc_type, exc, traceback
+
+            async def get(
+                self,
+                url: str,
+                *,
+                headers: Mapping[str, str] | None = None,
+            ) -> Response:
+                del url
+                CapturingAsyncClient.captured_headers = headers
+                return Response()
+
+        with patch("scripts.test_gateway1_proof_of_life.httpx.AsyncClient", CapturingAsyncClient):
+            result = await proof.probe_litellm(
+                "http://127.0.0.1:4000/v1",
+                api_key=sentinel,
+            )
+
+        self.assertTrue(result.ok)
+        self.assertIn("Authorization", CapturingAsyncClient.captured_headers or {})
+        serialized = json.dumps(result.to_json_dict())
+        self.assertNotIn(sentinel, serialized)
+        self.assertNotIn("Authorization", serialized)
+        proof.assert_sanitized(result.to_json_dict())
+
+    async def test_remote_url_guard_runs_before_async_probes(self) -> None:
+        async def fail_probe(*args: object, **kwargs: object) -> proof.ProbeResult:
+            del args, kwargs
+            self.fail("probe should not run after remote URL guard failure")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with (
+                patch.dict(
+                    os.environ,
+                    {
+                        "RUN_GATEWAY1_PROOF_OF_LIFE": "1",
+                        "QUIMERA_LLM_BASE_URL": "https://api.example.com/v1",
+                    },
+                    clear=True,
+                ),
+                patch.object(proof, "probe_ollama", fail_probe),
+                patch.object(proof, "probe_qdrant", fail_probe),
+                patch.object(proof, "probe_litellm", fail_probe),
+            ):
+                summary, _ = await proof.run_proof_of_life(output_dir=temp_dir)
+
+        self.assertFalse(summary.criteria_met["G1-02"])
+        self.assertEqual(set(summary.service_probes), {"ollama", "qdrant", "litellm"})
+        for service_probe in summary.service_probes.values():
+            self.assertFalse(service_probe.ok)
+            self.assertEqual(service_probe.error_category, "local_url_rejected")
+
+
+class GatewayProofOfLifeProbeTests(unittest.IsolatedAsyncioTestCase):
+    async def test_litellm_probe_reports_missing_aliases(self) -> None:
+        class Response:
+            def raise_for_status(self) -> None:
+                return None
+
+            def json(self) -> dict[str, object]:
+                return {"data": [{"id": "local_chat"}]}
+
+        class AliasAsyncClient:
+            def __init__(self, *args: object, **kwargs: object) -> None:
+                del args, kwargs
+
+            async def __aenter__(self) -> Self:
+                return self
+
+            async def __aexit__(
+                self,
+                exc_type: type[BaseException] | None,
+                exc: BaseException | None,
+                traceback: TracebackType | None,
+            ) -> None:
+                del exc_type, exc, traceback
+
+            async def get(
+                self,
+                url: str,
+                *,
+                headers: Mapping[str, str] | None = None,
+            ) -> Response:
+                del url, headers
+                return Response()
+
+        with patch("scripts.test_gateway1_proof_of_life.httpx.AsyncClient", AliasAsyncClient):
+            result = await proof.probe_litellm(
                 "http://127.0.0.1:4000/v1",
                 api_key="dev-key",
             )
@@ -345,6 +509,48 @@ class GatewayProofOfLifeProbeTests(unittest.TestCase):
         self.assertFalse(result.ok)
         self.assertEqual(result.error_category, "alias_missing")
         self.assertIn("local_rag", result.missing_aliases)
+
+
+def _fake_probe(
+    service: str,
+    ok: bool,
+    error_category: str | None = None,
+) -> Any:
+    async def fake(base_url: str) -> proof.ProbeResult:
+        del base_url
+        return proof.ProbeResult(
+            service=service,
+            ok=ok,
+            latency_ms=1.0,
+            error_category=error_category,
+        )
+
+    return fake
+
+
+def _fake_litellm_probe(ok: bool) -> Any:
+    async def fake(base_url: str, *, api_key: str | None) -> proof.ProbeResult:
+        del base_url, api_key
+        return proof.ProbeResult(service="litellm", ok=ok, latency_ms=1.0)
+
+    return fake
+
+
+def _fake_runner_smoke(name: str, ok: bool) -> Any:
+    async def fake() -> proof.RunnerSmokeResult:
+        return proof.RunnerSmokeResult(
+            name=name,
+            ok=ok,
+            route="local",
+            alias="local_chat" if name == "local_chat" else "local_rag",
+            used_rag=name == "rag",
+            latency_ms=1.0,
+            decision_id="decision",
+            estimated_remote_tokens_avoided=1,
+            answer_length_chars=20,
+        )
+
+    return fake
 
 
 if __name__ == "__main__":

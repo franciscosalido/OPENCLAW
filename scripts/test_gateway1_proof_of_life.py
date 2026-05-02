@@ -221,16 +221,23 @@ async def run_proof_of_life(
     criteria_met["G1-02"] = local_guard_ok
 
     if local_guard_ok:
-        probes["ollama"] = probe_ollama(urls.ollama_api_base)
-        probes["qdrant"] = probe_qdrant(urls.qdrant_url)
-        probes["litellm"] = probe_litellm(
-            urls.litellm_base_url,
-            api_key=os.environ.get("QUIMERA_LLM_API_KEY"),
+        (
+            probes["ollama"],
+            probes["qdrant"],
+            probes["litellm"],
+        ) = await asyncio.gather(
+            probe_ollama(urls.ollama_api_base),
+            probe_qdrant(urls.qdrant_url),
+            probe_litellm(
+                urls.litellm_base_url,
+                api_key=os.environ.get("QUIMERA_LLM_API_KEY"),
+            ),
         )
         criteria_met["G1-03"] = probes["ollama"].ok
         criteria_met["G1-04"] = probes["qdrant"].ok
         criteria_met["G1-05"] = probes["litellm"].ok
     else:
+        probes.update(_local_url_rejected_probes())
         skipped.update({"G1-03", "G1-04", "G1-05", "G1-06", "G1-07"})
 
     live_ready = all(
@@ -337,25 +344,49 @@ def is_local_url(url: str) -> bool:
     return url.startswith("http://127.0.0.1:") or url.startswith("http://localhost:")
 
 
-def probe_ollama(base_url: str) -> ProbeResult:
+def _local_url_rejected_probes() -> dict[str, ProbeResult]:
+    """Return safe placeholder probe results when URL guard blocks execution."""
+    return {
+        "ollama": ProbeResult(
+            service="ollama",
+            ok=False,
+            latency_ms=0.0,
+            error_category="local_url_rejected",
+        ),
+        "qdrant": ProbeResult(
+            service="qdrant",
+            ok=False,
+            latency_ms=0.0,
+            error_category="local_url_rejected",
+        ),
+        "litellm": ProbeResult(
+            service="litellm",
+            ok=False,
+            latency_ms=0.0,
+            error_category="local_url_rejected",
+        ),
+    }
+
+
+async def probe_ollama(base_url: str) -> ProbeResult:
     """Probe Ollama tags endpoint without mutating state."""
-    return _http_probe(
+    return await _http_probe(
         service="ollama",
         url=f"{base_url.rstrip('/')}/api/tags",
         expected_json_mapping=True,
     )
 
 
-def probe_qdrant(base_url: str) -> ProbeResult:
+async def probe_qdrant(base_url: str) -> ProbeResult:
     """Probe Qdrant health endpoint without mutating state."""
-    return _http_probe(
+    return await _http_probe(
         service="qdrant",
         url=f"{base_url.rstrip('/')}/healthz",
         expected_json_mapping=False,
     )
 
 
-def probe_litellm(base_url: str, *, api_key: str | None) -> ProbeResult:
+async def probe_litellm(base_url: str, *, api_key: str | None) -> ProbeResult:
     """Probe LiteLLM models endpoint and required aliases."""
     if not api_key:
         return ProbeResult(
@@ -366,11 +397,11 @@ def probe_litellm(base_url: str, *, api_key: str | None) -> ProbeResult:
         )
     start = time.perf_counter()
     try:
-        response = httpx.get(
-            f"{base_url.rstrip('/')}/models",
-            headers={"Authorization": f"Bearer {api_key}"},
-            timeout=PROBE_TIMEOUT_SECONDS,
-        )
+        async with httpx.AsyncClient(timeout=PROBE_TIMEOUT_SECONDS) as client:
+            response = await client.get(
+                f"{base_url.rstrip('/')}/models",
+                headers={"Authorization": f"Bearer {api_key}"},
+            )
         response.raise_for_status()
         payload = response.json()
         aliases = _extract_model_aliases(payload)
@@ -391,7 +422,7 @@ def probe_litellm(base_url: str, *, api_key: str | None) -> ProbeResult:
         )
 
 
-def _http_probe(
+async def _http_probe(
     *,
     service: str,
     url: str,
@@ -399,7 +430,8 @@ def _http_probe(
 ) -> ProbeResult:
     start = time.perf_counter()
     try:
-        response = httpx.get(url, timeout=PROBE_TIMEOUT_SECONDS)
+        async with httpx.AsyncClient(timeout=PROBE_TIMEOUT_SECONDS) as client:
+            response = await client.get(url)
         response.raise_for_status()
         if expected_json_mapping and not isinstance(response.json(), Mapping):
             return ProbeResult(
