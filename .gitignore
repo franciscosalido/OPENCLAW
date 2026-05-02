@@ -20,7 +20,6 @@ wheels/
 *.egg
 
 # Virtual environments
-.env
 .venv
 env/
 venv/
@@ -44,10 +43,13 @@ build/
 .next/
 .nuxt/
 
-# Environment variables
+# Local secrets — never commit any .env variant
+# Covers: .env, .env.production, .env.staging, .env.test, .env.local, etc.
+# Preserves: .env.example, .env.production.example, etc. (safe templates)
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
+!.env.*.example
 
 # IDE
 .vscode/
@@ -63,6 +65,7 @@ logs/*.jsonl
 *.log
 tests/golden/reports/
 reports/gateway1_smoke/
+reports/g2_latency_baseline/
 
 # Claude Code — local session artifacts (NOT hooks.json/settings.json — esses são versionados)
 *.claude_session
