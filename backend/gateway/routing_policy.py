@@ -222,6 +222,32 @@ def decide_route(
         budget_class=budget_class,
     )
 
+    # Decision priority ladder — intentional ordering:
+    #
+    # 1. budget_exceeded  → BLOCKED
+    #    Checked first because it is a hard operational gate that applies
+    #    regardless of content sensitivity. A budget-exhausted task would
+    #    otherwise fall through to the sensitive_context branch and produce
+    #    LOCAL instead of BLOCKED, silently allowing unbounded local usage.
+    #    BLOCKED is strictly more restrictive than LOCAL, so placing this
+    #    first is the conservative choice.
+    #
+    # 2. sensitive_context → LOCAL
+    #    Sensitive content is forced local, not blocked. LOCAL is the safe
+    #    outcome here: the task is allowed to run, but only on-device.
+    #    Checked after budget so that a budget-exceeded + sensitive task is
+    #    rejected outright rather than silently routed locally.
+    #
+    # 3. unsupported_task  → BLOCKED
+    #    Hard prohibition on trade_execution and brokerage_login.
+    #    Placed after content checks because task-type is a structural block
+    #    that does not interact with budget or sensitivity.
+    #
+    # 4. high_value / expensive → REMOTE_CANDIDATE or BLOCKED
+    #    Only reaches remote if policy explicitly enables it and at least one
+    #    provider is configured. Default policy disables this path entirely.
+    #
+    # 5. default           → LOCAL (local_first_default)
     if _budget_exceeded(total_tokens, policy.per_request_token_limit):
         return _decision(
             route=RouteDecisionKind.BLOCKED,
