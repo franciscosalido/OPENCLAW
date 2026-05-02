@@ -86,6 +86,17 @@ GW-19 tests cover:
 All tests are offline and deterministic. They do not require LiteLLM, Ollama,
 Qdrant or network services.
 
+## Gateway-1 Proof-of-Life
+
+GW-20 adds an opt-in operator smoke that scans structured proof-of-life outputs
+using the same prohibited-field discipline. It validates dry-run, local service
+probes, live runner paths, forced degradation and policy block behavior, then
+writes a sanitized summary JSON.
+
+The proof-of-life smoke is not OpenTelemetry, not a dashboard, not remote
+telemetry and not a profiling baseline. It is a local readiness gate for
+Gateway-2.
+
 ## Deferred
 
 `RagRunTrace` currently predates Agent-0 and does not carry Agent-0

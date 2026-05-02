@@ -170,10 +170,24 @@ RUN_AGENT0_LOCAL_SMOKE=1 scripts/test_agent0_local_runner.sh
 The smoke script is opt-in and local-only. It requires
 `QUIMERA_LLM_API_KEY` to match the local `LITELLM_MASTER_KEY`.
 
+## Gateway-1 Proof-of-Life
+
+GW-20 adds the final Gateway-1 proof-of-life smoke:
+
+```bash
+RUN_GATEWAY1_PROOF_OF_LIFE=1 uv run python scripts/test_gateway1_proof_of_life.py --output-dir /tmp/openclaw_gateway1_smoke
+```
+
+The command validates dry-run, local service probes, live `local_chat`, live
+`--rag` success or explicit fallback, forced Qdrant degradation and policy block
+behavior. It writes only sanitized metadata and answer lengths, never answer
+text, prompt text, chunks, vectors, payloads or secrets.
+
 ## Deferred
 
 - Progressive remote escalation remains out of scope.
 - Golden questions harness is provided by GW-18 in
   `scripts/run_golden_harness.py`.
-- Observability E2E validation remains deferred to a future explicit issue.
+- Observability signal validation is covered by GW-19; Gateway-1 proof-of-life
+  is covered by GW-20.
 - Remote providers remain disabled and require a future ADR.

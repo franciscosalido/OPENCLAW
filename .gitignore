@@ -61,6 +61,7 @@ Thumbs.db
 logs/
 *.log
 tests/golden/reports/
+reports/gateway1_smoke/
 
 # Claude Code — local session artifacts (NOT hooks.json/settings.json — esses são versionados)
 *.claude_session
