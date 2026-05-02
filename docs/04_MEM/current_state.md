@@ -4,23 +4,28 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Last updated:** 2026-05-01
-**Updated by:** Codex — Agent-0 GW-16 runner contract hardening
+**Last updated:** 2026-05-02
+**Updated by:** Codex — Agent-0 GW-17 local fail-safe degradation
 
 ---
 
 ## Active Sprint: Agent-0 / Local Runner MVP
 
-**Goal:** harden the Agent-0 local runner contracts for alias routing, output
-schema, dry-run, blocked and degraded states without adding fallback or new
-runtime features.
+**Goal:** add explicit local fail-safe degradation for Agent-0 so recoverable
+local RAG/Qdrant failures can fall back once to `local_chat`, while policy
+blocks remain hard refusals with no model call.
 
 Gateway-0 is complete on `main`. GW-13 is merged. GW-14 remains a separate
 open PR at the time GW-15 starts, so GW-15 uses compatibility helpers when the
 GW-14 token/config helpers are not present on `main`.
 
-GW-16 issue: <https://github.com/franciscosalido/OPENCLAW/issues/57>
-GW-16 branch: `feat/agent0-runner-contract-hardening`
+GW-17 issue: <https://github.com/franciscosalido/OPENCLAW/issues/59>
+GW-17 branch: `feat/agent0-local-failsafe-degradation`
+
+Note: local GitHub state on 2026-05-02 showed GW-15 merged and the GW-16
+hardening branch present, but the GW-16 commit was not on `origin/main`.
+GW-17 was therefore implemented as a stacked branch on the GW-16 branch and
+should be retargeted/rebased after GW-16 is integrated.
 
 Current runtime path:
 
@@ -117,8 +122,9 @@ unavoidable, use `git push --force-with-lease`.
 | GW-12 | `feat/gateway-operational-readiness` | Final runbook, readiness checks, ADR boundary, handoff | Done / merged |
 | GW-13 | `feat/gateway1-routing-policy-prelude` | Gateway-1 local-first routing policy and token economy prelude | Done / merged |
 | GW-14 | `feat/gateway1-routing-audit-token-economy` | Config-driven routing audit and token economy calibration | Open / separate PR |
-| GW-15 | `feat/agent0-local-runner` | Agent-0 local CLI runner MVP | Open / separate PR |
-| GW-16 | `feat/agent0-runner-contract-hardening` | Agent-0 runner contract hardening | Current |
+| GW-15 | `feat/agent0-local-runner` | Agent-0 local CLI runner MVP | Done / merged |
+| GW-16 | `feat/agent0-runner-contract-hardening` | Agent-0 runner contract hardening | Dependency branch / not on `origin/main` |
+| GW-17 | `feat/agent0-local-failsafe-degradation` | Explicit local fail-safe degradation for Agent-0 | Current |
 
 GW-05a issue: <https://github.com/franciscosalido/OPENCLAW/issues/25>
 GW-05b issue: <https://github.com/franciscosalido/OPENCLAW/issues/28>
@@ -132,6 +138,7 @@ GW-12 issue: <https://github.com/franciscosalido/OPENCLAW/issues/48>
 GW-13 issue: <https://github.com/franciscosalido/OPENCLAW/issues/51>
 GW-15 issue: <https://github.com/franciscosalido/OPENCLAW/issues/55>
 GW-16 issue: <https://github.com/franciscosalido/OPENCLAW/issues/57>
+GW-17 issue: <https://github.com/franciscosalido/OPENCLAW/issues/59>
 
 Gateway-0 sprint complete. GW-01 through GW-12 merged on `main`.
 The next sprint must start from a new explicit issue, ADR if architecture
@@ -184,6 +191,27 @@ Rules:
   alias.
 - No remote providers, no remote calls, no Qdrant mutation, no live services
   required for tests.
+
+## GW-17 Current Work
+
+GW-17 adds the first explicit local fail-safe degradation layer.
+
+Rules:
+
+- Fallback reasons are enum-derived, not free-form strings.
+- RAG/Qdrant unavailable can fallback once from `local_rag` to `local_chat`.
+- Successful RAG fallback returns the chat answer, `alias=local_chat`, and
+  `used_rag=false`.
+- Policy blocks such as `budget_exceeded` and `unsupported_task` never
+  fallback, call no model, and return `error_category=blocked`.
+- If the fallback alias also fails, the runner returns a safe failure with no
+  second fallback.
+- Fallback emits a sanitized local `agent_fallback` loguru event only when
+  fallback occurs.
+- `local_think` timeout fallback is deferred because Agent-0 has no public
+  think path yet.
+- No remote providers, no remote calls, no Qdrant mutation, no real data, and
+  no live services required for unit tests.
 
 ## GW-13 Completed Work
 
