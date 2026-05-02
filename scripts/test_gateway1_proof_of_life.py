@@ -29,6 +29,9 @@ from backend.gateway.routing_policy import (
 )
 from scripts import run_local_agent
 
+# Smoke summaries must not include "answer" — that key belongs to runner output
+# only and should never surface in observability reports.
+PROHIBITED_SMOKE_SUMMARY_KEYS: frozenset[str] = PROHIBITED_SIGNAL_KEYS | frozenset({"answer"})
 
 GUARD_ENV = "RUN_GATEWAY1_PROOF_OF_LIFE"
 DEFAULT_OUTPUT_DIR = Path("reports/gateway1_smoke")
@@ -580,7 +583,7 @@ def assert_sanitized(value: object) -> None:
     if isinstance(value, Mapping):
         for key, nested in value.items():
             key_text = str(key).lower()
-            if key_text in PROHIBITED_SIGNAL_KEYS:
+            if key_text in PROHIBITED_SMOKE_SUMMARY_KEYS:
                 raise ValueError(f"prohibited key in smoke output: {key_text}")
             assert_sanitized(nested)
         return

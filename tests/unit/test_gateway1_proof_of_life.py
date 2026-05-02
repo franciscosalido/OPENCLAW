@@ -139,6 +139,12 @@ class GatewayProofOfLifeUnitTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ValueError):
             proof.assert_sanitized({"safe_key": "FAKE_PROMPT_SHOULD_NOT_APPEAR"})
 
+    def test_recursive_sanitizer_catches_answer_key_in_smoke_output(self) -> None:
+        # "answer" is legitimate in AgentRunResult but must not appear in smoke
+        # summaries — PROHIBITED_SMOKE_SUMMARY_KEYS extends the base set with it.
+        with self.assertRaises(ValueError):
+            proof.assert_sanitized({"answer": "some answer text"})
+
     async def test_dry_run_criterion_success(self) -> None:
         result = await proof.run_dry_run_smoke()
         data = result.to_json_dict()
