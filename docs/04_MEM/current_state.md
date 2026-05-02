@@ -5,22 +5,22 @@
 > meaningful sessions.
 
 **Last updated:** 2026-05-02
-**Updated by:** Codex — Agent-0 GW-18 golden question harness
+**Updated by:** Codex — Agent-0 GW-19 observability signal contract
 
 ---
 
 ## Active Sprint: Agent-0 / Local Runner MVP
 
-**Goal:** add the Agent-0 golden question benchmark harness: fixed synthetic
-financial-domain questions, offline dry-run reports, and summary comparison
-tools for future regression checks.
+**Goal:** verify Agent-0 observability signal completeness and sanitization
+with deterministic offline tests for routing, token economy, RAG trace,
+fallback and decision-log records.
 
 Gateway-0 is complete on `main`. GW-13 is merged. GW-14 remains a separate
 open PR at the time GW-15 starts, so GW-15 uses compatibility helpers when the
 GW-14 token/config helpers are not present on `main`.
 
-GW-18 issue: <https://github.com/franciscosalido/OPENCLAW/issues/61>
-GW-18 branch: `feat/agent0-golden-question-harness`
+GW-19 issue: <https://github.com/franciscosalido/OPENCLAW/issues/63>
+GW-19 branch: `feat/agent0-observability-signal-contract`
 
 Note: local GitHub state on 2026-05-02 showed GW-15 merged and the GW-16
 hardening branch present, but the GW-16 commit was not on `origin/main`.
@@ -28,6 +28,8 @@ GW-17 was therefore implemented as a stacked branch on the GW-16 branch and
 should be retargeted/rebased after GW-16 is integrated.
 GW-18 was implemented as a stacked branch on GW-17 for the same reason and
 should be retargeted/rebased after GW-16/GW-17 are integrated.
+GW-19 was implemented as a stacked branch on the GW-18 integration branch and
+should be retargeted/rebased after GW-16/GW-17/GW-18 are integrated.
 
 Current runtime path:
 
@@ -127,7 +129,8 @@ unavoidable, use `git push --force-with-lease`.
 | GW-15 | `feat/agent0-local-runner` | Agent-0 local CLI runner MVP | Done / merged |
 | GW-16 | `feat/agent0-runner-contract-hardening` | Agent-0 runner contract hardening | Dependency branch / not on `origin/main` |
 | GW-17 | `feat/agent0-local-failsafe-degradation` | Explicit local fail-safe degradation for Agent-0 | Dependency branch / open PR |
-| GW-18 | `feat/agent0-golden-question-harness` | Golden question benchmark harness for Agent-0 | Current |
+| GW-18 | `feat/agent0-golden-question-harness` | Golden question benchmark harness for Agent-0 | Dependency branch / merged into stack |
+| GW-19 | `feat/agent0-observability-signal-contract` | Agent-0 observability signal contract and sanitization tests | Current |
 
 GW-05a issue: <https://github.com/franciscosalido/OPENCLAW/issues/25>
 GW-05b issue: <https://github.com/franciscosalido/OPENCLAW/issues/28>
@@ -143,6 +146,7 @@ GW-15 issue: <https://github.com/franciscosalido/OPENCLAW/issues/55>
 GW-16 issue: <https://github.com/franciscosalido/OPENCLAW/issues/57>
 GW-17 issue: <https://github.com/franciscosalido/OPENCLAW/issues/59>
 GW-18 issue: <https://github.com/franciscosalido/OPENCLAW/issues/61>
+GW-19 issue: <https://github.com/franciscosalido/OPENCLAW/issues/63>
 
 Gateway-0 sprint complete. GW-01 through GW-12 merged on `main`.
 The next sprint must start from a new explicit issue, ADR if architecture
@@ -241,6 +245,35 @@ Rules:
 - Optional human scoring helper is deferred to a future issue.
 - No remote providers, no remote calls, no Qdrant mutation, no real data, and
   no live services required for unit tests.
+
+## GW-19 Current Work
+
+GW-19 adds the Agent-0 observability signal contract.
+
+Deliverables:
+
+- `backend/gateway/observability_contract.py` with canonical allowlists and
+  prohibited signal keys.
+- `tests/unit/test_observability_signal_contract.py` for RouterDecision,
+  TokenEconomyRecord, RagRunTrace, fallback events, decision logs, Agent-0
+  output and golden harness dry-run reports.
+- `docs/AGENT0_OBSERVABILITY.md`.
+- GW-18 NB fixes:
+  - golden harness uses `estimate_prompt_tokens` directly from
+    `backend.gateway.routing_policy`;
+  - `GoldenResult` rejects `skipped=True` with `error_category`.
+
+Rules:
+
+- Sanitization is enforced with allowlists, not blocklist-only checks.
+- Fallback event `decision_id` must correlate with Agent-0 output.
+- `estimated_remote_tokens_avoided` is checked across success, dry-run,
+  blocked, fallback success and fallback failure paths.
+- No prompt, raw user input, chunks, vectors, payloads, headers, API keys, raw
+  exceptions or model weight paths may appear in observability keys.
+- No runtime routing behavior, fallback behavior or remote provider behavior is
+  changed.
+- No live LiteLLM/Ollama/Qdrant services are required for tests.
 
 ## GW-13 Completed Work
 

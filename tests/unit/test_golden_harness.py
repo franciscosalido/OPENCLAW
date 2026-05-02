@@ -92,6 +92,27 @@ class GoldenHarnessTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(FORBIDDEN_REPORT_KEYS.isdisjoint({key.lower() for key in data}))
         self.assertEqual(data["answer_length_chars"], 30)
 
+    def test_golden_result_cannot_be_skipped_and_failed(self) -> None:
+        with self.assertRaises(ValueError):
+            run_golden_harness.GoldenResult(
+                question_id="gq_test",
+                domain="risk",
+                mode="chat",
+                route="local",
+                alias=None,
+                used_rag=False,
+                latency_ms=0.0,
+                decision_id="decision",
+                estimated_remote_tokens_avoided=0,
+                answer_length_chars=0,
+                error_category="chat_unavailable",
+                fallback_applied=None,
+                fallback_reason=None,
+                quality_score=None,
+                skipped=True,
+                skipped_reason="offline",
+            )
+
     async def test_dry_run_harness_produces_jsonl_and_summary(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             jsonl_path, summary_path = await run_golden_harness.run_harness(
