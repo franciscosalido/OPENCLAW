@@ -24,6 +24,7 @@ from backend.rag.observability import (
     utc_now_iso,
 )
 from backend.rag.run_trace import (
+    RagRunContext,
     RagTracingConfig,
     build_rag_run_trace,
     load_rag_tracing_config,
@@ -96,6 +97,7 @@ class LocalRagPipeline:
         question: str,
         top_k: int | None = None,
         filters: Mapping[str, Any] | None = None,
+        run_context: RagRunContext | None = None,
     ) -> RagPipelineResult:
         """Run retrieval, build a prompt, and generate a local answer."""
 
@@ -210,6 +212,7 @@ class LocalRagPipeline:
             total_ms=latency["total_ms"],
             chunk_count=len(chunks),
             query_id=query_id,
+            run_context=run_context,
         )
         return RagPipelineResult(
             question=clean_question,
@@ -232,6 +235,7 @@ class LocalRagPipeline:
         chunk_count: int,
         query_id: str | None = None,
         actual_embedding_dimensions: int | None = None,
+        run_context: RagRunContext | None = None,
     ) -> None:
         """Emit a RagRunTrace provenance record via loguru.
 
@@ -277,6 +281,7 @@ class LocalRagPipeline:
             prompt_build_ms=prompt_ms,
             generation_ms=generation_ms,
             total_ms=total_ms,
+            run_context=run_context,
         )
         logger.bind(trace=trace.to_log_dict()).log(config.log_level, "rag_run_trace")
 
