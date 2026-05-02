@@ -69,6 +69,42 @@ It never includes question text, prompts, chunks, vectors, embeddings, payloads,
 API keys, Authorization headers, secrets, passwords, raw model responses or
 tracebacks.
 
+## GW-16 Contract Hardening
+
+GW-16 freezes the Agent-0 runner contracts with offline tests only.
+
+Alias matrix:
+
+| Mode | Alias | `used_rag` |
+|---|---|---:|
+| default | `local_chat` | `false` |
+| `--json` | `local_json` | `false` |
+| `--rag` | `local_rag` | `true` |
+
+Output schema invariants:
+
+- `answer`, `route`, `alias`, `used_rag`, `latency_ms`, `decision_id`, and
+  `estimated_remote_tokens_avoided` are always present.
+- `error_category` appears only for blocked/failure results.
+- `latency_ms` is numeric and non-negative.
+- `estimated_remote_tokens_avoided` is numeric and non-negative.
+- `decision_id` is non-empty.
+
+Safe error categories:
+
+- `blocked`
+- `chat_unavailable`
+- `json_unavailable`
+- `rag_unavailable`
+- `invalid_arguments` is reserved for future CLI/reporting integration.
+
+Fallback remains intentionally disabled:
+
+- RAG failure does not fallback to `local_chat`.
+- JSON failure does not fallback to `local_chat`.
+- Chat failure does not try another alias.
+- Timeout/retry fallback is deferred to a future PR.
+
 ## Dry Run
 
 ```bash
@@ -88,7 +124,7 @@ The smoke script is opt-in and local-only. It requires
 
 ## Deferred
 
-- Progressive fallback is deferred to GW-16.
-- Golden questions harness is deferred to GW-17.
+- Progressive fallback is deferred to GW-17.
+- Golden questions harness is deferred to GW-18.
 - Observability E2E validation is deferred to GW-18.
 - Remote providers remain disabled and require a future ADR.

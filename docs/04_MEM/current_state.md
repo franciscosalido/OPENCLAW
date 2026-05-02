@@ -5,21 +5,22 @@
 > meaningful sessions.
 
 **Last updated:** 2026-05-01
-**Updated by:** Codex — Agent-0 GW-15 local runner
+**Updated by:** Codex — Agent-0 GW-16 runner contract hardening
 
 ---
 
 ## Active Sprint: Agent-0 / Local Runner MVP
 
-**Goal:** add the first local MVP CLI entrypoint for one question, one routing
-decision, one local-only execution path and safe metadata output.
+**Goal:** harden the Agent-0 local runner contracts for alias routing, output
+schema, dry-run, blocked and degraded states without adding fallback or new
+runtime features.
 
 Gateway-0 is complete on `main`. GW-13 is merged. GW-14 remains a separate
 open PR at the time GW-15 starts, so GW-15 uses compatibility helpers when the
 GW-14 token/config helpers are not present on `main`.
 
-GW-15 issue: <https://github.com/franciscosalido/OPENCLAW/issues/55>
-GW-15 branch: `feat/agent0-local-runner`
+GW-16 issue: <https://github.com/franciscosalido/OPENCLAW/issues/57>
+GW-16 branch: `feat/agent0-runner-contract-hardening`
 
 Current runtime path:
 
@@ -116,7 +117,8 @@ unavoidable, use `git push --force-with-lease`.
 | GW-12 | `feat/gateway-operational-readiness` | Final runbook, readiness checks, ADR boundary, handoff | Done / merged |
 | GW-13 | `feat/gateway1-routing-policy-prelude` | Gateway-1 local-first routing policy and token economy prelude | Done / merged |
 | GW-14 | `feat/gateway1-routing-audit-token-economy` | Config-driven routing audit and token economy calibration | Open / separate PR |
-| GW-15 | `feat/agent0-local-runner` | Agent-0 local CLI runner MVP | Current |
+| GW-15 | `feat/agent0-local-runner` | Agent-0 local CLI runner MVP | Open / separate PR |
+| GW-16 | `feat/agent0-runner-contract-hardening` | Agent-0 runner contract hardening | Current |
 
 GW-05a issue: <https://github.com/franciscosalido/OPENCLAW/issues/25>
 GW-05b issue: <https://github.com/franciscosalido/OPENCLAW/issues/28>
@@ -129,6 +131,7 @@ GW-11 issue: <https://github.com/franciscosalido/OPENCLAW/issues/46>
 GW-12 issue: <https://github.com/franciscosalido/OPENCLAW/issues/48>
 GW-13 issue: <https://github.com/franciscosalido/OPENCLAW/issues/51>
 GW-15 issue: <https://github.com/franciscosalido/OPENCLAW/issues/55>
+GW-16 issue: <https://github.com/franciscosalido/OPENCLAW/issues/57>
 
 Gateway-0 sprint complete. GW-01 through GW-12 merged on `main`.
 The next sprint must start from a new explicit issue, ADR if architecture
@@ -163,6 +166,24 @@ Rules:
 - No Qdrant mutation, no reindexing, no ingestion, no real data.
 - Progressive fallback is deferred to GW-16.
 - Golden questions harness is deferred to GW-17.
+
+## GW-16 Current Work
+
+GW-16 hardens the Agent-0 runner contract without adding new execution
+features.
+
+Rules:
+
+- Alias matrix is frozen: default `local_chat`, `--json` `local_json`,
+  `--rag` `local_rag`.
+- Output schema remains stable across success, dry-run, blocked and failure
+  states.
+- Blocked and dry-run paths return `latency_ms=0.0`.
+- Chat, JSON and RAG failures return safe error categories only.
+- No fallback is added. RAG/JSON/chat failures do not silently try another
+  alias.
+- No remote providers, no remote calls, no Qdrant mutation, no live services
+  required for tests.
 
 ## GW-13 Completed Work
 

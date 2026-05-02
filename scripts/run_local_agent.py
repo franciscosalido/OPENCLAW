@@ -39,6 +39,7 @@ LOCAL_JSON_ALIAS = DEFAULT_LLM_JSON_MODEL
 SAFE_ERROR_CATEGORIES = {
     "blocked",
     "chat_unavailable",
+    "json_unavailable",
     "rag_unavailable",
     "invalid_arguments",
 }
@@ -226,7 +227,12 @@ async def run_agent(
                 response_format={"type": "json_object"} if use_json else None,
             )
     except Exception as exc:
-        error_category = "rag_unavailable" if use_rag else "chat_unavailable"
+        if use_rag:
+            error_category = "rag_unavailable"
+        elif use_json:
+            error_category = "json_unavailable"
+        else:
+            error_category = "chat_unavailable"
         if debug:
             error_category = f"{error_category}:{exc.__class__.__name__}"
         return AgentRunResult(
