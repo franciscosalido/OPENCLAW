@@ -1,8 +1,8 @@
 # Gateway-1 Sprint Handoff
 
 **Last updated:** 2026-05-01  
-**Current branch:** `feat/agent0-local-runner`
-**Issue:** [#55](https://github.com/franciscosalido/OPENCLAW/issues/55)
+**Current branch:** `feat/agent0-runner-contract-hardening`
+**Issue:** [#57](https://github.com/franciscosalido/OPENCLAW/issues/57)
 
 Gateway-0 is complete. Gateway-1 starts with routing policy primitives and
 token economy records only.
@@ -41,8 +41,8 @@ Out of scope:
 | Item | Scope |
 |---|---|
 | GW-14 | Config-driven routing audit and token economy calibration |
-| GW-16 | Progressive local fallback on timeout/alias failure |
-| GW-17 | Golden questions harness |
+| GW-17 | Progressive local fallback on timeout/alias failure |
+| GW-18 | Golden questions harness |
 
 ## GW-15 Current Work
 
@@ -73,3 +73,28 @@ Safety:
 - Dry-run performs routing and token estimates without model calls.
 - RAG unavailable returns `error_category=rag_unavailable`; no silent fallback in
   GW-15.
+
+## GW-16 Current Work
+
+Scope:
+
+- Harden `scripts/run_local_agent.py` contracts with offline tests.
+- Freeze alias matrix for `local_chat`, `local_json`, and `local_rag`.
+- Freeze output schema invariants across success, dry-run, blocked and failure
+  states.
+- Validate degraded-state behavior for chat, JSON and RAG.
+- Assert no silent fallback between aliases.
+- Validate parse/render/token-estimate boundaries.
+
+Out of scope:
+
+- Progressive fallback.
+- Retry/fallback on timeout.
+- Golden questions harness.
+- Remote providers or calls.
+- Qdrant mutation, reindexing or ingestion.
+
+Safety:
+
+- Runner output still excludes prompt/query/chunks/vectors/payloads/secrets.
+- Live services are not required for GW-16 tests.

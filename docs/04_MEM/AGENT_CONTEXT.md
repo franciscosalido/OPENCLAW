@@ -205,7 +205,8 @@ task metadata + token estimates
 |---|---|---|---|
 | GW-13 | `feat/gateway1-routing-policy-prelude` | Local-first routing decision records and token economy prelude | ✅ Merged |
 | GW-14 | `feat/gateway1-routing-audit-token-economy` | Config-driven routing audit and token economy calibration | Open / separate PR |
-| GW-15 | `feat/agent0-local-runner` | Agent-0 local CLI runner MVP | 🚧 Current |
+| GW-15 | `feat/agent0-local-runner` | Agent-0 local CLI runner MVP | Open / separate PR |
+| GW-16 | `feat/agent0-runner-contract-hardening` | Agent-0 runner contract hardening | 🚧 Current |
 
 GW-13 rules:
 
@@ -225,8 +226,10 @@ GW-15 rules:
 - `--dry-run` must work without live services.
 - Output metadata must not include question, prompt, chunks, vectors, payloads,
   raw responses, secrets or Authorization headers.
-- Progressive fallback is deferred to GW-16.
-- Golden questions harness is deferred to GW-17.
+- GW-16 hardens contracts only: alias matrix, output schema, blocked/dry-run,
+  degraded states, parse/render boundaries and no-fallback assertions.
+- Progressive fallback is deferred to GW-17.
+- Golden questions harness is deferred to GW-18.
 
 **Gateway-0 final baseline:** local-only LiteLLM gateway, Qdrant vector store,
 `quimera_embed` canonical embedding alias, `RagRunTrace` provenance,
