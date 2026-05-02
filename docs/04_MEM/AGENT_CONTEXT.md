@@ -130,8 +130,6 @@ Gateway-1 routing policy defaults:
 | `gateway.routing.default_route` | `local` | Local-first baseline |
 | `gateway.routing.allowed_remote_providers` | `[]` | Empty until future ADR |
 | `gateway.routing.per_request_token_limit` | `0` | No budget gate enforced yet |
-| `gateway.routing.decision_log_path` | `logs/routing_decisions` | Local JSONL audit base path |
-| `gateway.routing.blocked_task_types` | `trade_execution`, `brokerage_login` | Config-driven local blocks |
 
 ---
 
@@ -206,12 +204,8 @@ task metadata + token estimates
 | PR | Branch | Scope | Status |
 |---|---|---|---|
 | GW-13 | `feat/gateway1-routing-policy-prelude` | Local-first routing decision records and token economy prelude | ✅ Merged |
-<<<<<<< HEAD
-| GW-14 | `feat/gateway1-routing-audit-token-economy` | Config-driven routing audit and token economy calibration | 🚧 Current |
-=======
 | GW-14 | `feat/gateway1-routing-audit-token-economy` | Config-driven routing audit and token economy calibration | Open / separate PR |
 | GW-15 | `feat/agent0-local-runner` | Agent-0 local CLI runner MVP | 🚧 Current |
->>>>>>> 8a17f34 (feat(agent): add Agent-0 local runner)
 
 GW-13 rules:
 
@@ -221,15 +215,6 @@ GW-13 rules:
 - No runtime model routing change.
 - No Qdrant mutation or `openclaw_knowledge` access.
 
-<<<<<<< HEAD
-GW-14 rules:
-
-- Config-driven routing audit and token economy calibration.
-- Local JSONL audit records, heuristic token estimation, in-memory token budget accumulation.
-- Policy artifacts only — not billing, not runtime routing.
-- `remote_enabled` remains false. `allowed_remote_providers` remains empty.
-- No remote calls, no runtime routing change, no Qdrant mutation.
-=======
 GW-15 rules:
 
 - `scripts/run_local_agent.py` is a local CLI, not an API, daemon,
@@ -242,7 +227,6 @@ GW-15 rules:
   raw responses, secrets or Authorization headers.
 - Progressive fallback is deferred to GW-16.
 - Golden questions harness is deferred to GW-17.
->>>>>>> 8a17f34 (feat(agent): add Agent-0 local runner)
 
 **Gateway-0 final baseline:** local-only LiteLLM gateway, Qdrant vector store,
 `quimera_embed` canonical embedding alias, `RagRunTrace` provenance,
