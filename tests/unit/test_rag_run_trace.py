@@ -463,8 +463,10 @@ class RagRunTraceTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(len(traces), 1)
         trace = traces[0]
+        # routing_ms is None at the pipeline level — pipeline does not perform
+        # route selection, so the field is absent from to_log_dict() output.
+        self.assertNotIn("routing_ms", trace)
         for key in (
-            "routing_ms",
             "embedding_ms",
             "retrieval_ms",
             "context_pack_ms",
@@ -474,7 +476,6 @@ class RagRunTraceTests(unittest.IsolatedAsyncioTestCase):
         ):
             self.assertIsInstance(trace[key], int | float)
             self.assertGreaterEqual(cast(float, trace[key]), 0.0)
-        self.assertEqual(trace["routing_ms"], 0.0)
         self.assertEqual(trace["embedding_ms"], 1.25)
         self.assertEqual(trace["retrieval_ms"], 2.5)
         self.assertEqual(trace["context_pack_ms"], 0.75)
