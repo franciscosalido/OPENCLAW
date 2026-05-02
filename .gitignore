@@ -59,6 +59,7 @@ Thumbs.db
 
 # Logs
 logs/
+logs/*.jsonl
 *.log
 
 # Claude Code — local session artifacts (NOT hooks.json/settings.json — esses são versionados)

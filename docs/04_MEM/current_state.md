@@ -5,7 +5,7 @@
 > meaningful sessions.
 
 **Last updated:** 2026-05-01
-**Updated by:** Codex — Gateway GW-13 routing policy prelude
+**Updated by:** Codex — Gateway GW-14 routing audit and token economy
 
 ---
 
@@ -13,11 +13,13 @@
 
 **Goal:** add safe, offline local-first routing decision primitives and token
 economy records for future routing policy work. Remote providers remain
-disabled and no runtime model routing changes are made in GW-13.
+disabled and no runtime model routing changes are made in Gateway-1 policy
+work.
 
-Gateway-0 is complete on `main`. Gateway-1 starts from issue
-[#51](https://github.com/franciscosalido/OPENCLAW/issues/51) and branch
-`feat/gateway1-routing-policy-prelude`.
+Gateway-0 is complete on `main`. Gateway-1 started from issue
+[#51](https://github.com/franciscosalido/OPENCLAW/issues/51). GW-14 continues
+from issue [#53](https://github.com/franciscosalido/OPENCLAW/issues/53) on
+branch `feat/gateway1-routing-audit-token-economy`.
 
 Current runtime path:
 
@@ -112,7 +114,8 @@ unavoidable, use `git push --force-with-lease`.
 | GW-10 | `feat/rag-run-trace-provenance` | Safe per-query RAG provenance trace | Done / merged |
 | GW-11 | `feat/rag-observability-events` | Safe structured RAG lifecycle observability events | Done / merged |
 | GW-12 | `feat/gateway-operational-readiness` | Final runbook, readiness checks, ADR boundary, handoff | Done / merged |
-| GW-13 | `feat/gateway1-routing-policy-prelude` | Gateway-1 local-first routing policy and token economy prelude | Current |
+| GW-13 | `feat/gateway1-routing-policy-prelude` | Gateway-1 local-first routing policy and token economy prelude | Done / merged |
+| GW-14 | `feat/gateway1-routing-audit-token-economy` | Config-driven routing audit and token economy calibration | Current |
 
 GW-05a issue: <https://github.com/franciscosalido/OPENCLAW/issues/25>
 GW-05b issue: <https://github.com/franciscosalido/OPENCLAW/issues/28>
@@ -124,12 +127,13 @@ GW-10 issue: <https://github.com/franciscosalido/OPENCLAW/issues/44>
 GW-11 issue: <https://github.com/franciscosalido/OPENCLAW/issues/46>
 GW-12 issue: <https://github.com/franciscosalido/OPENCLAW/issues/48>
 GW-13 issue: <https://github.com/franciscosalido/OPENCLAW/issues/51>
+GW-14 issue: <https://github.com/franciscosalido/OPENCLAW/issues/53>
 
 Gateway-0 sprint complete. GW-01 through GW-12 merged on `main`.
 The next sprint must start from a new explicit issue, ADR if architecture
 changes, and `git pull --ff-only origin main`.
 
-## GW-13 Current Work
+## GW-13 Completed Work
 
 GW-13 opens Gateway-1 with safe routing policy records only.
 
@@ -153,6 +157,29 @@ Rules:
 - No Qdrant mutation, reindexing, ingestion, or `openclaw_knowledge` access.
 - Token economy is estimated only, not billed.
 - Remote escalation requires future sanitization and an explicit Accepted ADR.
+
+## GW-14 Current Work
+
+GW-14 connects Gateway-1 routing primitives to config and local audit records.
+
+Deliverables:
+
+- `load_routing_policy()` reads `gateway.routing` from `config/rag_config.yaml`.
+- `estimate_prompt_tokens()` adds heuristic token estimation without a
+  tokenizer dependency.
+- `TokenBudgetAccumulator` tracks session-local estimates in memory only.
+- `RoutingDecisionLogger` writes safe append-only JSONL audit records under
+  `logs/`.
+- `RouterDecision.decision_fingerprint()` hashes safe policy-relevant fields.
+- Task type blocking/allowing is config-driven.
+
+Rules:
+
+- `remote_enabled` remains false.
+- `allowed_remote_providers` remains empty.
+- No remote calls, no remote provider API keys, no runtime routing change.
+- JSONL audit files are local artifacts and must not be committed.
+- Local fallback on timeout and health-aware routing are deferred.
 
 ---
 
