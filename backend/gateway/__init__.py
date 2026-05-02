@@ -43,15 +43,20 @@ from backend.gateway.errors import (
 )
 from backend.gateway.health import check_gateway_services, check_litellm_gateway
 from backend.gateway.routing_policy import (
+    DEFAULT_RAG_CONFIG_PATH,
     RemoteEscalationPolicy,
     RouteBlockReason,
     RouteDecisionKind,
     RouterDecision,
+    RoutingDecisionLogger,
     TaskRiskLevel,
+    TokenBudgetAccumulator,
     TokenBudgetClass,
     TokenEconomyRecord,
     build_token_economy_record,
     decide_route,
+    estimate_prompt_tokens,
+    load_routing_policy,
 )
 
 __all__ = [
@@ -76,15 +81,20 @@ __all__ = [
     "check_gateway_services",
     "check_litellm_gateway",
     # Gateway-1 routing policy
+    "DEFAULT_RAG_CONFIG_PATH",
     "RemoteEscalationPolicy",
     "RouteBlockReason",
     "RouteDecisionKind",
     "RouterDecision",
+    "RoutingDecisionLogger",
     "TaskRiskLevel",
+    "TokenBudgetAccumulator",
     "TokenBudgetClass",
     "TokenEconomyRecord",
     "build_token_economy_record",
     "decide_route",
+    "estimate_prompt_tokens",
+    "load_routing_policy",
     # Errors
     "GatewayAuthenticationError",
     "GatewayConnectionError",

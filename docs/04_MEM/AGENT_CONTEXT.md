@@ -130,6 +130,8 @@ Gateway-1 routing policy defaults:
 | `gateway.routing.default_route` | `local` | Local-first baseline |
 | `gateway.routing.allowed_remote_providers` | `[]` | Empty until future ADR |
 | `gateway.routing.per_request_token_limit` | `0` | No budget gate enforced yet |
+| `gateway.routing.decision_log_path` | `logs/routing_decisions` | Local JSONL audit base path |
+| `gateway.routing.blocked_task_types` | `trade_execution`, `brokerage_login` | Config-driven local blocks |
 
 ---
 
@@ -202,7 +204,8 @@ task metadata + token estimates
 
 | PR | Branch | Scope | Status |
 |---|---|---|---|
-| GW-13 | `feat/gateway1-routing-policy-prelude` | Local-first routing decision records and token economy prelude | 🚧 Current |
+| GW-13 | `feat/gateway1-routing-policy-prelude` | Local-first routing decision records and token economy prelude | ✅ Merged |
+| GW-14 | `feat/gateway1-routing-audit-token-economy` | Config-driven routing audit and token economy calibration | 🚧 Current |
 
 GW-13 rules:
 
@@ -211,6 +214,9 @@ GW-13 rules:
 - No secrets, no API keys, no remote calls.
 - No runtime model routing change.
 - No Qdrant mutation or `openclaw_knowledge` access.
+- GW-14 adds local JSONL audit records, heuristic token estimation and
+  in-memory token budget accumulation. These are policy artifacts only, not
+  billing or runtime routing.
 | GW-12 | `feat/gateway-operational-readiness` | Final runbook, readiness checks, ADR boundary | ✅ Merged |
 
 **Gateway-0 final baseline:** local-only LiteLLM gateway, Qdrant vector store,

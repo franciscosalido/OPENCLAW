@@ -82,9 +82,17 @@ gateway:
     remote_enabled: false
     default_route: "local"
     log_decisions: true
-    # allow_remote_candidates: reserved for a future routing consumer.
-    # Not read by RemoteEscalationPolicy or decide_route() in Gateway-1.
-    # Enabling remote candidates requires an explicit ADR. See ADR-0020.
+    decision_log_path: "logs/routing_decisions"
+    decision_log_rotate_daily: true
+    # allow_remote_candidates records planning metadata only.
+    # Enabling remote execution requires a future accepted ADR.
     allow_remote_candidates: true
     allowed_remote_providers: []
     per_request_token_limit: 0
+    blocked_task_types:
+      - "trade_execution"
+      - "brokerage_login"
+    allowed_task_types: []
+    token_estimation:
+      chars_per_token: 4
+      min_tokens: 1
