@@ -5,19 +5,21 @@
 > meaningful sessions.
 
 **Last updated:** 2026-05-01
-**Updated by:** Codex — Gateway GW-13 routing policy prelude
+**Updated by:** Codex — Agent-0 GW-15 local runner
 
 ---
 
-## Active Sprint: Gateway-1 / Local-First Routing Prelude
+## Active Sprint: Agent-0 / Local Runner MVP
 
-**Goal:** add safe, offline local-first routing decision primitives and token
-economy records for future routing policy work. Remote providers remain
-disabled and no runtime model routing changes are made in GW-13.
+**Goal:** add the first local MVP CLI entrypoint for one question, one routing
+decision, one local-only execution path and safe metadata output.
 
-Gateway-0 is complete on `main`. Gateway-1 starts from issue
-[#51](https://github.com/franciscosalido/OPENCLAW/issues/51) and branch
-`feat/gateway1-routing-policy-prelude`.
+Gateway-0 is complete on `main`. GW-13 is merged. GW-14 remains a separate
+open PR at the time GW-15 starts, so GW-15 uses compatibility helpers when the
+GW-14 token/config helpers are not present on `main`.
+
+GW-15 issue: <https://github.com/franciscosalido/OPENCLAW/issues/55>
+GW-15 branch: `feat/agent0-local-runner`
 
 Current runtime path:
 
@@ -112,7 +114,9 @@ unavoidable, use `git push --force-with-lease`.
 | GW-10 | `feat/rag-run-trace-provenance` | Safe per-query RAG provenance trace | Done / merged |
 | GW-11 | `feat/rag-observability-events` | Safe structured RAG lifecycle observability events | Done / merged |
 | GW-12 | `feat/gateway-operational-readiness` | Final runbook, readiness checks, ADR boundary, handoff | Done / merged |
-| GW-13 | `feat/gateway1-routing-policy-prelude` | Gateway-1 local-first routing policy and token economy prelude | Current |
+| GW-13 | `feat/gateway1-routing-policy-prelude` | Gateway-1 local-first routing policy and token economy prelude | Done / merged |
+| GW-14 | `feat/gateway1-routing-audit-token-economy` | Config-driven routing audit and token economy calibration | Open / separate PR |
+| GW-15 | `feat/agent0-local-runner` | Agent-0 local CLI runner MVP | Current |
 
 GW-05a issue: <https://github.com/franciscosalido/OPENCLAW/issues/25>
 GW-05b issue: <https://github.com/franciscosalido/OPENCLAW/issues/28>
@@ -124,12 +128,43 @@ GW-10 issue: <https://github.com/franciscosalido/OPENCLAW/issues/44>
 GW-11 issue: <https://github.com/franciscosalido/OPENCLAW/issues/46>
 GW-12 issue: <https://github.com/franciscosalido/OPENCLAW/issues/48>
 GW-13 issue: <https://github.com/franciscosalido/OPENCLAW/issues/51>
+GW-15 issue: <https://github.com/franciscosalido/OPENCLAW/issues/55>
 
 Gateway-0 sprint complete. GW-01 through GW-12 merged on `main`.
 The next sprint must start from a new explicit issue, ADR if architecture
 changes, and `git pull --ff-only origin main`.
 
-## GW-13 Current Work
+## GW-15 Current Work
+
+GW-15 creates Agent-0, the first local MVP runner:
+
+```text
+question
+  -> decide_route(...)
+  -> local_chat | local_json | explicit local_rag
+  -> safe answer metadata
+```
+
+Deliverables:
+
+- `scripts/run_local_agent.py`.
+- `scripts/test_agent0_local_runner.sh` optional smoke guarded by
+  `RUN_AGENT0_LOCAL_SMOKE=1`.
+- `docs/AGENT0_LOCAL_RUNNER.md`.
+- `tests/unit/test_run_local_agent.py`.
+
+Rules:
+
+- Default execution uses `local_chat`.
+- `--json` uses `local_json`.
+- `--rag` explicitly opts into the existing local RAG path and `local_rag`.
+- `--dry-run` works without live services.
+- No remote providers, no remote calls, no API keys, no FastAPI, no MCP.
+- No Qdrant mutation, no reindexing, no ingestion, no real data.
+- Progressive fallback is deferred to GW-16.
+- Golden questions harness is deferred to GW-17.
+
+## GW-13 Completed Work
 
 GW-13 opens Gateway-1 with safe routing policy records only.
 
