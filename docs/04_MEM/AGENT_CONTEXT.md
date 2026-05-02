@@ -189,6 +189,7 @@ OpenClaw / LocalGenerator
 | GW-09 | `feat/rag-collection-metadata-guard` | Collection metadata drift guard | ✅ Merged |
 | GW-10 | `feat/rag-run-trace-provenance` | `RagRunTrace` provenance | ✅ Merged |
 | GW-11 | `feat/rag-observability-events` | Local structured RAG lifecycle events | ✅ Merged |
+| GW-12 | `feat/gateway-operational-readiness` | Final runbook, readiness checks, ADR boundary | ✅ Merged |
 
 ### Sprint Gateway-1 — CURRENT
 
@@ -214,10 +215,14 @@ GW-13 rules:
 - No secrets, no API keys, no remote calls.
 - No runtime model routing change.
 - No Qdrant mutation or `openclaw_knowledge` access.
-- GW-14 adds local JSONL audit records, heuristic token estimation and
-  in-memory token budget accumulation. These are policy artifacts only, not
-  billing or runtime routing.
-| GW-12 | `feat/gateway-operational-readiness` | Final runbook, readiness checks, ADR boundary | ✅ Merged |
+
+GW-14 rules:
+
+- Config-driven routing audit and token economy calibration.
+- Local JSONL audit records, heuristic token estimation, in-memory token budget accumulation.
+- Policy artifacts only — not billing, not runtime routing.
+- `remote_enabled` remains false. `allowed_remote_providers` remains empty.
+- No remote calls, no runtime routing change, no Qdrant mutation.
 
 **Gateway-0 final baseline:** local-only LiteLLM gateway, Qdrant vector store,
 `quimera_embed` canonical embedding alias, `RagRunTrace` provenance,
