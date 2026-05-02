@@ -1,8 +1,8 @@
 # Gateway-1 Sprint Handoff
 
 **Last updated:** 2026-05-02
-**Current branch:** `feat/agent0-golden-question-harness`
-**Issue:** [#61](https://github.com/franciscosalido/OPENCLAW/issues/61)
+**Current branch:** `feat/agent0-observability-signal-contract`
+**Issue:** [#63](https://github.com/franciscosalido/OPENCLAW/issues/63)
 
 Gateway-0 is complete. Gateway-1 starts with routing policy primitives and
 token economy records only.
@@ -43,6 +43,7 @@ Out of scope:
 | GW-14 | Config-driven routing audit and token economy calibration |
 | GW-17 | Explicit local fail-safe degradation for Agent-0 runner |
 | GW-18 | Golden question benchmark harness |
+| GW-19 | Agent-0 observability signal contract |
 
 ## GW-15 Current Work
 
@@ -156,3 +157,30 @@ Safety:
 - Reports exclude prompt/question/chunks/vectors/payloads/secrets and do not
   include answer text by default.
 - `tests/golden/reports/` is ignored by Git.
+
+## GW-19 Current Work
+
+Scope:
+
+- Add canonical signal allowlists in
+  `backend/gateway/observability_contract.py`.
+- Verify `RouterDecision`, `TokenEconomyRecord`, `RagRunTrace`, fallback events
+  and decision logs are serialized with safe metadata only.
+- Verify fallback event `decision_id` correlates with runner output.
+- Verify `estimated_remote_tokens_avoided` is present and non-negative across
+  success, dry-run, blocked, fallback success and fallback failure paths.
+- Verify GW-18 golden harness dry-run JSONL and summary outputs stay sanitized.
+
+Out of scope:
+
+- Runtime behavior changes.
+- Remote providers or remote calls.
+- OpenTelemetry, dashboards, Prometheus or Grafana.
+- Live LiteLLM/Ollama/Qdrant services in unit tests.
+- Qdrant mutation, reindexing or `openclaw_knowledge` access.
+
+Safety:
+
+- Sanitization tests use allowlists and deterministic sentinels.
+- Prohibited fields include prompts, raw user input, chunks, vectors, payloads,
+  headers, API keys, raw exceptions and model weight paths.

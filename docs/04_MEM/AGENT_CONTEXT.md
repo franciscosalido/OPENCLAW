@@ -208,7 +208,8 @@ task metadata + token estimates
 | GW-15 | `feat/agent0-local-runner` | Agent-0 local CLI runner MVP | ✅ Merged |
 | GW-16 | `feat/agent0-runner-contract-hardening` | Agent-0 runner contract hardening | Dependency branch / not on `origin/main` |
 | GW-17 | `feat/agent0-local-failsafe-degradation` | Explicit local fail-safe degradation for Agent-0 | Dependency branch / open PR |
-| GW-18 | `feat/agent0-golden-question-harness` | Golden question benchmark harness for Agent-0 | 🚧 Current |
+| GW-18 | `feat/agent0-golden-question-harness` | Golden question benchmark harness for Agent-0 | Dependency branch / merged into stack |
+| GW-19 | `feat/agent0-observability-signal-contract` | Agent-0 observability signal contract and sanitization tests | 🚧 Current |
 
 GW-13 rules:
 
@@ -241,6 +242,11 @@ GW-15 rules:
   `scripts/compare_golden_runs.py`.
 - Golden harness reports are opt-in, local-only, synthetic-only, and omit answer
   text by default.
+- GW-19 adds offline observability signal contract tests for `RouterDecision`,
+  `TokenEconomyRecord`, `RagRunTrace`, fallback events and decision logs.
+- GW-19 uses allowlists to enforce no prompt, raw input, chunks, vectors,
+  payloads, headers, API keys, raw exceptions or model weight paths in signal
+  keys.
 
 **Gateway-0 final baseline:** local-only LiteLLM gateway, Qdrant vector store,
 `quimera_embed` canonical embedding alias, `RagRunTrace` provenance,

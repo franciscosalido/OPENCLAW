@@ -21,6 +21,7 @@ from uuid import uuid4
 
 import yaml
 
+from backend.gateway.routing_policy import estimate_prompt_tokens
 from scripts import run_local_agent
 
 
@@ -60,6 +61,10 @@ class GoldenResult:
     quality_score: None
     skipped: bool = False
     skipped_reason: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.skipped and self.error_category is not None:
+            raise ValueError("GoldenResult cannot be both skipped and failed")
 
     def to_json_dict(self) -> dict[str, object]:
         """Return allowlisted JSONL-safe result metadata."""
@@ -198,7 +203,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 def _dry_run_result(question: GoldenQuestion) -> GoldenResult:
     alias = _alias_for_mode(question.mode)
     answer = "Dry run: no model call executed."
-    estimated = run_local_agent._estimate_prompt_token_count(question.question)
+    estimated = estimate_prompt_tokens(question.question)
     return GoldenResult(
         question_id=question.question_id,
         domain=question.domain,
