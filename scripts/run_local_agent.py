@@ -16,6 +16,8 @@ from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+from loguru import logger
+
 from backend.gateway.client import (
     DEFAULT_LLM_JSON_MODEL,
     DEFAULT_LLM_MODEL,
@@ -23,7 +25,9 @@ from backend.gateway.client import (
     GatewayChatClient,
 )
 from backend.gateway.routing_policy import (
+    FallbackReason,
     RemoteEscalationPolicy,
+    RouteBlockReason,
     RouteDecisionKind,
     RouterDecision,
     decide_route,
@@ -41,6 +45,7 @@ SAFE_ERROR_CATEGORIES = {
     "chat_unavailable",
     "json_unavailable",
     "rag_unavailable",
+    "fallback_alias_failed",
     "invalid_arguments",
 }
 
@@ -96,6 +101,12 @@ class AgentRunResult:
     decision_id: str
     estimated_remote_tokens_avoided: int
     error_category: str | None = None
+    fallback_applied: bool | None = None
+    fallback_from_alias: str | None = None
+    fallback_to_alias: str | None = None
+    fallback_reason: FallbackReason | None = None
+    fallback_chain: tuple[FallbackReason, ...] | None = None
+    block_reason: str | None = None
 
     def to_json_dict(self) -> dict[str, object]:
         """Return the safe public output schema."""
@@ -110,6 +121,18 @@ class AgentRunResult:
         }
         if self.error_category is not None:
             data["error_category"] = self.error_category
+        if self.fallback_applied is not None:
+            data["fallback_applied"] = self.fallback_applied
+        if self.fallback_from_alias is not None:
+            data["fallback_from_alias"] = self.fallback_from_alias
+        if self.fallback_to_alias is not None:
+            data["fallback_to_alias"] = self.fallback_to_alias
+        if self.fallback_reason is not None:
+            data["fallback_reason"] = self.fallback_reason.value
+        if self.fallback_chain:
+            data["fallback_chain"] = [reason.value for reason in self.fallback_chain]
+        if self.block_reason is not None:
+            data["block_reason"] = self.block_reason
         return data
 
 
@@ -195,6 +218,8 @@ async def run_agent(
             decision_id=decision.decision_id,
             estimated_remote_tokens_avoided=safe_avoided,
             error_category="blocked",
+            fallback_applied=False,
+            block_reason=_block_reason(decision),
         )
 
     if dry_run:
@@ -212,11 +237,75 @@ async def run_agent(
     try:
         if use_rag:
             active_rag_call = _call_rag if rag_call is None else rag_call
-            answer = await active_rag_call(
-                question,
-                max_tokens=max_tokens,
-                temperature=temperature,
-            )
+            try:
+                answer = await active_rag_call(
+                    question,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                )
+            except Exception as rag_exc:
+                active_chat_call = _call_chat_alias if chat_call is None else chat_call
+                fallback_reason = _rag_fallback_reason(rag_exc)
+                try:
+                    answer = await active_chat_call(
+                        question,
+                        alias=LOCAL_CHAT_ALIAS,
+                        max_tokens=max_tokens,
+                        temperature=temperature,
+                        response_format=None,
+                    )
+                except Exception as chat_exc:
+                    latency_ms = _elapsed_ms(start)
+                    _emit_fallback_event(
+                        decision_id=decision.decision_id,
+                        fallback_reason=fallback_reason,
+                        original_alias=LOCAL_RAG_ALIAS,
+                        fallback_alias=LOCAL_CHAT_ALIAS,
+                        fallback_succeeded=False,
+                        latency_ms=latency_ms,
+                    )
+                    error_category = "fallback_alias_failed"
+                    if debug:
+                        error_category = f"{error_category}:{chat_exc.__class__.__name__}"
+                    return AgentRunResult(
+                        answer="Local Agent-0 execution failed.",
+                        route=decision.route.value,
+                        alias=LOCAL_CHAT_ALIAS,
+                        used_rag=False,
+                        latency_ms=latency_ms,
+                        decision_id=decision.decision_id,
+                        estimated_remote_tokens_avoided=safe_avoided,
+                        error_category=error_category,
+                        fallback_applied=True,
+                        fallback_from_alias=LOCAL_RAG_ALIAS,
+                        fallback_to_alias=LOCAL_CHAT_ALIAS,
+                        fallback_reason=fallback_reason,
+                        fallback_chain=(fallback_reason,),
+                    )
+
+                latency_ms = _elapsed_ms(start)
+                _emit_fallback_event(
+                    decision_id=decision.decision_id,
+                    fallback_reason=fallback_reason,
+                    original_alias=LOCAL_RAG_ALIAS,
+                    fallback_alias=LOCAL_CHAT_ALIAS,
+                    fallback_succeeded=True,
+                    latency_ms=latency_ms,
+                )
+                return AgentRunResult(
+                    answer=answer,
+                    route=decision.route.value,
+                    alias=LOCAL_CHAT_ALIAS,
+                    used_rag=False,
+                    latency_ms=latency_ms,
+                    decision_id=decision.decision_id,
+                    estimated_remote_tokens_avoided=safe_avoided,
+                    fallback_applied=True,
+                    fallback_from_alias=LOCAL_RAG_ALIAS,
+                    fallback_to_alias=LOCAL_CHAT_ALIAS,
+                    fallback_reason=fallback_reason,
+                    fallback_chain=(fallback_reason,),
+                )
         else:
             active_chat_call = _call_chat_alias if chat_call is None else chat_call
             answer = await active_chat_call(
@@ -356,6 +445,47 @@ def _task_type(*, use_rag: bool, use_json: bool) -> str:
 
 def _elapsed_ms(started_at: float) -> float:
     return (time.perf_counter() - started_at) * 1000
+
+
+def _block_reason(decision: RouterDecision) -> str:
+    """Return a safe block reason from routing policy metadata."""
+    if decision.reason == RouteBlockReason.BUDGET_EXCEEDED.value:
+        return FallbackReason.BUDGET_EXCEEDED.value
+    if decision.reason == RouteBlockReason.UNSUPPORTED_TASK.value:
+        return FallbackReason.UNSUPPORTED_TASK.value
+    return decision.reason
+
+
+def _rag_fallback_reason(exc: Exception) -> FallbackReason:
+    """Classify a RAG failure without exposing exception details."""
+    class_name = exc.__class__.__name__.lower()
+    module_name = exc.__class__.__module__.lower()
+    if "qdrant" in class_name or "qdrant" in module_name:
+        return FallbackReason.QDRANT_UNAVAILABLE
+    return FallbackReason.RAG_UNAVAILABLE
+
+
+def _emit_fallback_event(
+    *,
+    decision_id: str,
+    fallback_reason: FallbackReason,
+    original_alias: str,
+    fallback_alias: str,
+    fallback_succeeded: bool,
+    latency_ms: float,
+) -> None:
+    """Emit a safe local fallback event with allowlisted metadata only."""
+    event: dict[str, object] = {
+        "event": "agent_fallback",
+        "decision_id": decision_id,
+        "fallback_reason": fallback_reason.value,
+        "original_alias": original_alias,
+        "fallback_alias": fallback_alias,
+        "fallback_succeeded": fallback_succeeded,
+        "latency_ms": latency_ms,
+        "status": "success" if fallback_succeeded else "failure",
+    }
+    logger.bind(event=event).info("agent_fallback")
 
 
 if __name__ == "__main__":
