@@ -97,7 +97,7 @@ def _build_pipeline() -> LocalRagPipeline:
     """Build a LocalRagPipeline from environment and config."""
     from backend.gateway.client import GatewayChatClient, GatewayRuntimeConfig
     from backend.gateway.embed_client import GatewayEmbedClient
-    from backend.qdrant_store import QdrantVectorStore
+    from backend.rag.qdrant_store import QdrantVectorStore
     from backend.rag.retriever import Retriever
 
     embed_client = GatewayEmbedClient()
