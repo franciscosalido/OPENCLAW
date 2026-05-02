@@ -207,7 +207,8 @@ task metadata + token estimates
 | GW-14 | `feat/gateway1-routing-audit-token-economy` | Config-driven routing audit and token economy calibration | Open / separate PR |
 | GW-15 | `feat/agent0-local-runner` | Agent-0 local CLI runner MVP | ✅ Merged |
 | GW-16 | `feat/agent0-runner-contract-hardening` | Agent-0 runner contract hardening | Dependency branch / not on `origin/main` |
-| GW-17 | `feat/agent0-local-failsafe-degradation` | Explicit local fail-safe degradation for Agent-0 | 🚧 Current |
+| GW-17 | `feat/agent0-local-failsafe-degradation` | Explicit local fail-safe degradation for Agent-0 | Dependency branch / open PR |
+| GW-18 | `feat/agent0-golden-question-harness` | Golden question benchmark harness for Agent-0 | 🚧 Current |
 
 GW-13 rules:
 
@@ -235,7 +236,11 @@ GW-15 rules:
 - Fallback reason codes are enum-derived and metadata-only.
 - `local_think` timeout fallback is deferred until Agent-0 has a public think
   path.
-- Golden questions harness is deferred to GW-18.
+- GW-18 adds the golden question harness:
+  `tests/golden/questions.yaml`, `scripts/run_golden_harness.py`, and
+  `scripts/compare_golden_runs.py`.
+- Golden harness reports are opt-in, local-only, synthetic-only, and omit answer
+  text by default.
 
 **Gateway-0 final baseline:** local-only LiteLLM gateway, Qdrant vector store,
 `quimera_embed` canonical embedding alias, `RagRunTrace` provenance,
