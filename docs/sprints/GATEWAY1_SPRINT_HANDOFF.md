@@ -184,3 +184,32 @@ Safety:
 - Sanitization tests use allowlists and deterministic sentinels.
 - Prohibited fields include prompts, raw user input, chunks, vectors, payloads,
   headers, API keys, raw exceptions and model weight paths.
+
+## GW-20 Current Work
+
+Scope:
+
+- Add `docs/sprints/GATEWAY1_DONE_CRITERIA.md` with fixed Gateway-1 done
+  criteria G1-01 through G1-11.
+- Add `scripts/test_gateway1_proof_of_life.py`, a single opt-in local
+  proof-of-life smoke command.
+- Probe Ollama, Qdrant and LiteLLM through local-only read-only endpoints.
+- Verify Agent-0 dry-run, live `local_chat`, live `--rag` success or honest
+  fallback, forced Qdrant degradation and policy-block behavior.
+- Write a sanitized structured JSON summary without answer text, prompt text,
+  chunks, vectors, payloads or secrets.
+
+Out of scope:
+
+- Remote providers or remote calls.
+- New runtime architecture.
+- OpenTelemetry, dashboards, Prometheus or Grafana.
+- Qdrant mutation, reindexing or `openclaw_knowledge` access.
+- Real portfolio data, real tickers, real companies or real fund names.
+
+Safety:
+
+- The smoke is guarded by `RUN_GATEWAY1_PROOF_OF_LIFE=1`.
+- Live probes refuse non-local URLs.
+- Forced degradation is injected through runner hooks; it does not stop Qdrant.
+- A summary exits `0` only when all mandatory criteria pass.

@@ -648,3 +648,60 @@ Out of scope:
 - OpenTelemetry, Prometheus, Grafana, dashboards, distributed tracing,
   profiling, soak tests, and memory/resource baselines.
 - Memory/resource baseline: not implemented in GW-12. Deferred to a future sprint. See ADR-0019 Future Work section.
+
+## GW-20 Completed Work
+
+GW-20 adds the Gateway-1 operational proof-of-life smoke and closes the
+Gateway-1 readiness loop before Gateway-2:
+
+```text
+dry-run Agent-0
+  -> local URL guard
+  -> Ollama/Qdrant/LiteLLM probes
+  -> live local_chat
+  -> live local_rag or explicit fallback
+  -> forced Qdrant degradation
+  -> policy block no-model-call check
+  -> sanitized summary JSON
+```
+
+Key files:
+
+- `docs/sprints/GATEWAY1_DONE_CRITERIA.md`
+- `scripts/test_gateway1_proof_of_life.py`
+- `docs/AGENT0_SMOKE.md`
+- `tests/unit/test_gateway1_proof_of_life.py`
+
+Rules:
+
+- The smoke is opt-in with `RUN_GATEWAY1_PROOF_OF_LIFE=1`.
+- Live probes refuse non-local service URLs.
+- Summary reports do not store answer text, prompts, questions, chunks,
+  vectors, payloads, secrets, Authorization headers, raw exceptions or
+  tracebacks.
+- Forced degradation is injected through Agent-0 hooks; it does not stop Docker,
+  mutate Qdrant, reindex, or touch `openclaw_knowledge`.
+- Gateway-2 should not begin until GW-20 passes locally.
+
+Live proof result on 2026-05-02:
+
+- Command:
+  `QUIMERA_LLM_API_KEY=dev-local-key-change-me RUN_GATEWAY1_PROOF_OF_LIFE=1 uv run python scripts/test_gateway1_proof_of_life.py --output-dir /tmp/openclaw_gateway1_smoke`
+- Result: **PASSED** — G1-01 through G1-11 all true.
+- Summary: `/tmp/openclaw_gateway1_smoke/gateway1_proof_of_life_9f23ce3df3f2.json`.
+- Probes: Ollama OK, Qdrant OK, LiteLLM OK.
+- Live runner: `local_chat` OK, `local_rag` OK.
+- Forced Qdrant degradation: fallback to `local_chat` with
+  `qdrant_unavailable`.
+- Policy block: blocked before model call.
+
+Observed live latencies:
+
+| Check | Latency |
+|---|---:|
+| Ollama probe | 28.6 ms |
+| Qdrant probe | 9.4 ms |
+| LiteLLM probe | 26.1 ms |
+| Agent-0 `local_chat` | 8790.5 ms |
+| Agent-0 `local_rag` | 32162.8 ms |
+| forced degradation | 0.03 ms |

@@ -663,3 +663,66 @@ Append or paste this at the end of substantial sessions:
 ### Risks
 - Live readiness (`--live`) not run in this shell — requires `LITELLM_MASTER_KEY` export and local services running.
 - None known for static validation.
+
+---
+
+## Handoff — 2026-05-02
+
+**Agent:** Codex
+**Branch:** `feat/gateway1-proof-of-life-smoke`
+**Issue/PR:** #65 / pending PR
+**Task:** GW-20 — Gateway-1 operational proof-of-life smoke.
+
+### Changed
+- `docs/sprints/GATEWAY1_DONE_CRITERIA.md`: fixed G1-01 through G1-11
+  done criteria for Gateway-1.
+- `scripts/test_gateway1_proof_of_life.py`: opt-in proof-of-life smoke with
+  local URL guards, Ollama/Qdrant/LiteLLM probes, Agent-0 dry-run/live checks,
+  forced Qdrant degradation, policy block validation and sanitized summary JSON.
+- `tests/unit/test_gateway1_proof_of_life.py`: 17 offline deterministic tests
+  for URL guards, serialization allowlists, sanitizer, criteria logic, forced
+  degradation, policy block and summary writing.
+- `docs/AGENT0_SMOKE.md`, `docs/AGENT0_LOCAL_RUNNER.md`,
+  `docs/AGENT0_OBSERVABILITY.md`, `docs/sprints/GATEWAY1_SPRINT_HANDOFF.md`:
+  operator docs and handoff updates.
+- `.gitignore`: ignores `reports/gateway1_smoke/`.
+
+### Validation
+- `git diff --check` — passed.
+- `uv run python scripts/test_gateway1_proof_of_life.py --help` — passed.
+- `uv run pytest tests/unit/test_gateway1_proof_of_life.py -v` — 17 passed.
+- `uv run pytest -v` — 315 passed, 7 skipped, 139 subtests passed.
+- `uv run mypy --strict .` — 0 errors.
+- `uv run pyright` — 0 errors.
+- `uv run pytest tests/smoke/ -v` — 5 passed, 7 skipped.
+- Live proof with local key:
+  `QUIMERA_LLM_API_KEY=dev-local-key-change-me RUN_GATEWAY1_PROOF_OF_LIFE=1 uv run python scripts/test_gateway1_proof_of_life.py --output-dir /tmp/openclaw_gateway1_smoke`
+  — **passed**, 11 criteria passed, 0 failed, 0 skipped.
+
+### Live Summary
+- Summary file:
+  `/tmp/openclaw_gateway1_smoke/gateway1_proof_of_life_9f23ce3df3f2.json`.
+- Ollama/Qdrant/LiteLLM probes: OK.
+- Agent-0 `local_chat`: OK.
+- Agent-0 `local_rag`: OK.
+- Forced degradation: `qdrant_unavailable` fallback to `local_chat`.
+- Policy block: no model call.
+
+### Not Changed
+- No remote providers, remote API keys or remote aliases.
+- No Qdrant mutation, reindexing or `openclaw_knowledge` access.
+- No real portfolio data, real tickers, real companies or real funds.
+- No runtime behavior change in Agent-0 beyond calling existing public APIs.
+- No OpenTelemetry, dashboards, Prometheus, Grafana, FastAPI, MCP or new
+  runtime architecture.
+
+### Next Action
+- Open PR for GW-20 with title
+  `test(gateway): add Gateway-1 proof-of-life smoke`.
+- After merge, Gateway-1 can be considered operationally ready for Gateway-2
+  planning.
+
+### Risks
+- Proof-of-life requires local services plus `QUIMERA_LLM_API_KEY` for full
+  pass. Without the key, the summary is still written but G1-05 fails as
+  `authentication`.
