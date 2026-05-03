@@ -171,6 +171,8 @@ class GatewayChatClient:
         model: str | None = None,
         temperature: float | None = None,
         max_tokens: int | None = None,
+        keep_alive: str | None = None,
+        extra_body: Mapping[str, object] | None = None,
         response_format: Mapping[str, object] | None = None,
     ) -> str:
         """Call ``/chat/completions`` and return normalized assistant text."""
@@ -193,6 +195,13 @@ class GatewayChatClient:
             if max_tokens <= 0:
                 raise ValueError("max_tokens must be greater than zero")
             payload["max_tokens"] = max_tokens
+        merged_extra_body = dict(extra_body or {})
+        if keep_alive is not None:
+            if not keep_alive.strip():
+                raise ValueError("keep_alive cannot be empty")
+            merged_extra_body["keep_alive"] = keep_alive.strip()
+        if merged_extra_body:
+            payload["extra_body"] = merged_extra_body
         if response_format is not None:
             payload["response_format"] = dict(response_format)
 

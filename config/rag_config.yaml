@@ -75,6 +75,12 @@ rag:
     target_sentences_min: 3
     target_sentences_max: 6
 
+  model_residency:
+    enabled: false
+    apply_to_aliases:
+      - "local_rag"
+    keep_alive: "5m"
+
   generation:
     model: "local_rag"
     reasoning_model: "local_think"

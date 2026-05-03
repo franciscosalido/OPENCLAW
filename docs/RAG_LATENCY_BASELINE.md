@@ -73,6 +73,16 @@ G2-03 adds optional generation budget metadata:
 These fields make answer length discipline observable without serializing the
 answer itself.
 
+G2-05 adds optional model residency metadata:
+
+- `model_residency_enabled`
+- `keep_alive_value`
+- `keep_alive_applied`
+
+These fields record whether a local `keep_alive` hint was intentionally sent
+for `local_rag`. They do not record prompt text, answer text or raw provider
+responses.
+
 Allowed `run_context` labels:
 
 - `cold_start`
@@ -194,6 +204,62 @@ uv run python scripts/run_rag_latency_baseline.py \
 `degraded_qdrant` is isolated from successful `local_rag` runs. It exists to
 verify failure/degradation measurement shape, not to represent normal RAG
 quality or latency.
+
+## G2-05 Model Residency
+
+G2-05 is the first optimization based on the cold/warm separation introduced by
+G2-04. It targets only Ollama model residency for `local_rag` by forwarding an
+opt-in `keep_alive` value through the local LiteLLM gateway.
+
+Configuration lives in `config/rag_config.yaml`:
+
+```yaml
+rag:
+  model_residency:
+    enabled: false
+    apply_to_aliases:
+      - "local_rag"
+    keep_alive: "5m"
+```
+
+Default behavior is unchanged because `enabled` is `false`.
+
+Rollback is config-only:
+
+- set `enabled: false` to omit the `keep_alive` hint;
+- set `keep_alive: "0"` to ask Ollama to unload after the request when the
+  feature is enabled.
+
+Allowed values are intentionally narrow:
+
+- `"0"`
+- `"30s"`
+- `"1m"`
+- `"5m"`
+- `"10m"`
+- `"30m"`
+- `"-1"`
+
+`-1` keeps the model resident indefinitely and should be used cautiously on
+memory-constrained machines.
+
+This PR does not preload models, unload models, set global
+`OLLAMA_KEEP_ALIVE`, change LiteLLM provider config, change aliases, change
+prompts, mutate Qdrant, alter retrieval, or touch embeddings. It applies only to
+`local_rag`; `local_chat`, `local_json`, `local_think` and embeddings remain
+unchanged.
+
+The baseline report records:
+
+- `model_residency_enabled`;
+- `keep_alive_value`;
+- `keep_alive_applied`;
+- `keep_alive_ineffective`.
+
+`keep_alive_ineffective` is `true` only when `run_type == "warm_model"`,
+`keep_alive_applied` is true, and `model_load_observed` is still true. This is
+a warning signal, not a hard failure. Local memory pressure, Ollama eviction, or
+gateway forwarding behavior can make `keep_alive` ineffective.
 
 ## Baseline Runs
 

@@ -65,6 +65,16 @@ G2-03 extends the trace with optional `local_rag` generation budget fields:
 These fields are safe scalar metadata only. They make output length and budget
 application observable without storing answer text.
 
+G2-05 extends the trace with optional `local_rag` model residency fields:
+
+- `model_residency_enabled`
+- `keep_alive_value`
+- `keep_alive_applied`
+
+These fields are safe scalar metadata only. They record the intended
+`keep_alive` hint without storing prompt text, answer text, raw responses,
+headers or secrets.
+
 ## Forbidden Content
 
 The trace must never contain:

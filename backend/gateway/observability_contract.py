@@ -93,6 +93,10 @@ RAG_RUN_TRACE_KEYS = frozenset(
         "generation_budget_applied",
         "generation_budget_max_tokens",
         "conciseness_instruction_applied",
+        # Gateway-2 local_rag model residency fields.
+        "model_residency_enabled",
+        "keep_alive_value",
+        "keep_alive_applied",
         "prompt_build_ms",
         "generation_ms",
         "total_ms",

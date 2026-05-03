@@ -230,6 +230,66 @@ class GatewayChatClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(answer, "Resposta compacta.")
         self.assertNotIn("max_tokens", seen_payloads[0])
 
+    async def test_chat_completion_includes_keep_alive_in_extra_body_when_provided(
+        self,
+    ) -> None:
+        seen_payloads: list[dict[str, object]] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen_payloads.append(json.loads(request.content.decode("utf-8")))
+            return httpx.Response(
+                200,
+                json={"choices": [{"message": {"content": "Resposta compacta."}}]},
+            )
+
+        async with httpx.AsyncClient(
+            base_url=DEFAULT_LLM_BASE_URL,
+            transport=httpx.MockTransport(handler),
+        ) as client:
+            gateway = GatewayChatClient(
+                config=GatewayRuntimeConfig(api_key="secret-test-key"),
+                client=client,
+            )
+            answer = await gateway.chat_completion(
+                [{"role": "user", "content": "pergunta"}],
+                model=DEFAULT_LLM_RAG_MODEL,
+                keep_alive="5m",
+                extra_body={"think": False},
+            )
+
+        self.assertEqual(answer, "Resposta compacta.")
+        self.assertEqual(
+            seen_payloads[0]["extra_body"],
+            {"think": False, "keep_alive": "5m"},
+        )
+        self.assertNotIn("secret-test-key", str(seen_payloads[0]))
+
+    async def test_chat_completion_omits_keep_alive_when_none(self) -> None:
+        seen_payloads: list[dict[str, object]] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen_payloads.append(json.loads(request.content.decode("utf-8")))
+            return httpx.Response(
+                200,
+                json={"choices": [{"message": {"content": "Resposta compacta."}}]},
+            )
+
+        async with httpx.AsyncClient(
+            base_url=DEFAULT_LLM_BASE_URL,
+            transport=httpx.MockTransport(handler),
+        ) as client:
+            gateway = GatewayChatClient(
+                config=GatewayRuntimeConfig(api_key="secret-test-key"),
+                client=client,
+            )
+            await gateway.chat_completion(
+                [{"role": "user", "content": "pergunta"}],
+                model=DEFAULT_LLM_MODEL,
+                keep_alive=None,
+            )
+
+        self.assertNotIn("extra_body", seen_payloads[0])
+
     async def test_chat_completion_uses_alias_specific_timeout(self) -> None:
         seen_timeouts: list[dict[str, float]] = []
 
