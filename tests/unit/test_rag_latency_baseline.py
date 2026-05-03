@@ -19,6 +19,7 @@ def _result(
     load_ms: float | None = None,
     eval_count: int | None = None,
     eval_duration_ms: float | None = None,
+    keep_alive_applied: bool | None = None,
 ) -> baseline.BaselineRunResult:
     model_load_observed = baseline._model_load_observed(load_ms)
     typed_run_type = baseline._validate_run_type(run_type)
@@ -57,6 +58,14 @@ def _result(
         tokens_per_second=baseline._tokens_per_second(
             eval_count=eval_count,
             eval_duration_ms=eval_duration_ms,
+        ),
+        model_residency_enabled=keep_alive_applied,
+        keep_alive_value="5m" if keep_alive_applied else None,
+        keep_alive_applied=keep_alive_applied,
+        keep_alive_ineffective=baseline._keep_alive_ineffective(
+            run_type=typed_run_type,
+            keep_alive_applied=keep_alive_applied,
+            model_load_observed=model_load_observed,
         ),
         wall_ms=total_ms,
         ok=True,
@@ -200,6 +209,54 @@ class RagLatencyBaselineTests(unittest.TestCase):
         self.assertIsNone(
             baseline._tokens_per_second(eval_count=None, eval_duration_ms=100.0)
         )
+
+    def test_keep_alive_ineffective_flags_warm_reload_only(self) -> None:
+        self.assertTrue(
+            baseline._keep_alive_ineffective(
+                run_type="warm_model",
+                keep_alive_applied=True,
+                model_load_observed=True,
+            )
+        )
+        self.assertFalse(
+            baseline._keep_alive_ineffective(
+                run_type="warm_model",
+                keep_alive_applied=True,
+                model_load_observed=False,
+            )
+        )
+        self.assertIsNone(
+            baseline._keep_alive_ineffective(
+                run_type="cold_start",
+                keep_alive_applied=True,
+                model_load_observed=True,
+            )
+        )
+        self.assertIsNone(
+            baseline._keep_alive_ineffective(
+                run_type="warm_model",
+                keep_alive_applied=False,
+                model_load_observed=True,
+            )
+        )
+
+    def test_report_records_keep_alive_fields(self) -> None:
+        report = baseline.build_report(
+            [
+                _result(
+                    run_type="warm_model",
+                    load_ms=1000.0,
+                    keep_alive_applied=True,
+                )
+            ]
+        )
+
+        record = self._records(report)[0]
+
+        self.assertEqual(record["model_residency_enabled"], True)
+        self.assertEqual(record["keep_alive_value"], "5m")
+        self.assertEqual(record["keep_alive_applied"], True)
+        self.assertEqual(record["keep_alive_ineffective"], True)
 
     def test_missing_metrics_get_safe_reason(self) -> None:
         self.assertEqual(

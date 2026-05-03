@@ -53,7 +53,7 @@ _QUESTION_HASH_8 = hashlib.sha256(
 DEFAULT_OUTPUT_DIR = Path("reports/g2_latency_baseline")
 DEFAULT_LITELLM_CONFIG_PATH = Path("config/litellm_config.yaml")
 DEFAULT_OLLAMA_API_BASE = "http://127.0.0.1:11434"
-REPORT_SCHEMA_VERSION = "g2_pr04_rag_latency_baseline_v1"
+REPORT_SCHEMA_VERSION = "g2_pr05_rag_latency_baseline_v1"
 LOAD_DURATION_THRESHOLD_MS = 500.0
 LOCAL_URL_PREFIXES = ("http://127.0.0.1:", "http://localhost:")
 RUN_TYPES = frozenset({"cold_start", "warm_model", "degraded_qdrant"})
@@ -143,6 +143,10 @@ class BaselineRunResult:
     model_was_resident_before_run: bool | None
     resident_check_unavailable_reason: ResidentCheckUnavailableReason | None
     tokens_per_second: float | None
+    model_residency_enabled: bool | None
+    keep_alive_value: str | None
+    keep_alive_applied: bool | None
+    keep_alive_ineffective: bool | None
     wall_ms: float
     ok: bool
     error_category: str | None
@@ -172,6 +176,10 @@ class BaselineRunResult:
                 self.resident_check_unavailable_reason
             ),
             "tokens_per_second": self.tokens_per_second,
+            "model_residency_enabled": self.model_residency_enabled,
+            "keep_alive_value": self.keep_alive_value,
+            "keep_alive_applied": self.keep_alive_applied,
+            "keep_alive_ineffective": self.keep_alive_ineffective,
             "wall_ms": self.wall_ms,
             "ok": self.ok,
             "error_category": self.error_category,
@@ -283,6 +291,8 @@ async def _run_once(
     ollama_load_duration_ms = _float_or_none(trace.get("ollama_load_duration_ms"))
     ollama_eval_count = _int_or_none(trace.get("ollama_eval_count"))
     ollama_eval_duration_ms = _float_or_none(trace.get("ollama_eval_duration_ms"))
+    model_load_observed = _model_load_observed(ollama_load_duration_ms)
+    keep_alive_applied = _bool_or_none(trace.get("keep_alive_applied"))
 
     return BaselineRunResult(
         run_type=run_type,
@@ -305,10 +315,10 @@ async def _run_once(
         ollama_prompt_eval_duration_ms=_float_or_none(
             trace.get("ollama_prompt_eval_duration_ms")
         ),
-        model_load_observed=_model_load_observed(ollama_load_duration_ms),
+        model_load_observed=model_load_observed,
         run_type_verified=_run_type_verified(
             run_type=run_type,
-            model_load_observed=_model_load_observed(ollama_load_duration_ms),
+            model_load_observed=model_load_observed,
             error_category=error_category,
         ),
         model_was_resident_before_run=(
@@ -320,6 +330,14 @@ async def _run_once(
         tokens_per_second=_tokens_per_second(
             eval_count=ollama_eval_count,
             eval_duration_ms=ollama_eval_duration_ms,
+        ),
+        model_residency_enabled=_bool_or_none(trace.get("model_residency_enabled")),
+        keep_alive_value=_str_or_none(trace.get("keep_alive_value")),
+        keep_alive_applied=keep_alive_applied,
+        keep_alive_ineffective=_keep_alive_ineffective(
+            run_type=run_type,
+            keep_alive_applied=keep_alive_applied,
+            model_load_observed=model_load_observed,
         ),
         wall_ms=wall_ms,
         ok=ok,
@@ -337,6 +355,18 @@ def _int_or_none(value: object) -> int | None:
     if isinstance(value, bool) or not isinstance(value, int):
         return None
     return value
+
+
+def _bool_or_none(value: object) -> bool | None:
+    if isinstance(value, bool):
+        return value
+    return None
+
+
+def _str_or_none(value: object) -> str | None:
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return None
 
 
 def _validate_run_type(value: str) -> RagRunContext:
@@ -391,6 +421,17 @@ def _tokens_per_second(
     if eval_count is None or eval_duration_ms is None or eval_duration_ms <= 0:
         return None
     return float(eval_count) / (eval_duration_ms / 1000.0)
+
+
+def _keep_alive_ineffective(
+    *,
+    run_type: RagRunContext,
+    keep_alive_applied: bool | None,
+    model_load_observed: bool | None,
+) -> bool | None:
+    if run_type != "warm_model" or keep_alive_applied is not True:
+        return None
+    return model_load_observed is True
 
 
 def _is_local_url(url: str) -> bool:

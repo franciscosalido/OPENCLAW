@@ -10,6 +10,7 @@ from loguru import logger
 from backend.rag.collection_guard import EmbeddingDimensionMismatchError
 from backend.rag.context_packer import ContextBudgetResult, RetrievedChunk
 from backend.rag.generation_budget import GenerationBudgetConfig
+from backend.rag.model_residency import ModelResidencyConfig
 from backend.rag.pipeline import LocalRagPipeline
 from backend.rag.prompt_builder import PromptBuilder
 from backend.rag.run_trace import (
@@ -134,18 +135,21 @@ class FakeGenerator:
         temperature: float | None = None,
         thinking_mode: bool = False,
         max_tokens: int | None = None,
+        keep_alive: str | None = None,
     ) -> str:
-        del messages, temperature, thinking_mode, max_tokens
+        del messages, temperature, thinking_mode, max_tokens, keep_alive
         return "Resposta sintetica segura com citacao [trace_doc#0]."
 
 
 class CapturingGenerator:
     model: str
     max_tokens_seen: int | None
+    keep_alive_seen: str | None
 
     def __init__(self, model: str) -> None:
         self.model = model
         self.max_tokens_seen = None
+        self.keep_alive_seen = None
 
     async def chat(
         self,
@@ -153,9 +157,11 @@ class CapturingGenerator:
         temperature: float | None = None,
         thinking_mode: bool = False,
         max_tokens: int | None = None,
+        keep_alive: str | None = None,
     ) -> str:
         del messages, temperature, thinking_mode
         self.max_tokens_seen = max_tokens
+        self.keep_alive_seen = keep_alive
         return "Resposta sintetica com citacao [trace_doc#0]."
 
 
@@ -245,6 +251,9 @@ class RagRunTraceTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(trace.generation_budget_applied)
         self.assertIsNone(trace.generation_budget_max_tokens)
         self.assertIsNone(trace.conciseness_instruction_applied)
+        self.assertIsNone(trace.model_residency_enabled)
+        self.assertIsNone(trace.keep_alive_value)
+        self.assertIsNone(trace.keep_alive_applied)
         self.assertFalse(trace.ollama_metrics_available)
         self.assertTrue(FORBIDDEN_KEYS.isdisjoint({key.lower() for key in data}))
 
@@ -267,6 +276,9 @@ class RagRunTraceTests(unittest.IsolatedAsyncioTestCase):
             generation_budget_applied=True,
             generation_budget_max_tokens=768,
             conciseness_instruction_applied=True,
+            model_residency_enabled=True,
+            keep_alive_value="5m",
+            keep_alive_applied=True,
             prompt_build_ms=0.5,
             generation_ms=31.0,
             total_ms=35.0,
@@ -292,6 +304,9 @@ class RagRunTraceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(data["generation_budget_applied"], True)
         self.assertEqual(data["generation_budget_max_tokens"], 768)
         self.assertEqual(data["conciseness_instruction_applied"], True)
+        self.assertEqual(data["model_residency_enabled"], True)
+        self.assertEqual(data["keep_alive_value"], "5m")
+        self.assertEqual(data["keep_alive_applied"], True)
         self.assertEqual(data["prompt_build_ms"], 0.5)
         self.assertEqual(data["generation_ms"], 31.0)
         self.assertEqual(data["total_ms"], 35.0)
@@ -319,6 +334,10 @@ class RagRunTraceTests(unittest.IsolatedAsyncioTestCase):
     def test_invalid_generation_budget_max_tokens_raises(self) -> None:
         with self.assertRaises(ValueError):
             _trace(generation_budget_max_tokens=0)
+
+    def test_empty_keep_alive_value_raises(self) -> None:
+        with self.assertRaises(ValueError):
+            _trace(keep_alive_value=" ")
 
     def test_total_ms_is_direct_field_not_sum_assumption(self) -> None:
         trace = _trace(
@@ -716,6 +735,66 @@ class RagRunTraceTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIsNone(generator.max_tokens_seen)
         self.assertNotIn("Responda de forma concisa", result.messages[1]["content"])
+
+    async def test_local_rag_model_residency_forwards_keep_alive_and_trace_metadata(
+        self,
+    ) -> None:
+        traces: list[dict[str, object]] = []
+        generator = CapturingGenerator("local_rag")
+
+        def sink(message: Any) -> None:
+            trace = message.record["extra"].get("trace")
+            if isinstance(trace, dict):
+                traces.append(trace)
+
+        sink_id = logger.add(sink, level="INFO")
+        try:
+            pipeline = LocalRagPipeline(
+                retriever=FakeRetriever(),
+                generator=generator,
+                prompt_builder=PromptBuilder(),
+                tracing_config=RagTracingConfig(
+                    enabled=True,
+                    log_level="INFO",
+                    collection_name="configured_collection",
+                    embedding_backend="gateway_litellm_current",
+                    embedding_model="nomic-embed-text",
+                    embedding_alias="quimera_embed",
+                    embedding_dimensions=768,
+                ).validated(),
+                model_residency_config=ModelResidencyConfig(
+                    enabled=True,
+                    keep_alive="5m",
+                ),
+            )
+            await pipeline.ask("Pergunta sintetica?")
+        finally:
+            logger.remove(sink_id)
+
+        self.assertEqual(generator.keep_alive_seen, "5m")
+        self.assertEqual(len(traces), 1)
+        trace = traces[0]
+        self.assertEqual(trace["model_residency_enabled"], True)
+        self.assertEqual(trace["keep_alive_value"], "5m")
+        self.assertEqual(trace["keep_alive_applied"], True)
+        self.assertTrue(FORBIDDEN_KEYS.isdisjoint({key.lower() for key in trace}))
+
+    async def test_model_residency_does_not_apply_to_non_rag_alias(self) -> None:
+        generator = CapturingGenerator("local_chat")
+        pipeline = LocalRagPipeline(
+            retriever=FakeRetriever(),
+            generator=generator,
+            prompt_builder=PromptBuilder(),
+            tracing_config=RagTracingConfig(enabled=False).validated(),
+            model_residency_config=ModelResidencyConfig(
+                enabled=True,
+                keep_alive="5m",
+            ),
+        )
+
+        await pipeline.ask("Pergunta sintetica?")
+
+        self.assertIsNone(generator.keep_alive_seen)
 
     def test_load_rag_tracing_config_reads_yaml_defaults(self) -> None:
         config = load_rag_tracing_config()

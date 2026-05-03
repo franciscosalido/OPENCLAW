@@ -221,19 +221,24 @@ The first rule is measurement before optimization.
 |---|---|---|---|
 | G2-PR01 | `feat/g2-rag-segment-timing-baseline` | Per-segment RAG latency baseline in `RagRunTrace` | ✅ Merged |
 | G2-PR02 | `feat/g2-local-rag-context-budget-cap` | Configurable whole-chunk context budget cap for `local_rag` | ✅ Merged |
-| G2-PR03 | `feat/g2-local-rag-generation-budget` | Configurable generation budget and answer-length discipline for `local_rag` | 🚧 Current |
+| G2-PR03 | `feat/g2-local-rag-generation-budget` | Configurable generation budget and answer-length discipline for `local_rag` | ✅ Merged |
+| G2-PR04 | `feat/g2-warm-model-cold-start-separation` | Cold/warm/degraded latency separation and residency measurement | ✅ Merged |
+| G2-PR05 | `feat/g2-keep-alive-model-residency` | Configurable Ollama keep_alive for `local_rag` model residency | 🚧 Current |
 
-G2-PR03 rules:
+G2-PR05 rules:
 
-- Budget is configured under `rag.generation_budget`.
+- Model residency is configured under `rag.model_residency`.
 - Default is rollback-safe: `enabled: false`.
-- `max_tokens` forwarding applies only to `local_rag`.
-- `local_chat`, `local_json`, `local_think`, retrieval, context packing,
-  Qdrant, aliases, timeouts and fallback behavior remain unchanged.
-- Optional concise-answer discipline must preserve citations and
-  insufficient-context behavior.
-- Trace fields are scalar only: answer length, token estimate, budget enabled,
-  budget applied, max tokens and conciseness applied.
+- `keep_alive` forwarding applies only to `local_rag`.
+- `local_chat`, `local_json`, `local_think`, embeddings, retrieval, context
+  packing, generation budget, Qdrant, aliases, timeouts and fallback behavior
+  remain unchanged.
+- No global `OLLAMA_KEEP_ALIVE`, model preload/unload, LiteLLM provider config
+  change or warmup-on-init is introduced.
+- Trace fields are scalar only: model residency enabled, keep_alive value and
+  keep_alive applied.
+- G2-PR04 baseline report can flag `keep_alive_ineffective` for warm runs that
+  still show model load after a keep_alive hint.
 - No answer text, prompts, chunks, vectors, payloads or secrets are serialized.
 
 GW-13 rules:

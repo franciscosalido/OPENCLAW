@@ -42,8 +42,9 @@ class SmokeGenerator:
         temperature: float | None = None,
         thinking_mode: bool = False,
         max_tokens: int | None = None,
+        keep_alive: str | None = None,
     ) -> str:
-        del max_tokens
+        del max_tokens, keep_alive
         self.seen_messages = messages
         self.seen_thinking_mode = thinking_mode
         content = messages[-1]["content"]

@@ -19,6 +19,12 @@ from backend.rag.generation_budget import (
     decide_generation_budget,
     load_generation_budget_config,
 )
+from backend.rag.model_residency import (
+    ModelResidencyConfig,
+    ModelResidencyDecision,
+    decide_model_residency,
+    load_model_residency_config,
+)
 from backend.rag.prompt_builder import PromptBuilder
 from backend.rag.observability import (
     RagErrorCategory,
@@ -60,6 +66,7 @@ class GeneratorProtocol(Protocol):
         temperature: float | None = None,
         thinking_mode: bool = False,
         max_tokens: int | None = None,
+        keep_alive: str | None = None,
     ) -> Awaitable[str]:
         """Generate an answer from chat messages."""
         ...
@@ -94,6 +101,7 @@ class LocalRagPipeline:
     tracing_config: RagTracingConfig | None = None
     observability_config: RagObservabilityConfig | None = None
     generation_budget_config: GenerationBudgetConfig | None = None
+    model_residency_config: ModelResidencyConfig | None = None
 
     def __post_init__(self) -> None:
         if self.tracing_config is None:
@@ -102,6 +110,8 @@ class LocalRagPipeline:
             self.observability_config = load_rag_observability_config()
         if self.generation_budget_config is None:
             self.generation_budget_config = load_generation_budget_config()
+        if self.model_residency_config is None:
+            self.model_residency_config = load_model_residency_config()
 
     async def ask(
         self,
@@ -160,6 +170,10 @@ class LocalRagPipeline:
             self.generation_budget_config or GenerationBudgetConfig(),
             alias=gateway_alias,
         )
+        model_residency = decide_model_residency(
+            self.model_residency_config or ModelResidencyConfig(),
+            alias=gateway_alias,
+        )
 
         prompt_start = time.perf_counter()
         messages = self.prompt_builder.build(
@@ -184,9 +198,10 @@ class LocalRagPipeline:
                 self.generator,
                 messages=messages,
                 temperature=self.temperature,
-                thinking_mode=self.thinking_mode,
-                generation_budget=generation_budget,
-            )
+            thinking_mode=self.thinking_mode,
+            generation_budget=generation_budget,
+            model_residency=model_residency,
+        )
         except Exception as exc:
             self._emit_pipeline_event(
                 RagEventKind.GENERATION_FAILED,
@@ -229,6 +244,7 @@ class LocalRagPipeline:
             context_pack_ms=retrieval_segments.context_pack_ms,
             context_budget_result=context_budget_result,
             generation_budget=generation_budget,
+            model_residency=model_residency,
             answer_length_chars=len(answer),
             answer_token_estimate=estimate_prompt_tokens(answer),
             prompt_ms=prompt_ms,
@@ -259,6 +275,7 @@ class LocalRagPipeline:
         chunk_count: int,
         context_budget_result: ContextBudgetResult | None = None,
         generation_budget: GenerationBudgetDecision | None = None,
+        model_residency: ModelResidencyDecision | None = None,
         answer_length_chars: int | None = None,
         answer_token_estimate: int | None = None,
         query_id: str | None = None,
@@ -359,6 +376,17 @@ class LocalRagPipeline:
                 if generation_budget is not None
                 else None
             ),
+            model_residency_enabled=(
+                model_residency.enabled if model_residency is not None else None
+            ),
+            keep_alive_value=(
+                model_residency.keep_alive if model_residency is not None else None
+            ),
+            keep_alive_applied=(
+                model_residency.keep_alive_applied
+                if model_residency is not None
+                else None
+            ),
             prompt_build_ms=prompt_ms,
             generation_ms=generation_ms,
             total_ms=total_ms,
@@ -426,12 +454,14 @@ async def _chat_with_generation_budget(
     temperature: float | None,
     thinking_mode: bool,
     generation_budget: GenerationBudgetDecision,
+    model_residency: ModelResidencyDecision,
 ) -> str:
     return await generator.chat(
         messages,
         temperature=temperature,
         thinking_mode=thinking_mode,
         max_tokens=generation_budget.max_tokens,
+        keep_alive=model_residency.keep_alive,
     )
 
 

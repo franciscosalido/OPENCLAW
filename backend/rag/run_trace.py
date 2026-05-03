@@ -134,6 +134,9 @@ class RagRunTrace:
     generation_budget_applied: bool | None = None
     generation_budget_max_tokens: int | None = None
     conciseness_instruction_applied: bool | None = None
+    model_residency_enabled: bool | None = None
+    keep_alive_value: str | None = None
+    keep_alive_applied: bool | None = None
     prompt_build_ms: float | None = None
     generation_ms: float | None = None
     total_ms: float | None = None
@@ -221,10 +224,14 @@ class RagRunTrace:
             "generation_budget_enabled",
             "generation_budget_applied",
             "conciseness_instruction_applied",
+            "model_residency_enabled",
+            "keep_alive_applied",
         ):
             value = getattr(self, field_name)
             if value is not None and not isinstance(value, bool):
                 raise TypeError(f"{field_name} must be boolean when provided")
+        if self.keep_alive_value is not None:
+            _validate_non_empty(self.keep_alive_value, "keep_alive_value")
         if self.run_context is not None and self.run_context not in RUN_CONTEXTS:
             raise ValueError(
                 f"run_context must be one of {sorted(RUN_CONTEXTS)}"
@@ -289,6 +296,9 @@ class RagRunTrace:
             "generation_budget_applied": self.generation_budget_applied,
             "generation_budget_max_tokens": self.generation_budget_max_tokens,
             "conciseness_instruction_applied": self.conciseness_instruction_applied,
+            "model_residency_enabled": self.model_residency_enabled,
+            "keep_alive_value": self.keep_alive_value,
+            "keep_alive_applied": self.keep_alive_applied,
             "prompt_build_ms": self.prompt_build_ms,
             "generation_ms": self.generation_ms,
             "total_ms": self.total_ms,
@@ -343,6 +353,9 @@ def build_rag_run_trace(
     generation_budget_applied: bool | None = None,
     generation_budget_max_tokens: int | None = None,
     conciseness_instruction_applied: bool | None = None,
+    model_residency_enabled: bool | None = None,
+    keep_alive_value: str | None = None,
+    keep_alive_applied: bool | None = None,
     prompt_build_ms: float | None = None,
     generation_ms: float | None = None,
     total_ms: float | None = None,
@@ -389,6 +402,9 @@ def build_rag_run_trace(
         generation_budget_applied=generation_budget_applied,
         generation_budget_max_tokens=generation_budget_max_tokens,
         conciseness_instruction_applied=conciseness_instruction_applied,
+        model_residency_enabled=model_residency_enabled,
+        keep_alive_value=keep_alive_value,
+        keep_alive_applied=keep_alive_applied,
         prompt_build_ms=prompt_build_ms,
         generation_ms=generation_ms,
         total_ms=total_ms,
