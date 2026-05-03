@@ -46,6 +46,34 @@ class LocalGeneratorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(seen_payloads[0]["temperature"], 0.2)
         self.assertEqual(seen_payloads[0]["max_tokens"], 128)
 
+    async def test_chat_call_max_tokens_overrides_generator_default(self) -> None:
+        seen_payloads: list[dict[str, object]] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen_payloads.append(json.loads(request.content.decode("utf-8")))
+            return httpx.Response(
+                200,
+                json={"choices": [{"message": {"content": "Resposta curta."}}]},
+            )
+
+        async with httpx.AsyncClient(
+            base_url=DEFAULT_LLM_BASE_URL,
+            transport=httpx.MockTransport(handler),
+        ) as client:
+            generator = LocalGenerator(
+                client=client,
+                api_key="dev-key",
+                model="local_rag",
+                max_tokens=2048,
+            )
+            answer = await generator.chat(
+                [{"role": "user", "content": "pergunta"}],
+                max_tokens=768,
+            )
+
+        self.assertEqual(answer, "Resposta curta.")
+        self.assertEqual(seen_payloads[0]["max_tokens"], 768)
+
     async def test_chat_strips_thinking_blocks_when_disabled(self) -> None:
         async with httpx.AsyncClient(
             base_url=DEFAULT_LLM_BASE_URL,

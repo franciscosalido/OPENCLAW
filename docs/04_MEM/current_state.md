@@ -5,31 +5,21 @@
 > meaningful sessions.
 
 **Last updated:** 2026-05-02
-**Updated by:** Codex — Agent-0 GW-19 observability signal contract
+**Updated by:** Codex — G2-PR03 local_rag generation budget
 
 ---
 
-## Active Sprint: Agent-0 / Local Runner MVP
+## Active Sprint: Gateway-2 / RAG Latency Optimization
 
-**Goal:** verify Agent-0 observability signal completeness and sanitization
-with deterministic offline tests for routing, token economy, RAG trace,
-fallback and decision-log records.
+**Goal:** reduce `local_rag` wall time through controlled, observable,
+rollback-safe local optimizations after the Gateway-1 proof-of-life baseline.
 
-Gateway-0 is complete on `main`. GW-13 is merged. GW-14 remains a separate
-open PR at the time GW-15 starts, so GW-15 uses compatibility helpers when the
-GW-14 token/config helpers are not present on `main`.
+Current branch: `feat/g2-local-rag-generation-budget`
+Current issue: `[G2-03] Constrain local_rag generation budget`
 
-GW-19 issue: <https://github.com/franciscosalido/OPENCLAW/issues/63>
-GW-19 branch: `feat/agent0-observability-signal-contract`
-
-Note: local GitHub state on 2026-05-02 showed GW-15 merged and the GW-16
-hardening branch present, but the GW-16 commit was not on `origin/main`.
-GW-17 was therefore implemented as a stacked branch on the GW-16 branch and
-should be retargeted/rebased after GW-16 is integrated.
-GW-18 was implemented as a stacked branch on GW-17 for the same reason and
-should be retargeted/rebased after GW-16/GW-17 are integrated.
-GW-19 was implemented as a stacked branch on the GW-18 integration branch and
-should be retargeted/rebased after GW-16/GW-17/GW-18 are integrated.
+Gateway-0 and Gateway-1 are complete on `main`. Gateway-2 starts from the
+measured `local_rag` latency baseline and must keep all optimizations
+config-driven, local-only, and reversible.
 
 Current runtime path:
 
@@ -125,12 +115,16 @@ unavoidable, use `git push --force-with-lease`.
 | GW-11 | `feat/rag-observability-events` | Safe structured RAG lifecycle observability events | Done / merged |
 | GW-12 | `feat/gateway-operational-readiness` | Final runbook, readiness checks, ADR boundary, handoff | Done / merged |
 | GW-13 | `feat/gateway1-routing-policy-prelude` | Gateway-1 local-first routing policy and token economy prelude | Done / merged |
-| GW-14 | `feat/gateway1-routing-audit-token-economy` | Config-driven routing audit and token economy calibration | Open / separate PR |
+| GW-14 | `feat/gateway1-routing-audit-token-economy` | Config-driven routing audit and token economy calibration | Done / merged |
 | GW-15 | `feat/agent0-local-runner` | Agent-0 local CLI runner MVP | Done / merged |
-| GW-16 | `feat/agent0-runner-contract-hardening` | Agent-0 runner contract hardening | Dependency branch / not on `origin/main` |
-| GW-17 | `feat/agent0-local-failsafe-degradation` | Explicit local fail-safe degradation for Agent-0 | Dependency branch / open PR |
-| GW-18 | `feat/agent0-golden-question-harness` | Golden question benchmark harness for Agent-0 | Dependency branch / merged into stack |
-| GW-19 | `feat/agent0-observability-signal-contract` | Agent-0 observability signal contract and sanitization tests | Current |
+| GW-16 | `feat/agent0-runner-contract-hardening` | Agent-0 runner contract hardening | Done / merged |
+| GW-17 | `feat/agent0-local-failsafe-degradation` | Explicit local fail-safe degradation for Agent-0 | Done / merged |
+| GW-18 | `feat/agent0-golden-question-harness` | Golden question benchmark harness for Agent-0 | Done / merged |
+| GW-19 | `feat/agent0-observability-signal-contract` | Agent-0 observability signal contract and sanitization tests | Done / merged |
+| GW-20 | `feat/gateway1-proof-of-life-smoke` | Gateway-1 operational proof-of-life smoke | Done / merged |
+| G2-PR01 | `feat/g2-rag-segment-timing-baseline` | Per-segment RAG latency baseline | Done / merged |
+| G2-PR02 | `feat/g2-local-rag-context-budget-cap` | Configurable whole-chunk context budget cap | Done / merged |
+| G2-PR03 | `feat/g2-local-rag-generation-budget` | Configurable local_rag generation budget | Current |
 
 GW-05a issue: <https://github.com/franciscosalido/OPENCLAW/issues/25>
 GW-05b issue: <https://github.com/franciscosalido/OPENCLAW/issues/28>
@@ -151,6 +145,36 @@ GW-19 issue: <https://github.com/franciscosalido/OPENCLAW/issues/63>
 Gateway-0 sprint complete. GW-01 through GW-12 merged on `main`.
 The next sprint must start from a new explicit issue, ADR if architecture
 changes, and `git pull --ff-only origin main`.
+
+## G2-PR03 Current Work
+
+G2-PR03 adds a rollback-safe generation budget for `local_rag` only.
+
+Configuration:
+
+```yaml
+rag:
+  generation_budget:
+    enabled: false
+    apply_to_aliases:
+      - "local_rag"
+    max_tokens: 768
+    enforce_conciseness: false
+    target_sentences_min: 3
+    target_sentences_max: 6
+```
+
+Rules:
+
+- Default is disabled, preserving pre-PR behavior.
+- `max_tokens` is forwarded only for `local_rag` when enabled.
+- `local_chat`, `local_json`, `local_think`, retrieval, Qdrant and context
+  packing remain unchanged.
+- Optional conciseness instruction preserves citations and insufficient-context
+  behavior.
+- `RagRunTrace` records answer length and generation-budget scalar metadata,
+  never answer text, prompt text, chunks, vectors, payloads or secrets.
+- `local_rag` keeps `extra_body.think=false` in the operational LiteLLM config.
 
 ## GW-15 Current Work
 

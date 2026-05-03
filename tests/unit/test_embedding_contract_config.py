@@ -143,6 +143,22 @@ class EmbeddingContractConfigTests(unittest.TestCase):
             },
         )
 
+    def test_rag_config_generation_budget_is_rollback_safe_by_default(self) -> None:
+        raw = _load_yaml(RAG_CONFIG)
+        generation_budget = raw["rag"]["generation_budget"]
+
+        self.assertEqual(
+            generation_budget,
+            {
+                "enabled": False,
+                "apply_to_aliases": ["local_rag"],
+                "max_tokens": 768,
+                "enforce_conciseness": False,
+                "target_sentences_min": 3,
+                "target_sentences_max": 6,
+            },
+        )
+
     def test_application_facing_embedding_alias_hides_concrete_model(self) -> None:
         self.assertNotIn("nomic", DEFAULT_LLM_EMBED_MODEL)
         self.assertNotIn("ollama/", DEFAULT_LLM_EMBED_MODEL)

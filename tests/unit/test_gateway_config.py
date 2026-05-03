@@ -17,6 +17,7 @@ import unittest
 from pathlib import Path
 from typing import Any
 
+import yaml
 from pydantic import ValidationError
 
 from backend.gateway.config import (
@@ -31,6 +32,9 @@ from backend.gateway.errors import GatewayConfigurationError, GatewayModelAliasE
 # ─── Fixtures ─────────────────────────────────────────────────────────────────
 
 _YAML_PATH = Path(__file__).parent.parent.parent / "config" / "litellm_config.yaml"
+_OPERATIONAL_YAML_PATH = (
+    Path(__file__).parent.parent.parent / "infra" / "litellm" / "litellm_config.yaml"
+)
 
 _LOCALHOST = "http://localhost:11434"
 _LOOPBACK = "http://127.0.0.1:11434"
@@ -242,6 +246,32 @@ class TestActualGatewayConfig(unittest.TestCase):
                     alias.model_info.thinking_mode,
                     f"'{name}' must have thinking_mode=false",
                 )
+
+    def test_local_rag_has_think_disabled_in_extra_body(self) -> None:
+        """G2-03 guard: local_rag must keep Ollama thinking disabled."""
+        raw = yaml.safe_load(_OPERATIONAL_YAML_PATH.read_text(encoding="utf-8"))
+        if not isinstance(raw, dict):
+            raise AssertionError("Operational LiteLLM config must be a mapping")
+        model_list = raw.get("model_list")
+        if not isinstance(model_list, list):
+            raise AssertionError("Operational LiteLLM config must include model_list")
+        local_rag = next(
+            item
+            for item in model_list
+            if isinstance(item, dict) and item.get("model_name") == "local_rag"
+        )
+        litellm_params = local_rag.get("litellm_params")
+        if not isinstance(litellm_params, dict):
+            raise AssertionError("local_rag.litellm_params must be a mapping")
+        extra_body = litellm_params.get("extra_body")
+        if not isinstance(extra_body, dict):
+            raise AssertionError("local_rag.litellm_params.extra_body must be a mapping")
+
+        self.assertEqual(
+            extra_body.get("think"),
+            False,
+            "local_rag.litellm_params.extra_body.think must remain false",
+        )
 
     def test_local_embed_maps_to_nomic_embed_text(self) -> None:
         embed = self.config.get_alias("local_embed")

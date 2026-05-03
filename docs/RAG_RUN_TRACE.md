@@ -53,6 +53,18 @@ G2-02 extends the trace with optional whole-chunk context budget fields:
 These fields are safe scalar counts only. They do not include chunk text,
 prompt text, answers, vectors, Qdrant payloads or secrets.
 
+G2-03 extends the trace with optional `local_rag` generation budget fields:
+
+- `answer_length_chars`
+- `answer_token_estimate`
+- `generation_budget_enabled`
+- `generation_budget_applied`
+- `generation_budget_max_tokens`
+- `conciseness_instruction_applied`
+
+These fields are safe scalar metadata only. They make output length and budget
+application observable without storing answer text.
+
 ## Forbidden Content
 
 The trace must never contain:
@@ -102,4 +114,5 @@ semantics.
 
 - GW-11 adds structured observability lifecycle events separately in
   `RagObservabilityEvent`.
-- GW-12 will add memory/resource baseline work.
+- Future Gateway-2 work may add token-economy recalibration against the final
+  capped prompt, still without logging prompt or answer content.
