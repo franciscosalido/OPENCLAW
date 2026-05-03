@@ -130,8 +130,6 @@ Gateway-1 routing policy defaults:
 | `gateway.routing.default_route` | `local` | Local-first baseline |
 | `gateway.routing.allowed_remote_providers` | `[]` | Empty until future ADR |
 | `gateway.routing.per_request_token_limit` | `0` | No budget gate enforced yet |
-| `gateway.routing.decision_log_path` | `logs/routing_decisions` | Local JSONL audit base path |
-| `gateway.routing.blocked_task_types` | `trade_execution`, `brokerage_login` | Config-driven local blocks |
 
 ---
 
@@ -206,12 +204,12 @@ task metadata + token estimates
 | PR | Branch | Scope | Status |
 |---|---|---|---|
 | GW-13 | `feat/gateway1-routing-policy-prelude` | Local-first routing decision records and token economy prelude | ✅ Merged |
-<<<<<<< HEAD
-| GW-14 | `feat/gateway1-routing-audit-token-economy` | Config-driven routing audit and token economy calibration | 🚧 Current |
-=======
 | GW-14 | `feat/gateway1-routing-audit-token-economy` | Config-driven routing audit and token economy calibration | Open / separate PR |
-| GW-15 | `feat/agent0-local-runner` | Agent-0 local CLI runner MVP | 🚧 Current |
->>>>>>> 8a17f34 (feat(agent): add Agent-0 local runner)
+| GW-15 | `feat/agent0-local-runner` | Agent-0 local CLI runner MVP | ✅ Merged |
+| GW-16 | `feat/agent0-runner-contract-hardening` | Agent-0 runner contract hardening | Dependency branch / not on `origin/main` |
+| GW-17 | `feat/agent0-local-failsafe-degradation` | Explicit local fail-safe degradation for Agent-0 | Dependency branch / open PR |
+| GW-18 | `feat/agent0-golden-question-harness` | Golden question benchmark harness for Agent-0 | Dependency branch / merged into stack |
+| GW-19 | `feat/agent0-observability-signal-contract` | Agent-0 observability signal contract and sanitization tests | 🚧 Current |
 
 GW-13 rules:
 
@@ -221,15 +219,6 @@ GW-13 rules:
 - No runtime model routing change.
 - No Qdrant mutation or `openclaw_knowledge` access.
 
-<<<<<<< HEAD
-GW-14 rules:
-
-- Config-driven routing audit and token economy calibration.
-- Local JSONL audit records, heuristic token estimation, in-memory token budget accumulation.
-- Policy artifacts only — not billing, not runtime routing.
-- `remote_enabled` remains false. `allowed_remote_providers` remains empty.
-- No remote calls, no runtime routing change, no Qdrant mutation.
-=======
 GW-15 rules:
 
 - `scripts/run_local_agent.py` is a local CLI, not an API, daemon,
@@ -240,9 +229,24 @@ GW-15 rules:
 - `--dry-run` must work without live services.
 - Output metadata must not include question, prompt, chunks, vectors, payloads,
   raw responses, secrets or Authorization headers.
-- Progressive fallback is deferred to GW-16.
-- Golden questions harness is deferred to GW-17.
->>>>>>> 8a17f34 (feat(agent): add Agent-0 local runner)
+- GW-16 hardens contracts only: alias matrix, output schema, blocked/dry-run,
+  degraded states, parse/render boundaries and no-fallback assertions.
+- GW-17 adds explicit local-only fail-safe degradation:
+  `local_rag`/RAG infrastructure failure can fallback once to `local_chat`;
+  policy blocks never fallback.
+- Fallback reason codes are enum-derived and metadata-only.
+- `local_think` timeout fallback is deferred until Agent-0 has a public think
+  path.
+- GW-18 adds the golden question harness:
+  `tests/golden/questions.yaml`, `scripts/run_golden_harness.py`, and
+  `scripts/compare_golden_runs.py`.
+- Golden harness reports are opt-in, local-only, synthetic-only, and omit answer
+  text by default.
+- GW-19 adds offline observability signal contract tests for `RouterDecision`,
+  `TokenEconomyRecord`, `RagRunTrace`, fallback events and decision logs.
+- GW-19 uses allowlists to enforce no prompt, raw input, chunks, vectors,
+  payloads, headers, API keys, raw exceptions or model weight paths in signal
+  keys.
 
 **Gateway-0 final baseline:** local-only LiteLLM gateway, Qdrant vector store,
 `quimera_embed` canonical embedding alias, `RagRunTrace` provenance,
@@ -659,3 +663,117 @@ Append or paste this at the end of substantial sessions:
 ### Risks
 - Live readiness (`--live`) not run in this shell — requires `LITELLM_MASTER_KEY` export and local services running.
 - None known for static validation.
+
+---
+
+## Handoff — 2026-05-02
+
+**Agent:** Codex
+**Branch:** `feat/gateway1-proof-of-life-smoke`
+**Issue/PR:** #65 / pending PR
+**Task:** GW-20 — Gateway-1 operational proof-of-life smoke.
+
+### Changed
+- `docs/sprints/GATEWAY1_DONE_CRITERIA.md`: fixed G1-01 through G1-11
+  done criteria for Gateway-1.
+- `scripts/test_gateway1_proof_of_life.py`: opt-in proof-of-life smoke with
+  local URL guards, Ollama/Qdrant/LiteLLM probes, Agent-0 dry-run/live checks,
+  forced Qdrant degradation, policy block validation and sanitized summary JSON.
+- `tests/unit/test_gateway1_proof_of_life.py`: 17 offline deterministic tests
+  for URL guards, serialization allowlists, sanitizer, criteria logic, forced
+  degradation, policy block and summary writing.
+- `docs/AGENT0_SMOKE.md`, `docs/AGENT0_LOCAL_RUNNER.md`,
+  `docs/AGENT0_OBSERVABILITY.md`, `docs/sprints/GATEWAY1_SPRINT_HANDOFF.md`:
+  operator docs and handoff updates.
+- `.gitignore`: ignores `reports/gateway1_smoke/`.
+
+### Validation
+- `git diff --check` — passed.
+- `uv run python scripts/test_gateway1_proof_of_life.py --help` — passed.
+- `uv run pytest tests/unit/test_gateway1_proof_of_life.py -v` — 17 passed.
+- `uv run pytest -v` — 315 passed, 7 skipped, 139 subtests passed.
+- `uv run mypy --strict .` — 0 errors.
+- `uv run pyright` — 0 errors.
+- `uv run pytest tests/smoke/ -v` — 5 passed, 7 skipped.
+- Live proof with local key:
+  `QUIMERA_LLM_API_KEY=dev-local-key-change-me RUN_GATEWAY1_PROOF_OF_LIFE=1 uv run python scripts/test_gateway1_proof_of_life.py --output-dir /tmp/openclaw_gateway1_smoke`
+  — **passed**, 11 criteria passed, 0 failed, 0 skipped.
+
+### Live Summary
+- Summary file:
+  `/tmp/openclaw_gateway1_smoke/gateway1_proof_of_life_9f23ce3df3f2.json`.
+- Ollama/Qdrant/LiteLLM probes: OK.
+- Agent-0 `local_chat`: OK.
+- Agent-0 `local_rag`: OK.
+- Forced degradation: `qdrant_unavailable` fallback to `local_chat`.
+- Policy block: no model call.
+
+### Not Changed
+- No remote providers, remote API keys or remote aliases.
+- No Qdrant mutation, reindexing or `openclaw_knowledge` access.
+- No real portfolio data, real tickers, real companies or real funds.
+- No runtime behavior change in Agent-0 beyond calling existing public APIs.
+- No OpenTelemetry, dashboards, Prometheus, Grafana, FastAPI, MCP or new
+  runtime architecture.
+
+### Next Action
+- Open PR for GW-20 with title
+  `test(gateway): add Gateway-1 proof-of-life smoke`.
+- After merge, Gateway-1 can be considered operationally ready for Gateway-2
+  planning.
+
+### Risks
+- Proof-of-life requires local services plus `QUIMERA_LLM_API_KEY` for full
+  pass. Without the key, the summary is still written but G1-05 fails as
+  `authentication`.
+
+---
+
+## Handoff — 2026-05-02
+
+**Agent:** Codex
+**Branch:** `feat/g2-rag-segment-timing-baseline`
+**Issue/PR:** #67 / pending PR
+**Task:** G2-01 — RAG per-segment latency baseline.
+
+### Changed
+- `backend/rag/run_trace.py`: optional segment fields on `RagRunTrace`,
+  validated `run_context`, safe Ollama metric extraction/conversion from
+  already-available metadata only.
+- `backend/rag/pipeline.py`: populates trace segment timings from existing
+  pipeline timers and `Retriever.last_timings`; `routing_ms` is `0.0` for
+  direct `LocalRagPipeline` because Agent routing lives outside the pipeline.
+- `backend/gateway/observability_contract.py`: allowlist extended for G2
+  trace fields.
+- `tests/unit/test_rag_run_trace.py`: optional field, serialization,
+  total-directness, Ollama metric, degraded context, and pipeline trace tests.
+- `tests/unit/test_retriever.py`: separate embed/search/pack timing test.
+- `docs/RAG_LATENCY_BASELINE.md`, `docs/RAG_RUN_TRACE.md`: segment boundary
+  contract and LiteLLM/Ollama metric limitation.
+- `tests/unit/test_gateway1_proof_of_life.py`: tiny typing-only fix for
+  existing mypy/pyright compatibility.
+
+### Validation
+- `git diff --check` — passed.
+- `uv run pytest tests/unit/test_rag_run_trace.py -v` — 23 passed.
+- `uv run pytest tests/unit/test_rag_observability_event.py -v` — 8 passed.
+- `uv run pytest tests/unit/test_rag_pipeline.py -v` — not applicable; file
+  does not exist in this branch. Used `tests/unit/test_rag_pipeline_observability.py`.
+- `uv run pytest tests/unit/test_rag_pipeline_observability.py -v` — 2 passed.
+- `uv run pytest tests/unit/test_retriever.py -v` — 6 passed.
+- `uv run pytest tests/unit/test_run_local_agent.py -v` — 32 passed.
+- `uv run pytest tests/unit/test_golden_harness.py -v` — 8 passed.
+- `uv run pytest -v` — 332 passed, 7 skipped, 139 subtests passed.
+- `uv run mypy --strict .` — 0 errors.
+- `uv run pyright` — 0 errors.
+
+### Not Changed
+- No prompt text, top-k, retrieval defaults, context packing, aliases, timeouts,
+  LiteLLM/Ollama/Qdrant config, or fallback behavior changed.
+- No Qdrant mutation, no reindex, no `openclaw_knowledge` access.
+- No remote providers, OpenTelemetry, dashboards, profiling framework or new
+  dependencies.
+
+### Deferred
+- `scripts/run_rag_latency_baseline.py` and the formal 3-run
+  cold/warm/degraded report are deferred to G2-02.

@@ -24,6 +24,7 @@ from backend.rag.observability import (
     utc_now_iso,
 )
 from backend.rag.run_trace import (
+    RagRunContext,
     RagTracingConfig,
     build_rag_run_trace,
     load_rag_tracing_config,
@@ -96,6 +97,7 @@ class LocalRagPipeline:
         question: str,
         top_k: int | None = None,
         filters: Mapping[str, Any] | None = None,
+        run_context: RagRunContext | None = None,
     ) -> RagPipelineResult:
         """Run retrieval, build a prompt, and generate a local answer."""
 
@@ -131,6 +133,7 @@ class LocalRagPipeline:
             )
             raise
         retrieval_ms = _elapsed_ms(retrieval_start)
+        retrieval_segments = _extract_retrieval_segments(self.retriever)
         self._emit_pipeline_event(
             RagEventKind.RETRIEVAL_FINISHED,
             query_id=query_id,
@@ -201,11 +204,15 @@ class LocalRagPipeline:
         )
         self._emit_trace(
             retrieval_ms=retrieval_ms,
+            embedding_ms=retrieval_segments.embedding_ms,
+            vector_search_ms=retrieval_segments.retrieval_ms,
+            context_pack_ms=retrieval_segments.context_pack_ms,
             prompt_ms=prompt_ms,
             generation_ms=generation_ms,
             total_ms=latency["total_ms"],
             chunk_count=len(chunks),
             query_id=query_id,
+            run_context=run_context,
         )
         return RagPipelineResult(
             question=clean_question,
@@ -219,12 +226,16 @@ class LocalRagPipeline:
         self,
         *,
         retrieval_ms: float,
+        embedding_ms: float | None = None,
+        vector_search_ms: float | None = None,
+        context_pack_ms: float | None = None,
         prompt_ms: float,
         generation_ms: float,
         total_ms: float,
         chunk_count: int,
         query_id: str | None = None,
         actual_embedding_dimensions: int | None = None,
+        run_context: RagRunContext | None = None,
     ) -> None:
         """Emit a RagRunTrace provenance record via loguru.
 
@@ -263,6 +274,14 @@ class LocalRagPipeline:
             total_latency_ms=total_ms,
             prompt_latency_ms=prompt_ms,
             context_chunk_count=chunk_count,
+            routing_ms=None,
+            embedding_ms=embedding_ms,
+            retrieval_ms=vector_search_ms,
+            context_pack_ms=context_pack_ms,
+            prompt_build_ms=prompt_ms,
+            generation_ms=generation_ms,
+            total_ms=total_ms,
+            run_context=run_context,
         )
         logger.bind(trace=trace.to_log_dict()).log(config.log_level, "rag_run_trace")
 
@@ -317,6 +336,31 @@ def _infer_gateway_alias(generator: object) -> str | None:
     if isinstance(model, str) and model.strip():
         return model.strip()
     return None
+
+
+@dataclass(frozen=True)
+class _RetrievalSegments:
+    embedding_ms: float | None
+    retrieval_ms: float | None
+    context_pack_ms: float | None
+
+
+def _extract_retrieval_segments(retriever: object) -> _RetrievalSegments:
+    timings = getattr(retriever, "last_timings", None)
+    embed_ms = getattr(timings, "embed_ms", None)
+    search_ms = getattr(timings, "search_ms", None)
+    pack_ms = getattr(timings, "pack_ms", None)
+    return _RetrievalSegments(
+        embedding_ms=_optional_timing(embed_ms),
+        retrieval_ms=_optional_timing(search_ms),
+        context_pack_ms=_optional_timing(pack_ms),
+    )
+
+
+def _optional_timing(value: object) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value)
 
 
 def _elapsed_ms(start: float) -> float:

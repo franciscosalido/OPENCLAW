@@ -1,8 +1,8 @@
 # Gateway-1 Sprint Handoff
 
-**Last updated:** 2026-05-01  
-**Current branch:** `feat/agent0-local-runner`
-**Issue:** [#55](https://github.com/franciscosalido/OPENCLAW/issues/55)
+**Last updated:** 2026-05-02
+**Current branch:** `feat/agent0-observability-signal-contract`
+**Issue:** [#63](https://github.com/franciscosalido/OPENCLAW/issues/63)
 
 Gateway-0 is complete. Gateway-1 starts with routing policy primitives and
 token economy records only.
@@ -40,44 +40,10 @@ Out of scope:
 
 | Item | Scope |
 |---|---|
-<<<<<<< HEAD
-| GW-14 | Sanitization policy before any remote escalation |
-| GW-15 | Budget enforcement and approval flow |
-| GW-16 | Provider-specific ADR if remote routing is ever proposed |
-
-## GW-14 Current Work
-
-Branch: `feat/gateway1-routing-audit-token-economy`
-Issue: [#53](https://github.com/franciscosalido/OPENCLAW/issues/53)
-
-Scope:
-
-- Load `RemoteEscalationPolicy` from `config/rag_config.yaml`.
-- Add local JSONL routing decision audit records.
-- Add heuristic prompt token estimation.
-- Add in-memory `TokenBudgetAccumulator`.
-- Add config-driven blocked/allowed task type registry.
-- Add stable `RouterDecision.decision_fingerprint()`.
-- Add deterministic unit and integration tests.
-
-Out of scope:
-
-- Remote providers, API keys or remote calls.
-- Runtime chat/RAG routing changes.
-- Local fallback on timeout.
-- Health-aware runtime routing.
-- Qdrant mutation, reindexing, ingestion, or `openclaw_knowledge`.
-
-Safety:
-
-- `remote_enabled` remains false.
-- `allowed_remote_providers` remains empty.
-- JSONL audit files are local and ignored by git.
-- Token economy is estimated, not billed.
-=======
 | GW-14 | Config-driven routing audit and token economy calibration |
-| GW-16 | Progressive local fallback on timeout/alias failure |
-| GW-17 | Golden questions harness |
+| GW-17 | Explicit local fail-safe degradation for Agent-0 runner |
+| GW-18 | Golden question benchmark harness |
+| GW-19 | Agent-0 observability signal contract |
 
 ## GW-15 Current Work
 
@@ -108,4 +74,142 @@ Safety:
 - Dry-run performs routing and token estimates without model calls.
 - RAG unavailable returns `error_category=rag_unavailable`; no silent fallback in
   GW-15.
->>>>>>> 8a17f34 (feat(agent): add Agent-0 local runner)
+
+## GW-16 Current Work
+
+Scope:
+
+- Harden `scripts/run_local_agent.py` contracts with offline tests.
+- Freeze alias matrix for `local_chat`, `local_json`, and `local_rag`.
+- Freeze output schema invariants across success, dry-run, blocked and failure
+  states.
+- Validate degraded-state behavior for chat, JSON and RAG.
+- Assert no silent fallback between aliases.
+- Validate parse/render/token-estimate boundaries.
+
+Out of scope:
+
+- Progressive fallback.
+- Retry/fallback on timeout.
+- Golden questions harness.
+- Remote providers or calls.
+- Qdrant mutation, reindexing or ingestion.
+
+Safety:
+
+- Runner output still excludes prompt/query/chunks/vectors/payloads/secrets.
+- Live services are not required for GW-16 tests.
+
+## GW-17 Current Work
+
+Scope:
+
+- Add typed fallback reason vocabulary.
+- Add safe optional fallback metadata to Agent-0 runner output.
+- Fallback once from `local_rag` to `local_chat` when local RAG/Qdrant
+  infrastructure is unavailable.
+- Keep policy blocks as hard stops with no model call and no fallback.
+- Add a no-double-fallback guard when the fallback alias also fails.
+- Emit a sanitized local `agent_fallback` loguru event.
+- Add offline tests for fallback, policy blocks, schema stability and exit
+  codes.
+
+Out of scope:
+
+- Remote providers or remote calls.
+- FastAPI, MCP or multi-agent orchestration.
+- Qdrant mutation, reindexing, ingestion or `openclaw_knowledge` access.
+- Public `local_think` runner path. `local_think` timeout fallback remains
+  deferred until a think path exists.
+
+Safety:
+
+- Fallback reason codes are enum-derived.
+- Fallback metadata excludes prompt/query/chunks/vectors/payloads/secrets.
+- Successful fallback exits `0`; policy block and unrecoverable local failure
+  exit non-zero.
+
+## GW-18 Current Work
+
+Scope:
+
+- Add `tests/golden/questions.yaml` with fixed synthetic financial-domain
+  questions.
+- Add `scripts/run_golden_harness.py` with opt-in dry-run and optional live
+  execution.
+- Emit safe JSONL and summary JSON reports without answer text.
+- Add `scripts/compare_golden_runs.py` for summary-to-summary regression checks.
+- Add offline unit tests for registry, report schema, guard behavior and
+  comparison logic.
+
+Out of scope:
+
+- Remote providers or remote calls.
+- LLM-as-judge.
+- Dashboards, OpenTelemetry, Prometheus or Grafana.
+- Qdrant mutation, reindexing or `openclaw_knowledge` access.
+- Live baseline publication. First committed live baseline requires a future
+  explicit baseline-update decision.
+
+Safety:
+
+- Golden questions are synthetic-only.
+- Reports exclude prompt/question/chunks/vectors/payloads/secrets and do not
+  include answer text by default.
+- `tests/golden/reports/` is ignored by Git.
+
+## GW-19 Current Work
+
+Scope:
+
+- Add canonical signal allowlists in
+  `backend/gateway/observability_contract.py`.
+- Verify `RouterDecision`, `TokenEconomyRecord`, `RagRunTrace`, fallback events
+  and decision logs are serialized with safe metadata only.
+- Verify fallback event `decision_id` correlates with runner output.
+- Verify `estimated_remote_tokens_avoided` is present and non-negative across
+  success, dry-run, blocked, fallback success and fallback failure paths.
+- Verify GW-18 golden harness dry-run JSONL and summary outputs stay sanitized.
+
+Out of scope:
+
+- Runtime behavior changes.
+- Remote providers or remote calls.
+- OpenTelemetry, dashboards, Prometheus or Grafana.
+- Live LiteLLM/Ollama/Qdrant services in unit tests.
+- Qdrant mutation, reindexing or `openclaw_knowledge` access.
+
+Safety:
+
+- Sanitization tests use allowlists and deterministic sentinels.
+- Prohibited fields include prompts, raw user input, chunks, vectors, payloads,
+  headers, API keys, raw exceptions and model weight paths.
+
+## GW-20 Current Work
+
+Scope:
+
+- Add `docs/sprints/GATEWAY1_DONE_CRITERIA.md` with fixed Gateway-1 done
+  criteria G1-01 through G1-11.
+- Add `scripts/test_gateway1_proof_of_life.py`, a single opt-in local
+  proof-of-life smoke command.
+- Probe Ollama, Qdrant and LiteLLM through local-only read-only endpoints.
+- Verify Agent-0 dry-run, live `local_chat`, live `--rag` success or honest
+  fallback, forced Qdrant degradation and policy-block behavior.
+- Write a sanitized structured JSON summary without answer text, prompt text,
+  chunks, vectors, payloads or secrets.
+
+Out of scope:
+
+- Remote providers or remote calls.
+- New runtime architecture.
+- OpenTelemetry, dashboards, Prometheus or Grafana.
+- Qdrant mutation, reindexing or `openclaw_knowledge` access.
+- Real portfolio data, real tickers, real companies or real fund names.
+
+Safety:
+
+- The smoke is guarded by `RUN_GATEWAY1_PROOF_OF_LIFE=1`.
+- Live probes refuse non-local URLs.
+- Forced degradation is injected through runner hooks; it does not stop Qdrant.
+- A summary exits `0` only when all mandatory criteria pass.
