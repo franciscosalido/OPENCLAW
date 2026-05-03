@@ -129,6 +129,20 @@ class EmbeddingContractConfigTests(unittest.TestCase):
         self.assertEqual(embedding["model"], "nomic-embed-text")
         self.assertEqual(embedding["endpoint"], "http://localhost:11434")
 
+    def test_rag_config_context_budget_is_rollback_safe_by_default(self) -> None:
+        raw = _load_yaml(RAG_CONFIG)
+        context_budget = raw["rag"]["context_budget"]
+
+        self.assertEqual(
+            context_budget,
+            {
+                "enabled": False,
+                "max_context_chunks": 3,
+                "mode": "whole_chunks",
+                "apply_to_aliases": ["local_rag"],
+            },
+        )
+
     def test_application_facing_embedding_alias_hides_concrete_model(self) -> None:
         self.assertNotIn("nomic", DEFAULT_LLM_EMBED_MODEL)
         self.assertNotIn("ollama/", DEFAULT_LLM_EMBED_MODEL)

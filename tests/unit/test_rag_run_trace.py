@@ -8,7 +8,7 @@ from typing import Any, cast
 from loguru import logger
 
 from backend.rag.collection_guard import EmbeddingDimensionMismatchError
-from backend.rag.context_packer import RetrievedChunk
+from backend.rag.context_packer import ContextBudgetResult, RetrievedChunk
 from backend.rag.pipeline import LocalRagPipeline
 from backend.rag.prompt_builder import PromptBuilder
 from backend.rag.run_trace import (
@@ -53,6 +53,7 @@ class FakeStore:
 class FakeRetriever:
     store = FakeStore()
     last_timings: RetrievalTimings | None = None
+    last_context_budget_result: ContextBudgetResult | None = None
 
     async def retrieve(
         self,
@@ -89,6 +90,38 @@ class TimedFakeRetriever(FakeRetriever):
             total_ms=4.8,
         )
         return chunks
+
+
+class BudgetedFakeRetriever(FakeRetriever):
+    async def retrieve(
+        self,
+        question: str,
+        top_k: int | None = None,
+        filters: Mapping[str, Any] | None = None,
+    ) -> list[RetrievedChunk]:
+        del question, top_k, filters
+        self.last_context_budget_result = ContextBudgetResult(
+            enabled=True,
+            applied=True,
+            chunks_retrieved=5,
+            chunks_used=3,
+            chunks_dropped=2,
+            max_context_chunks=3,
+            estimated_tokens_used=24,
+        )
+        return [
+            RetrievedChunk(
+                id=f"trace_doc:{index}",
+                score=0.9 - index / 10,
+                doc_id="trace_doc",
+                chunk_index=index,
+                text=f"synthetic budgeted chunk {index}",
+                token_count=8,
+                rank=index + 1,
+                payload={"source": "synthetic", "secret": "do-not-log"},
+            )
+            for index in range(3)
+        ]
 
 
 class FakeGenerator:
@@ -179,6 +212,10 @@ class RagRunTraceTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(trace.generation_ms)
         self.assertIsNone(trace.total_ms)
         self.assertIsNone(trace.run_context)
+        self.assertIsNone(trace.context_budget_enabled)
+        self.assertIsNone(trace.context_budget_applied)
+        self.assertIsNone(trace.context_chunks_used)
+        self.assertIsNone(trace.context_chunks_dropped)
         self.assertFalse(trace.ollama_metrics_available)
         self.assertTrue(FORBIDDEN_KEYS.isdisjoint({key.lower() for key in data}))
 
@@ -188,6 +225,13 @@ class RagRunTraceTests(unittest.IsolatedAsyncioTestCase):
             embedding_ms=1.2,
             retrieval_ms=2.3,
             context_pack_ms=0.4,
+            context_budget_enabled=True,
+            context_budget_applied=True,
+            context_chunks_retrieved=5,
+            context_chunks_used=3,
+            context_chunks_dropped=2,
+            context_budget_max_chunks=3,
+            context_estimated_tokens_used=120,
             prompt_build_ms=0.5,
             generation_ms=31.0,
             total_ms=35.0,
@@ -200,6 +244,13 @@ class RagRunTraceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(data["embedding_ms"], 1.2)
         self.assertEqual(data["retrieval_ms"], 2.3)
         self.assertEqual(data["context_pack_ms"], 0.4)
+        self.assertEqual(data["context_budget_enabled"], True)
+        self.assertEqual(data["context_budget_applied"], True)
+        self.assertEqual(data["context_chunks_retrieved"], 5)
+        self.assertEqual(data["context_chunks_used"], 3)
+        self.assertEqual(data["context_chunks_dropped"], 2)
+        self.assertEqual(data["context_budget_max_chunks"], 3)
+        self.assertEqual(data["context_estimated_tokens_used"], 120)
         self.assertEqual(data["prompt_build_ms"], 0.5)
         self.assertEqual(data["generation_ms"], 31.0)
         self.assertEqual(data["total_ms"], 35.0)
@@ -479,6 +530,46 @@ class RagRunTraceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(trace["embedding_ms"], 1.25)
         self.assertEqual(trace["retrieval_ms"], 2.5)
         self.assertEqual(trace["context_pack_ms"], 0.75)
+        self.assertTrue(FORBIDDEN_KEYS.isdisjoint({key.lower() for key in trace}))
+
+    async def test_pipeline_trace_contains_context_budget_metadata(self) -> None:
+        traces: list[dict[str, object]] = []
+
+        def sink(message: Any) -> None:
+            trace = message.record["extra"].get("trace")
+            if isinstance(trace, dict):
+                traces.append(trace)
+
+        sink_id = logger.add(sink, level="INFO")
+        try:
+            pipeline = LocalRagPipeline(
+                retriever=BudgetedFakeRetriever(),
+                generator=FakeGenerator(),
+                prompt_builder=PromptBuilder(),
+                tracing_config=RagTracingConfig(
+                    enabled=True,
+                    log_level="INFO",
+                    collection_name="configured_collection",
+                    embedding_backend="gateway_litellm_current",
+                    embedding_model="nomic-embed-text",
+                    embedding_alias="quimera_embed",
+                    embedding_dimensions=768,
+                ).validated(),
+            )
+            result = await pipeline.ask("Pergunta sintetica?")
+        finally:
+            logger.remove(sink_id)
+
+        self.assertEqual(len(result.chunks_used), 3)
+        self.assertEqual(len(traces), 1)
+        trace = traces[0]
+        self.assertEqual(trace["context_budget_enabled"], True)
+        self.assertEqual(trace["context_budget_applied"], True)
+        self.assertEqual(trace["context_chunks_retrieved"], 5)
+        self.assertEqual(trace["context_chunks_used"], 3)
+        self.assertEqual(trace["context_chunks_dropped"], 2)
+        self.assertEqual(trace["context_budget_max_chunks"], 3)
+        self.assertEqual(trace["context_estimated_tokens_used"], 24)
         self.assertTrue(FORBIDDEN_KEYS.isdisjoint({key.lower() for key in trace}))
 
     def test_load_rag_tracing_config_reads_yaml_defaults(self) -> None:

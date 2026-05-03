@@ -23,11 +23,13 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from loguru import logger
 
 from backend.rag.pipeline import LocalRagPipeline
+from backend.rag.generator import LocalGenerator
 from backend.rag.prompt_builder import PromptBuilder
 from backend.rag.retriever import Retriever
 from backend.rag.run_trace import RagRunContext, load_rag_tracing_config
@@ -95,7 +97,6 @@ class BaselineRunResult:
 
 def _build_pipeline() -> LocalRagPipeline:
     """Build a LocalRagPipeline from environment and config."""
-    from backend.gateway.client import GatewayChatClient, GatewayRuntimeConfig
     from backend.gateway.embed_client import GatewayEmbedClient
     from backend.rag.qdrant_store import QdrantVectorStore
     from backend.rag.retriever import Retriever
@@ -103,7 +104,7 @@ def _build_pipeline() -> LocalRagPipeline:
     embed_client = GatewayEmbedClient()
     store = QdrantVectorStore()
     retriever = Retriever(embedder=embed_client, store=store)
-    generator = GatewayChatClient(config=GatewayRuntimeConfig())
+    generator = LocalGenerator(model="local_rag")
     tracing_config = load_rag_tracing_config().validated()
 
     return LocalRagPipeline(
@@ -116,17 +117,23 @@ def _build_pipeline() -> LocalRagPipeline:
 
 def _build_degraded_pipeline() -> LocalRagPipeline:
     """Build a pipeline with a fake store that raises on search."""
-    from backend.gateway.client import GatewayChatClient, GatewayRuntimeConfig
     from backend.gateway.embed_client import GatewayEmbedClient
     from backend.rag.retriever import Retriever
 
     class _FakeUnavailableStore:
-        async def search(self, *args: object, **kwargs: object) -> list[object]:
+        async def search(
+            self,
+            vector: Sequence[float],
+            top_k: int = 5,
+            score_threshold: float | None = 0.3,
+            filters: Mapping[str, Any] | None = None,
+        ) -> list[dict[str, object]]:
+            del vector, top_k, score_threshold, filters
             raise RuntimeError("FakeQdrantUnavailableError: store unreachable")
 
     embed_client = GatewayEmbedClient()
-    retriever = Retriever(embedder=embed_client, store=_FakeUnavailableStore())  # type: ignore[arg-type]
-    generator = GatewayChatClient(config=GatewayRuntimeConfig())
+    retriever = Retriever(embedder=embed_client, store=_FakeUnavailableStore())
+    generator = LocalGenerator(model="local_rag")
     tracing_config = load_rag_tracing_config().validated()
 
     return LocalRagPipeline(
@@ -137,7 +144,7 @@ def _build_degraded_pipeline() -> LocalRagPipeline:
     )
 
 
-def _capture_trace(pipeline: LocalRagPipeline) -> list[dict[str, object]]:
+def _capture_trace(pipeline: LocalRagPipeline) -> tuple[list[dict[str, object]], int]:
     """Install a loguru sink and collect all rag_run_trace dicts."""
     captured: list[dict[str, object]] = []
 
@@ -149,7 +156,7 @@ def _capture_trace(pipeline: LocalRagPipeline) -> list[dict[str, object]]:
                 captured.append(dict(trace))
 
     sink_id = logger.add(sink, level="DEBUG")
-    return captured, sink_id  # type: ignore[return-value]
+    return captured, sink_id
 
 
 async def _run_once(
@@ -182,21 +189,37 @@ async def _run_once(
             logger.remove(sink_id)
 
     trace = captured[0] if captured else {}
-    segments = {k: trace.get(k) for k in SEGMENT_KEYS}
+    segments: dict[str, float | None] = {
+        key: _float_or_none(trace.get(key)) for key in SEGMENT_KEYS
+    }
 
     return BaselineRunResult(
         run_context=run_context,
         question_hash_8=_QUESTION_HASH_8,
         segment_ms=segments,
         ollama_metrics_available=bool(trace.get("ollama_metrics_available", False)),
-        ollama_eval_count=trace.get("ollama_eval_count"),  # type: ignore[arg-type]
-        ollama_eval_duration_ms=trace.get("ollama_eval_duration_ms"),  # type: ignore[arg-type]
-        ollama_prompt_eval_count=trace.get("ollama_prompt_eval_count"),  # type: ignore[arg-type]
-        ollama_prompt_eval_duration_ms=trace.get("ollama_prompt_eval_duration_ms"),  # type: ignore[arg-type]
+        ollama_eval_count=_int_or_none(trace.get("ollama_eval_count")),
+        ollama_eval_duration_ms=_float_or_none(trace.get("ollama_eval_duration_ms")),
+        ollama_prompt_eval_count=_int_or_none(trace.get("ollama_prompt_eval_count")),
+        ollama_prompt_eval_duration_ms=_float_or_none(
+            trace.get("ollama_prompt_eval_duration_ms")
+        ),
         wall_ms=wall_ms,
         ok=ok,
         error_category=error_category,
     )
+
+
+def _float_or_none(value: object) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value)
+
+
+def _int_or_none(value: object) -> int | None:
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    return value
 
 
 def _assert_no_forbidden_keys(data: dict[str, object]) -> None:

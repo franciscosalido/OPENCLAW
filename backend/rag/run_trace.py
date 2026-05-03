@@ -112,6 +112,13 @@ class RagRunTrace:
     embedding_ms: float | None = None
     retrieval_ms: float | None = None
     context_pack_ms: float | None = None
+    context_budget_enabled: bool | None = None
+    context_budget_applied: bool | None = None
+    context_chunks_retrieved: int | None = None
+    context_chunks_used: int | None = None
+    context_chunks_dropped: int | None = None
+    context_budget_max_chunks: int | None = None
+    context_estimated_tokens_used: int | None = None
     prompt_build_ms: float | None = None
     generation_ms: float | None = None
     total_ms: float | None = None
@@ -171,10 +178,24 @@ class RagRunTrace:
         for field_name in (
             "ollama_prompt_eval_count",
             "ollama_eval_count",
+            "context_chunks_retrieved",
+            "context_chunks_used",
+            "context_chunks_dropped",
+            "context_budget_max_chunks",
+            "context_estimated_tokens_used",
         ):
             value = getattr(self, field_name)
             if value is not None:
                 _validate_non_negative_int(value, field_name)
+        if self.context_budget_max_chunks is not None:
+            _validate_positive_int(
+                self.context_budget_max_chunks,
+                "context_budget_max_chunks",
+            )
+        for field_name in ("context_budget_enabled", "context_budget_applied"):
+            value = getattr(self, field_name)
+            if value is not None and not isinstance(value, bool):
+                raise TypeError(f"{field_name} must be boolean when provided")
         if self.run_context is not None and self.run_context not in RUN_CONTEXTS:
             raise ValueError(
                 f"run_context must be one of {sorted(RUN_CONTEXTS)}"
@@ -226,6 +247,13 @@ class RagRunTrace:
             "embedding_ms": self.embedding_ms,
             "retrieval_ms": self.retrieval_ms,
             "context_pack_ms": self.context_pack_ms,
+            "context_budget_enabled": self.context_budget_enabled,
+            "context_budget_applied": self.context_budget_applied,
+            "context_chunks_retrieved": self.context_chunks_retrieved,
+            "context_chunks_used": self.context_chunks_used,
+            "context_chunks_dropped": self.context_chunks_dropped,
+            "context_budget_max_chunks": self.context_budget_max_chunks,
+            "context_estimated_tokens_used": self.context_estimated_tokens_used,
             "prompt_build_ms": self.prompt_build_ms,
             "generation_ms": self.generation_ms,
             "total_ms": self.total_ms,
@@ -267,6 +295,13 @@ def build_rag_run_trace(
     embedding_ms: float | None = None,
     retrieval_ms: float | None = None,
     context_pack_ms: float | None = None,
+    context_budget_enabled: bool | None = None,
+    context_budget_applied: bool | None = None,
+    context_chunks_retrieved: int | None = None,
+    context_chunks_used: int | None = None,
+    context_chunks_dropped: int | None = None,
+    context_budget_max_chunks: int | None = None,
+    context_estimated_tokens_used: int | None = None,
     prompt_build_ms: float | None = None,
     generation_ms: float | None = None,
     total_ms: float | None = None,
@@ -300,6 +335,13 @@ def build_rag_run_trace(
         embedding_ms=embedding_ms,
         retrieval_ms=retrieval_ms,
         context_pack_ms=context_pack_ms,
+        context_budget_enabled=context_budget_enabled,
+        context_budget_applied=context_budget_applied,
+        context_chunks_retrieved=context_chunks_retrieved,
+        context_chunks_used=context_chunks_used,
+        context_chunks_dropped=context_chunks_dropped,
+        context_budget_max_chunks=context_budget_max_chunks,
+        context_estimated_tokens_used=context_estimated_tokens_used,
         prompt_build_ms=prompt_build_ms,
         generation_ms=generation_ms,
         total_ms=total_ms,
