@@ -54,13 +54,14 @@ class ModelResidencyConfigTests(unittest.TestCase):
         self.assertTrue(decision.keep_alive_applied)
 
     def test_enabled_non_rag_alias_is_not_applied(self) -> None:
-        decision = decide_model_residency(
-            ModelResidencyConfig(enabled=True, keep_alive="5m").validated(),
-            alias="local_chat",
-        )
+        config = ModelResidencyConfig(enabled=True, keep_alive="5m").validated()
 
-        self.assertFalse(decision.enabled)
-        self.assertIsNone(decision.keep_alive)
+        for alias in ("local_chat", "local_json", "local_think"):
+            with self.subTest(alias=alias):
+                decision = decide_model_residency(config, alias=alias)
+                self.assertFalse(decision.enabled)
+                self.assertIsNone(decision.keep_alive)
+                self.assertFalse(decision.keep_alive_applied)
 
     def test_keep_alive_zero_is_forwardable_when_enabled(self) -> None:
         decision = decide_model_residency(
