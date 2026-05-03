@@ -230,18 +230,17 @@ Rollback is config-only:
 - set `keep_alive: "0"` to ask Ollama to unload after the request when the
   feature is enabled.
 
-Allowed values are intentionally narrow:
+Allowed values:
 
-- `"0"`
-- `"30s"`
-- `"1m"`
-- `"5m"`
-- `"10m"`
-- `"30m"`
-- `"-1"`
+- `"0"` — unload immediately after the request
+- `"30s"`, `"1m"`, `"5m"`, `"10m"`, `"30m"` — minute-range residency
+- `"1h"`, `"2h"`, `"6h"` — hour-range residency for sustained workloads
+- `"-1"` — indefinite residency; use with caution on memory-constrained machines
+  as the model will remain in VRAM until Ollama is restarted or the model is
+  explicitly unloaded
 
-`-1` keeps the model resident indefinitely and should be used cautiously on
-memory-constrained machines.
+Values not in this list (e.g. `"1d"`, `"forever"`, `"2h30m"`) are rejected at
+config load time with a `ValueError`.
 
 This PR does not preload models, unload models, set global
 `OLLAMA_KEEP_ALIVE`, change LiteLLM provider config, change aliases, change

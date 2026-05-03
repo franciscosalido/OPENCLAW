@@ -31,7 +31,7 @@ class ModelResidencyConfigTests(unittest.TestCase):
                 self.assertEqual(config.keep_alive, keep_alive)
 
     def test_invalid_keep_alive_rejected(self) -> None:
-        for keep_alive in ("", " ", "2h", "forever", "5 minutes"):
+        for keep_alive in ("", " ", "1d", "forever", "5 minutes"):
             with self.subTest(keep_alive=keep_alive):
                 with self.assertRaises(ValueError):
                     ModelResidencyConfig(keep_alive=keep_alive).validated()
@@ -103,7 +103,7 @@ rag:
     enabled: true
     apply_to_aliases:
       - local_rag
-    keep_alive: "2h"
+    keep_alive: "1d"
 """,
                 encoding="utf-8",
             )

@@ -12,7 +12,7 @@ import yaml
 
 LOCAL_RAG_ALIAS = "local_rag"
 ALLOWED_MODEL_RESIDENCY_ALIASES = frozenset({LOCAL_RAG_ALIAS})
-ALLOWED_KEEP_ALIVE_VALUES = frozenset({"0", "30s", "1m", "5m", "10m", "30m", "-1"})
+ALLOWED_KEEP_ALIVE_VALUES = frozenset({"0", "30s", "1m", "5m", "10m", "30m", "1h", "2h", "6h", "-1"})
 DEFAULT_KEEP_ALIVE = "5m"
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_RAG_CONFIG_PATH = REPO_ROOT / "config" / "rag_config.yaml"
