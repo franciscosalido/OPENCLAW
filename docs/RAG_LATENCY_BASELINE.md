@@ -61,6 +61,18 @@ G2-02 adds optional context budget metadata:
 These fields are counts only. They make the whole-chunk context cap observable
 without logging chunks or prompt text.
 
+G2-03 adds optional generation budget metadata:
+
+- `answer_length_chars`
+- `answer_token_estimate`
+- `generation_budget_enabled`
+- `generation_budget_applied`
+- `generation_budget_max_tokens`
+- `conciseness_instruction_applied`
+
+These fields make answer length discipline observable without serializing the
+answer itself.
+
 Allowed `run_context` labels:
 
 - `cold_start`
@@ -105,6 +117,16 @@ Latency traces must never include:
 - raw model responses
 - raw exceptions, exception messages or tracebacks
 - model weight paths
+
+## Generation Budget Follow-up
+
+G2-03 targets the measured `generation_ms` segment by allowing a config-driven
+`local_rag` max-token cap and optional concise-answer instruction. It does not
+change retrieval, context packing, Qdrant, model aliases, JSON mode, default
+chat behavior, or fallback behavior.
+
+See `docs/RAG_GENERATION_BUDGET.md` for the rollback-safe configuration and
+validation contract.
 
 Serialization uses explicit allowlists and optional scalar fields only.
 

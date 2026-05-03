@@ -39,7 +39,9 @@ class CitationGenerator:
         messages: Sequence[dict[str, str]],
         temperature: float | None = None,
         thinking_mode: bool = False,
+        max_tokens: int | None = None,
     ) -> str:
+        del max_tokens
         self.seen_messages = messages
         self.seen_thinking_mode = thinking_mode
         user_content = messages[-1]["content"]

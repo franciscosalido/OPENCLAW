@@ -63,6 +63,15 @@ rag:
     apply_to_aliases:
       - "local_rag"
 
+  generation_budget:
+    enabled: false
+    apply_to_aliases:
+      - "local_rag"
+    max_tokens: 768
+    enforce_conciseness: false
+    target_sentences_min: 3
+    target_sentences_max: 6
+
   generation:
     model: "local_rag"
     reasoning_model: "local_think"

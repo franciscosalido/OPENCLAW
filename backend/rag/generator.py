@@ -110,6 +110,7 @@ class LocalGenerator:
         messages: Sequence[dict[str, str]],
         temperature: float | None = None,
         thinking_mode: bool = False,
+        max_tokens: int | None = None,
     ) -> str:
         """Generate one local answer through LiteLLM chat completions."""
 
@@ -120,13 +121,16 @@ class LocalGenerator:
         effective_temperature = self.temperature if temperature is None else temperature
         if not 0.0 <= effective_temperature <= 2.0:
             raise ValueError("temperature must be between 0.0 and 2.0")
+        effective_max_tokens = self.max_tokens if max_tokens is None else max_tokens
+        if effective_max_tokens <= 0:
+            raise ValueError("max_tokens must be greater than zero")
 
         start = time.perf_counter()
         answer = await self.gateway_client.chat_completion(
             clean_messages,
             model=self.model,
             temperature=effective_temperature,
-            max_tokens=self.max_tokens,
+            max_tokens=effective_max_tokens,
         )
         if not thinking_mode:
             answer = _strip_thinking(answer)

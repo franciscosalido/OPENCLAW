@@ -10,8 +10,15 @@ from uuid import uuid4
 
 from loguru import logger
 
+from backend.gateway.routing_policy import estimate_prompt_tokens
 from backend.rag._validation import validate_question
 from backend.rag.context_packer import ContextBudgetResult, RetrievedChunk
+from backend.rag.generation_budget import (
+    GenerationBudgetConfig,
+    GenerationBudgetDecision,
+    decide_generation_budget,
+    load_generation_budget_config,
+)
 from backend.rag.prompt_builder import PromptBuilder
 from backend.rag.observability import (
     RagErrorCategory,
@@ -52,6 +59,7 @@ class GeneratorProtocol(Protocol):
         messages: Sequence[dict[str, str]],
         temperature: float | None = None,
         thinking_mode: bool = False,
+        max_tokens: int | None = None,
     ) -> Awaitable[str]:
         """Generate an answer from chat messages."""
         ...
@@ -85,12 +93,15 @@ class LocalRagPipeline:
     thinking_mode: bool = False
     tracing_config: RagTracingConfig | None = None
     observability_config: RagObservabilityConfig | None = None
+    generation_budget_config: GenerationBudgetConfig | None = None
 
     def __post_init__(self) -> None:
         if self.tracing_config is None:
             self.tracing_config = load_rag_tracing_config()
         if self.observability_config is None:
             self.observability_config = load_rag_observability_config()
+        if self.generation_budget_config is None:
+            self.generation_budget_config = load_generation_budget_config()
 
     async def ask(
         self,
@@ -144,16 +155,22 @@ class LocalRagPipeline:
             status="success",
         )
 
+        gateway_alias = _infer_gateway_alias(self.generator)
+        generation_budget = decide_generation_budget(
+            self.generation_budget_config or GenerationBudgetConfig(),
+            alias=gateway_alias,
+        )
+
         prompt_start = time.perf_counter()
         messages = self.prompt_builder.build(
             clean_question,
             chunks,
             thinking_mode=self.thinking_mode,
+            conciseness_instruction=generation_budget.conciseness_instruction,
         )
         prompt_ms = _elapsed_ms(prompt_start)
 
         generation_start = time.perf_counter()
-        gateway_alias = _infer_gateway_alias(self.generator)
         self._emit_pipeline_event(
             RagEventKind.GENERATION_STARTED,
             query_id=query_id,
@@ -163,10 +180,12 @@ class LocalRagPipeline:
             status="started",
         )
         try:
-            answer = await self.generator.chat(
-                messages,
+            answer = await _chat_with_generation_budget(
+                self.generator,
+                messages=messages,
                 temperature=self.temperature,
                 thinking_mode=self.thinking_mode,
+                generation_budget=generation_budget,
             )
         except Exception as exc:
             self._emit_pipeline_event(
@@ -209,6 +228,9 @@ class LocalRagPipeline:
             vector_search_ms=retrieval_segments.retrieval_ms,
             context_pack_ms=retrieval_segments.context_pack_ms,
             context_budget_result=context_budget_result,
+            generation_budget=generation_budget,
+            answer_length_chars=len(answer),
+            answer_token_estimate=estimate_prompt_tokens(answer),
             prompt_ms=prompt_ms,
             generation_ms=generation_ms,
             total_ms=latency["total_ms"],
@@ -236,6 +258,9 @@ class LocalRagPipeline:
         total_ms: float,
         chunk_count: int,
         context_budget_result: ContextBudgetResult | None = None,
+        generation_budget: GenerationBudgetDecision | None = None,
+        answer_length_chars: int | None = None,
+        answer_token_estimate: int | None = None,
         query_id: str | None = None,
         actual_embedding_dimensions: int | None = None,
         run_context: RagRunContext | None = None,
@@ -316,6 +341,24 @@ class LocalRagPipeline:
                 if context_budget_result is not None
                 else None
             ),
+            answer_length_chars=answer_length_chars,
+            answer_token_estimate=answer_token_estimate,
+            generation_budget_enabled=(
+                generation_budget.enabled if generation_budget is not None else None
+            ),
+            generation_budget_applied=(
+                generation_budget.max_tokens_applied
+                if generation_budget is not None
+                else None
+            ),
+            generation_budget_max_tokens=(
+                generation_budget.max_tokens if generation_budget is not None else None
+            ),
+            conciseness_instruction_applied=(
+                generation_budget.conciseness_instruction_applied
+                if generation_budget is not None
+                else None
+            ),
             prompt_build_ms=prompt_ms,
             generation_ms=generation_ms,
             total_ms=total_ms,
@@ -374,6 +417,22 @@ def _infer_gateway_alias(generator: object) -> str | None:
     if isinstance(model, str) and model.strip():
         return model.strip()
     return None
+
+
+async def _chat_with_generation_budget(
+    generator: GeneratorProtocol,
+    *,
+    messages: Sequence[dict[str, str]],
+    temperature: float | None,
+    thinking_mode: bool,
+    generation_budget: GenerationBudgetDecision,
+) -> str:
+    return await generator.chat(
+        messages,
+        temperature=temperature,
+        thinking_mode=thinking_mode,
+        max_tokens=generation_budget.max_tokens,
+    )
 
 
 @dataclass(frozen=True)

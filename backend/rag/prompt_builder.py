@@ -36,21 +36,29 @@ class PromptBuilder:
         question: str,
         chunks: Sequence[RetrievedChunk],
         thinking_mode: bool = False,
+        conciseness_instruction: str | None = None,
     ) -> list[dict[str, str]]:
         """Return chat messages with recovered context and citation rules."""
 
         clean_question = validate_question(question)
         context = self._format_context(chunks)
         thinking_directive = "/think" if thinking_mode else "/no_think"
+        response_instructions = [
+            "- Responda em portugues brasileiro.",
+            "- Use apenas o contexto recuperado.",
+            "- Inclua citacoes no formato [doc_id#chunk_index].",
+            "- Se o contexto for insuficiente, diga isso claramente.",
+        ]
+        if conciseness_instruction is not None:
+            instruction = conciseness_instruction.strip()
+            if instruction:
+                response_instructions.append(f"- {instruction}")
         user_content = (
             f"{thinking_directive}\n\n"
             f"PERGUNTA:\n{clean_question}\n\n"
             f"CONTEXTO RECUPERADO:\n{context}\n\n"
             "INSTRUCOES DE RESPOSTA:\n"
-            "- Responda em portugues brasileiro.\n"
-            "- Use apenas o contexto recuperado.\n"
-            "- Inclua citacoes no formato [doc_id#chunk_index].\n"
-            "- Se o contexto for insuficiente, diga isso claramente."
+            + "\n".join(response_instructions)
         )
 
         return [

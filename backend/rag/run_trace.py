@@ -119,6 +119,12 @@ class RagRunTrace:
     context_chunks_dropped: int | None = None
     context_budget_max_chunks: int | None = None
     context_estimated_tokens_used: int | None = None
+    answer_length_chars: int | None = None
+    answer_token_estimate: int | None = None
+    generation_budget_enabled: bool | None = None
+    generation_budget_applied: bool | None = None
+    generation_budget_max_tokens: int | None = None
+    conciseness_instruction_applied: bool | None = None
     prompt_build_ms: float | None = None
     generation_ms: float | None = None
     total_ms: float | None = None
@@ -183,6 +189,9 @@ class RagRunTrace:
             "context_chunks_dropped",
             "context_budget_max_chunks",
             "context_estimated_tokens_used",
+            "answer_length_chars",
+            "answer_token_estimate",
+            "generation_budget_max_tokens",
         ):
             value = getattr(self, field_name)
             if value is not None:
@@ -192,7 +201,18 @@ class RagRunTrace:
                 self.context_budget_max_chunks,
                 "context_budget_max_chunks",
             )
-        for field_name in ("context_budget_enabled", "context_budget_applied"):
+        if self.generation_budget_max_tokens is not None:
+            _validate_positive_int(
+                self.generation_budget_max_tokens,
+                "generation_budget_max_tokens",
+            )
+        for field_name in (
+            "context_budget_enabled",
+            "context_budget_applied",
+            "generation_budget_enabled",
+            "generation_budget_applied",
+            "conciseness_instruction_applied",
+        ):
             value = getattr(self, field_name)
             if value is not None and not isinstance(value, bool):
                 raise TypeError(f"{field_name} must be boolean when provided")
@@ -254,6 +274,12 @@ class RagRunTrace:
             "context_chunks_dropped": self.context_chunks_dropped,
             "context_budget_max_chunks": self.context_budget_max_chunks,
             "context_estimated_tokens_used": self.context_estimated_tokens_used,
+            "answer_length_chars": self.answer_length_chars,
+            "answer_token_estimate": self.answer_token_estimate,
+            "generation_budget_enabled": self.generation_budget_enabled,
+            "generation_budget_applied": self.generation_budget_applied,
+            "generation_budget_max_tokens": self.generation_budget_max_tokens,
+            "conciseness_instruction_applied": self.conciseness_instruction_applied,
             "prompt_build_ms": self.prompt_build_ms,
             "generation_ms": self.generation_ms,
             "total_ms": self.total_ms,
@@ -302,6 +328,12 @@ def build_rag_run_trace(
     context_chunks_dropped: int | None = None,
     context_budget_max_chunks: int | None = None,
     context_estimated_tokens_used: int | None = None,
+    answer_length_chars: int | None = None,
+    answer_token_estimate: int | None = None,
+    generation_budget_enabled: bool | None = None,
+    generation_budget_applied: bool | None = None,
+    generation_budget_max_tokens: int | None = None,
+    conciseness_instruction_applied: bool | None = None,
     prompt_build_ms: float | None = None,
     generation_ms: float | None = None,
     total_ms: float | None = None,
@@ -342,6 +374,12 @@ def build_rag_run_trace(
         context_chunks_dropped=context_chunks_dropped,
         context_budget_max_chunks=context_budget_max_chunks,
         context_estimated_tokens_used=context_estimated_tokens_used,
+        answer_length_chars=answer_length_chars,
+        answer_token_estimate=answer_token_estimate,
+        generation_budget_enabled=generation_budget_enabled,
+        generation_budget_applied=generation_budget_applied,
+        generation_budget_max_tokens=generation_budget_max_tokens,
+        conciseness_instruction_applied=conciseness_instruction_applied,
         prompt_build_ms=prompt_build_ms,
         generation_ms=generation_ms,
         total_ms=total_ms,

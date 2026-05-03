@@ -204,6 +204,32 @@ class GatewayChatClientTests(unittest.IsolatedAsyncioTestCase):
             ],
         )
 
+    async def test_chat_completion_omits_max_tokens_when_none(self) -> None:
+        seen_payloads: list[dict[str, object]] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen_payloads.append(json.loads(request.content.decode("utf-8")))
+            return httpx.Response(
+                200,
+                json={"choices": [{"message": {"content": "Resposta compacta."}}]},
+            )
+
+        async with httpx.AsyncClient(
+            base_url=DEFAULT_LLM_BASE_URL,
+            transport=httpx.MockTransport(handler),
+        ) as client:
+            gateway = GatewayChatClient(
+                config=GatewayRuntimeConfig(api_key="secret-test-key"),
+                client=client,
+            )
+            answer = await gateway.chat_completion(
+                [{"role": "user", "content": "pergunta"}],
+                max_tokens=None,
+            )
+
+        self.assertEqual(answer, "Resposta compacta.")
+        self.assertNotIn("max_tokens", seen_payloads[0])
+
     async def test_chat_completion_uses_alias_specific_timeout(self) -> None:
         seen_timeouts: list[dict[str, float]] = []
 

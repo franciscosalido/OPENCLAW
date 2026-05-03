@@ -9,6 +9,7 @@ from loguru import logger
 
 from backend.rag.collection_guard import EmbeddingDimensionMismatchError
 from backend.rag.context_packer import ContextBudgetResult, RetrievedChunk
+from backend.rag.generation_budget import GenerationBudgetConfig
 from backend.rag.pipeline import LocalRagPipeline
 from backend.rag.prompt_builder import PromptBuilder
 from backend.rag.run_trace import (
@@ -132,8 +133,30 @@ class FakeGenerator:
         messages: Sequence[dict[str, str]],
         temperature: float | None = None,
         thinking_mode: bool = False,
+        max_tokens: int | None = None,
     ) -> str:
+        del messages, temperature, thinking_mode, max_tokens
         return "Resposta sintetica segura com citacao [trace_doc#0]."
+
+
+class CapturingGenerator:
+    model: str
+    max_tokens_seen: int | None
+
+    def __init__(self, model: str) -> None:
+        self.model = model
+        self.max_tokens_seen = None
+
+    async def chat(
+        self,
+        messages: Sequence[dict[str, str]],
+        temperature: float | None = None,
+        thinking_mode: bool = False,
+        max_tokens: int | None = None,
+    ) -> str:
+        del messages, temperature, thinking_mode
+        self.max_tokens_seen = max_tokens
+        return "Resposta sintetica com citacao [trace_doc#0]."
 
 
 def _trace(**overrides: Any) -> RagRunTrace:
@@ -216,6 +239,12 @@ class RagRunTraceTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(trace.context_budget_applied)
         self.assertIsNone(trace.context_chunks_used)
         self.assertIsNone(trace.context_chunks_dropped)
+        self.assertIsNone(trace.answer_length_chars)
+        self.assertIsNone(trace.answer_token_estimate)
+        self.assertIsNone(trace.generation_budget_enabled)
+        self.assertIsNone(trace.generation_budget_applied)
+        self.assertIsNone(trace.generation_budget_max_tokens)
+        self.assertIsNone(trace.conciseness_instruction_applied)
         self.assertFalse(trace.ollama_metrics_available)
         self.assertTrue(FORBIDDEN_KEYS.isdisjoint({key.lower() for key in data}))
 
@@ -232,6 +261,12 @@ class RagRunTraceTests(unittest.IsolatedAsyncioTestCase):
             context_chunks_dropped=2,
             context_budget_max_chunks=3,
             context_estimated_tokens_used=120,
+            answer_length_chars=48,
+            answer_token_estimate=12,
+            generation_budget_enabled=True,
+            generation_budget_applied=True,
+            generation_budget_max_tokens=768,
+            conciseness_instruction_applied=True,
             prompt_build_ms=0.5,
             generation_ms=31.0,
             total_ms=35.0,
@@ -251,11 +286,21 @@ class RagRunTraceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(data["context_chunks_dropped"], 2)
         self.assertEqual(data["context_budget_max_chunks"], 3)
         self.assertEqual(data["context_estimated_tokens_used"], 120)
+        self.assertEqual(data["answer_length_chars"], 48)
+        self.assertEqual(data["answer_token_estimate"], 12)
+        self.assertEqual(data["generation_budget_enabled"], True)
+        self.assertEqual(data["generation_budget_applied"], True)
+        self.assertEqual(data["generation_budget_max_tokens"], 768)
+        self.assertEqual(data["conciseness_instruction_applied"], True)
         self.assertEqual(data["prompt_build_ms"], 0.5)
         self.assertEqual(data["generation_ms"], 31.0)
         self.assertEqual(data["total_ms"], 35.0)
         self.assertEqual(data["run_context"], "warm_model")
         self.assertTrue(FORBIDDEN_KEYS.isdisjoint({key.lower() for key in data}))
+
+    def test_invalid_generation_budget_max_tokens_raises(self) -> None:
+        with self.assertRaises(ValueError):
+            _trace(generation_budget_max_tokens=0)
 
     def test_total_ms_is_direct_field_not_sum_assumption(self) -> None:
         trace = _trace(
@@ -571,6 +616,88 @@ class RagRunTraceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(trace["context_budget_max_chunks"], 3)
         self.assertEqual(trace["context_estimated_tokens_used"], 24)
         self.assertTrue(FORBIDDEN_KEYS.isdisjoint({key.lower() for key in trace}))
+
+    async def test_local_rag_generation_budget_forwards_max_tokens_and_trace_metadata(self) -> None:
+        traces: list[dict[str, object]] = []
+        generator = CapturingGenerator("local_rag")
+
+        def sink(message: Any) -> None:
+            trace = message.record["extra"].get("trace")
+            if isinstance(trace, dict):
+                traces.append(trace)
+
+        sink_id = logger.add(sink, level="INFO")
+        try:
+            pipeline = LocalRagPipeline(
+                retriever=FakeRetriever(),
+                generator=generator,
+                prompt_builder=PromptBuilder(),
+                tracing_config=RagTracingConfig(
+                    enabled=True,
+                    log_level="INFO",
+                    collection_name="configured_collection",
+                    embedding_backend="gateway_litellm_current",
+                    embedding_model="nomic-embed-text",
+                    embedding_alias="quimera_embed",
+                    embedding_dimensions=768,
+                ).validated(),
+                generation_budget_config=GenerationBudgetConfig(
+                    enabled=True,
+                    max_tokens=768,
+                    enforce_conciseness=True,
+                ),
+            )
+            result = await pipeline.ask("Pergunta sintetica?")
+        finally:
+            logger.remove(sink_id)
+
+        self.assertEqual(generator.max_tokens_seen, 768)
+        self.assertIn("Answer concisely", result.messages[1]["content"])
+        self.assertIn("include inline citations", result.messages[1]["content"])
+        self.assertEqual(len(traces), 1)
+        trace = traces[0]
+        self.assertEqual(trace["generation_budget_enabled"], True)
+        self.assertEqual(trace["generation_budget_applied"], True)
+        self.assertEqual(trace["generation_budget_max_tokens"], 768)
+        self.assertEqual(trace["conciseness_instruction_applied"], True)
+        self.assertEqual(trace["answer_length_chars"], len(result.answer))
+        self.assertIsInstance(trace["answer_token_estimate"], int)
+        self.assertNotIn(result.answer, str(trace))
+        self.assertTrue(FORBIDDEN_KEYS.isdisjoint({key.lower() for key in trace}))
+
+    async def test_generation_budget_disabled_does_not_forward_max_tokens(self) -> None:
+        generator = CapturingGenerator("local_rag")
+        pipeline = LocalRagPipeline(
+            retriever=FakeRetriever(),
+            generator=generator,
+            prompt_builder=PromptBuilder(),
+            tracing_config=RagTracingConfig(enabled=False).validated(),
+            generation_budget_config=GenerationBudgetConfig(enabled=False),
+        )
+
+        result = await pipeline.ask("Pergunta sintetica?")
+
+        self.assertIsNone(generator.max_tokens_seen)
+        self.assertNotIn("Answer concisely", result.messages[1]["content"])
+
+    async def test_generation_budget_does_not_apply_to_non_rag_alias(self) -> None:
+        generator = CapturingGenerator("local_chat")
+        pipeline = LocalRagPipeline(
+            retriever=FakeRetriever(),
+            generator=generator,
+            prompt_builder=PromptBuilder(),
+            tracing_config=RagTracingConfig(enabled=False).validated(),
+            generation_budget_config=GenerationBudgetConfig(
+                enabled=True,
+                max_tokens=768,
+                enforce_conciseness=True,
+            ),
+        )
+
+        result = await pipeline.ask("Pergunta sintetica?")
+
+        self.assertIsNone(generator.max_tokens_seen)
+        self.assertNotIn("Answer concisely", result.messages[1]["content"])
 
     def test_load_rag_tracing_config_reads_yaml_defaults(self) -> None:
         config = load_rag_tracing_config()

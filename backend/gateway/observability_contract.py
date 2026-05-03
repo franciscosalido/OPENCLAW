@@ -86,6 +86,13 @@ RAG_RUN_TRACE_KEYS = frozenset(
         "context_chunks_dropped",
         "context_budget_max_chunks",
         "context_estimated_tokens_used",
+        # Gateway-2 local_rag generation budget fields.
+        "answer_length_chars",
+        "answer_token_estimate",
+        "generation_budget_enabled",
+        "generation_budget_applied",
+        "generation_budget_max_tokens",
+        "conciseness_instruction_applied",
         "prompt_build_ms",
         "generation_ms",
         "total_ms",

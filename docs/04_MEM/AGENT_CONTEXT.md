@@ -189,7 +189,7 @@ OpenClaw / LocalGenerator
 | GW-11 | `feat/rag-observability-events` | Local structured RAG lifecycle events | ✅ Merged |
 | GW-12 | `feat/gateway-operational-readiness` | Final runbook, readiness checks, ADR boundary | ✅ Merged |
 
-### Sprint Gateway-1 — CURRENT
+### Sprint Gateway-1 — COMPLETE ✅
 
 Gateway-1 starts after Gateway-0 readiness. GW-13 adds routing policy
 primitives only:
@@ -204,12 +204,37 @@ task metadata + token estimates
 | PR | Branch | Scope | Status |
 |---|---|---|---|
 | GW-13 | `feat/gateway1-routing-policy-prelude` | Local-first routing decision records and token economy prelude | ✅ Merged |
-| GW-14 | `feat/gateway1-routing-audit-token-economy` | Config-driven routing audit and token economy calibration | Open / separate PR |
+| GW-14 | `feat/gateway1-routing-audit-token-economy` | Config-driven routing audit and token economy calibration | ✅ Merged |
 | GW-15 | `feat/agent0-local-runner` | Agent-0 local CLI runner MVP | ✅ Merged |
-| GW-16 | `feat/agent0-runner-contract-hardening` | Agent-0 runner contract hardening | Dependency branch / not on `origin/main` |
-| GW-17 | `feat/agent0-local-failsafe-degradation` | Explicit local fail-safe degradation for Agent-0 | Dependency branch / open PR |
-| GW-18 | `feat/agent0-golden-question-harness` | Golden question benchmark harness for Agent-0 | Dependency branch / merged into stack |
-| GW-19 | `feat/agent0-observability-signal-contract` | Agent-0 observability signal contract and sanitization tests | 🚧 Current |
+| GW-16 | `feat/agent0-runner-contract-hardening` | Agent-0 runner contract hardening | ✅ Merged |
+| GW-17 | `feat/agent0-local-failsafe-degradation` | Explicit local fail-safe degradation for Agent-0 | ✅ Merged |
+| GW-18 | `feat/agent0-golden-question-harness` | Golden question benchmark harness for Agent-0 | ✅ Merged |
+| GW-19 | `feat/agent0-observability-signal-contract` | Agent-0 observability signal contract and sanitization tests | ✅ Merged |
+| GW-20 | `feat/gateway1-proof-of-life-smoke` | Gateway-1 operational proof-of-life smoke | ✅ Merged |
+
+### Sprint Gateway-2 — CURRENT
+
+Gateway-2 is performance work on top of the stable local-only Gateway-1 stack.
+The first rule is measurement before optimization.
+
+| PR | Branch | Scope | Status |
+|---|---|---|---|
+| G2-PR01 | `feat/g2-rag-segment-timing-baseline` | Per-segment RAG latency baseline in `RagRunTrace` | ✅ Merged |
+| G2-PR02 | `feat/g2-local-rag-context-budget-cap` | Configurable whole-chunk context budget cap for `local_rag` | ✅ Merged |
+| G2-PR03 | `feat/g2-local-rag-generation-budget` | Configurable generation budget and answer-length discipline for `local_rag` | 🚧 Current |
+
+G2-PR03 rules:
+
+- Budget is configured under `rag.generation_budget`.
+- Default is rollback-safe: `enabled: false`.
+- `max_tokens` forwarding applies only to `local_rag`.
+- `local_chat`, `local_json`, `local_think`, retrieval, context packing,
+  Qdrant, aliases, timeouts and fallback behavior remain unchanged.
+- Optional concise-answer discipline must preserve citations and
+  insufficient-context behavior.
+- Trace fields are scalar only: answer length, token estimate, budget enabled,
+  budget applied, max tokens and conciseness applied.
+- No answer text, prompts, chunks, vectors, payloads or secrets are serialized.
 
 GW-13 rules:
 
