@@ -4,8 +4,8 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Last updated:** 2026-05-02
-**Updated by:** Codex — G2-PR03 local_rag generation budget
+**Last updated:** 2026-05-03
+**Updated by:** Codex — G2-PR05 local_rag model residency
 
 ---
 
@@ -14,8 +14,8 @@
 **Goal:** reduce `local_rag` wall time through controlled, observable,
 rollback-safe local optimizations after the Gateway-1 proof-of-life baseline.
 
-Current branch: `feat/g2-local-rag-generation-budget`
-Current issue: `[G2-03] Constrain local_rag generation budget`
+Current branch: `feat/g2-keep-alive-model-residency`
+Current issue: `[G2-05] Tune Ollama keep_alive for local_rag model residency`
 
 Gateway-0 and Gateway-1 are complete on `main`. Gateway-2 starts from the
 measured `local_rag` latency baseline and must keep all optimizations
@@ -124,7 +124,9 @@ unavoidable, use `git push --force-with-lease`.
 | GW-20 | `feat/gateway1-proof-of-life-smoke` | Gateway-1 operational proof-of-life smoke | Done / merged |
 | G2-PR01 | `feat/g2-rag-segment-timing-baseline` | Per-segment RAG latency baseline | Done / merged |
 | G2-PR02 | `feat/g2-local-rag-context-budget-cap` | Configurable whole-chunk context budget cap | Done / merged |
-| G2-PR03 | `feat/g2-local-rag-generation-budget` | Configurable local_rag generation budget | Current |
+| G2-PR03 | `feat/g2-local-rag-generation-budget` | Configurable local_rag generation budget | Done / merged |
+| G2-PR04 | `feat/g2-warm-model-cold-start-separation` | Cold/warm/degraded latency separation and model residency measurement | Done / merged |
+| G2-PR05 | `feat/g2-keep-alive-model-residency` | Configurable local_rag Ollama keep_alive model residency | Current |
 
 GW-05a issue: <https://github.com/franciscosalido/OPENCLAW/issues/25>
 GW-05b issue: <https://github.com/franciscosalido/OPENCLAW/issues/28>
@@ -146,35 +148,34 @@ Gateway-0 sprint complete. GW-01 through GW-12 merged on `main`.
 The next sprint must start from a new explicit issue, ADR if architecture
 changes, and `git pull --ff-only origin main`.
 
-## G2-PR03 Current Work
+## G2-PR05 Current Work
 
-G2-PR03 adds a rollback-safe generation budget for `local_rag` only.
+G2-PR05 adds a rollback-safe model residency hint for `local_rag` only.
 
 Configuration:
 
 ```yaml
 rag:
-  generation_budget:
+  model_residency:
     enabled: false
     apply_to_aliases:
       - "local_rag"
-    max_tokens: 768
-    enforce_conciseness: false
-    target_sentences_min: 3
-    target_sentences_max: 6
+    keep_alive: "5m"
 ```
 
 Rules:
 
 - Default is disabled, preserving pre-PR behavior.
-- `max_tokens` is forwarded only for `local_rag` when enabled.
-- `local_chat`, `local_json`, `local_think`, retrieval, Qdrant and context
-  packing remain unchanged.
-- Optional conciseness instruction preserves citations and insufficient-context
-  behavior.
-- `RagRunTrace` records answer length and generation-budget scalar metadata,
+- `keep_alive` is forwarded only for `local_rag` when enabled.
+- `local_chat`, `local_json`, `local_think`, embeddings, retrieval, Qdrant,
+  prompt building, context budget, generation budget and fallback behavior
+  remain unchanged.
+- `RagRunTrace` records model residency scalar metadata,
   never answer text, prompt text, chunks, vectors, payloads or secrets.
-- `local_rag` keeps `extra_body.think=false` in the operational LiteLLM config.
+- G2-PR04 baseline reports can flag `keep_alive_ineffective` when warm runs
+  still show model load after a keep_alive hint.
+- No global `OLLAMA_KEEP_ALIVE`, preloading, unloading or LiteLLM provider
+  config change is introduced.
 
 ## GW-15 Current Work
 
