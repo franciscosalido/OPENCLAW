@@ -154,6 +154,8 @@ async def _maybe_await(value: T | Awaitable[T]) -> T:
     if inspect.isawaitable(value):
         return await cast(Awaitable[T], value)
     return value
+
+
 def _validate_top_k(top_k: int) -> None:
     if isinstance(top_k, bool) or not isinstance(top_k, int):
         raise TypeError("top_k must be an integer")
