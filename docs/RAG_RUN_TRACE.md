@@ -40,6 +40,19 @@ measurement-only RAG baselining:
 
 See `docs/RAG_LATENCY_BASELINE.md` for exact segment boundaries.
 
+G2-02 extends the trace with optional whole-chunk context budget fields:
+
+- `context_budget_enabled`
+- `context_budget_applied`
+- `context_chunks_retrieved`
+- `context_chunks_used`
+- `context_chunks_dropped`
+- `context_budget_max_chunks`
+- `context_estimated_tokens_used`
+
+These fields are safe scalar counts only. They do not include chunk text,
+prompt text, answers, vectors, Qdrant payloads or secrets.
+
 ## Forbidden Content
 
 The trace must never contain:

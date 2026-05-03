@@ -11,7 +11,7 @@ from typing import Any, Protocol, TypeVar, cast
 from loguru import logger
 
 from backend.rag._validation import validate_question
-from backend.rag.context_packer import ContextPacker, RetrievedChunk
+from backend.rag.context_packer import ContextBudgetResult, ContextPacker, RetrievedChunk
 
 
 DEFAULT_TOP_K = 5
@@ -80,6 +80,10 @@ class Retriever:
     top_k: int = DEFAULT_TOP_K
     score_threshold: float | None = DEFAULT_SCORE_THRESHOLD
     last_timings: RetrievalTimings | None = field(init=False, default=None)
+    last_context_budget_result: ContextBudgetResult | None = field(
+        init=False,
+        default=None,
+    )
 
     def __post_init__(self) -> None:
         _validate_top_k(self.top_k)
@@ -125,6 +129,9 @@ class Retriever:
             for index, result in enumerate(raw_results)
         ]
         packed_chunks = self.packer.pack(retrieved_chunks)
+        budget_result = getattr(self.packer, "last_budget_result", None)
+        if isinstance(budget_result, ContextBudgetResult):
+            self.last_context_budget_result = budget_result
         pack_ms = _elapsed_ms(pack_start)
 
         self.last_timings = RetrievalTimings(
@@ -147,6 +154,8 @@ async def _maybe_await(value: T | Awaitable[T]) -> T:
     if inspect.isawaitable(value):
         return await cast(Awaitable[T], value)
     return value
+
+
 def _validate_top_k(top_k: int) -> None:
     if isinstance(top_k, bool) or not isinstance(top_k, int):
         raise TypeError("top_k must be an integer")

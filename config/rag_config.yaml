@@ -56,6 +56,13 @@ rag:
     max_context_tokens: 8000
     dedup_similarity_threshold: 0.92
 
+  context_budget:
+    enabled: false
+    max_context_chunks: 3
+    mode: "whole_chunks"
+    apply_to_aliases:
+      - "local_rag"
+
   generation:
     model: "local_rag"
     reasoning_model: "local_think"

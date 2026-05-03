@@ -1,6 +1,13 @@
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
-from backend.rag.context_packer import ContextPacker, RetrievedChunk
+from backend.rag.context_packer import (
+    ContextBudgetConfig,
+    ContextPacker,
+    RetrievedChunk,
+    load_context_budget_config,
+)
 
 
 def chunk(
@@ -19,7 +26,11 @@ def chunk(
         text=text,
         token_count=token_count or len(text.split()),
         rank=rank,
-        payload={"source": "synthetic"},
+        payload={
+            "source": "synthetic",
+            "doc_id": doc_id,
+            "chunk_id": f"{doc_id}#{chunk_index}",
+        },
     )
 
 
@@ -122,6 +133,99 @@ class ContextPackerTests(unittest.TestCase):
                     "text": "texto",
                 }
             )
+
+    def test_context_budget_disabled_returns_identical_chunk_list(self) -> None:
+        packer = ContextPacker(
+            max_context_tokens=100,
+            context_budget=ContextBudgetConfig(enabled=False, max_context_chunks=1),
+        )
+        items = [
+            chunk("doc-a", 0, "primeiro trecho sintetico", 0.9),
+            chunk("doc-a", 1, "segundo trecho sintetico", 0.8),
+        ]
+
+        packed = packer.pack(items)
+
+        self.assertEqual(packed, items)
+        self.assertFalse(packer.last_budget_result.enabled)
+        self.assertFalse(packer.last_budget_result.applied)
+        self.assertEqual(packer.last_budget_result.chunks_retrieved, 2)
+        self.assertEqual(packer.last_budget_result.chunks_used, 2)
+        self.assertEqual(packer.last_budget_result.chunks_dropped, 0)
+
+    def test_context_budget_caps_whole_chunks_and_preserves_metadata(self) -> None:
+        packer = ContextPacker(
+            max_context_tokens=100,
+            context_budget=ContextBudgetConfig(enabled=True, max_context_chunks=3),
+        )
+        items = [
+            chunk("doc-a", index, f"trecho sintetico {index}", 1.0 - index / 10)
+            for index in range(5)
+        ]
+
+        packed = packer.pack(items)
+
+        self.assertEqual(len(packed), 3)
+        self.assertEqual([item.chunk_index for item in packed], [0, 1, 2])
+        self.assertEqual([item.citation_id for item in packed], ["doc-a#0", "doc-a#1", "doc-a#2"])
+        self.assertEqual(packed[0].payload["doc_id"], "doc-a")
+        self.assertEqual(packed[0].payload["chunk_id"], "doc-a#0")
+        self.assertTrue(packer.last_budget_result.enabled)
+        self.assertTrue(packer.last_budget_result.applied)
+        self.assertEqual(packer.last_budget_result.chunks_retrieved, 5)
+        self.assertEqual(packer.last_budget_result.chunks_used, 3)
+        self.assertEqual(packer.last_budget_result.chunks_dropped, 2)
+        self.assertEqual(packer.last_budget_result.max_context_chunks, 3)
+
+    def test_context_budget_not_applied_when_under_cap(self) -> None:
+        packer = ContextPacker(
+            max_context_tokens=100,
+            context_budget=ContextBudgetConfig(enabled=True, max_context_chunks=3),
+        )
+        items = [
+            chunk("doc-a", 0, "primeiro trecho sintetico", 0.9),
+            chunk("doc-a", 1, "segundo trecho sintetico", 0.8),
+        ]
+
+        packed = packer.pack(items)
+
+        self.assertEqual(packed, items)
+        self.assertTrue(packer.last_budget_result.enabled)
+        self.assertFalse(packer.last_budget_result.applied)
+        self.assertEqual(packer.last_budget_result.chunks_used, 2)
+        self.assertEqual(packer.last_budget_result.chunks_dropped, 0)
+
+    def test_context_budget_config_validation(self) -> None:
+        self.assertFalse(ContextBudgetConfig().validated().enabled)
+        self.assertEqual(ContextBudgetConfig().validated().max_context_chunks, 3)
+        with self.assertRaises(ValueError):
+            ContextBudgetConfig(enabled=True, max_context_chunks=0).validated()
+        with self.assertRaises(ValueError):
+            ContextBudgetConfig(mode="chars").validated()  # type: ignore[arg-type]
+        with self.assertRaises(ValueError):
+            ContextBudgetConfig(apply_to_aliases=("local_chat",)).validated()
+
+    def test_load_context_budget_config_reads_yaml(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "rag_config.yaml"
+            path.write_text(
+                """
+rag:
+  context_budget:
+    enabled: true
+    max_context_chunks: 2
+    mode: "whole_chunks"
+    apply_to_aliases:
+      - "local_rag"
+""",
+                encoding="utf-8",
+            )
+
+            config = load_context_budget_config(path)
+
+        self.assertTrue(config.enabled)
+        self.assertEqual(config.max_context_chunks, 2)
+        self.assertEqual(config.apply_to_aliases, ("local_rag",))
 
 
 if __name__ == "__main__":

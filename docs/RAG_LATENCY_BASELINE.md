@@ -48,6 +48,19 @@ fields:
 - `total_ms`
 - `run_context`
 
+G2-02 adds optional context budget metadata:
+
+- `context_budget_enabled`
+- `context_budget_applied`
+- `context_chunks_retrieved`
+- `context_chunks_used`
+- `context_chunks_dropped`
+- `context_budget_max_chunks`
+- `context_estimated_tokens_used`
+
+These fields are counts only. They make the whole-chunk context cap observable
+without logging chunks or prompt text.
+
 Allowed `run_context` labels:
 
 - `cold_start`

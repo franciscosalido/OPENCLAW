@@ -11,7 +11,7 @@ from uuid import uuid4
 from loguru import logger
 
 from backend.rag._validation import validate_question
-from backend.rag.context_packer import RetrievedChunk
+from backend.rag.context_packer import ContextBudgetResult, RetrievedChunk
 from backend.rag.prompt_builder import PromptBuilder
 from backend.rag.observability import (
     RagErrorCategory,
@@ -134,6 +134,7 @@ class LocalRagPipeline:
             raise
         retrieval_ms = _elapsed_ms(retrieval_start)
         retrieval_segments = _extract_retrieval_segments(self.retriever)
+        context_budget_result = _extract_context_budget_result(self.retriever)
         self._emit_pipeline_event(
             RagEventKind.RETRIEVAL_FINISHED,
             query_id=query_id,
@@ -207,6 +208,7 @@ class LocalRagPipeline:
             embedding_ms=retrieval_segments.embedding_ms,
             vector_search_ms=retrieval_segments.retrieval_ms,
             context_pack_ms=retrieval_segments.context_pack_ms,
+            context_budget_result=context_budget_result,
             prompt_ms=prompt_ms,
             generation_ms=generation_ms,
             total_ms=latency["total_ms"],
@@ -233,6 +235,7 @@ class LocalRagPipeline:
         generation_ms: float,
         total_ms: float,
         chunk_count: int,
+        context_budget_result: ContextBudgetResult | None = None,
         query_id: str | None = None,
         actual_embedding_dimensions: int | None = None,
         run_context: RagRunContext | None = None,
@@ -278,6 +281,41 @@ class LocalRagPipeline:
             embedding_ms=embedding_ms,
             retrieval_ms=vector_search_ms,
             context_pack_ms=context_pack_ms,
+            context_budget_enabled=(
+                context_budget_result.enabled
+                if context_budget_result is not None
+                else None
+            ),
+            context_budget_applied=(
+                context_budget_result.applied
+                if context_budget_result is not None
+                else None
+            ),
+            context_chunks_retrieved=(
+                context_budget_result.chunks_retrieved
+                if context_budget_result is not None
+                else None
+            ),
+            context_chunks_used=(
+                context_budget_result.chunks_used
+                if context_budget_result is not None
+                else None
+            ),
+            context_chunks_dropped=(
+                context_budget_result.chunks_dropped
+                if context_budget_result is not None
+                else None
+            ),
+            context_budget_max_chunks=(
+                context_budget_result.max_context_chunks
+                if context_budget_result is not None
+                else None
+            ),
+            context_estimated_tokens_used=(
+                context_budget_result.estimated_tokens_used
+                if context_budget_result is not None
+                else None
+            ),
             prompt_build_ms=prompt_ms,
             generation_ms=generation_ms,
             total_ms=total_ms,
@@ -355,6 +393,13 @@ def _extract_retrieval_segments(retriever: object) -> _RetrievalSegments:
         retrieval_ms=_optional_timing(search_ms),
         context_pack_ms=_optional_timing(pack_ms),
     )
+
+
+def _extract_context_budget_result(retriever: object) -> ContextBudgetResult | None:
+    result = getattr(retriever, "last_context_budget_result", None)
+    if isinstance(result, ContextBudgetResult):
+        return result
+    return None
 
 
 def _optional_timing(value: object) -> float | None:
