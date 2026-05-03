@@ -156,6 +156,38 @@ class RagLatencyBaselineTests(unittest.TestCase):
                 error_category=None,
             )
         )
+        # Mislabelled cold start — model was already warm
+        self.assertFalse(
+            baseline._run_type_verified(
+                run_type="cold_start",
+                model_load_observed=False,
+                error_category=None,
+            )
+        )
+        # Cold start unverifiable — no Ollama metrics
+        self.assertIsNone(
+            baseline._run_type_verified(
+                run_type="cold_start",
+                model_load_observed=None,
+                error_category=None,
+            )
+        )
+        # Mislabelled warm — model loaded during claimed warm run
+        self.assertFalse(
+            baseline._run_type_verified(
+                run_type="warm_model",
+                model_load_observed=True,
+                error_category=None,
+            )
+        )
+        # Degraded run that did not actually fail
+        self.assertFalse(
+            baseline._run_type_verified(
+                run_type="degraded_qdrant",
+                model_load_observed=None,
+                error_category=None,
+            )
+        )
 
     def test_tokens_per_second_computed_safely(self) -> None:
         self.assertEqual(
