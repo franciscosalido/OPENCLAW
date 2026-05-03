@@ -741,8 +741,9 @@ Append or paste this at the end of substantial sessions:
   validated `run_context`, safe Ollama metric extraction/conversion from
   already-available metadata only.
 - `backend/rag/pipeline.py`: populates trace segment timings from existing
-  pipeline timers and `Retriever.last_timings`; `routing_ms` is `0.0` for
-  direct `LocalRagPipeline` because Agent routing lives outside the pipeline.
+  pipeline timers and `Retriever.last_timings`; `routing_ms` is absent/`None`
+  for direct `LocalRagPipeline` because Agent routing lives outside the
+  pipeline.
 - `backend/gateway/observability_contract.py`: allowlist extended for G2
   trace fields.
 - `tests/unit/test_rag_run_trace.py`: optional field, serialization,
@@ -775,5 +776,56 @@ Append or paste this at the end of substantial sessions:
   dependencies.
 
 ### Deferred
-- `scripts/run_rag_latency_baseline.py` and the formal 3-run
-  cold/warm/degraded report are deferred to G2-02.
+- First optimization experiment: configurable context budget cap for
+  `local_rag`.
+
+---
+
+## Handoff — 2026-05-02
+
+**Agent:** Codex
+**Branch:** `feat/g2-local-rag-context-budget-cap`
+**Issue/PR:** pending
+**Task:** G2-02 — configurable local_rag context budget cap.
+
+### Changed
+- `backend/rag/context_packer.py`: added `ContextBudgetConfig`,
+  `ContextBudgetResult`, YAML loader and optional whole-chunk cap.
+- `backend/rag/retriever.py`: exposes `last_context_budget_result` after
+  packing so pipeline traces can record safe budget metadata.
+- `backend/rag/pipeline.py`: forwards budget metadata into `RagRunTrace`.
+- `backend/rag/run_trace.py`: optional context budget fields and validation.
+- `backend/gateway/observability_contract.py`: trace allowlist extended for
+  context budget fields.
+- `config/rag_config.yaml`: added rollback-safe `rag.context_budget` with
+  `enabled: false`, `max_context_chunks: 3`, `mode: whole_chunks`,
+  `apply_to_aliases: [local_rag]`.
+- `docs/RAG_CONTEXT_BUDGET.md`, `docs/RAG_LATENCY_BASELINE.md`,
+  `docs/RAG_RUN_TRACE.md`: context budget contract, rollback and trace docs.
+- `scripts/run_rag_latency_baseline.py`: typing-only fix so strict gates pass.
+- `tests/unit/test_context_packer.py`, `tests/unit/test_rag_run_trace.py`,
+  `tests/unit/test_embedding_contract_config.py`: config, cap and trace tests.
+
+### Validation
+- `git diff --check` — passed.
+- `uv run pytest tests/unit/test_context_packer.py -v` — 12 passed.
+- `uv run pytest tests/unit/test_rag_run_trace.py -v` — 24 passed.
+- `uv run pytest tests/unit/test_embedding_contract_config.py -v` — 9 passed.
+- `uv run pytest -v` — 356 passed, 7 skipped, 142 subtests passed.
+- `uv run mypy --strict .` — 0 errors.
+- `uv run pyright` — 0 errors.
+- `uv run pytest tests/smoke/ -v` — 5 passed, 7 skipped.
+
+### Not Changed
+- No `top_k`, retrieval defaults, Qdrant search, embeddings, model aliases,
+  prompt template, generation settings, timeout values or fallback behavior
+  changed.
+- No Qdrant mutation, reindexing or `openclaw_knowledge` access.
+- No remote providers, new dependencies, OpenTelemetry, dashboards, profiling
+  framework or pytest-benchmark.
+- Agent-0 runner output schema unchanged.
+
+### Deferred
+- Token-based context budgeting.
+- Full token economy recalibration after final capped prompt construction.
+- Mandatory live Golden Harness quality/latency comparison.

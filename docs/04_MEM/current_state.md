@@ -739,7 +739,50 @@ Safety:
 - No prompt, question, chunks, answer, vectors, payloads, API keys,
   Authorization headers, raw exceptions or tracebacks in trace serialization.
 
+Deferred from G2-01:
+
+- First optimization experiment: configurable local RAG context budget cap.
+
+## G2-02 Current Work
+
+G2-02 adds a rollback-safe, config-controlled context budget cap for
+`local_rag`:
+
+```text
+retrieved chunks
+  -> existing ContextPacker dedup/token-limit/document ordering
+  -> optional whole-chunk max_context_chunks cap
+  -> PromptBuilder
+  -> LocalGenerator/local_rag
+```
+
+Scope:
+
+- Add `rag.context_budget` to `config/rag_config.yaml`:
+  `enabled: false`, `max_context_chunks: 3`, `mode: whole_chunks`,
+  `apply_to_aliases: [local_rag]`.
+- Add typed `ContextBudgetConfig` and `ContextBudgetResult`.
+- Apply the cap in `ContextPacker` only, after existing packing logic.
+- Preserve whole chunks, citation ids, `doc_id`, `chunk_index`, and payload
+  metadata.
+- Expose safe trace metadata on `RagRunTrace`:
+  `context_budget_enabled`, `context_budget_applied`,
+  `context_chunks_retrieved`, `context_chunks_used`,
+  `context_chunks_dropped`, `context_budget_max_chunks`, and
+  `context_estimated_tokens_used`.
+
+Safety:
+
+- Default `enabled: false` preserves existing behavior.
+- Rollback is a single config change.
+- No retrieval/top-k/Qdrant/model alias/prompt template/timeout change.
+- No Qdrant mutation, no reindex, no `openclaw_knowledge` access.
+- No prompt, chunks, answer, vectors, payloads, secrets, Authorization headers,
+  raw exceptions or tracebacks in trace serialization.
+
 Deferred:
 
-- Dedicated 3-run cold/warm/degraded baseline command is deferred to G2-02 to
-  keep G2-01 focused on trace schema and segment instrumentation.
+- Token-based context budgeting.
+- Full recalibration of `estimated_remote_tokens_avoided` against the final
+  capped prompt.
+- Mandatory live Golden Harness before/after gate.
