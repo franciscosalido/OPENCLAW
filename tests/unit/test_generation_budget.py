@@ -114,6 +114,24 @@ rag:
         self.assertEqual(config.target_sentences_min, 2)
         self.assertEqual(config.target_sentences_max, 5)
 
+    def test_load_generation_budget_config_validates_at_load_boundary(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "rag_config.yaml"
+            path.write_text(
+                """
+rag:
+  generation_budget:
+    enabled: true
+    apply_to_aliases:
+      - local_rag
+    max_tokens: 0
+""",
+                encoding="utf-8",
+            )
+
+            with self.assertRaises(ValueError):
+                load_generation_budget_config(path)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -109,11 +109,10 @@ def decide_generation_budget(
     alias: str | None,
 ) -> GenerationBudgetDecision:
     """Return the generation budget decision for one model alias."""
-    normalized = config.validated()
     if (
-        not normalized.enabled
+        not config.enabled
         or alias is None
-        or alias not in normalized.apply_to_aliases
+        or alias not in config.apply_to_aliases
     ):
         return GenerationBudgetDecision(
             enabled=False,
@@ -121,13 +120,13 @@ def decide_generation_budget(
             conciseness_instruction=None,
         )
     instruction = (
-        _conciseness_instruction(normalized)
-        if normalized.enforce_conciseness
+        _conciseness_instruction(config)
+        if config.enforce_conciseness
         else None
     )
     return GenerationBudgetDecision(
         enabled=True,
-        max_tokens=normalized.max_tokens,
+        max_tokens=config.max_tokens,
         conciseness_instruction=instruction,
     )
 
