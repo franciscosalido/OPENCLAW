@@ -82,6 +82,10 @@ Allowed `run_context` labels:
 Normal runtime may leave `run_context` unset. Baseline runs should label
 cold/warm/degraded explicitly so reports are distinguishable without rerunning.
 
+G2-04 makes the report-level label mandatory as `run_type`. New baseline
+records without `run_type` are invalid. `run_context` remains the pipeline trace
+label, while `run_type` is the benchmark report contract.
+
 ## Ollama Metrics
 
 `RagRunTrace` can store native Ollama metric fields only if they are already
@@ -102,6 +106,20 @@ metrics are not available in normal `local_rag` traces. G2-01 records
 
 Do not bypass LiteLLM, call Ollama directly, duplicate generation calls, or log
 prompt/answer text to recover these metrics.
+
+G2-04 preserves native Ollama metrics in baseline reports when they are already
+available in `RagRunTrace`, including `ollama_load_duration_ms`,
+`ollama_prompt_eval_duration_ms`, `ollama_eval_duration_ms`, and
+`ollama_eval_count`. If they are unavailable, reports use safe enum-style
+reasons only:
+
+- `not_forwarded_by_gateway`
+- `not_present_in_response`
+- `not_applicable_degraded`
+- `unknown`
+
+`model_load_observed` is derived from `ollama_load_duration_ms > 500.0`. If
+`ollama_load_duration_ms` is unavailable, `model_load_observed` is `null`.
 
 ## Safety
 
@@ -129,6 +147,53 @@ See `docs/RAG_GENERATION_BUDGET.md` for the rollback-safe configuration and
 validation contract.
 
 Serialization uses explicit allowlists and optional scalar fields only.
+
+## G2-04 Cold/Warm/Degraded Separation
+
+G2-04 is measurement-only. It does not tune `keep_alive`, preload models, unload
+models, change model config, change aliases, mutate Qdrant, alter retrieval, or
+change fallback behavior.
+
+The baseline command remains opt-in:
+
+```bash
+RUN_RAG_LATENCY_BASELINE=1 uv run python scripts/run_rag_latency_baseline.py \
+  --output-dir /tmp/openclaw_g2_cold_warm
+```
+
+Generated reports include:
+
+- one record per `run_type`;
+- `alias`;
+- safe model name;
+- hardware snapshot;
+- Ollama metric availability;
+- model residency check result from read-only Ollama `/api/ps`;
+- grouped latency aggregates by alias and `run_type`.
+
+The `/api/ps` residency check is best-effort and local-only. It uses
+`OLLAMA_API_BASE` when present, refuses non-local URLs, and records `null` if
+the check is unavailable. It does not fail the whole benchmark just because
+`/api/ps` is missing.
+
+Cold start is operational and best-effort unless the operator ensures the model
+is not already resident. Warm-model results are meaningful only when model
+residency is observed or `ollama_load_duration_ms` indicates no load cost.
+
+`cold_start`, `warm_model`, and `degraded_qdrant` numbers must never be averaged
+into one global latency number. Reports group `mean_total_ms`, `p50_total_ms`,
+and `p95_total_ms` by alias and `run_type`.
+
+Existing reports can be validated without live services:
+
+```bash
+uv run python scripts/run_rag_latency_baseline.py \
+  --verify-only /tmp/openclaw_g2_cold_warm/<report>.json
+```
+
+`degraded_qdrant` is isolated from successful `local_rag` runs. It exists to
+verify failure/degradation measurement shape, not to represent normal RAG
+quality or latency.
 
 ## Baseline Runs
 
