@@ -90,7 +90,16 @@ class RagTracingConfig:
 
 @dataclass(frozen=True)
 class RagRunTrace:
-    """Safe provenance metadata for one RAG query execution."""
+    """Safe provenance metadata for one RAG query execution.
+
+    Compatibility note: legacy latency fields are intentionally retained while
+    Gateway-2 segment fields stabilize. ``prompt_latency_ms`` mirrors
+    ``prompt_build_ms``, ``generation_latency_ms`` mirrors ``generation_ms``,
+    and ``total_latency_ms`` mirrors ``total_ms`` when both fields are present.
+    New consumers should prefer ``prompt_build_ms``, ``generation_ms`` and
+    ``total_ms``. Legacy fields may be considered for removal only in a future
+    schema-versioned PR.
+    """
 
     query_id: str
     timestamp_utc: str

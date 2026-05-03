@@ -72,14 +72,15 @@ class PromptBuilderTests(unittest.TestCase):
 
         messages = builder.build("Qual o impacto da Selic?", [chunk()])
 
-        self.assertNotIn("Answer concisely", messages[1]["content"])
+        self.assertNotIn("Responda de forma concisa", messages[1]["content"])
 
     def test_conciseness_instruction_is_added_when_provided(self) -> None:
         builder = PromptBuilder()
         instruction = (
-            "Answer concisely, usually in 3-6 sentences. Preserve the most "
-            "important evidence and include inline citations when context is "
-            "available. If the context is insufficient, say so clearly."
+            "Responda de forma concisa, normalmente em 3 a 6 frases. Preserve "
+            "as evidencias mais relevantes e inclua citacoes quando o contexto "
+            "estiver disponivel. Se o contexto for insuficiente, diga isso "
+            "claramente."
         )
 
         messages = builder.build(
@@ -89,9 +90,9 @@ class PromptBuilderTests(unittest.TestCase):
         )
 
         user_content = messages[1]["content"]
-        self.assertIn("Answer concisely", user_content)
-        self.assertIn("include inline citations", user_content)
-        self.assertIn("context is insufficient", user_content)
+        self.assertIn("Responda de forma concisa", user_content)
+        self.assertIn("inclua citacoes", user_content)
+        self.assertIn("contexto for insuficiente", user_content)
         self.assertIn("[doc-a#0]", user_content)
         self.assertEqual(builder.system_prompt, PromptBuilder().system_prompt)
 

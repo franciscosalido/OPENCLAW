@@ -66,9 +66,9 @@ class GenerationBudgetConfigTests(unittest.TestCase):
 
         self.assertTrue(decision.conciseness_instruction_applied)
         assert decision.conciseness_instruction is not None
-        self.assertIn("3-6 sentences", decision.conciseness_instruction)
-        self.assertIn("citations", decision.conciseness_instruction)
-        self.assertIn("context is insufficient", decision.conciseness_instruction)
+        self.assertIn("3 a 6 frases", decision.conciseness_instruction)
+        self.assertIn("citacoes", decision.conciseness_instruction)
+        self.assertIn("contexto for insuficiente", decision.conciseness_instruction)
 
     def test_validation_rejects_invalid_max_tokens(self) -> None:
         with self.assertRaises(ValueError):

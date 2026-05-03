@@ -298,6 +298,24 @@ class RagRunTraceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(data["run_context"], "warm_model")
         self.assertTrue(FORBIDDEN_KEYS.isdisjoint({key.lower() for key in data}))
 
+    def test_legacy_latency_fields_mirror_segment_fields_for_compatibility(self) -> None:
+        # Intentional backward compatibility, not accidental duplication:
+        # new consumers should prefer prompt_build_ms/generation_ms/total_ms.
+        trace = _trace(
+            prompt_latency_ms=0.5,
+            generation_latency_ms=31.0,
+            total_latency_ms=35.0,
+            prompt_build_ms=0.5,
+            generation_ms=31.0,
+            total_ms=35.0,
+        )
+
+        data = trace.to_log_dict()
+
+        self.assertEqual(data["prompt_latency_ms"], data["prompt_build_ms"])
+        self.assertEqual(data["generation_latency_ms"], data["generation_ms"])
+        self.assertEqual(data["total_latency_ms"], data["total_ms"])
+
     def test_invalid_generation_budget_max_tokens_raises(self) -> None:
         with self.assertRaises(ValueError):
             _trace(generation_budget_max_tokens=0)
@@ -652,8 +670,8 @@ class RagRunTraceTests(unittest.IsolatedAsyncioTestCase):
             logger.remove(sink_id)
 
         self.assertEqual(generator.max_tokens_seen, 768)
-        self.assertIn("Answer concisely", result.messages[1]["content"])
-        self.assertIn("include inline citations", result.messages[1]["content"])
+        self.assertIn("Responda de forma concisa", result.messages[1]["content"])
+        self.assertIn("inclua citacoes", result.messages[1]["content"])
         self.assertEqual(len(traces), 1)
         trace = traces[0]
         self.assertEqual(trace["generation_budget_enabled"], True)
@@ -678,7 +696,7 @@ class RagRunTraceTests(unittest.IsolatedAsyncioTestCase):
         result = await pipeline.ask("Pergunta sintetica?")
 
         self.assertIsNone(generator.max_tokens_seen)
-        self.assertNotIn("Answer concisely", result.messages[1]["content"])
+        self.assertNotIn("Responda de forma concisa", result.messages[1]["content"])
 
     async def test_generation_budget_does_not_apply_to_non_rag_alias(self) -> None:
         generator = CapturingGenerator("local_chat")
@@ -697,7 +715,7 @@ class RagRunTraceTests(unittest.IsolatedAsyncioTestCase):
         result = await pipeline.ask("Pergunta sintetica?")
 
         self.assertIsNone(generator.max_tokens_seen)
-        self.assertNotIn("Answer concisely", result.messages[1]["content"])
+        self.assertNotIn("Responda de forma concisa", result.messages[1]["content"])
 
     def test_load_rag_tracing_config_reads_yaml_defaults(self) -> None:
         config = load_rag_tracing_config()

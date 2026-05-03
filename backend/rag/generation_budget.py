@@ -179,11 +179,11 @@ def load_generation_budget_config(
 
 def _conciseness_instruction(config: GenerationBudgetConfig) -> str:
     return (
-        "Answer concisely, usually in "
-        f"{config.target_sentences_min}-{config.target_sentences_max} sentences. "
-        "Preserve the most important evidence and include inline citations when "
-        "context is available. Do not repeat retrieved passages verbatim. If "
-        "the context is insufficient, say so clearly."
+        "Responda de forma concisa, normalmente em "
+        f"{config.target_sentences_min} a {config.target_sentences_max} frases. "
+        "Preserve as evidencias mais relevantes e inclua citacoes quando o "
+        "contexto estiver disponivel. Nao repita trechos recuperados na integra. "
+        "Se o contexto for insuficiente, diga isso claramente."
     )
 
 
