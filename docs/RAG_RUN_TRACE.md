@@ -75,6 +75,13 @@ These fields are safe scalar metadata only. They record the intended
 `keep_alive` hint without storing prompt text, answer text, raw responses,
 headers or secrets.
 
+`keep_alive_value` reflects the value from `rag.model_residency.keep_alive` in
+`rag_config.yaml`. Allowed values are `"0"`, `"30s"`, `"1m"`, `"5m"`, `"10m"`,
+`"30m"`, `"1h"`, `"2h"`, `"6h"`, and `"-1"`. The value `"-1"` keeps the model
+resident in VRAM indefinitely — use with caution on memory-constrained machines.
+See `docs/RAG_LATENCY_BASELINE.md` for the full residency configuration
+reference.
+
 ## Forbidden Content
 
 The trace must never contain:
