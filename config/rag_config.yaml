@@ -64,6 +64,9 @@ rag:
       - "local_rag"
 
   generation_budget:
+    # G2-03 is validated only for local_rag with thinking_mode=false.
+    # Do not enable this budget for thinking aliases: Qwen3 reasoning tokens can
+    # consume the same max_tokens/num_predict budget before final answer tokens.
     enabled: false
     apply_to_aliases:
       - "local_rag"

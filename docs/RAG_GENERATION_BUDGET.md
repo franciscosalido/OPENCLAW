@@ -52,6 +52,21 @@ It does not apply to:
 
 G2-03 intentionally keeps JSON mode and default chat behavior unchanged.
 
+## Thinking Mode Warning
+
+G2-03 validates `generation_budget` for `local_rag` with
+`thinking_mode=false`. The combination of `generation_budget` and
+`thinking_mode=True` is untested.
+
+For Qwen3 thinking runs, reasoning tokens may consume the same
+`max_tokens` / `num_predict` budget before final answer tokens are produced.
+With a cap such as 768 tokens, this can truncate reasoning or leave little to
+no useful final answer.
+
+Do not enable `generation_budget` for thinking aliases until a dedicated
+benchmark validates that path. `local_rag` should remain `think=false` for this
+optimization.
+
 ## Max Tokens
 
 When enabled and `max_tokens` is set, `LocalRagPipeline` forwards the cap to the
