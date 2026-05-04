@@ -65,6 +65,28 @@ G2-03 extends the trace with optional `local_rag` generation budget fields:
 These fields are safe scalar metadata only. They make output length and budget
 application observable without storing answer text.
 
+G2-05 extends the trace with optional `local_rag` model residency fields:
+
+- `model_residency_enabled`
+- `keep_alive_value`
+- `keep_alive_applied`
+- `keep_alive_skipped_reason`
+
+These fields are safe scalar metadata only. They record the intended
+`keep_alive` hint without storing prompt text, answer text, raw responses,
+headers or secrets.
+
+`keep_alive_skipped_reason` is emitted only when no hint is sent and uses one
+of three safe reason codes: `disabled`, `alias_not_in_scope`, or
+`no_keep_alive_value`.
+
+`keep_alive_value` reflects the value from `rag.model_residency.keep_alive` in
+`rag_config.yaml`. Valid values match `^-?\d+(?:s|m|h)?$`; examples include
+`"0"`, `"-1"`, `"30s"`, `"1m"`, `"5m"`, `"10m"`, and `"24h"`. The value `"-1"`
+keeps the model resident in VRAM indefinitely — use with caution on
+memory-constrained machines. See `docs/RAG_LATENCY_BASELINE.md` for the full
+residency configuration reference.
+
 ## Forbidden Content
 
 The trace must never contain:

@@ -159,6 +159,19 @@ class EmbeddingContractConfigTests(unittest.TestCase):
             },
         )
 
+    def test_rag_config_model_residency_is_rollback_safe_by_default(self) -> None:
+        raw = _load_yaml(RAG_CONFIG)
+        model_residency = raw["rag"]["model_residency"]
+
+        self.assertEqual(
+            model_residency,
+            {
+                "enabled": False,
+                "apply_to_aliases": ["local_rag"],
+                "keep_alive": "5m",
+            },
+        )
+
     def test_application_facing_embedding_alias_hides_concrete_model(self) -> None:
         self.assertNotIn("nomic", DEFAULT_LLM_EMBED_MODEL)
         self.assertNotIn("ollama/", DEFAULT_LLM_EMBED_MODEL)

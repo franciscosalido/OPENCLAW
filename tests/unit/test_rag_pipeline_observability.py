@@ -49,8 +49,9 @@ class FakeGenerator:
         temperature: float | None = None,
         thinking_mode: bool = False,
         max_tokens: int | None = None,
+        keep_alive: str | None = None,
     ) -> str:
-        del max_tokens
+        del max_tokens, keep_alive
         return "Resposta sintetica com citacao [obs_doc#0]."
 
 
