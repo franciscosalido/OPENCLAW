@@ -167,11 +167,16 @@ Rules:
 
 - Default is disabled, preserving pre-PR behavior.
 - `keep_alive` is forwarded only for `local_rag` when enabled.
+- `keep_alive` is validated with `^-?\d+(?:s|m|h)?$`; examples include
+  `"0"`, `"-1"`, `"30s"`, `"1m"`, `"5m"`, `"10m"` and `"24h"`.
+- `"-1"` emits a safe structured warning because it requests indefinite model
+  residency.
 - `local_chat`, `local_json`, `local_think`, embeddings, retrieval, Qdrant,
   prompt building, context budget, generation budget and fallback behavior
   remain unchanged.
-- `RagRunTrace` records model residency scalar metadata,
-  never answer text, prompt text, chunks, vectors, payloads or secrets.
+- `RagRunTrace` records model residency scalar metadata and
+  `keep_alive_skipped_reason`, never answer text, prompt text, chunks, vectors,
+  payloads or secrets.
 - G2-PR04 baseline reports can flag `keep_alive_ineffective` when warm runs
   still show model load after a keep_alive hint.
 - No global `OLLAMA_KEEP_ALIVE`, preloading, unloading or LiteLLM provider

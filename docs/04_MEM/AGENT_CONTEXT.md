@@ -230,13 +230,16 @@ G2-PR05 rules:
 - Model residency is configured under `rag.model_residency`.
 - Default is rollback-safe: `enabled: false`.
 - `keep_alive` forwarding applies only to `local_rag`.
+- `keep_alive` must match `^-?\d+(?:s|m|h)?$`; `"0"` and `"-1"` are valid
+  operational values.
+- `"-1"` emits one safe structured warning for indefinite model residency.
 - `local_chat`, `local_json`, `local_think`, embeddings, retrieval, context
   packing, generation budget, Qdrant, aliases, timeouts and fallback behavior
   remain unchanged.
 - No global `OLLAMA_KEEP_ALIVE`, model preload/unload, LiteLLM provider config
   change or warmup-on-init is introduced.
-- Trace fields are scalar only: model residency enabled, keep_alive value and
-  keep_alive applied.
+- Trace fields are scalar only: model residency enabled, keep_alive value,
+  keep_alive applied and keep_alive skipped reason.
 - G2-PR04 baseline report can flag `keep_alive_ineffective` for warm runs that
   still show model load after a keep_alive hint.
 - No answer text, prompts, chunks, vectors, payloads or secrets are serialized.
