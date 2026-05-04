@@ -387,6 +387,11 @@ class LocalRagPipeline:
                 if model_residency is not None
                 else None
             ),
+            keep_alive_skipped_reason=(
+                model_residency.skipped_reason
+                if model_residency is not None
+                else None
+            ),
             prompt_build_ms=prompt_ms,
             generation_ms=generation_ms,
             total_ms=total_ms,

@@ -137,6 +137,7 @@ class RagRunTrace:
     model_residency_enabled: bool | None = None
     keep_alive_value: str | None = None
     keep_alive_applied: bool | None = None
+    keep_alive_skipped_reason: str | None = None
     prompt_build_ms: float | None = None
     generation_ms: float | None = None
     total_ms: float | None = None
@@ -232,6 +233,12 @@ class RagRunTrace:
                 raise TypeError(f"{field_name} must be boolean when provided")
         if self.keep_alive_value is not None:
             _validate_non_empty(self.keep_alive_value, "keep_alive_value")
+        if self.keep_alive_skipped_reason is not None:
+            _validate_allowed_value(
+                self.keep_alive_skipped_reason,
+                "keep_alive_skipped_reason",
+                {"disabled", "alias_not_in_scope", "no_keep_alive_value"},
+            )
         if self.run_context is not None and self.run_context not in RUN_CONTEXTS:
             raise ValueError(
                 f"run_context must be one of {sorted(RUN_CONTEXTS)}"
@@ -299,6 +306,7 @@ class RagRunTrace:
             "model_residency_enabled": self.model_residency_enabled,
             "keep_alive_value": self.keep_alive_value,
             "keep_alive_applied": self.keep_alive_applied,
+            "keep_alive_skipped_reason": self.keep_alive_skipped_reason,
             "prompt_build_ms": self.prompt_build_ms,
             "generation_ms": self.generation_ms,
             "total_ms": self.total_ms,
@@ -356,6 +364,7 @@ def build_rag_run_trace(
     model_residency_enabled: bool | None = None,
     keep_alive_value: str | None = None,
     keep_alive_applied: bool | None = None,
+    keep_alive_skipped_reason: str | None = None,
     prompt_build_ms: float | None = None,
     generation_ms: float | None = None,
     total_ms: float | None = None,
@@ -405,6 +414,7 @@ def build_rag_run_trace(
         model_residency_enabled=model_residency_enabled,
         keep_alive_value=keep_alive_value,
         keep_alive_applied=keep_alive_applied,
+        keep_alive_skipped_reason=keep_alive_skipped_reason,
         prompt_build_ms=prompt_build_ms,
         generation_ms=generation_ms,
         total_ms=total_ms,
@@ -578,3 +588,12 @@ def _validate_non_negative_float(value: float, field_name: str) -> None:
         raise TypeError(f"{field_name} must be numeric")
     if float(value) < 0.0:
         raise ValueError(f"{field_name} cannot be negative")
+
+
+def _validate_allowed_value(
+    value: str,
+    field_name: str,
+    allowed: set[str],
+) -> None:
+    if value not in allowed:
+        raise ValueError(f"{field_name} must be one of {sorted(allowed)}")

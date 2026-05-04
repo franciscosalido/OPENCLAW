@@ -2,18 +2,25 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
+from loguru import logger
 
 
 LOCAL_RAG_ALIAS = "local_rag"
 ALLOWED_MODEL_RESIDENCY_ALIASES = frozenset({LOCAL_RAG_ALIAS})
-ALLOWED_KEEP_ALIVE_VALUES = frozenset({"0", "30s", "1m", "5m", "10m", "30m", "1h", "2h", "6h", "-1"})
 DEFAULT_KEEP_ALIVE = "5m"
+KEEP_ALIVE_PATTERN = re.compile(r"^-?\d+(?:s|m|h)?$")
+ModelResidencySkippedReason = Literal[
+    "disabled",
+    "alias_not_in_scope",
+    "no_keep_alive_value",
+]
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_RAG_CONFIG_PATH = REPO_ROOT / "config" / "rag_config.yaml"
 
@@ -24,7 +31,7 @@ class ModelResidencyConfig:
 
     enabled: bool = False
     apply_to_aliases: tuple[str, ...] = (LOCAL_RAG_ALIAS,)
-    keep_alive: str = DEFAULT_KEEP_ALIVE
+    keep_alive: str | None = DEFAULT_KEEP_ALIVE
 
     def validated(self) -> ModelResidencyConfig:
         """Return normalized config or raise a clear validation error."""
@@ -50,6 +57,7 @@ class ModelResidencyDecision:
 
     enabled: bool
     keep_alive: str | None
+    skipped_reason: ModelResidencySkippedReason | None = None
 
     @property
     def keep_alive_applied(self) -> bool:
@@ -63,13 +71,34 @@ def decide_model_residency(
     alias: str | None,
 ) -> ModelResidencyDecision:
     """Return the model residency decision for one model alias."""
-    if (
-        not config.enabled
-        or alias is None
-        or alias not in config.apply_to_aliases
-    ):
-        return ModelResidencyDecision(enabled=False, keep_alive=None)
-    return ModelResidencyDecision(enabled=True, keep_alive=config.keep_alive)
+    if not config.enabled:
+        return ModelResidencyDecision(
+            enabled=False,
+            keep_alive=None,
+            skipped_reason="disabled",
+        )
+    if alias is None or alias not in config.apply_to_aliases:
+        return ModelResidencyDecision(
+            enabled=True,
+            keep_alive=None,
+            skipped_reason="alias_not_in_scope",
+        )
+    if config.keep_alive is None:
+        return ModelResidencyDecision(
+            enabled=True,
+            keep_alive=None,
+            skipped_reason="no_keep_alive_value",
+        )
+    if config.keep_alive == "-1":
+        logger.bind(
+            event="model_residency_indefinite_keep_alive",
+            alias=alias,
+        ).warning("model_residency_indefinite_keep_alive")
+    return ModelResidencyDecision(
+        enabled=True,
+        keep_alive=config.keep_alive,
+        skipped_reason=None,
+    )
 
 
 def load_model_residency_config(
@@ -94,7 +123,7 @@ def load_model_residency_config(
             "apply_to_aliases",
             (LOCAL_RAG_ALIAS,),
         ),
-        keep_alive=_string_value(
+        keep_alive=_optional_string_value(
             model_residency,
             "keep_alive",
             DEFAULT_KEEP_ALIVE,
@@ -109,8 +138,14 @@ def _bool_value(mapping: Mapping[str, Any], key: str, default: bool) -> bool:
     return value
 
 
-def _string_value(mapping: Mapping[str, Any], key: str, default: str) -> str:
+def _optional_string_value(
+    mapping: Mapping[str, Any],
+    key: str,
+    default: str | None,
+) -> str | None:
     value = mapping.get(key, default)
+    if value is None:
+        return None
     if not isinstance(value, str):
         raise TypeError(f"rag.model_residency.{key} must be a string")
     return value
@@ -141,13 +176,15 @@ def _validate_model_residency_alias(alias: object) -> str:
     return value
 
 
-def _validate_keep_alive(value: object) -> str:
+def _validate_keep_alive(value: object) -> str | None:
+    if value is None:
+        return None
     if not isinstance(value, str):
         raise TypeError("rag.model_residency.keep_alive must be a string")
     clean = value.strip()
-    if clean not in ALLOWED_KEEP_ALIVE_VALUES:
+    if not clean or KEEP_ALIVE_PATTERN.fullmatch(clean) is None:
         raise ValueError(
-            "rag.model_residency.keep_alive must be one of "
-            f"{sorted(ALLOWED_KEEP_ALIVE_VALUES)}"
+            "rag.model_residency.keep_alive must match "
+            "^-?\\d+(?:s|m|h)?$"
         )
     return clean

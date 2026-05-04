@@ -254,6 +254,7 @@ class RagRunTraceTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(trace.model_residency_enabled)
         self.assertIsNone(trace.keep_alive_value)
         self.assertIsNone(trace.keep_alive_applied)
+        self.assertIsNone(trace.keep_alive_skipped_reason)
         self.assertFalse(trace.ollama_metrics_available)
         self.assertTrue(FORBIDDEN_KEYS.isdisjoint({key.lower() for key in data}))
 
@@ -279,6 +280,7 @@ class RagRunTraceTests(unittest.IsolatedAsyncioTestCase):
             model_residency_enabled=True,
             keep_alive_value="5m",
             keep_alive_applied=True,
+            keep_alive_skipped_reason=None,
             prompt_build_ms=0.5,
             generation_ms=31.0,
             total_ms=35.0,
@@ -307,6 +309,7 @@ class RagRunTraceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(data["model_residency_enabled"], True)
         self.assertEqual(data["keep_alive_value"], "5m")
         self.assertEqual(data["keep_alive_applied"], True)
+        self.assertNotIn("keep_alive_skipped_reason", data)
         self.assertEqual(data["prompt_build_ms"], 0.5)
         self.assertEqual(data["generation_ms"], 31.0)
         self.assertEqual(data["total_ms"], 35.0)
@@ -338,6 +341,22 @@ class RagRunTraceTests(unittest.IsolatedAsyncioTestCase):
     def test_empty_keep_alive_value_raises(self) -> None:
         with self.assertRaises(ValueError):
             _trace(keep_alive_value=" ")
+
+    def test_invalid_keep_alive_skipped_reason_raises(self) -> None:
+        with self.assertRaises(ValueError):
+            _trace(keep_alive_skipped_reason="free_form")
+
+    def test_keep_alive_skipped_reason_serializes_safely(self) -> None:
+        data = _trace(
+            model_residency_enabled=False,
+            keep_alive_applied=False,
+            keep_alive_skipped_reason="disabled",
+        ).to_log_dict()
+
+        self.assertEqual(data["model_residency_enabled"], False)
+        self.assertEqual(data["keep_alive_applied"], False)
+        self.assertEqual(data["keep_alive_skipped_reason"], "disabled")
+        self.assertTrue(FORBIDDEN_KEYS.isdisjoint({key.lower() for key in data}))
 
     def test_total_ms_is_direct_field_not_sum_assumption(self) -> None:
         trace = _trace(
@@ -777,6 +796,7 @@ class RagRunTraceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(trace["model_residency_enabled"], True)
         self.assertEqual(trace["keep_alive_value"], "5m")
         self.assertEqual(trace["keep_alive_applied"], True)
+        self.assertNotIn("keep_alive_skipped_reason", trace)
         self.assertTrue(FORBIDDEN_KEYS.isdisjoint({key.lower() for key in trace}))
 
     async def test_model_residency_does_not_apply_to_non_rag_alias(self) -> None:

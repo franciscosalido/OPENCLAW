@@ -3,9 +3,11 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any
+
+from loguru import logger
 
 from backend.rag.model_residency import (
-    ALLOWED_KEEP_ALIVE_VALUES,
     ModelResidencyConfig,
     decide_model_residency,
     load_model_residency_config,
@@ -25,13 +27,13 @@ class ModelResidencyConfigTests(unittest.TestCase):
         self.assertFalse(decision.keep_alive_applied)
 
     def test_keep_alive_allowlist_accepts_expected_values(self) -> None:
-        for keep_alive in sorted(ALLOWED_KEEP_ALIVE_VALUES):
+        for keep_alive in ("0", "-1", "30s", "1m", "5m", "10m", "24h"):
             with self.subTest(keep_alive=keep_alive):
                 config = ModelResidencyConfig(keep_alive=keep_alive).validated()
                 self.assertEqual(config.keep_alive, keep_alive)
 
     def test_invalid_keep_alive_rejected(self) -> None:
-        for keep_alive in ("", " ", "1d", "forever", "5 minutes"):
+        for keep_alive in ("", " ", "5min", "forever", "../x", "abc"):
             with self.subTest(keep_alive=keep_alive):
                 with self.assertRaises(ValueError):
                     ModelResidencyConfig(keep_alive=keep_alive).validated()
@@ -52,6 +54,7 @@ class ModelResidencyConfigTests(unittest.TestCase):
         self.assertTrue(decision.enabled)
         self.assertEqual(decision.keep_alive, "5m")
         self.assertTrue(decision.keep_alive_applied)
+        self.assertIsNone(decision.skipped_reason)
 
     def test_enabled_non_rag_alias_is_not_applied(self) -> None:
         config = ModelResidencyConfig(enabled=True, keep_alive="5m").validated()
@@ -59,9 +62,23 @@ class ModelResidencyConfigTests(unittest.TestCase):
         for alias in ("local_chat", "local_json", "local_think"):
             with self.subTest(alias=alias):
                 decision = decide_model_residency(config, alias=alias)
-                self.assertFalse(decision.enabled)
+                self.assertTrue(decision.enabled)
                 self.assertIsNone(decision.keep_alive)
                 self.assertFalse(decision.keep_alive_applied)
+                self.assertEqual(decision.skipped_reason, "alias_not_in_scope")
+
+    def test_disabled_and_no_value_have_distinct_skipped_reasons(self) -> None:
+        disabled = decide_model_residency(
+            ModelResidencyConfig(enabled=False, keep_alive="5m").validated(),
+            alias="local_rag",
+        )
+        no_value = decide_model_residency(
+            ModelResidencyConfig(enabled=True, keep_alive=None).validated(),
+            alias="local_rag",
+        )
+
+        self.assertEqual(disabled.skipped_reason, "disabled")
+        self.assertEqual(no_value.skipped_reason, "no_keep_alive_value")
 
     def test_keep_alive_zero_is_forwardable_when_enabled(self) -> None:
         decision = decide_model_residency(
@@ -71,6 +88,32 @@ class ModelResidencyConfigTests(unittest.TestCase):
 
         self.assertTrue(decision.keep_alive_applied)
         self.assertEqual(decision.keep_alive, "0")
+
+    def test_indefinite_keep_alive_emits_safe_warning(self) -> None:
+        warnings: list[dict[str, object]] = []
+
+        def sink(message: Any) -> None:
+            warnings.append(dict(message.record["extra"]))
+
+        sink_id = logger.add(sink, level="WARNING")
+        try:
+            decision = decide_model_residency(
+                ModelResidencyConfig(enabled=True, keep_alive="-1").validated(),
+                alias="local_rag",
+            )
+        finally:
+            logger.remove(sink_id)
+
+        self.assertTrue(decision.keep_alive_applied)
+        self.assertEqual(len(warnings), 1)
+        self.assertEqual(
+            warnings[0]["event"],
+            "model_residency_indefinite_keep_alive",
+        )
+        self.assertEqual(warnings[0]["alias"], "local_rag")
+        serialized = str(warnings[0]).lower()
+        for forbidden in ("prompt", "answer", "authorization", "secret", "headers"):
+            self.assertNotIn(forbidden, serialized)
 
     def test_load_model_residency_config_reads_yaml(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -103,7 +146,7 @@ rag:
     enabled: true
     apply_to_aliases:
       - local_rag
-    keep_alive: "1d"
+    keep_alive: "5min"
 """,
                 encoding="utf-8",
             )

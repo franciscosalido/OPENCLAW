@@ -97,6 +97,7 @@ RAG_RUN_TRACE_KEYS = frozenset(
         "model_residency_enabled",
         "keep_alive_value",
         "keep_alive_applied",
+        "keep_alive_skipped_reason",
         "prompt_build_ms",
         "generation_ms",
         "total_ms",

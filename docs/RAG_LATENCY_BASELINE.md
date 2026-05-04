@@ -230,17 +230,19 @@ Rollback is config-only:
 - set `keep_alive: "0"` to ask Ollama to unload after the request when the
   feature is enabled.
 
-Allowed values:
+Valid values must match `^-?\d+(?:s|m|h)?$`.
+
+Examples:
 
 - `"0"` — unload immediately after the request
 - `"30s"`, `"1m"`, `"5m"`, `"10m"`, `"30m"` — minute-range residency
-- `"1h"`, `"2h"`, `"6h"` — hour-range residency for sustained workloads
+- `"1h"`, `"2h"`, `"6h"`, `"24h"` — hour-range residency for sustained workloads
 - `"-1"` — indefinite residency; use with caution on memory-constrained machines
   as the model will remain in VRAM until Ollama is restarted or the model is
   explicitly unloaded
 
-Values not in this list (e.g. `"1d"`, `"forever"`, `"2h30m"`) are rejected at
-config load time with a `ValueError`.
+Invalid values such as `"5min"`, `"forever"`, `"../x"`, `""`, and `"abc"` are
+rejected at config load time with a `ValueError`.
 
 This PR does not preload models, unload models, set global
 `OLLAMA_KEEP_ALIVE`, change LiteLLM provider config, change aliases, change
@@ -253,7 +255,12 @@ The baseline report records:
 - `model_residency_enabled`;
 - `keep_alive_value`;
 - `keep_alive_applied`;
+- `keep_alive_skipped_reason`;
 - `keep_alive_ineffective`.
+
+`keep_alive_skipped_reason` is one of `disabled`, `alias_not_in_scope`, or
+`no_keep_alive_value`. It distinguishes why no hint was sent without using
+free-form strings.
 
 `keep_alive_ineffective` is `true` only when `run_type == "warm_model"`,
 `keep_alive_applied` is true, and `model_load_observed` is still true. This is

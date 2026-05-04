@@ -76,6 +76,10 @@ rag:
     target_sentences_max: 6
 
   model_residency:
+    # G2-05 local_rag-only Ollama keep_alive hint.
+    # Disabled by default. "0" is an explicit unload-after-request rollback
+    # value; "-1" keeps the model resident indefinitely and should be used
+    # cautiously on memory-constrained machines.
     enabled: false
     apply_to_aliases:
       - "local_rag"

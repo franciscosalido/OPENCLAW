@@ -62,6 +62,9 @@ def _result(
         model_residency_enabled=keep_alive_applied,
         keep_alive_value="5m" if keep_alive_applied else None,
         keep_alive_applied=keep_alive_applied,
+        keep_alive_skipped_reason=(
+            None if keep_alive_applied else "disabled"
+        ),
         keep_alive_ineffective=baseline._keep_alive_ineffective(
             run_type=typed_run_type,
             keep_alive_applied=keep_alive_applied,
@@ -256,6 +259,7 @@ class RagLatencyBaselineTests(unittest.TestCase):
         self.assertEqual(record["model_residency_enabled"], True)
         self.assertEqual(record["keep_alive_value"], "5m")
         self.assertEqual(record["keep_alive_applied"], True)
+        self.assertIsNone(record["keep_alive_skipped_reason"])
         self.assertEqual(record["keep_alive_ineffective"], True)
 
     def test_missing_metrics_get_safe_reason(self) -> None:

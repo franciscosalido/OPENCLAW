@@ -146,6 +146,7 @@ class BaselineRunResult:
     model_residency_enabled: bool | None
     keep_alive_value: str | None
     keep_alive_applied: bool | None
+    keep_alive_skipped_reason: str | None
     keep_alive_ineffective: bool | None
     wall_ms: float
     ok: bool
@@ -179,6 +180,7 @@ class BaselineRunResult:
             "model_residency_enabled": self.model_residency_enabled,
             "keep_alive_value": self.keep_alive_value,
             "keep_alive_applied": self.keep_alive_applied,
+            "keep_alive_skipped_reason": self.keep_alive_skipped_reason,
             "keep_alive_ineffective": self.keep_alive_ineffective,
             "wall_ms": self.wall_ms,
             "ok": self.ok,
@@ -334,6 +336,9 @@ async def _run_once(
         model_residency_enabled=_bool_or_none(trace.get("model_residency_enabled")),
         keep_alive_value=_str_or_none(trace.get("keep_alive_value")),
         keep_alive_applied=keep_alive_applied,
+        keep_alive_skipped_reason=_str_or_none(
+            trace.get("keep_alive_skipped_reason")
+        ),
         keep_alive_ineffective=_keep_alive_ineffective(
             run_type=run_type,
             keep_alive_applied=keep_alive_applied,
