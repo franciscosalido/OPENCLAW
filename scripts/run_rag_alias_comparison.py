@@ -584,7 +584,6 @@ def _is_local_api_base(api_base: str) -> bool:
     return (
         api_base.startswith("http://localhost:")
         or api_base.startswith("http://127.0.0.1:")
-        or api_base == "os.environ/OLLAMA_API_BASE"
     )
 
 

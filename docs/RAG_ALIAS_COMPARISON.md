@@ -29,6 +29,11 @@ exits before running any comparison.
 - Candidate aliases must exist in the local LiteLLM config passed by
   `--litellm-config`.
 - Candidate aliases must use local Ollama config only.
+- Candidate alias `api_base` values must be literal local URLs using
+  `http://localhost:` or `http://127.0.0.1:`.
+- Environment references such as `os.environ/OLLAMA_API_BASE` are rejected by
+  this comparison script because they cannot be proven local at config-read
+  time.
 - Candidate aliases must not equal `local_rag`.
 - Concrete model names such as values containing `/` or `:` are rejected.
 - Remote provider prefixes such as `openai/`, `anthropic/`, `gemini/`,

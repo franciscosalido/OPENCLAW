@@ -132,6 +132,21 @@ class RagAliasComparisonTests(unittest.IsolatedAsyncioTestCase):
                 alias_metadata=aliases,
             )
 
+    def test_alias_validation_rejects_env_api_base_reference(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = _config_file(
+                Path(tmpdir),
+                candidate_api_base="os.environ/OLLAMA_API_BASE",
+            )
+            aliases = run_rag_alias_comparison.load_alias_metadata(path)
+
+        with self.assertRaises(ValueError):
+            run_rag_alias_comparison.validate_aliases(
+                baseline_alias="local_rag",
+                candidate_aliases=("local_rag_fast",),
+                alias_metadata=aliases,
+            )
+
     def test_alias_validation_rejects_concrete_model_name(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = _config_file(Path(tmpdir))
