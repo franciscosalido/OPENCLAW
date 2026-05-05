@@ -1,0 +1,27 @@
+thresholds_version: gateway2_regression_thresholds_v1
+quality:
+  required: false
+  minimum_score: 2
+aliases:
+  local_rag:
+    warm_model:
+      latency_regression_pct: 20
+      metric: total_ms
+    cold_start:
+      latency_regression_pct: 30
+      warning_only: true
+      metric: total_ms
+    degraded_qdrant:
+      fallback_contract_only: true
+  local_chat:
+    warm_model:
+      latency_regression_pct: 25
+      warning_only: true
+      metric: total_ms
+    degraded_qdrant:
+      fallback_contract_only: true
+  local_json:
+    warm_model:
+      latency_regression_pct: 25
+      warning_only: true
+      metric: total_ms
