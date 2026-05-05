@@ -5,5 +5,12 @@
     "provider": "claude-mem",
     "dbPath": "~/.claude-mem/claude-mem.db",
     "projectTag": "OPENCLAW"
+  },
+  "mcpServers": {
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"],
+      "description": "Context7 — up-to-date library docs for any framework/package"
+    }
   }
 }
