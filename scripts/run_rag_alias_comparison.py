@@ -512,10 +512,8 @@ def _material_latency_improvement(delta: Mapping[str, object]) -> bool:
     total = delta.get("total_ms_delta_pct")
     generation = delta.get("generation_ms_delta_pct")
     return (
-        isinstance(total, (int, float))
-        and total >= 30.0
-        or isinstance(generation, (int, float))
-        and generation >= 30.0
+        (isinstance(total, (int, float)) and total >= 30.0)
+        or (isinstance(generation, (int, float)) and generation >= 30.0)
     )
 
 
