@@ -66,6 +66,7 @@ logs/*.jsonl
 tests/golden/reports/
 reports/gateway1_smoke/
 reports/g2_latency_baseline/
+reports/g2_alias_comparison/
 
 # Claude Code — local session artifacts (NOT hooks.json/settings.json — esses são versionados)
 *.claude_session

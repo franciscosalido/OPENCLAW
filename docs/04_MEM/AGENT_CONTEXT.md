@@ -223,26 +223,26 @@ The first rule is measurement before optimization.
 | G2-PR02 | `feat/g2-local-rag-context-budget-cap` | Configurable whole-chunk context budget cap for `local_rag` | ✅ Merged |
 | G2-PR03 | `feat/g2-local-rag-generation-budget` | Configurable generation budget and answer-length discipline for `local_rag` | ✅ Merged |
 | G2-PR04 | `feat/g2-warm-model-cold-start-separation` | Cold/warm/degraded latency separation and residency measurement | ✅ Merged |
-| G2-PR05 | `feat/g2-keep-alive-model-residency` | Configurable Ollama keep_alive for `local_rag` model residency | 🚧 Current |
+| G2-PR05 | `feat/g2-keep-alive-model-residency` | Configurable Ollama keep_alive for `local_rag` model residency | ✅ Merged |
+| G2-PR06 | `feat/g2-local-rag-alias-comparison` | Local-only local_rag candidate alias comparison harness | 🚧 Current |
 
-G2-PR05 rules:
+G2-PR06 rules:
 
-- Model residency is configured under `rag.model_residency`.
-- Default is rollback-safe: `enabled: false`.
-- `keep_alive` forwarding applies only to `local_rag`.
-- `keep_alive` must match `^-?\d+(?:s|m|h)?$`; `"0"` and `"-1"` are valid
-  operational values.
-- `"-1"` emits one safe structured warning for indefinite model residency.
-- `local_chat`, `local_json`, `local_think`, embeddings, retrieval, context
-  packing, generation budget, Qdrant, aliases, timeouts and fallback behavior
-  remain unchanged.
-- No global `OLLAMA_KEEP_ALIVE`, model preload/unload, LiteLLM provider config
-  change or warmup-on-init is introduced.
-- Trace fields are scalar only: model residency enabled, keep_alive value,
-  keep_alive applied and keep_alive skipped reason.
-- G2-PR04 baseline report can flag `keep_alive_ineffective` for warm runs that
-  still show model load after a keep_alive hint.
-- No answer text, prompts, chunks, vectors, payloads or secrets are serialized.
+- Alias comparison is opt-in via `RUN_RAG_ALIAS_COMPARISON=1`.
+- `local_rag` remains the baseline and default.
+- Candidate aliases must be semantic local LiteLLM aliases and must not be
+  concrete model names.
+- Candidate aliases must resolve to local Ollama config only; remote provider
+  prefixes are rejected.
+- The same synthetic golden question fixture is used for every alias.
+- Warmup calls are discarded from measured results.
+- Reports contain safe metadata only: alias, run type, latency, eval metrics,
+  answer length, citation flag, fallback flag and token estimate.
+- No prompt, answer, question text, chunks, vectors, payloads, headers, API
+  keys, raw exceptions or tracebacks are serialized.
+- No prompt, retrieval, Qdrant, context budget, generation budget, keep_alive,
+  default alias or provider config is changed.
+- Candidate promotion requires a separate future PR.
 
 GW-13 rules:
 

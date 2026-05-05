@@ -5,7 +5,7 @@
 > meaningful sessions.
 
 **Last updated:** 2026-05-03
-**Updated by:** Codex — G2-PR05 local_rag model residency
+**Updated by:** Codex — G2-PR06 local_rag alias comparison
 
 ---
 
@@ -14,8 +14,8 @@
 **Goal:** reduce `local_rag` wall time through controlled, observable,
 rollback-safe local optimizations after the Gateway-1 proof-of-life baseline.
 
-Current branch: `feat/g2-keep-alive-model-residency`
-Current issue: `[G2-05] Tune Ollama keep_alive for local_rag model residency`
+Current branch: `feat/g2-local-rag-alias-comparison`
+Current issue: `[G2-06] Compare local_rag candidate aliases without changing defaults`
 
 Gateway-0 and Gateway-1 are complete on `main`. Gateway-2 starts from the
 measured `local_rag` latency baseline and must keep all optimizations
@@ -126,7 +126,8 @@ unavoidable, use `git push --force-with-lease`.
 | G2-PR02 | `feat/g2-local-rag-context-budget-cap` | Configurable whole-chunk context budget cap | Done / merged |
 | G2-PR03 | `feat/g2-local-rag-generation-budget` | Configurable local_rag generation budget | Done / merged |
 | G2-PR04 | `feat/g2-warm-model-cold-start-separation` | Cold/warm/degraded latency separation and model residency measurement | Done / merged |
-| G2-PR05 | `feat/g2-keep-alive-model-residency` | Configurable local_rag Ollama keep_alive model residency | Current |
+| G2-PR05 | `feat/g2-keep-alive-model-residency` | Configurable local_rag Ollama keep_alive model residency | Done / merged |
+| G2-PR06 | `feat/g2-local-rag-alias-comparison` | Local-only local_rag candidate alias comparison harness | Current |
 
 GW-05a issue: <https://github.com/franciscosalido/OPENCLAW/issues/25>
 GW-05b issue: <https://github.com/franciscosalido/OPENCLAW/issues/28>
@@ -148,39 +149,32 @@ Gateway-0 sprint complete. GW-01 through GW-12 merged on `main`.
 The next sprint must start from a new explicit issue, ADR if architecture
 changes, and `git pull --ff-only origin main`.
 
-## G2-PR05 Current Work
+## G2-PR06 Current Work
 
-G2-PR05 adds a rollback-safe model residency hint for `local_rag` only.
+G2-PR06 adds an opt-in alias comparison harness for `local_rag` candidates.
 
-Configuration:
+Deliverables:
 
-```yaml
-rag:
-  model_residency:
-    enabled: false
-    apply_to_aliases:
-      - "local_rag"
-    keep_alive: "5m"
-```
+- `scripts/run_rag_alias_comparison.py`.
+- `tests/unit/test_rag_alias_comparison.py`.
+- `docs/RAG_ALIAS_COMPARISON.md`.
 
 Rules:
 
-- Default is disabled, preserving pre-PR behavior.
-- `keep_alive` is forwarded only for `local_rag` when enabled.
-- `keep_alive` is validated with `^-?\d+(?:s|m|h)?$`; examples include
-  `"0"`, `"-1"`, `"30s"`, `"1m"`, `"5m"`, `"10m"` and `"24h"`.
-- `"-1"` emits a safe structured warning because it requests indefinite model
-  residency.
-- `local_chat`, `local_json`, `local_think`, embeddings, retrieval, Qdrant,
-  prompt building, context budget, generation budget and fallback behavior
-  remain unchanged.
-- `RagRunTrace` records model residency scalar metadata and
-  `keep_alive_skipped_reason`, never answer text, prompt text, chunks, vectors,
-  payloads or secrets.
-- G2-PR04 baseline reports can flag `keep_alive_ineffective` when warm runs
-  still show model load after a keep_alive hint.
-- No global `OLLAMA_KEEP_ALIVE`, preloading, unloading or LiteLLM provider
-  config change is introduced.
+- `local_rag` remains the default and comparison baseline.
+- Candidate aliases must be semantic local LiteLLM aliases, never concrete
+  model names.
+- Candidate aliases must resolve to local Ollama config only.
+- Remote provider prefixes are rejected.
+- The same synthetic golden question fixture is used for baseline and
+  candidates.
+- Reports store `question_id`, fixture hash, alias metrics and citation flags,
+  never question text, answer text, prompt text, chunks, vectors, payloads,
+  headers, API keys or tracebacks.
+- Warmup runs are discarded and marked only in summary metadata.
+- No prompt, retrieval, Qdrant, context budget, generation budget, keep_alive,
+  alias default or provider config is changed.
+- Candidate promotion requires a separate future PR.
 
 ## GW-15 Current Work
 
