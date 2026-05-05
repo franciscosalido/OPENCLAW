@@ -1,0 +1,65 @@
+{
+  "baseline_format_version": "gateway2_baseline_v1",
+  "branch": "main",
+  "generated_by": "gateway2_baseline_freeze",
+  "golden_harness_version": "agent0_golden_harness_v1",
+  "question_fixture_hash": "29efe17273f4349d54c140b3c60eec139693292ef239d7e9176d57d49ee3c726",
+  "results_artifact": "gateway2_baseline_results.jsonl",
+  "run_id": "gateway2-baseline-freeze-20260505",
+  "scores_artifact": "gateway2_baseline_scores.jsonl",
+  "source_commit": "07e1e26fe73181fb97152c1e5898468fa34470ea",
+  "sprint": "Gateway-2",
+  "summary_by_alias_and_run_type": {
+    "local_chat": {
+      "degraded_qdrant": {
+        "citation_present_count": 0,
+        "count": 2,
+        "fallback_count": 2,
+        "mean_answer_length_chars": 720.0,
+        "mean_estimated_remote_tokens_avoided": 650.0,
+        "mean_total_ms": 9100.0
+      },
+      "warm_model": {
+        "citation_present_count": 0,
+        "count": 4,
+        "fallback_count": 0,
+        "mean_answer_length_chars": 760.0,
+        "mean_estimated_remote_tokens_avoided": 535.0,
+        "mean_total_ms": 8875.0
+      }
+    },
+    "local_json": {
+      "warm_model": {
+        "citation_present_count": 0,
+        "count": 2,
+        "fallback_count": 0,
+        "mean_answer_length_chars": 360.0,
+        "mean_estimated_remote_tokens_avoided": 462.5,
+        "mean_total_ms": 9600.0
+      }
+    },
+    "local_rag": {
+      "cold_start": {
+        "citation_present_count": 2,
+        "count": 2,
+        "fallback_count": 0,
+        "mean_answer_length_chars": 1040.0,
+        "mean_estimated_remote_tokens_avoided": 890.0,
+        "mean_generation_ms": 14350.0,
+        "mean_total_ms": 23750.0
+      },
+      "warm_model": {
+        "citation_present_count": 2,
+        "count": 2,
+        "fallback_count": 0,
+        "mean_answer_length_chars": 1020.0,
+        "mean_estimated_remote_tokens_avoided": 890.0,
+        "mean_generation_ms": 11150.0,
+        "mean_total_ms": 18600.0
+      }
+    }
+  },
+  "thresholds_version": "gateway2_regression_thresholds_v1",
+  "timestamp_utc": "2026-05-05T00:45:00Z",
+  "total_results": 12
+}

@@ -862,3 +862,36 @@ Append or paste this at the end of substantial sessions:
 - Token-based context budgeting.
 - Full token economy recalibration after final capped prompt construction.
 - Mandatory live Golden Harness quality/latency comparison.
+
+---
+
+## Handoff — 2026-05-05
+
+**Agent:** Codex
+**Branch:** `feat/g2-baseline-freeze-regression-gate`
+**Issue/PR:** G2-07 / pending PR
+**Task:** Gateway-2 baseline freeze and regression gate.
+
+### Changed
+- Added official Gateway-2 baseline artifacts in `tests/golden/baseline/`.
+- Extended `scripts/compare_golden_runs.py` with an offline Gateway-2 gate:
+  verify-only mode, threshold-driven comparison, fixture hash validation,
+  run-type separation, citation/quality checks, latency regression checks and
+  stable exit codes.
+- Added `tests/unit/test_golden_baseline_gate.py` for schema, sanitization,
+  citation, latency, fixture, threshold and no-network assertions.
+- Added `docs/GATEWAY2_BASELINE.md` and
+  `docs/sprints/GATEWAY2_SPRINT_HANDOFF.md`.
+- Updated `.gitignore` for generated Gateway-2 reports while preserving tracked
+  official baseline artifacts.
+
+### Not Changed
+- No prompt, retrieval, context budget, generation budget, keep_alive/model
+  residency, alias/default model, Qdrant, `openclaw_knowledge`, remote provider
+  or runtime behavior change.
+- No LLM-as-judge, OpenTelemetry or dashboard.
+
+### Next Action
+- Open PR with title
+  `test(golden): freeze Gateway-2 RAG latency baseline`.
+- Gateway-3 should treat the Gateway-2 baseline as the regression reference.

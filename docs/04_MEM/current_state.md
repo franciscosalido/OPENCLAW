@@ -810,3 +810,40 @@ Deferred:
 - Full recalibration of `estimated_remote_tokens_avoided` against the final
   capped prompt.
 - Mandatory live Golden Harness before/after gate.
+
+## G2-07 Current Work
+
+G2-07 closes Gateway-2 with an offline baseline freeze and regression gate.
+This is not an optimization PR.
+
+Delivered scope:
+
+- Official tracked baseline artifacts under `tests/golden/baseline/`:
+  `gateway2_baseline_summary.json`, `gateway2_baseline_results.jsonl`,
+  `gateway2_baseline_scores.jsonl`, and
+  `gateway2_regression_thresholds.yaml`.
+- `scripts/compare_golden_runs.py` now supports:
+  `--verify-only <summary.json>` and
+  `--baseline <summary.json> --candidate <summary.json> --thresholds <yaml>`.
+- Regression gate exit codes:
+  `0` pass, `2` schema/sanitization, `3` citation/quality,
+  `4` latency, `5` fixture/config mismatch, `6` incompatibility.
+- Baseline summaries stay grouped by alias and run type:
+  `cold_start`, `warm_model`, and `degraded_qdrant`.
+- Generated report directories are ignored while official baseline artifacts
+  remain explicitly allowed.
+
+Safety:
+
+- No prompt, question text, answer text, chunks, vectors, payloads, headers,
+  API keys, raw exceptions, tracebacks, usernames, local paths or model weight
+  paths are allowed in baseline artifacts.
+- No remote providers, no live services, no Qdrant mutation, no reindexing and
+  no `openclaw_knowledge` access are required for the gate.
+
+Gateway-2 handoff:
+
+- See `docs/GATEWAY2_BASELINE.md`.
+- See `docs/sprints/GATEWAY2_SPRINT_HANDOFF.md`.
+- Gateway-3 should start from the frozen Gateway-2 baseline and use the offline
+  gate before accepting performance or quality regressions.
