@@ -308,21 +308,36 @@ class RagAliasComparisonTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(citation_regression["local_rag_fast"], True)
         self.assertEqual(hypothesis_supported["local_rag_fast"], False)
 
-    def test_warmup_is_discarded_from_measured_results(self) -> None:
+    async def test_warmup_is_discarded_from_measured_results(self) -> None:
+        call_log: list[tuple[str, str]] = []
+
+        async def counting_runner(
+            question: run_golden_harness.GoldenQuestion,
+            alias: str,
+            run_type: str,
+        ) -> run_rag_alias_comparison.AliasComparisonResult:
+            call_log.append((question.question_id, alias))
+            return await _fake_runner(question, alias, run_type)
+
         questions = run_golden_harness.load_questions()
-        self.assertEqual(
-            len(questions) * 2,
-            len([1 for question in questions for _alias in ("local_rag", "fast")]),
-        )
-        summary = run_rag_alias_comparison.build_summary(
-            baseline_alias="local_rag",
-            candidate_aliases=("local_rag_fast",),
-            fixture_hash="hash",
-            run_id="run",
-            timestamp_utc="2026-05-04T00:00:00Z",
-            results=(),
-        )
-        self.assertEqual(summary["warmup_discarded"], True)
+        aliases = ["local_rag", "local_rag_fast"]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            temp_path = Path(tmpdir)
+            config_path = _config_file(temp_path)
+            jsonl_path, _summary = await run_rag_alias_comparison.run_comparison(
+                baseline_alias="local_rag",
+                candidate_aliases=("local_rag_fast",),
+                litellm_config_path=config_path,
+                output_dir=temp_path,
+                runner=counting_runner,
+            )
+            lines = jsonl_path.read_text(encoding="utf-8").splitlines()
+
+        expected_measured = len(questions) * len(aliases)
+        expected_warmup = len(aliases)
+        self.assertEqual(len(call_log), expected_measured + expected_warmup)
+        self.assertEqual(len(lines), expected_measured)
 
     def test_default_alias_constant_is_not_changed(self) -> None:
         self.assertEqual(run_rag_alias_comparison.DEFAULT_BASELINE_ALIAS, "local_rag")
