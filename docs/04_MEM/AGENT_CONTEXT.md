@@ -212,7 +212,7 @@ task metadata + token estimates
 | GW-19 | `feat/agent0-observability-signal-contract` | Agent-0 observability signal contract and sanitization tests | ✅ Merged |
 | GW-20 | `feat/gateway1-proof-of-life-smoke` | Gateway-1 operational proof-of-life smoke | ✅ Merged |
 
-### Sprint Gateway-2 — CURRENT
+### Sprint Gateway-2 — COMPLETE ✅
 
 Gateway-2 is performance work on top of the stable local-only Gateway-1 stack.
 The first rule is measurement before optimization.
@@ -224,7 +224,46 @@ The first rule is measurement before optimization.
 | G2-PR03 | `feat/g2-local-rag-generation-budget` | Configurable generation budget and answer-length discipline for `local_rag` | ✅ Merged |
 | G2-PR04 | `feat/g2-warm-model-cold-start-separation` | Cold/warm/degraded latency separation and residency measurement | ✅ Merged |
 | G2-PR05 | `feat/g2-keep-alive-model-residency` | Configurable Ollama keep_alive for `local_rag` model residency | ✅ Merged |
-| G2-PR06 | `feat/g2-local-rag-alias-comparison` | Local-only local_rag candidate alias comparison harness | 🚧 Current |
+| G2-PR06 | `feat/g2-local-rag-alias-comparison` | Local-only local_rag candidate alias comparison harness | ✅ Complete |
+
+### Sprint Agent-0 — CURRENT
+
+Agent-0 ingestion starts from a contract-first, local-only, synthetic-only
+corpus path. A0-PR01 proves safe verification before any Qdrant write path:
+
+```text
+data/corpus/manifest.yaml
+  -> manifest validation
+  -> pre-parse PII rejection
+  -> raw file sha256
+  -> local parser
+  -> parsed-text PII scan
+  -> normalized text sha256
+  -> exact hash dedup
+  -> existing RAG chunker
+  -> sanitized report
+```
+
+| PR | Branch | Scope | Status |
+|---|---|---|---|
+| A0-PR01 | `feat/agent0-ingestion` | Controlled verify-only corpus ingestion pipeline | 🚧 Current |
+
+A0-PR01 rules:
+
+- `data/corpus/manifest.yaml` is the ingestion contract.
+- Verify-only is the default.
+- Verify-only never calls Qdrant mutating methods.
+- `--commit` is required for any future write and requires explicit
+  `--manifest`.
+- Do not touch `openclaw_knowledge`.
+- Use synthetic `.md` corpus documents only unless a lightweight existing PDF
+  parser dependency is already present.
+- No OCR, remote APIs, remote providers, LiteLLM changes, FastAPI, Redis, MCP or
+  dependency installation.
+- Reuse the existing RAG chunker and `VectorStoreChunk`-compatible shape.
+- Reports contain counts, hashes, statuses, chunk counts and timing only; never
+  text, chunks, vectors, embeddings, payloads, prompts, answers, headers,
+  secrets, raw exceptions or tracebacks.
 
 G2-PR06 rules:
 
