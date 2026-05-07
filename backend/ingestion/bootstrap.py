@@ -105,7 +105,6 @@ class BootstrapOptions:
 
     corpus: CorpusName
     mode: IngestionMode = "verify_only"
-    report_out: Path | None = None
 
 
 @dataclass(frozen=True)

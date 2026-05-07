@@ -66,7 +66,6 @@ def main(argv: list[str] | None = None) -> int:
         BootstrapOptions(
             corpus=corpus,
             mode=mode,
-            report_out=args.report_out,
         ),
         commit_store=QdrantIngestionCommitStore(
             collection_name=collection_for_corpus(corpus),

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import unittest
 from collections import Counter
 from pathlib import Path
@@ -49,6 +50,18 @@ class DualCorpusManifestTests(unittest.TestCase):
                     resolved = resolve_corpus_path(manifest_path, document)
                     self.assertTrue(resolved.is_relative_to(Path("data/corpus").resolve()))
                     self.assertFalse(resolved.is_symlink())
+
+    def test_expected_hashes_are_pinned_and_match_files(self) -> None:
+        for corpus in ("internal", "financial"):
+            manifest_path = manifest_path_for_corpus(corpus)
+            manifest = load_manifest(manifest_path)
+            for document in manifest.documents:
+                with self.subTest(corpus=corpus, doc_id=document.doc_id):
+                    resolved = resolve_corpus_path(manifest_path, document)
+                    digest = hashlib.sha256(resolved.read_bytes()).hexdigest()
+
+                    self.assertIsNotNone(document.expected_hash)
+                    self.assertEqual(document.expected_hash, digest)
 
 
 if __name__ == "__main__":
