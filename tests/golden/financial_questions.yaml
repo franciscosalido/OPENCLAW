@@ -1,0 +1,28 @@
+questions:
+  - question_id: fq-001
+    text: o que e duration de renda fixa?
+    expected_corpus: financial
+    expected_collection: openclaw_financial
+    expected_doc_ids:
+      - financial_renda_fixa_curva
+    domain: renda_fixa
+    language: pt-BR
+    enabled: true
+  - question_id: fq-002
+    text: como calcular o EBITDA?
+    expected_corpus: financial
+    expected_collection: openclaw_financial
+    expected_doc_ids:
+      - financial_valuation_crescimento
+    domain: valuation
+    language: pt-BR
+    enabled: true
+  - question_id: fq-003
+    text: como a Selic afeta a inflacao?
+    expected_corpus: financial
+    expected_collection: openclaw_financial
+    expected_doc_ids:
+      - financial_macro_ciclo_juros
+    domain: macroeconomia
+    language: pt-BR
+    enabled: true

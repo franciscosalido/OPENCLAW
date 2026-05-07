@@ -1,0 +1,28 @@
+questions:
+  - question_id: iq-001
+    text: qual o estado atual do GW-07?
+    expected_corpus: internal
+    expected_collection: openclaw_internal
+    expected_doc_ids:
+      - internal_current_state
+    domain: internal
+    language: pt-BR
+    enabled: true
+  - question_id: iq-002
+    text: qual o ultimo alias canonico de embeddings?
+    expected_corpus: internal
+    expected_collection: openclaw_internal
+    expected_doc_ids:
+      - internal_decisions
+    domain: internal
+    language: pt-BR
+    enabled: true
+  - question_id: iq-003
+    text: quais aliases tem timeout maior que 60s?
+    expected_corpus: internal
+    expected_collection: openclaw_internal
+    expected_doc_ids:
+      - internal_claude_contract
+    domain: internal
+    language: pt-BR
+    enabled: true
