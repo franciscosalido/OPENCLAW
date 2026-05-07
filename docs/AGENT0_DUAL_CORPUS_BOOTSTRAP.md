@@ -77,6 +77,12 @@ Bootstrap idempotence is document-hash based:
 The collection existing by itself is not enough to skip documents. Hashes must
 match document metadata.
 
+All synthetic documents versioned in A0-PR02 pin `expected_hash` in their
+corpus manifest. The value is the SHA256 of the raw file bytes. Verify-only
+runs reject a document before chunking if the current file hash differs from
+the pinned manifest value. This keeps the synthetic bootstrap corpus
+deterministic and gives reviewers a simple tamper-detection gate.
+
 ## Metadata
 
 Committed chunks carry safe metadata:
@@ -113,6 +119,34 @@ ingestion timing.
 Reports must not include text, chunks, vectors, embeddings, payloads, prompts,
 answers, API keys, authorization headers, raw exceptions, tracebacks, absolute
 paths or usernames.
+
+Report file writing is intentionally owned by `scripts/bootstrap_corpus.py`.
+`run_bootstrap()` returns a sanitized report object and performs no report file
+I/O. This keeps the orchestration layer deterministic and makes CLI output
+handling explicit.
+
+## Legacy Qdrant Default
+
+The older RAG store still defines `DEFAULT_COLLECTION_NAME` as
+`openclaw_knowledge` for pre-existing RAG code paths. A0-PR02 does not change
+that legacy default. The dual-corpus bootstrap path never relies on it:
+
+- `scripts/bootstrap_corpus.py` derives the collection from the closed corpus
+  mapping.
+- `QdrantIngestionCommitStore` validates the mapped collection before creating
+  a vector store.
+- `CollectionGuard.assert_collection_namespace(...)` rejects
+  `openclaw_knowledge`, empty names and arbitrary names for bootstrap commits.
+
+Changing the legacy default is a separate migration concern outside A0-PR02.
+
+## Sync Commit Boundary
+
+The commit store is deliberately synchronous in A0-PR02. `_embed_chunks()` uses
+`asyncio.run()` as a bridge around the existing async embedder contract and the
+code comment at that call site marks the async-runtime footgun. Before wiring
+bootstrap commit into FastAPI, pytest-asyncio or any already-running event
+loop, replace that bridge with an async-safe commit path.
 
 ## Rollback
 

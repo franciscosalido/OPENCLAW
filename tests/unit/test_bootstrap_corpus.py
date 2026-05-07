@@ -4,6 +4,7 @@ import json
 import tempfile
 import unittest
 from collections.abc import Sequence
+from dataclasses import fields
 from pathlib import Path
 from typing import Any, cast
 from unittest.mock import patch
@@ -33,6 +34,11 @@ class FakeCommitStore:
 
 
 class BootstrapCorpusTests(unittest.TestCase):
+    def test_bootstrap_options_do_not_own_report_file_io(self) -> None:
+        option_fields = {field.name for field in fields(BootstrapOptions)}
+
+        self.assertEqual(option_fields, {"corpus", "mode"})
+
     def test_invalid_corpus_arg_rejected(self) -> None:
         with self.assertRaises(SystemExit):
             bootstrap_corpus.main(["--corpus", "unknown"])
