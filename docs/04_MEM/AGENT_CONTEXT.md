@@ -246,7 +246,8 @@ data/corpus/manifest.yaml
 
 | PR | Branch | Scope | Status |
 |---|---|---|---|
-| A0-PR01 | `feat/agent0-ingestion` | Controlled verify-only corpus ingestion pipeline | 🚧 Current |
+| A0-PR01 | `feat/agent0-ingestion` | Controlled verify-only corpus ingestion pipeline | ✅ Complete |
+| A0-PR02 | `feat/agent0-dual-corpus-bootstrap` | Bootstrap internal and financial corpora into isolated Qdrant collections | 🚧 Current |
 
 A0-PR01 rules:
 
@@ -264,6 +265,22 @@ A0-PR01 rules:
 - Reports contain counts, hashes, statuses, chunk counts and timing only; never
   text, chunks, vectors, embeddings, payloads, prompts, answers, headers,
   secrets, raw exceptions or tracebacks.
+
+A0-PR02 rules:
+
+- Do not create a super-manifest.
+- Corpus roots are separate: `data/corpus/internal/` and
+  `data/corpus/financial/`.
+- Collection mapping is closed: `internal -> openclaw_internal`,
+  `financial -> openclaw_financial`.
+- `scripts/bootstrap_corpus.py` accepts only `--corpus internal|financial`.
+- No arbitrary `--collection` override in this PR.
+- `openclaw_knowledge` is explicitly rejected by namespace guard.
+- Verify-only never mutates Qdrant.
+- Commit path is mock-tested and guarded before ensure/upsert.
+- Idempotence uses document hashes, not collection existence or semantic dedup.
+- Query dry-run p95 is offline only: fake embed/search planning, no Qdrant and
+  no LLM answer generation.
 
 G2-PR06 rules:
 
