@@ -262,7 +262,8 @@ data/corpus/manifest.yaml
 | PR | Branch | Scope | Status |
 |---|---|---|---|
 | A0-PR01 | `feat/agent0-ingestion` | Controlled verify-only corpus ingestion pipeline | ✅ Complete |
-| A0-PR02 | `feat/agent0-dual-corpus-bootstrap` | Bootstrap internal and financial corpora into isolated Qdrant collections | 🚧 Current |
+| A0-PR02 | `feat/agent0-dual-corpus-bootstrap` | Bootstrap internal and financial corpora into isolated Qdrant collections | ✅ Complete |
+| A0-PR03 | `feat/agent0-golden-questions` | Six golden questions and frozen citation contract | 🚧 Current |
 
 A0-PR01 rules:
 
@@ -296,6 +297,23 @@ A0-PR02 rules:
 - Idempotence uses document hashes, not collection existence or semantic dedup.
 - Query dry-run p95 is offline only: fake embed/search planning, no Qdrant and
   no LLM answer generation.
+
+A0-PR03 rules:
+
+- Golden questions are split by namespace:
+  `tests/golden/internal_questions.yaml` and
+  `tests/golden/financial_questions.yaml`.
+- There is no golden question super-manifest.
+- `iq-*` questions must route to `internal` / `openclaw_internal`.
+- `fq-*` questions must route to `financial` / `openclaw_financial`.
+- Expected doc ids are validated against A0-PR02 corpus manifests at harness
+  startup.
+- `Citation` is a frozen metadata-only dataclass.
+- `scripts/run_golden_questions.py` dry-run is offline and uses a fake retriever.
+- Smoke mode is opt-in via `RUN_GOLDEN_SMOKE=1` and does not generate answers.
+- Reports contain IDs, expected collections, matched doc ids and latency only;
+  never answer text, question text, chunks, vectors, embeddings, payloads,
+  prompts, secrets, raw exceptions, tracebacks, absolute paths or usernames.
 
 G2-PR06 rules:
 
