@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import re
 import time
-import json
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
@@ -22,6 +22,7 @@ from backend.ingestion.bootstrap import (
 )
 from backend.ingestion.commit_store import DUAL_CORPUS_COLLECTIONS
 from backend.ingestion.manifest import CorpusDocument, load_manifest
+from backend.ingestion.report import assert_report_is_sanitized
 from backend.rag.collection_guard import assert_collection_namespace
 
 
@@ -56,10 +57,12 @@ GOLDEN_FORBIDDEN_KEYS = frozenset(
         "api_key",
         "authorization",
         "headers",
+        "secret",
         "raw_exception",
         "exception_message",
         "traceback",
         "absolute_paths",
+        "local_absolute_path",
         "username",
     }
 )
@@ -303,14 +306,11 @@ def run_golden_questions(
 
     if mode != "dry_run" and retriever is None:
         raise ValueError("smoke mode requires an explicit retriever")
-    questions = tuple(
-        question
-        for question in load_all_golden_questions(
-            internal_path=internal_path,
-            financial_path=financial_path,
-        )
-        if question.enabled
+    loaded_questions = load_all_golden_questions(
+        internal_path=internal_path,
+        financial_path=financial_path,
     )
+    questions = tuple(question for question in loaded_questions if question.enabled)
     documents_by_corpus = load_corpus_documents()
     validate_expected_doc_ids(questions, documents_by_corpus)
     active_retriever = retriever or FakeRetriever(documents_by_corpus)
@@ -351,17 +351,22 @@ def run_golden_questions(
             }
         )
 
-    total = len(questions)
-    failed = total - passed
+    total_questions = len(loaded_questions)
+    evaluated_questions = len(questions)
+    skipped_questions = total_questions - evaluated_questions
+    failed = evaluated_questions - passed
     report = {
         "run_id": uuid4().hex,
         "timestamp_utc": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "mode": mode,
-        "total_questions": total,
+        "total_questions": total_questions,
+        "enabled_questions": evaluated_questions,
+        "skipped_questions": skipped_questions,
+        "evaluated_questions": evaluated_questions,
         "passed": passed,
         "failed": failed,
-        "coverage": _ratio(passed + failed, total),
-        "citation_hit_rate": _ratio(passed, total),
+        "coverage": _ratio(evaluated_questions, total_questions),
+        "citation_hit_rate": _ratio(passed, evaluated_questions),
         "p50_query_ms": round(median(durations), 3) if durations else 0.0,
         "p95_query_ms": round(_percentile(durations, 95), 3) if durations else 0.0,
         "per_question": per_question,
@@ -383,6 +388,7 @@ def write_golden_report(path: Path | str, report: Mapping[str, Any]) -> None:
 def assert_golden_report_sanitized(report: Mapping[str, Any]) -> None:
     """Raise if the report contains forbidden content-bearing keys."""
 
+    assert_report_is_sanitized(dict(report))
     forbidden_hits = _forbidden_key_hits(report)
     if forbidden_hits:
         raise ValueError(f"golden report contains forbidden keys: {forbidden_hits}")

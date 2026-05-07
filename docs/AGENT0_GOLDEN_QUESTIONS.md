@@ -91,7 +91,9 @@ RUN_GOLDEN_SMOKE=1 uv run python scripts/run_golden_questions.py --smoke
 
 A0-PR03 does not wire a live retriever. Future smoke work may add a real
 retriever, but it must still avoid answer generation and preserve the sanitized
-report contract.
+report contract. In this PR, `--smoke` exits with code `2` even when
+`RUN_GOLDEN_SMOKE=1` is present because the live retriever is intentionally not
+wired yet.
 
 ## Report Schema
 
@@ -101,6 +103,9 @@ The report contains:
 - `timestamp_utc`
 - `mode`
 - `total_questions`
+- `enabled_questions`
+- `skipped_questions`
+- `evaluated_questions`
 - `passed`
 - `failed`
 - `coverage`
@@ -108,6 +113,10 @@ The report contains:
 - `p50_query_ms`
 - `p95_query_ms`
 - `per_question`
+
+`coverage` is the executed-question coverage: enabled/evaluated questions
+divided by total loaded questions. It is separate from `citation_hit_rate`,
+which is passed citation checks divided by evaluated questions.
 
 Per-question rows contain only:
 

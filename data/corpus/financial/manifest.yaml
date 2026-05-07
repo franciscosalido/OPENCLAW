@@ -90,7 +90,7 @@ documents:
     curation_status: approved
     ingestion_policy: financial
     enabled: true
-    expected_hash: b06b4bb6f5fb232a0167372b5e99516d779ed5f92da0b4f2ab07f64329d54807
+    expected_hash: a05f67b4e1ed44f5dcdc3ff1d0b07c03dbb767d95446555bf8d09158773954c2
   - source_id: financial-val-capital-001
     doc_id: financial_valuation_custo_capital
     origin_path: docs/valuation_custo_capital_sintetico.md

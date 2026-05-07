@@ -136,10 +136,58 @@ class GoldenQuestionHarnessTests(unittest.TestCase):
         passing = run_golden_questions(retriever=TrackingRetriever())
         failing = run_golden_questions(retriever=EmptyRetriever())
 
+        self.assertEqual(passing.report["total_questions"], 6)
+        self.assertEqual(passing.report["enabled_questions"], 6)
+        self.assertEqual(passing.report["skipped_questions"], 0)
+        self.assertEqual(passing.report["evaluated_questions"], 6)
         self.assertEqual(passing.report["coverage"], 1.0)
         self.assertEqual(passing.report["citation_hit_rate"], 1.0)
         self.assertEqual(failing.report["coverage"], 1.0)
         self.assertEqual(failing.report["citation_hit_rate"], 0.0)
+
+    def test_coverage_tracks_enabled_questions_not_pass_rate(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            internal_path = Path(tmpdir) / "internal_questions.yaml"
+            financial_path = Path(tmpdir) / "financial_questions.yaml"
+            internal_path.write_text(
+                """
+questions:
+  - question_id: iq-001
+    text: qual o estado atual do GW-07?
+    expected_corpus: internal
+    expected_collection: openclaw_internal
+    expected_doc_ids:
+      - internal_current_state
+    domain: internal
+    language: pt-BR
+    enabled: true
+  - question_id: iq-004
+    text: pergunta interna desabilitada
+    expected_corpus: internal
+    expected_collection: openclaw_internal
+    expected_doc_ids:
+      - internal_current_state
+    domain: internal
+    language: pt-BR
+    enabled: false
+""".lstrip(),
+                encoding="utf-8",
+            )
+            financial_path.write_text("questions: []\n", encoding="utf-8")
+
+            result = run_golden_questions(
+                retriever=TrackingRetriever(),
+                internal_path=internal_path,
+                financial_path=financial_path,
+            )
+
+        self.assertEqual(result.report["total_questions"], 2)
+        self.assertEqual(result.report["enabled_questions"], 1)
+        self.assertEqual(result.report["skipped_questions"], 1)
+        self.assertEqual(result.report["evaluated_questions"], 1)
+        self.assertEqual(result.report["coverage"], 0.5)
+        self.assertEqual(result.report["citation_hit_rate"], 1.0)
+        self.assertEqual(len(_per_question(result.report)), 1)
 
     def test_p50_and_p95_query_latency_computed(self) -> None:
         result = run_golden_questions()
@@ -160,6 +208,12 @@ class GoldenQuestionHarnessTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertEqual(report["total_questions"], 6)
         assert_golden_report_sanitized(report)
+
+    def test_sanitizer_rejects_ingestion_forbidden_keys_too(self) -> None:
+        with self.assertRaises(ValueError):
+            assert_golden_report_sanitized({"secret": "redacted"})
+        with self.assertRaises(ValueError):
+            assert_golden_report_sanitized({"local_absolute_path": "/tmp/example"})
 
     def test_smoke_requires_guard_env(self) -> None:
         self.assertEqual(golden_script.main(["--smoke"]), 2)
