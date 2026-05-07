@@ -6,4 +6,3 @@ ativos reais.
 
 A ingestao deve registrar dominio financeiro, hashes e metricas, mas nunca
 texto extraido no relatorio.
-

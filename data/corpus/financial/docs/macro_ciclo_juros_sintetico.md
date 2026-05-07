@@ -6,4 +6,3 @@ economica e comunicacao de politica monetaria, sem dado real ou privado.
 
 O objetivo e validar bootstrap isolado no corpus financeiro, mantendo todo o
 conteudo seguro, pequeno e revisavel.
-

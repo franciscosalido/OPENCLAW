@@ -6,4 +6,3 @@ ativos reais.
 
 O texto ajuda a validar que documentos de renda fixa entram apenas em
 `openclaw_financial` quando o commit explicito for usado.
-

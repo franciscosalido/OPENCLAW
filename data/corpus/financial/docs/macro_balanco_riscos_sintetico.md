@@ -6,4 +6,3 @@ inventados e nao representam previsao, recomendacao ou carteira real.
 
 A curadoria usa o texto apenas para testar manifestos, hashing, chunking e
 isolamento da collection financeira.
-

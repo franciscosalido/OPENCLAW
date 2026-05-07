@@ -141,5 +141,6 @@ def _embed_chunks(
     chunks: Sequence[VectorStoreChunk],
 ) -> list[list[float]]:
     active_embedder = embedder or create_rag_embedder()
+    # A0-PR02 bootstrap is intentionally synchronous. Replace this bridge before
+    # wiring commit into an async runtime such as FastAPI or pytest-asyncio.
     return asyncio.run(active_embedder.embed_batch([chunk.text for chunk in chunks]))
-

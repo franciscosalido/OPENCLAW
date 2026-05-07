@@ -6,4 +6,3 @@ privado.
 
 A finalidade e validar fluxo local, deduplicacao deterministica e relatorio
 sanitizado no namespace financeiro.
-

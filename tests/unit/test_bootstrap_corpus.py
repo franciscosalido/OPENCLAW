@@ -11,8 +11,10 @@ from unittest.mock import patch
 from backend.ingestion.bootstrap import (
     BootstrapOptions,
     MappingExistingHashIndex,
+    _validate_manifest_for_corpus,
     run_bootstrap,
 )
+from backend.ingestion.manifest import CorpusManifest
 from backend.rag.qdrant_store import VectorStoreChunk
 from scripts import bootstrap_corpus
 
@@ -34,6 +36,12 @@ class BootstrapCorpusTests(unittest.TestCase):
     def test_invalid_corpus_arg_rejected(self) -> None:
         with self.assertRaises(SystemExit):
             bootstrap_corpus.main(["--corpus", "unknown"])
+
+    def test_verify_only_and_commit_are_mutually_exclusive(self) -> None:
+        with self.assertRaises(SystemExit):
+            bootstrap_corpus.main(
+                ["--corpus", "internal", "--verify-only", "--commit"],
+            )
 
     def test_verify_only_does_not_instantiate_qdrant_commit_store(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -147,10 +155,51 @@ class BootstrapCorpusTests(unittest.TestCase):
             "raw_exception",
             "exception_message",
             "traceback",
-            "absolute paths",
+            "absolute_paths",
             "username",
         }
         self.assertTrue(forbidden.isdisjoint(result.report))
+
+    def test_internal_manifest_rejects_financial_domain(self) -> None:
+        manifest = CorpusManifest.model_validate(
+            {
+                "documents": [
+                    _document(
+                        ingestion_policy="internal",
+                        financial_domain="macroeconomia",
+                    )
+                ]
+            }
+        )
+
+        with self.assertRaises(ValueError):
+            _validate_manifest_for_corpus(manifest, corpus="internal")
+
+    def test_financial_manifest_requires_financial_domain(self) -> None:
+        manifest = CorpusManifest.model_validate(
+            {"documents": [_document(ingestion_policy="financial")]}
+        )
+
+        with self.assertRaises(ValueError):
+            _validate_manifest_for_corpus(manifest, corpus="financial")
+
+
+def _document(**overrides: object) -> dict[str, object]:
+    document: dict[str, object] = {
+        "source_id": "rc-test-source-001",
+        "doc_id": "rc_test_doc",
+        "origin_path": "docs/rc_test_doc.md",
+        "source_type": "md",
+        "domain": "internal",
+        "language": "pt-BR",
+        "license": "synthetic-internal",
+        "contains_pii": False,
+        "curation_status": "approved",
+        "ingestion_policy": "internal",
+        "enabled": True,
+    }
+    document.update(overrides)
+    return document
 
 
 if __name__ == "__main__":

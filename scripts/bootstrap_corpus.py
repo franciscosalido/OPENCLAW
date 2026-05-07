@@ -9,9 +9,14 @@ import sys
 from pathlib import Path
 from typing import cast
 
-from backend.ingestion.bootstrap import BootstrapOptions, CorpusName, run_bootstrap
-from backend.ingestion.report import IngestionMode
+from backend.ingestion.bootstrap import (
+    BootstrapOptions,
+    CorpusName,
+    collection_for_corpus,
+    run_bootstrap,
+)
 from backend.ingestion.commit_store import QdrantIngestionCommitStore
+from backend.ingestion.report import IngestionMode
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -64,9 +69,7 @@ def main(argv: list[str] | None = None) -> int:
             report_out=args.report_out,
         ),
         commit_store=QdrantIngestionCommitStore(
-            collection_name=(
-                "openclaw_internal" if corpus == "internal" else "openclaw_financial"
-            ),
+            collection_name=collection_for_corpus(corpus),
             corpus=corpus,
         )
         if args.commit
