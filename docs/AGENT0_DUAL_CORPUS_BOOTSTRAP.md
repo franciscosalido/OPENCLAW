@@ -23,6 +23,17 @@ Each root has its own `manifest.yaml`. There is no dual or super manifest.
 Manifest paths are relative to their corpus root and must remain under
 `data/corpus/`. Symlinks are not used.
 
+The original PR01 file `data/corpus/manifest.yaml` may still exist in the
+repository. It is the legacy single-corpus Agent-0 ingestion manifest from
+A0-PR01, not a dual-corpus or super manifest. A0-PR02 bootstrap entrypoints are
+only:
+
+- `data/corpus/internal/manifest.yaml`
+- `data/corpus/financial/manifest.yaml`
+
+`scripts/bootstrap_corpus.py` resolves manifests from those two closed roots
+and must not read `data/corpus/manifest.yaml`.
+
 ## Collection Mapping
 
 The namespace mapping is closed:
@@ -82,6 +93,11 @@ corpus manifest. The value is the SHA256 of the raw file bytes. Verify-only
 runs reject a document before chunking if the current file hash differs from
 the pinned manifest value. This keeps the synthetic bootstrap corpus
 deterministic and gives reviewers a simple tamper-detection gate.
+
+After the first successful real `--commit` run, re-check the committed document
+metadata against the manifest and re-pin `expected_hash` only if the versioned
+source files intentionally changed. This keeps drift detection tied to the
+curated corpus rather than to stale local reports.
 
 ## Metadata
 
@@ -147,6 +163,11 @@ The commit store is deliberately synchronous in A0-PR02. `_embed_chunks()` uses
 code comment at that call site marks the async-runtime footgun. Before wiring
 bootstrap commit into FastAPI, pytest-asyncio or any already-running event
 loop, replace that bridge with an async-safe commit path.
+
+Open a GitHub follow-up issue for that replacement before any async integration
+lands. The issue should cover the async-safe API shape, tests that run inside an
+already-running event loop and proof that commit still writes only to the
+mapped dual-corpus collection.
 
 ## Rollback
 
