@@ -13,6 +13,7 @@ from backend.rag.collection_guard import (
     CollectionMetadataCheckResult,
     CollectionMetadataMismatchError,
     EmbeddingDimensionMismatchError,
+    assert_collection_namespace,
     check_collection_metadata,
     check_collection_metadata_from_config,
     load_active_embedding_metadata,
@@ -86,6 +87,28 @@ class CollectionGuardTests(unittest.TestCase):
         self.assertTrue(result.backend_matches)
         self.assertTrue(result.metadata_complete)
         self.assertEqual(self.log_messages, [])
+
+    def test_assert_collection_namespace_accepts_allowed_mapping_value(self) -> None:
+        collection = assert_collection_namespace(
+            "openclaw_internal",
+            {"internal": "openclaw_internal", "financial": "openclaw_financial"},
+        )
+
+        self.assertEqual(collection, "openclaw_internal")
+
+    def test_assert_collection_namespace_rejects_openclaw_knowledge(self) -> None:
+        with self.assertRaises(ValueError):
+            assert_collection_namespace(
+                "openclaw_knowledge",
+                {"internal": "openclaw_internal", "financial": "openclaw_financial"},
+            )
+
+    def test_assert_collection_namespace_rejects_arbitrary_and_empty_names(self) -> None:
+        allowed = {"internal": "openclaw_internal", "financial": "openclaw_financial"}
+        for collection_name in ("", "custom_collection"):
+            with self.subTest(collection_name=collection_name):
+                with self.assertRaises(ValueError):
+                    assert_collection_namespace(collection_name, allowed)
 
     def test_matching_metadata_all_match(self) -> None:
         result = _check(

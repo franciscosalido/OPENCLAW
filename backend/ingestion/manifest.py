@@ -15,6 +15,7 @@ SourceType = Literal["md", "pdf"]
 CurationStatus = Literal["approved", "pending", "rejected"]
 IngestionPolicy = Literal["internal", "financial"]
 Language = Literal["pt-BR"]
+FinancialDomain = Literal["macroeconomia", "renda_fixa", "valuation"]
 
 MANIFEST_DOCUMENTS_KEY = "documents"
 _STABLE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{5,127}$")
@@ -30,6 +31,7 @@ class CorpusDocument(BaseModel):
     origin_path: str
     source_type: SourceType
     domain: str
+    financial_domain: FinancialDomain | None = None
     language: Language
     license: str
     contains_pii: bool

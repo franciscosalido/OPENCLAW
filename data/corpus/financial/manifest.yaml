@@ -1,0 +1,110 @@
+version: 1
+documents:
+  - source_id: financial-macro-juros-001
+    doc_id: financial_macro_ciclo_juros
+    origin_path: docs/macro_ciclo_juros_sintetico.md
+    source_type: md
+    domain: macroeconomia
+    financial_domain: macroeconomia
+    language: pt-BR
+    license: synthetic-internal
+    contains_pii: false
+    curation_status: approved
+    ingestion_policy: financial
+    enabled: true
+  - source_id: financial-macro-riscos-001
+    doc_id: financial_macro_balanco_riscos
+    origin_path: docs/macro_balanco_riscos_sintetico.md
+    source_type: md
+    domain: macroeconomia
+    financial_domain: macroeconomia
+    language: pt-BR
+    license: synthetic-internal
+    contains_pii: false
+    curation_status: approved
+    ingestion_policy: financial
+    enabled: true
+  - source_id: financial-macro-expect-001
+    doc_id: financial_macro_expectativas
+    origin_path: docs/macro_expectativas_sinteticas.md
+    source_type: md
+    domain: macroeconomia
+    financial_domain: macroeconomia
+    language: pt-BR
+    license: synthetic-internal
+    contains_pii: false
+    curation_status: approved
+    ingestion_policy: financial
+    enabled: true
+  - source_id: financial-rf-curva-001
+    doc_id: financial_renda_fixa_curva
+    origin_path: docs/renda_fixa_curva_sintetica.md
+    source_type: md
+    domain: renda_fixa
+    financial_domain: renda_fixa
+    language: pt-BR
+    license: synthetic-internal
+    contains_pii: false
+    curation_status: approved
+    ingestion_policy: financial
+    enabled: true
+  - source_id: financial-rf-liquidez-001
+    doc_id: financial_renda_fixa_liquidez
+    origin_path: docs/renda_fixa_liquidez_sintetica.md
+    source_type: md
+    domain: renda_fixa
+    financial_domain: renda_fixa
+    language: pt-BR
+    license: synthetic-internal
+    contains_pii: false
+    curation_status: approved
+    ingestion_policy: financial
+    enabled: true
+  - source_id: financial-rf-credito-001
+    doc_id: financial_renda_fixa_risco_credito
+    origin_path: docs/renda_fixa_risco_credito_sintetico.md
+    source_type: md
+    domain: renda_fixa
+    financial_domain: renda_fixa
+    language: pt-BR
+    license: synthetic-internal
+    contains_pii: false
+    curation_status: approved
+    ingestion_policy: financial
+    enabled: true
+  - source_id: financial-val-growth-001
+    doc_id: financial_valuation_crescimento
+    origin_path: docs/valuation_crescimento_sintetico.md
+    source_type: md
+    domain: valuation
+    financial_domain: valuation
+    language: pt-BR
+    license: synthetic-internal
+    contains_pii: false
+    curation_status: approved
+    ingestion_policy: financial
+    enabled: true
+  - source_id: financial-val-capital-001
+    doc_id: financial_valuation_custo_capital
+    origin_path: docs/valuation_custo_capital_sintetico.md
+    source_type: md
+    domain: valuation
+    financial_domain: valuation
+    language: pt-BR
+    license: synthetic-internal
+    contains_pii: false
+    curation_status: approved
+    ingestion_policy: financial
+    enabled: true
+  - source_id: financial-val-cenarios-001
+    doc_id: financial_valuation_cenarios
+    origin_path: docs/valuation_cenarios_sinteticos.md
+    source_type: md
+    domain: valuation
+    financial_domain: valuation
+    language: pt-BR
+    license: synthetic-internal
+    contains_pii: false
+    curation_status: approved
+    ingestion_policy: financial
+    enabled: true

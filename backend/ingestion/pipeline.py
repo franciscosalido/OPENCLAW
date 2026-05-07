@@ -219,6 +219,16 @@ def _vector_chunks_for_document(
     overlap_tokens: int,
 ) -> list[VectorStoreChunk]:
     chunks = chunk_text(text, max_tokens=max_tokens, overlap_tokens=overlap_tokens)
+    base_metadata: dict[str, object] = {
+        "source_id": document.source_id,
+        "domain": document.domain,
+        "source_type": document.source_type,
+        "ingestion_policy": document.ingestion_policy,
+        "language": document.language,
+        "license": document.license,
+    }
+    if document.financial_domain is not None:
+        base_metadata["financial_domain"] = document.financial_domain
     return [
         VectorStoreChunk(
             doc_id=document.doc_id,
@@ -226,12 +236,7 @@ def _vector_chunks_for_document(
             text=chunk.text,
             security_level="Level 1",
             metadata={
-                "source_id": document.source_id,
-                "domain": document.domain,
-                "source_type": document.source_type,
-                "ingestion_policy": document.ingestion_policy,
-                "language": document.language,
-                "license": document.license,
+                **base_metadata,
                 "chunk_id": f"{document.doc_id}#{chunk.index}",
                 "start_char": chunk.start_char,
                 "end_char": chunk.end_char,

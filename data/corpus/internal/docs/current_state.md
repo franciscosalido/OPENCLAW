@@ -1,0 +1,877 @@
+# current_state.md — OPENCLAW Operational Memory
+
+> Volatile project state for Codex, Claude Code, ChatGPT Thinking, and human
+> review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
+> meaningful sessions.
+
+**Last updated:** 2026-05-06
+**Updated by:** Codex — A0-PR01 controlled corpus ingestion
+
+---
+
+## Active Sprint: Agent-0 / Controlled Ingestion
+
+**Goal:** add a contract-first, verify-only-by-default ingestion path for a
+curated synthetic Agent-0 corpus.
+
+Current branch: `feat/agent0-ingestion`
+Current issue: `[A0-PR01] Add controlled corpus ingestion pipeline`
+
+A0-PR01 starts after Gateway-2 completion. The first Agent-0 ingestion PR keeps
+the corpus local, synthetic and explicitly controlled by
+`data/corpus/manifest.yaml`.
+
+Current runtime path:
+
+```text
+OpenClaw / runtime generation
+  -> LiteLLM at http://127.0.0.1:4000/v1
+  -> Ollama / Qwen local
+```
+
+Current controlled embedding path:
+
+```text
+RagEmbedder factory
+  -> gateway_litellm
+  -> GatewayEmbedClient
+  -> LiteLLM at http://127.0.0.1:4000/v1/embeddings
+  -> quimera_embed
+  -> Ollama / nomic-embed-text local
+```
+
+Rollback embedding path:
+
+```text
+RagEmbedder factory
+  -> direct_ollama
+  -> OllamaEmbedder
+  -> Ollama direct at http://127.0.0.1:11434/api/embed
+```
+
+GW-07 proves the current RAG E2E path without migrating embeddings:
+
+```text
+synthetic docs
+  -> chunking
+  -> OllamaEmbedder direct at http://127.0.0.1:11434/api/embed
+  -> Qdrant temporary collection gw07_synthetic_rag_<short_uuid>
+  -> Retriever / ContextPacker / PromptBuilder
+  -> LocalGenerator / GatewayChatClient
+  -> LiteLLM at http://127.0.0.1:4000/v1/chat/completions
+  -> Ollama / Qwen local
+```
+
+Hard constraints remain:
+
+- Local only.
+- No remote providers.
+- No FastAPI.
+- No MCP.
+- No quant tools.
+- No secrets or real portfolio data.
+- No `openclaw_knowledge` mutation in verify-only.
+- No Qdrant mutation unless `--commit` is explicit and a future writer is wired.
+- No final local merge into `main`; GitHub PR approval is the integration path.
+
+## A0-PR01 Current Work
+
+A0-PR01 adds controlled ingestion primitives:
+
+- `data/corpus/manifest.yaml` with ten safe synthetic PT-BR Markdown documents.
+- `backend/ingestion/manifest.py` for frozen Pydantic manifest contracts.
+- `backend/ingestion/fingerprint.py` for raw-file and normalized-text sha256.
+- `backend/ingestion/sanitizer.py` for manifest PII and parsed-text PII guards.
+- `backend/ingestion/parsers.py` for local `.md` and optional `pypdf` `.pdf`.
+- `backend/ingestion/pipeline.py` reusing the existing RAG chunker and
+  `VectorStoreChunk` shape.
+- `backend/ingestion/report.py` for allowlisted sanitized reports.
+- `scripts/ingest_corpus.py` with verify-only default and explicit `--commit`.
+- `docs/AGENT0_INGESTION.md` for operator semantics.
+
+Rules:
+
+- Verify-only validates, parses, sanitizes, fingerprints, deduplicates, chunks
+  and reports, but does not write to Qdrant.
+- `--commit` requires explicit `--manifest`.
+- Pending, rejected, PII, duplicate, parser-failed or hash-mismatched documents
+  block commit by default.
+- Reports never include text, chunks, vectors, embeddings, payloads, prompts,
+  answers, secrets, headers, raw exceptions or tracebacks.
+- p50/p95 ingestion metrics cover only offline local validation work.
+
+---
+
+## Mandatory GitHub Workflow
+
+For every tracked task:
+
+1. Sync local `main` with GitHub.
+2. Open or update a GitHub Issue before implementation.
+3. Create a feature branch from updated `main`.
+4. Implement locally.
+5. Run validation locally.
+6. Commit atomic changes.
+7. Push the feature branch.
+8. Open a GitHub PR to `main`.
+9. Link the PR to the issue.
+10. Address review on the same branch.
+11. Merge only in GitHub after approval.
+12. After merge, pull `main` with `--ff-only` and delete branches only when safe.
+
+Do not push directly to `main`. Do not use `git push --force`; if a rebase is
+unavoidable, use `git push --force-with-lease`.
+
+---
+
+## Gateway PR Tracking
+
+| PR | Branch | Scope | Status |
+|---|---|---|---|
+| GW-01 | `feat/gateway-prep-contracts` | ADR, Blueprint V3.0, semantic aliases, config contracts | Done / merged |
+| GW-02 | `feat/gateway-install-health` | Local-only LiteLLM operational setup | Done / merged |
+| GW-03 | `feat/gateway-route-opencraw-litellm` | Runtime chat/generation through LiteLLM | Done / merged |
+| GW-04 | `feat/gateway-runtime-smoke` | Shared message validation, optional smoke, observability | Done / merged |
+| GW-05a | `feat/gateway-per-alias-timeouts` | Per-alias timeout configuration | Done / merged |
+| GW-05b | `feat/gateway-live-smoke-timeouts` | Live smoke with effective timeout observability | Done / merged |
+| GW-06 | `feat/gateway-local-embed-evaluation` | Evaluate embeddings via `local_embed` | Done / merged |
+| GW06C | `feat/adr-openai-compatible-embeddings-contract` | OpenAI-compatible embeddings ADR and `quimera_embed` | Done / merged |
+| GW-07 | `feat/gateway-rag-e2e-synthetic` | Synthetic RAG E2E through gateway path | Done / merged |
+| GW-08 | `feat/rag-controlled-embedding-migration` | Controlled RAG embedding migration to `quimera_embed` | Done / merged |
+| GW-09 | `feat/rag-collection-metadata-guard` | Collection metadata drift guard for embedding traceability | Done / merged |
+| GW-10 | `feat/rag-run-trace-provenance` | Safe per-query RAG provenance trace | Done / merged |
+| GW-11 | `feat/rag-observability-events` | Safe structured RAG lifecycle observability events | Done / merged |
+| GW-12 | `feat/gateway-operational-readiness` | Final runbook, readiness checks, ADR boundary, handoff | Done / merged |
+| GW-13 | `feat/gateway1-routing-policy-prelude` | Gateway-1 local-first routing policy and token economy prelude | Done / merged |
+| GW-14 | `feat/gateway1-routing-audit-token-economy` | Config-driven routing audit and token economy calibration | Done / merged |
+| GW-15 | `feat/agent0-local-runner` | Agent-0 local CLI runner MVP | Done / merged |
+| GW-16 | `feat/agent0-runner-contract-hardening` | Agent-0 runner contract hardening | Done / merged |
+| GW-17 | `feat/agent0-local-failsafe-degradation` | Explicit local fail-safe degradation for Agent-0 | Done / merged |
+| GW-18 | `feat/agent0-golden-question-harness` | Golden question benchmark harness for Agent-0 | Done / merged |
+| GW-19 | `feat/agent0-observability-signal-contract` | Agent-0 observability signal contract and sanitization tests | Done / merged |
+| GW-20 | `feat/gateway1-proof-of-life-smoke` | Gateway-1 operational proof-of-life smoke | Done / merged |
+| G2-PR01 | `feat/g2-rag-segment-timing-baseline` | Per-segment RAG latency baseline | Done / merged |
+| G2-PR02 | `feat/g2-local-rag-context-budget-cap` | Configurable whole-chunk context budget cap | Done / merged |
+| G2-PR03 | `feat/g2-local-rag-generation-budget` | Configurable local_rag generation budget | Done / merged |
+| G2-PR04 | `feat/g2-warm-model-cold-start-separation` | Cold/warm/degraded latency separation and model residency measurement | Done / merged |
+| G2-PR05 | `feat/g2-keep-alive-model-residency` | Configurable local_rag Ollama keep_alive model residency | Done / merged |
+| G2-PR06 | `feat/g2-local-rag-alias-comparison` | Local-only local_rag candidate alias comparison harness | Current |
+
+GW-05a issue: <https://github.com/franciscosalido/OPENCLAW/issues/25>
+GW-05b issue: <https://github.com/franciscosalido/OPENCLAW/issues/28>
+GW-06 issue: <https://github.com/franciscosalido/OPENCLAW/issues/30>
+GW-07 issue: <https://github.com/franciscosalido/OPENCLAW/issues/38>
+GW-08 issue: <https://github.com/franciscosalido/OPENCLAW/issues/40>
+GW-09 issue: <https://github.com/franciscosalido/OPENCLAW/issues/42>
+GW-10 issue: <https://github.com/franciscosalido/OPENCLAW/issues/44>
+GW-11 issue: <https://github.com/franciscosalido/OPENCLAW/issues/46>
+GW-12 issue: <https://github.com/franciscosalido/OPENCLAW/issues/48>
+GW-13 issue: <https://github.com/franciscosalido/OPENCLAW/issues/51>
+GW-15 issue: <https://github.com/franciscosalido/OPENCLAW/issues/55>
+GW-16 issue: <https://github.com/franciscosalido/OPENCLAW/issues/57>
+GW-17 issue: <https://github.com/franciscosalido/OPENCLAW/issues/59>
+GW-18 issue: <https://github.com/franciscosalido/OPENCLAW/issues/61>
+GW-19 issue: <https://github.com/franciscosalido/OPENCLAW/issues/63>
+
+Gateway-0 sprint complete. GW-01 through GW-12 merged on `main`.
+The next sprint must start from a new explicit issue, ADR if architecture
+changes, and `git pull --ff-only origin main`.
+
+## G2-PR06 Current Work
+
+G2-PR06 adds an opt-in alias comparison harness for `local_rag` candidates.
+
+Deliverables:
+
+- `scripts/run_rag_alias_comparison.py`.
+- `tests/unit/test_rag_alias_comparison.py`.
+- `docs/RAG_ALIAS_COMPARISON.md`.
+
+Rules:
+
+- `local_rag` remains the default and comparison baseline.
+- Candidate aliases must be semantic local LiteLLM aliases, never concrete
+  model names.
+- Candidate aliases must resolve to local Ollama config only.
+- Remote provider prefixes are rejected.
+- The same synthetic golden question fixture is used for baseline and
+  candidates.
+- Reports store `question_id`, fixture hash, alias metrics and citation flags,
+  never question text, answer text, prompt text, chunks, vectors, payloads,
+  headers, API keys or tracebacks.
+- Warmup runs are discarded and marked only in summary metadata.
+- No prompt, retrieval, Qdrant, context budget, generation budget, keep_alive,
+  alias default or provider config is changed.
+- Candidate promotion requires a separate future PR.
+
+## GW-15 Current Work
+
+GW-15 creates Agent-0, the first local MVP runner:
+
+```text
+question
+  -> decide_route(...)
+  -> local_chat | local_json | explicit local_rag
+  -> safe answer metadata
+```
+
+Deliverables:
+
+- `scripts/run_local_agent.py`.
+- `scripts/test_agent0_local_runner.sh` optional smoke guarded by
+  `RUN_AGENT0_LOCAL_SMOKE=1`.
+- `docs/AGENT0_LOCAL_RUNNER.md`.
+- `tests/unit/test_run_local_agent.py`.
+
+Rules:
+
+- Default execution uses `local_chat`.
+- `--json` uses `local_json`.
+- `--rag` explicitly opts into the existing local RAG path and `local_rag`.
+- `--dry-run` works without live services.
+- No remote providers, no remote calls, no API keys, no FastAPI, no MCP.
+- No Qdrant mutation, no reindexing, no ingestion, no real data.
+- Progressive fallback is handled by GW-17.
+- Golden questions harness is handled by GW-18.
+
+## GW-16 Current Work
+
+GW-16 hardens the Agent-0 runner contract without adding new execution
+features.
+
+Rules:
+
+- Alias matrix is frozen: default `local_chat`, `--json` `local_json`,
+  `--rag` `local_rag`.
+- Output schema remains stable across success, dry-run, blocked and failure
+  states.
+- Blocked and dry-run paths return `latency_ms=0.0`.
+- Chat, JSON and RAG failures return safe error categories only.
+- No fallback is added. RAG/JSON/chat failures do not silently try another
+  alias.
+- No remote providers, no remote calls, no Qdrant mutation, no live services
+  required for tests.
+
+## GW-17 Current Work
+
+GW-17 adds the first explicit local fail-safe degradation layer.
+
+Rules:
+
+- Fallback reasons are enum-derived, not free-form strings.
+- RAG/Qdrant unavailable can fallback once from `local_rag` to `local_chat`.
+- Successful RAG fallback returns the chat answer, `alias=local_chat`, and
+  `used_rag=false`.
+- Policy blocks such as `budget_exceeded` and `unsupported_task` never
+  fallback, call no model, and return `error_category=blocked`.
+- If the fallback alias also fails, the runner returns a safe failure with no
+  second fallback.
+- Fallback emits a sanitized local `agent_fallback` loguru event only when
+  fallback occurs.
+- `local_think` timeout fallback is deferred because Agent-0 has no public
+  think path yet.
+- No remote providers, no remote calls, no Qdrant mutation, no real data, and
+  no live services required for unit tests.
+
+## GW-18 Current Work
+
+GW-18 adds the reproducible Agent-0 golden question harness.
+
+Deliverables:
+
+- `tests/golden/questions.yaml` with 8 synthetic financial-domain questions.
+- `scripts/run_golden_harness.py` opt-in harness guarded by
+  `RUN_GOLDEN_HARNESS=1`.
+- Offline `--dry-run` mode that emits JSONL and summary JSON without live
+  services.
+- `scripts/compare_golden_runs.py` for summary-to-summary regression checks.
+- `docs/AGENT0_GOLDEN_HARNESS.md` and `tests/golden/README.md`.
+
+Rules:
+
+- No answer text is stored in JSONL by default; only `answer_length_chars`.
+- Reports exclude prompt/question/chunks/vectors/payloads/secrets and raw
+  exceptions.
+- Reports are written under `tests/golden/reports/`, which is ignored by Git.
+- Quality scoring is human-readable only; no LLM-as-judge and no external API.
+- Optional human scoring helper is deferred to a future issue.
+- No remote providers, no remote calls, no Qdrant mutation, no real data, and
+  no live services required for unit tests.
+
+## GW-19 Current Work
+
+GW-19 adds the Agent-0 observability signal contract.
+
+Deliverables:
+
+- `backend/gateway/observability_contract.py` with canonical allowlists and
+  prohibited signal keys.
+- `tests/unit/test_observability_signal_contract.py` for RouterDecision,
+  TokenEconomyRecord, RagRunTrace, fallback events, decision logs, Agent-0
+  output and golden harness dry-run reports.
+- `docs/AGENT0_OBSERVABILITY.md`.
+- GW-18 NB fixes:
+  - golden harness uses `estimate_prompt_tokens` directly from
+    `backend.gateway.routing_policy`;
+  - `GoldenResult` rejects `skipped=True` with `error_category`.
+
+Rules:
+
+- Sanitization is enforced with allowlists, not blocklist-only checks.
+- Fallback event `decision_id` must correlate with Agent-0 output.
+- `estimated_remote_tokens_avoided` is checked across success, dry-run,
+  blocked, fallback success and fallback failure paths.
+- No prompt, raw user input, chunks, vectors, payloads, headers, API keys, raw
+  exceptions or model weight paths may appear in observability keys.
+- No runtime routing behavior, fallback behavior or remote provider behavior is
+  changed.
+- No live LiteLLM/Ollama/Qdrant services are required for tests.
+
+## GW-13 Completed Work
+
+GW-13 opens Gateway-1 with safe routing policy records only.
+
+Deliverables:
+
+- `backend/gateway/routing_policy.py` with frozen decision and token economy
+  dataclasses.
+- `config/rag_config.yaml` `gateway.routing` defaults with
+  `remote_enabled: false` and no allowed remote providers.
+- `docs/GATEWAY1_ROUTING_POLICY.md`.
+- `docs/ADR/0020-controlled-remote-escalation-policy.md` with status Proposed.
+- `docs/sprints/GATEWAY1_SPRINT_HANDOFF.md`.
+- `tests/unit/test_gateway_routing_policy.py`.
+
+Rules:
+
+- No remote providers.
+- No remote calls.
+- No API keys.
+- No runtime model routing change.
+- No Qdrant mutation, reindexing, ingestion, or `openclaw_knowledge` access.
+- Token economy is estimated only, not billed.
+- Remote escalation requires future sanitization and an explicit Accepted ADR.
+
+---
+
+## GW-05a Timeout Contract
+
+Runtime gateway calls now reserve different timeout budgets per semantic alias:
+
+| Alias | Timeout | Notes |
+|---|---:|---|
+| `local_chat` | 30.0s | Default chat calls |
+| `local_think` | 120.0s | Longer local reasoning calls |
+| `local_rag` | 60.0s | RAG answer synthesis |
+| `local_json` | 30.0s | Structured local responses |
+| `local_embed` | 30.0s | Placeholder only; embeddings are not routed through LiteLLM in GW-05a |
+
+Unknown aliases and `None` fall back to the global `timeout_seconds`.
+
+---
+
+## GW-12 Completed Work
+
+GW-12 closed Gateway-0 as an operational readiness PR, not a feature PR.
+
+Deliverables:
+
+- `docs/GATEWAY_FINAL_RUNBOOK.md`.
+- `scripts/check_gateway_readiness.sh` with static default mode and explicit
+  `--live`.
+- `tests/unit/test_gateway_readiness_script.py`.
+- `tests/unit/test_gateway_final_baseline.py`.
+- `docs/ADR/0019-gateway-0-sprint-boundary.md`.
+- Final updates to shared context, setup, runtime and handoff docs.
+
+Rules respected:
+
+- No runtime architecture change.
+- No remote providers.
+- No FastAPI, MCP, quant tools, OpenTelemetry, Prometheus, Grafana,
+  dashboards, profiling, or mandatory soak tests.
+- No Qdrant mutation, no reindexing, no `openclaw_knowledge` access.
+- Live proof remains opt-in and must not become CI.
+- Memory/resource baseline: not implemented in GW-12. Deferred to a future sprint. See ADR-0019 Future Work section.
+
+## Historical Work
+
+GW-05b:
+
+- Add `timeout_s` to gateway call debug logs.
+- Run expanded live smoke with LiteLLM and Ollama actually running when
+  `RUN_LITELLM_SMOKE=1` is explicitly set.
+- Validate `local_chat`, `local_think`, `local_rag`, and `local_json` against
+  their effective timeout budgets.
+- Keep smoke synthetic-only and local-only.
+- Do not introduce remote providers, real data, RAG E2E, or embeddings through
+  LiteLLM.
+
+Live smoke status for GW-05b:
+
+- **2026-04-28: PASSED** — Cenário A completo.
+- 128/128 unit+integration tests passed. mypy 0. pyright 0.
+- `RUN_LITELLM_SMOKE=1 pytest tests/smoke/` — 7/7 passed.
+- `RUN_LITELLM_SMOKE=1 RUN_LITELLM_SMOKE_REPEAT=3 pytest tests/smoke/` — 7/7 passed (54s).
+
+Observed latencies (macOS, qwen3:14b Q4_K_M):
+
+| Alias | elapsed_s | timeout_s |
+|---|---:|---:|
+| `local_chat` | 2.20 | 30.0 |
+| `local_think` | 12.44 | 120.0 |
+| `local_rag` | 2.23 | 60.0 |
+| `local_json` | 1.72 | 30.0 |
+
+GW-06:
+
+- Evaluate whether embeddings should route through `local_embed`.
+- Add an experimental `GatewayEmbedClient` for OpenAI-compatible
+  `/embeddings` calls through LiteLLM.
+- Keep existing direct/local embedding behavior as the default RAG path.
+- Do not reindex Qdrant or touch real documents.
+- Use only synthetic smoke inputs.
+- Live evaluation on 2026-04-28 passed against local LiteLLM + Ollama.
+- Decision status: **Approved for future migration**.
+- Migration is still not performed in GW-06; a future PR must preserve or
+  replace the current Ollama embedder's retry/backoff/concurrency behavior.
+
+Observed local_embed results (2026-04-28):
+
+| Check | Result |
+|---|---|
+| LiteLLM single embedding | 768 dimensions, 0.08s |
+| LiteLLM batch embedding | 2 vectors, 768 dimensions each, 0.05s |
+| Direct Ollama parity | 768 dimensions |
+| Cosine similarity | 1.000000 |
+| Script smoke | 768 dimensions, 0.70s |
+
+GW-07:
+
+- Prove a synthetic RAG end-to-end flow against the gateway path.
+- Keep Qdrant data synthetic and local.
+- Use a unique temporary collection named `gw07_synthetic_rag_<short_uuid>`.
+- Attempt prefix-guarded cleanup and delete only temporary collections with the
+  `gw07_synthetic_rag_` prefix.
+- Never touch `openclaw_knowledge`.
+- Keep embeddings direct through `OllamaEmbedder`; `quimera_embed` appears only
+  as embedding contract metadata in this PR.
+- Generate the final answer through LiteLLM using `local_rag`.
+- Run only when explicitly enabled with `RUN_RAG_E2E_SMOKE=1`.
+
+Manual live command:
+
+```bash
+export QUIMERA_LLM_API_KEY="${LITELLM_MASTER_KEY}"
+scripts/test_rag_e2e_gateway.sh
+```
+
+Direct pytest command:
+
+```bash
+RUN_RAG_E2E_SMOKE=1 uv run pytest tests/smoke/test_rag_e2e_gateway_smoke.py -v
+```
+
+Cleanup is attempted in teardown. If cleanup is interrupted, manually delete
+only Qdrant collections whose names start with `gw07_synthetic_rag_`.
+
+Live status:
+
+- **2026-04-30: PASSED** — Cenário A completo for GW-07.
+- Command: `RUN_RAG_E2E_SMOKE=1 uv run pytest tests/smoke/test_rag_e2e_gateway_smoke.py -v -s`.
+- Corpus: 3 PT-BR synthetic documents, 14 chunks, 5 chunks retrieved/used.
+- Temporary collection: `gw07_synthetic_rag_<short_uuid>` with prefix-guarded
+  cleanup for the recorded run; interrupted runs may require manual cleanup by
+  prefix.
+- Embedding path: direct `OllamaEmbedder` to Ollama `/api/embed`.
+- Generation path: `LocalGenerator` / `GatewayChatClient` through LiteLLM
+  `local_rag`.
+
+Observed GW-07 latencies (2026-04-30):
+
+| Stage | Latency |
+|---|---:|
+| embedding/indexing | 178.1 ms |
+| retrieval | 18.4 ms |
+| generation | 3621.2 ms |
+| total pipeline | 3639.6 ms |
+
+---
+
+## Validation Expectations For GW-07
+
+Before opening PR:
+
+```bash
+git diff --check
+uv run pytest -v
+uv run mypy --strict .
+uv run pyright
+uv run python -m compileall backend tests scripts infra
+uv run pytest tests/unit/test_gateway_embed_client.py -v
+uv run pytest tests/smoke/ -v
+```
+
+## GW-10 Completed Work
+
+GW-10 adds `RagRunTrace`, a safe frozen dataclass for per-query provenance:
+
+```text
+LocalRagPipeline.ask(...)
+  -> retrieval/prompt/generation timings
+  -> RagRunTrace safe metadata only
+  -> logger.bind(trace=...).log(...)
+```
+
+Trace scope:
+
+- Records collection name, embedding backend/model/alias/dimensions, chunk
+  count, gateway alias, and latency metadata.
+- Does not record query text, chunk text, prompts, answer text, vectors,
+  payloads, real portfolio data, private documents, API keys, Authorization
+  headers, or secrets.
+- Uses `rag.tracing.enabled` and `rag.tracing.log_level` from
+  `config/rag_config.yaml`.
+- Raises `EmbeddingDimensionMismatchError` if trace dimensions diverge from
+  active expected dimensions.
+- Does not mutate Qdrant, reindex collections, or touch `openclaw_knowledge`.
+
+GW-11 current work remains separate from `RagRunTrace`: lifecycle events are
+local structured loguru records around embedding, retrieval, and generation.
+Memory/resource baseline: not implemented in GW-12. Deferred to a future sprint. See ADR-0019 Future Work section.
+
+Live smoke tests should skip by default unless their explicit guards are set.
+GW-07 requires `RUN_RAG_E2E_SMOKE=1`.
+
+Optional live validation when local services are already running:
+
+```bash
+export QUIMERA_LLM_API_KEY="${LITELLM_MASTER_KEY}"
+RUN_LITELLM_EMBED_SMOKE=1 uv run pytest tests/smoke/test_gateway_embed_smoke.py -v
+scripts/test_local_embed_litellm.sh
+```
+
+Optional GW-07 live validation when Qdrant, Ollama, LiteLLM, and credentials are
+already running locally:
+
+```bash
+export QUIMERA_LLM_API_KEY="${LITELLM_MASTER_KEY}"
+scripts/test_rag_e2e_gateway.sh
+```
+
+## GW-08 Completed Work
+
+GW-08 aligns new controlled RAG embedding generation with the accepted
+OpenAI-compatible embeddings contract:
+
+```text
+RagEmbedder factory
+  -> gateway_litellm
+  -> GatewayEmbedClient
+  -> LiteLLM /v1/embeddings
+  -> quimera_embed
+  -> Ollama / nomic-embed-text
+```
+
+Rollback remains explicit:
+
+```bash
+export QUIMERA_RAG_EMBEDDING_BACKEND="direct_ollama"
+```
+
+Key rules:
+
+- `OllamaEmbedder` remains available.
+- `direct_ollama` remains the rollback backend.
+- Existing collections are not reindexed automatically.
+- `openclaw_knowledge` is not touched.
+- Vectors from different embedding backends, models, providers, or dimensions
+  must not be mixed silently in one collection.
+- GW-08 smoke uses temporary collections with prefix
+  `gw08_embedding_migration_`.
+
+Validation expectations:
+
+```bash
+git diff --check
+uv run pytest -v
+uv run mypy --strict .
+uv run pyright
+uv run pytest tests/smoke/ -v
+```
+
+Optional live validation:
+
+```bash
+export QUIMERA_LLM_API_KEY="${LITELLM_MASTER_KEY}"
+scripts/test_gw08_embedding_migration.sh
+```
+
+Live status:
+
+- **2026-04-30: PASSED** — controlled migration smoke and parity smoke passed.
+- Required operational note: restart LiteLLM after adding `quimera_embed`; an
+  old LiteLLM process may still expose only `local_embed`.
+- Command: `QUIMERA_LLM_API_KEY=<local-placeholder> scripts/test_gw08_embedding_migration.sh`.
+- Temporary collection prefix: `gw08_embedding_migration_`.
+- Synthetic chunks: 4 indexed, 4 retrieved/used.
+- Embedding path: `RagEmbedder factory -> gateway_litellm -> GatewayEmbedClient -> LiteLLM /v1/embeddings -> quimera_embed`.
+- Generation path: `LocalGenerator / GatewayChatClient -> LiteLLM local_rag`.
+- Rollback path remains: `QUIMERA_RAG_EMBEDDING_BACKEND=direct_ollama`.
+- `openclaw_knowledge` was not touched.
+
+Observed GW-08 latencies and parity (2026-04-30):
+
+| Check | Result |
+|---|---:|
+| embedding/indexing | 314.7 ms |
+| retrieval | 27.4 ms |
+| generation | 4951.7 ms |
+| total pipeline | 4979.1 ms |
+| cosine similarity vs direct Ollama | 1.000000 |
+| vector dimensions | 768 |
+
+## GW-09 Completed Work
+
+GW-09 adds a traceability guard for Qdrant collection embedding metadata:
+
+```text
+Qdrant payload sample
+  -> embedding_backend/model/dimensions/contract/alias check
+  -> structured warning on drift
+  -> hard error only for dimension mismatch by default
+```
+
+Key rules:
+
+- The guard samples payloads with `with_payload=True` and `with_vectors=False`.
+- It does not mutate, delete, recreate, or reindex collections.
+- It does not touch `openclaw_knowledge`.
+- Backend, model, contract, alias, and missing metadata drift warn by default.
+- Dimension mismatch always raises `EmbeddingDimensionMismatchError`.
+- `strict=True` can raise on backend/model/contract/alias mismatch.
+- No chunk text, vectors, prompts, secrets, or Authorization headers are logged.
+- GW-10 remains the place for `RagRunTrace`.
+- GW-11 adds structured RAG observability lifecycle events separately.
+
+Validation expectations:
+
+```bash
+git diff --check
+uv run pytest -v
+uv run mypy --strict .
+uv run pyright
+uv run pytest tests/smoke/ -v
+```
+
+## GW-11 Completed Work
+
+GW-11 adds local structured RAG lifecycle observability events:
+
+```text
+embedding/retrieval/generation stage
+  -> RagObservabilityEvent safe metadata only
+  -> logger.bind(event=...).log(...)
+```
+
+Scope:
+
+- `backend/rag/observability.py` defines event kinds, error categories, config,
+  safe serialization, emission, and exception categorization.
+- `GatewayEmbedClient` emits embedding started/finished/failed events for
+  `gateway_litellm`.
+- `OllamaEmbedder` emits embedding started/finished/failed events for
+  `direct_ollama`.
+- `LocalRagPipeline` emits retrieval and generation lifecycle events.
+- `config/rag_config.yaml` has `rag.observability` flags and log level.
+
+Safety rules:
+
+- Events contain only safe scalar metadata.
+- Events never include query text, prompt text, answer text, chunk text,
+  document text, vectors, Qdrant payloads, portfolio data, API keys,
+  Authorization headers, tokens, passwords, or secrets.
+- No return values change.
+- Retry/backoff/concurrency semantics are unchanged.
+- Qdrant is not mutated and `openclaw_knowledge` is not touched.
+
+Out of scope:
+
+- OpenTelemetry, Prometheus, Grafana, dashboards, distributed tracing,
+  profiling, soak tests, and memory/resource baselines.
+- Memory/resource baseline: not implemented in GW-12. Deferred to a future sprint. See ADR-0019 Future Work section.
+
+## GW-20 Completed Work
+
+GW-20 adds the Gateway-1 operational proof-of-life smoke and closes the
+Gateway-1 readiness loop before Gateway-2:
+
+```text
+dry-run Agent-0
+  -> local URL guard
+  -> Ollama/Qdrant/LiteLLM probes
+  -> live local_chat
+  -> live local_rag or explicit fallback
+  -> forced Qdrant degradation
+  -> policy block no-model-call check
+  -> sanitized summary JSON
+```
+
+Key files:
+
+- `docs/sprints/GATEWAY1_DONE_CRITERIA.md`
+- `scripts/test_gateway1_proof_of_life.py`
+- `docs/AGENT0_SMOKE.md`
+- `tests/unit/test_gateway1_proof_of_life.py`
+
+Rules:
+
+- The smoke is opt-in with `RUN_GATEWAY1_PROOF_OF_LIFE=1`.
+- Live probes refuse non-local service URLs.
+- Summary reports do not store answer text, prompts, questions, chunks,
+  vectors, payloads, secrets, Authorization headers, raw exceptions or
+  tracebacks.
+- Forced degradation is injected through Agent-0 hooks; it does not stop Docker,
+  mutate Qdrant, reindex, or touch `openclaw_knowledge`.
+- Gateway-2 should not begin until GW-20 passes locally.
+
+Live proof result on 2026-05-02:
+
+- Command:
+  `QUIMERA_LLM_API_KEY=dev-local-key-change-me RUN_GATEWAY1_PROOF_OF_LIFE=1 uv run python scripts/test_gateway1_proof_of_life.py --output-dir /tmp/openclaw_gateway1_smoke`
+- Result: **PASSED** — G1-01 through G1-11 all true.
+- Summary: `/tmp/openclaw_gateway1_smoke/gateway1_proof_of_life_9f23ce3df3f2.json`.
+- Probes: Ollama OK, Qdrant OK, LiteLLM OK.
+- Live runner: `local_chat` OK, `local_rag` OK.
+- Forced Qdrant degradation: fallback to `local_chat` with
+  `qdrant_unavailable`.
+- Policy block: blocked before model call.
+
+Observed live latencies:
+
+| Check | Latency |
+|---|---:|
+| Ollama probe | 28.6 ms |
+| Qdrant probe | 9.4 ms |
+| LiteLLM probe | 26.1 ms |
+| Agent-0 `local_chat` | 8790.5 ms |
+| Agent-0 `local_rag` | 32162.8 ms |
+| forced degradation | 0.03 ms |
+
+## G2-01 Current Work
+
+G2-01 starts Gateway-2 with a measurement-only RAG latency baseline:
+
+```text
+LocalRagPipeline
+  -> RagRunTrace optional segment fields
+  -> embed/search/pack/prompt/generation/total timings
+  -> safe trace serialization only
+```
+
+Scope:
+
+- Extend `RagRunTrace` with optional per-segment fields:
+  `routing_ms`, `embedding_ms`, `retrieval_ms`, `context_pack_ms`,
+  `prompt_build_ms`, `generation_ms`, `total_ms`, and `run_context`.
+- Preserve old trace fields such as `retrieval_latency_ms`,
+  `generation_latency_ms`, `prompt_latency_ms`, and `total_latency_ms`.
+- Populate pipeline traces from existing `time.perf_counter()` wrappers and
+  `Retriever.last_timings`.
+- Keep `total_ms` as a directly measured outer timer, not a segment sum.
+- Add optional Ollama metric fields, but only when already available in
+  metadata. Current LiteLLM path does not expose native Ollama metrics, so
+  normal traces record `ollama_metrics_available=false`.
+
+Safety:
+
+- No optimization.
+- No prompt/top-k/model/timeout/alias/routing/fallback behavior change.
+- No Qdrant mutation, no reindex, no `openclaw_knowledge` access.
+- No prompt, question, chunks, answer, vectors, payloads, API keys,
+  Authorization headers, raw exceptions or tracebacks in trace serialization.
+
+Deferred from G2-01:
+
+- First optimization experiment: configurable local RAG context budget cap.
+
+## G2-02 Current Work
+
+G2-02 adds a rollback-safe, config-controlled context budget cap for
+`local_rag`:
+
+```text
+retrieved chunks
+  -> existing ContextPacker dedup/token-limit/document ordering
+  -> optional whole-chunk max_context_chunks cap
+  -> PromptBuilder
+  -> LocalGenerator/local_rag
+```
+
+Scope:
+
+- Add `rag.context_budget` to `config/rag_config.yaml`:
+  `enabled: false`, `max_context_chunks: 3`, `mode: whole_chunks`,
+  `apply_to_aliases: [local_rag]`.
+- Add typed `ContextBudgetConfig` and `ContextBudgetResult`.
+- Apply the cap in `ContextPacker` only, after existing packing logic.
+- Preserve whole chunks, citation ids, `doc_id`, `chunk_index`, and payload
+  metadata.
+- Expose safe trace metadata on `RagRunTrace`:
+  `context_budget_enabled`, `context_budget_applied`,
+  `context_chunks_retrieved`, `context_chunks_used`,
+  `context_chunks_dropped`, `context_budget_max_chunks`, and
+  `context_estimated_tokens_used`.
+
+Safety:
+
+- Default `enabled: false` preserves existing behavior.
+- Rollback is a single config change.
+- No retrieval/top-k/Qdrant/model alias/prompt template/timeout change.
+- No Qdrant mutation, no reindex, no `openclaw_knowledge` access.
+- No prompt, chunks, answer, vectors, payloads, secrets, Authorization headers,
+  raw exceptions or tracebacks in trace serialization.
+
+Deferred:
+
+- Token-based context budgeting.
+- Full recalibration of `estimated_remote_tokens_avoided` against the final
+  capped prompt.
+- Mandatory live Golden Harness before/after gate.
+
+## G2-07 Current Work
+
+G2-07 closes Gateway-2 with an offline baseline freeze and regression gate.
+This is not an optimization PR.
+
+Delivered scope:
+
+- Official tracked baseline artifacts under `tests/golden/baseline/`:
+  `gateway2_baseline_summary.json`, `gateway2_baseline_results.jsonl`,
+  `gateway2_baseline_scores.jsonl`, and
+  `gateway2_regression_thresholds.yaml`.
+- `scripts/compare_golden_runs.py` now supports:
+  `--verify-only <summary.json>` and
+  `--baseline <summary.json> --candidate <summary.json> --thresholds <yaml>`.
+- Regression gate exit codes:
+  `0` pass, `2` schema/sanitization, `3` citation/quality,
+  `4` latency, `5` fixture/config mismatch, `6` incompatibility.
+- Baseline summaries stay grouped by alias and run type:
+  `cold_start`, `warm_model`, and `degraded_qdrant`.
+- Generated report directories are ignored while official baseline artifacts
+  remain explicitly allowed.
+
+Safety:
+
+- No prompt, question text, answer text, chunks, vectors, payloads, headers,
+  API keys, raw exceptions, tracebacks, usernames, local paths or model weight
+  paths are allowed in baseline artifacts.
+- No remote providers, no live services, no Qdrant mutation, no reindexing and
+  no `openclaw_knowledge` access are required for the gate.
+
+Gateway-2 handoff:
+
+- See `docs/GATEWAY2_BASELINE.md`.
+- See `docs/sprints/GATEWAY2_SPRINT_HANDOFF.md`.
+- Gateway-3 should start from the frozen Gateway-2 baseline and use the offline
+  gate before accepting performance or quality regressions.
