@@ -1,0 +1,114 @@
+version: 1
+documents:
+  - source_id: synth-macro-selic-001
+    doc_id: macro_selic_neutra
+    origin_path: docs/macro_selic_neutra.md
+    source_type: md
+    domain: macroeconomia
+    language: pt-BR
+    license: synthetic-internal
+    contains_pii: false
+    curation_status: approved
+    ingestion_policy: financial
+    enabled: true
+    notes: Documento sintetico para validar ingestao controlada.
+  - source_id: synth-macro-inflacao-001
+    doc_id: macro_inflacao_nucleos
+    origin_path: docs/macro_inflacao_nucleos.md
+    source_type: md
+    domain: macroeconomia
+    language: pt-BR
+    license: synthetic-internal
+    contains_pii: false
+    curation_status: approved
+    ingestion_policy: financial
+    enabled: true
+  - source_id: synth-macro-cambio-001
+    doc_id: macro_cambio_cenario
+    origin_path: docs/macro_cambio_cenario.md
+    source_type: md
+    domain: macroeconomia
+    language: pt-BR
+    license: synthetic-internal
+    contains_pii: false
+    curation_status: approved
+    ingestion_policy: financial
+    enabled: true
+  - source_id: synth-rf-prefixado-001
+    doc_id: renda_fixa_prefixado
+    origin_path: docs/renda_fixa_prefixado.md
+    source_type: md
+    domain: renda_fixa
+    language: pt-BR
+    license: synthetic-internal
+    contains_pii: false
+    curation_status: approved
+    ingestion_policy: financial
+    enabled: true
+  - source_id: synth-rf-indexado-001
+    doc_id: renda_fixa_indexado
+    origin_path: docs/renda_fixa_indexado.md
+    source_type: md
+    domain: renda_fixa
+    language: pt-BR
+    license: synthetic-internal
+    contains_pii: false
+    curation_status: approved
+    ingestion_policy: financial
+    enabled: true
+  - source_id: synth-rf-credito-001
+    doc_id: renda_fixa_credito_privado
+    origin_path: docs/renda_fixa_credito_privado.md
+    source_type: md
+    domain: renda_fixa
+    language: pt-BR
+    license: synthetic-internal
+    contains_pii: false
+    curation_status: approved
+    ingestion_policy: financial
+    enabled: true
+  - source_id: synth-val-fluxo-001
+    doc_id: valuation_fluxo_caixa
+    origin_path: docs/valuation_fluxo_caixa.md
+    source_type: md
+    domain: valuation
+    language: pt-BR
+    license: synthetic-internal
+    contains_pii: false
+    curation_status: approved
+    ingestion_policy: financial
+    enabled: true
+  - source_id: synth-val-multiplos-001
+    doc_id: valuation_multiplos
+    origin_path: docs/valuation_multiplos.md
+    source_type: md
+    domain: valuation
+    language: pt-BR
+    license: synthetic-internal
+    contains_pii: false
+    curation_status: approved
+    ingestion_policy: financial
+    enabled: true
+  - source_id: synth-val-margem-001
+    doc_id: valuation_margem_seguranca
+    origin_path: docs/valuation_margem_seguranca.md
+    source_type: md
+    domain: valuation
+    language: pt-BR
+    license: synthetic-internal
+    contains_pii: false
+    curation_status: approved
+    ingestion_policy: financial
+    enabled: true
+  - source_id: synth-int-politica-001
+    doc_id: internal_politica_curadoria
+    origin_path: docs/internal_politica_curadoria.md
+    source_type: md
+    domain: internal
+    language: pt-BR
+    license: synthetic-internal
+    contains_pii: false
+    curation_status: approved
+    ingestion_policy: internal
+    enabled: true
+

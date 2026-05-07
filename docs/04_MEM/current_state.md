@@ -4,22 +4,22 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Last updated:** 2026-05-03
-**Updated by:** Codex — G2-PR06 local_rag alias comparison
+**Last updated:** 2026-05-06
+**Updated by:** Codex — A0-PR01 controlled corpus ingestion
 
 ---
 
-## Active Sprint: Gateway-2 / RAG Latency Optimization
+## Active Sprint: Agent-0 / Controlled Ingestion
 
-**Goal:** reduce `local_rag` wall time through controlled, observable,
-rollback-safe local optimizations after the Gateway-1 proof-of-life baseline.
+**Goal:** add a contract-first, verify-only-by-default ingestion path for a
+curated synthetic Agent-0 corpus.
 
-Current branch: `feat/g2-local-rag-alias-comparison`
-Current issue: `[G2-06] Compare local_rag candidate aliases without changing defaults`
+Current branch: `feat/agent0-ingestion`
+Current issue: `[A0-PR01] Add controlled corpus ingestion pipeline`
 
-Gateway-0 and Gateway-1 are complete on `main`. Gateway-2 starts from the
-measured `local_rag` latency baseline and must keep all optimizations
-config-driven, local-only, and reversible.
+A0-PR01 starts after Gateway-2 completion. The first Agent-0 ingestion PR keeps
+the corpus local, synthetic and explicitly controlled by
+`data/corpus/manifest.yaml`.
 
 Current runtime path:
 
@@ -70,7 +70,35 @@ Hard constraints remain:
 - No MCP.
 - No quant tools.
 - No secrets or real portfolio data.
+- No `openclaw_knowledge` mutation in verify-only.
+- No Qdrant mutation unless `--commit` is explicit and a future writer is wired.
 - No final local merge into `main`; GitHub PR approval is the integration path.
+
+## A0-PR01 Current Work
+
+A0-PR01 adds controlled ingestion primitives:
+
+- `data/corpus/manifest.yaml` with ten safe synthetic PT-BR Markdown documents.
+- `backend/ingestion/manifest.py` for frozen Pydantic manifest contracts.
+- `backend/ingestion/fingerprint.py` for raw-file and normalized-text sha256.
+- `backend/ingestion/sanitizer.py` for manifest PII and parsed-text PII guards.
+- `backend/ingestion/parsers.py` for local `.md` and optional `pypdf` `.pdf`.
+- `backend/ingestion/pipeline.py` reusing the existing RAG chunker and
+  `VectorStoreChunk` shape.
+- `backend/ingestion/report.py` for allowlisted sanitized reports.
+- `scripts/ingest_corpus.py` with verify-only default and explicit `--commit`.
+- `docs/AGENT0_INGESTION.md` for operator semantics.
+
+Rules:
+
+- Verify-only validates, parses, sanitizes, fingerprints, deduplicates, chunks
+  and reports, but does not write to Qdrant.
+- `--commit` requires explicit `--manifest`.
+- Pending, rejected, PII, duplicate, parser-failed or hash-mismatched documents
+  block commit by default.
+- Reports never include text, chunks, vectors, embeddings, payloads, prompts,
+  answers, secrets, headers, raw exceptions or tracebacks.
+- p50/p95 ingestion metrics cover only offline local validation work.
 
 ---
 
