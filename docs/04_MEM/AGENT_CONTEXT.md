@@ -11,6 +11,21 @@
 
 ---
 
+## 0-pre. Sandbox / CI Bootstrap (run this first in any fresh environment)
+
+The project requires **Python 3.12** (`requires-python = ">=3.12"` in `pyproject.toml`).
+If the sandbox or CI only has Python 3.10/3.11 run the bootstrap script before any other command:
+
+```bash
+bash scripts/bootstrap_sandbox.sh
+```
+
+This script uses `uv` to install Python 3.12 and sync all dependencies. It is idempotent and safe to rerun. After it completes, all project commands (`uv run pytest`, `uv run mypy --strict`, `uv run pyright`, etc.) work without caveats.
+
+Verified on Python 3.12.13: full test suite passes, mypy strict 0 errors, pyright 0 errors.
+
+---
+
 ## 0. Rule Number One — Token Economy
 
 These 15 rules are mandatory before any deep repo exploration or implementation:
