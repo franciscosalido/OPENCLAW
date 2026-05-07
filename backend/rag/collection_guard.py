@@ -23,6 +23,7 @@ REQUIRED_EMBEDDING_METADATA_FIELDS = frozenset(
         "embedding_alias",
     }
 )
+FORBIDDEN_COLLECTION_NAMES = frozenset({"openclaw_knowledge"})
 
 
 class CollectionMetadataMismatchError(RuntimeError):
@@ -31,6 +32,25 @@ class CollectionMetadataMismatchError(RuntimeError):
 
 class EmbeddingDimensionMismatchError(RuntimeError):
     """Raised when stored vector dimensions diverge from active configuration."""
+
+
+def assert_collection_namespace(
+    collection_name: str,
+    allowed: Mapping[str, str] | Sequence[str] | frozenset[str],
+) -> str:
+    """Return a validated collection name from a closed namespace allowlist."""
+
+    clean_collection_name = _validate_non_empty(collection_name, "collection_name")
+    if clean_collection_name in FORBIDDEN_COLLECTION_NAMES:
+        raise ValueError("collection_name is explicitly forbidden")
+
+    if isinstance(allowed, Mapping):
+        allowed_names = frozenset(allowed.values())
+    else:
+        allowed_names = frozenset(allowed)
+    if clean_collection_name not in allowed_names:
+        raise ValueError("collection_name is outside the allowed namespace")
+    return clean_collection_name
 
 
 @dataclass(frozen=True)

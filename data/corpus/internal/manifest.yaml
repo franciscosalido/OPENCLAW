@@ -1,0 +1,63 @@
+version: 1
+documents:
+  - source_id: internal-claude-contract-001
+    doc_id: internal_claude_contract
+    origin_path: docs/CLAUDE.md
+    source_type: md
+    domain: internal
+    language: pt-BR
+    license: project-internal
+    contains_pii: false
+    curation_status: approved
+    ingestion_policy: internal
+    enabled: true
+    expected_hash: aec6d0c010012c8648518986160cc329e86a73a07467a59983053120860c7eef
+    notes: Versioned copy for internal corpus bootstrap.
+  - source_id: internal-current-state-001
+    doc_id: internal_current_state
+    origin_path: docs/current_state.md
+    source_type: md
+    domain: internal
+    language: pt-BR
+    license: project-internal
+    contains_pii: false
+    curation_status: approved
+    ingestion_policy: internal
+    enabled: true
+    expected_hash: 2bedf345132b7da1c880b219af8363b193c4a876eb6013b59da178c400dc7457
+  - source_id: internal-decisions-001
+    doc_id: internal_decisions
+    origin_path: docs/decisions.md
+    source_type: md
+    domain: internal
+    language: pt-BR
+    license: project-internal
+    contains_pii: false
+    curation_status: approved
+    ingestion_policy: internal
+    enabled: true
+    expected_hash: 33e478acd007dd4cf76c54b7a50e90b999e5b4efd2f07fe2da1d2db2f71a0130
+  - source_id: internal-adr-rag-local-001
+    doc_id: internal_adr_rag_local_only
+    origin_path: docs/adr_001_rag_local_only.md
+    source_type: md
+    domain: internal
+    language: pt-BR
+    license: project-internal
+    contains_pii: false
+    curation_status: approved
+    ingestion_policy: internal
+    enabled: true
+    expected_hash: 3b899bfb4f90a6de2af80b0c4cfe29ea9199ed82b2f6dc7d2b58bcd79a1de029
+  - source_id: internal-rag-runbook-001
+    doc_id: internal_rag_runbook
+    origin_path: docs/rag_runbook.md
+    source_type: md
+    domain: internal
+    language: pt-BR
+    license: project-internal
+    contains_pii: false
+    curation_status: approved
+    ingestion_policy: internal
+    enabled: true
+    expected_hash: 66d51437a9f78a605c2ecb132c42d6fc5935a8fbcfd8a1805ffe9f905f62dd3f

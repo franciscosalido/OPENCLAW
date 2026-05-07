@@ -11,6 +11,21 @@
 
 ---
 
+## 0-pre. Sandbox / CI Bootstrap (run this first in any fresh environment)
+
+The project requires **Python 3.12** (`requires-python = ">=3.12"` in `pyproject.toml`).
+If the sandbox or CI only has Python 3.10/3.11 run the bootstrap script before any other command:
+
+```bash
+bash scripts/bootstrap_sandbox.sh
+```
+
+This script uses `uv` to install Python 3.12 and sync all dependencies. It is idempotent and safe to rerun. After it completes, all project commands (`uv run pytest`, `uv run mypy --strict`, `uv run pyright`, etc.) work without caveats.
+
+Verified on Python 3.12.13: full test suite passes, mypy strict 0 errors, pyright 0 errors.
+
+---
+
 ## 0. Rule Number One — Token Economy
 
 These 15 rules are mandatory before any deep repo exploration or implementation:
@@ -212,7 +227,7 @@ task metadata + token estimates
 | GW-19 | `feat/agent0-observability-signal-contract` | Agent-0 observability signal contract and sanitization tests | ✅ Merged |
 | GW-20 | `feat/gateway1-proof-of-life-smoke` | Gateway-1 operational proof-of-life smoke | ✅ Merged |
 
-### Sprint Gateway-2 — CURRENT
+### Sprint Gateway-2 — COMPLETE ✅
 
 Gateway-2 is performance work on top of the stable local-only Gateway-1 stack.
 The first rule is measurement before optimization.
@@ -224,7 +239,63 @@ The first rule is measurement before optimization.
 | G2-PR03 | `feat/g2-local-rag-generation-budget` | Configurable generation budget and answer-length discipline for `local_rag` | ✅ Merged |
 | G2-PR04 | `feat/g2-warm-model-cold-start-separation` | Cold/warm/degraded latency separation and residency measurement | ✅ Merged |
 | G2-PR05 | `feat/g2-keep-alive-model-residency` | Configurable Ollama keep_alive for `local_rag` model residency | ✅ Merged |
-| G2-PR06 | `feat/g2-local-rag-alias-comparison` | Local-only local_rag candidate alias comparison harness | 🚧 Current |
+| G2-PR06 | `feat/g2-local-rag-alias-comparison` | Local-only local_rag candidate alias comparison harness | ✅ Complete |
+
+### Sprint Agent-0 — CURRENT
+
+Agent-0 ingestion starts from a contract-first, local-only, synthetic-only
+corpus path. A0-PR01 proves safe verification before any Qdrant write path:
+
+```text
+data/corpus/manifest.yaml
+  -> manifest validation
+  -> pre-parse PII rejection
+  -> raw file sha256
+  -> local parser
+  -> parsed-text PII scan
+  -> normalized text sha256
+  -> exact hash dedup
+  -> existing RAG chunker
+  -> sanitized report
+```
+
+| PR | Branch | Scope | Status |
+|---|---|---|---|
+| A0-PR01 | `feat/agent0-ingestion` | Controlled verify-only corpus ingestion pipeline | ✅ Complete |
+| A0-PR02 | `feat/agent0-dual-corpus-bootstrap` | Bootstrap internal and financial corpora into isolated Qdrant collections | 🚧 Current |
+
+A0-PR01 rules:
+
+- `data/corpus/manifest.yaml` is the ingestion contract.
+- Verify-only is the default.
+- Verify-only never calls Qdrant mutating methods.
+- `--commit` is required for any future write and requires explicit
+  `--manifest`.
+- Do not touch `openclaw_knowledge`.
+- Use synthetic `.md` corpus documents only unless a lightweight existing PDF
+  parser dependency is already present.
+- No OCR, remote APIs, remote providers, LiteLLM changes, FastAPI, Redis, MCP or
+  dependency installation.
+- Reuse the existing RAG chunker and `VectorStoreChunk`-compatible shape.
+- Reports contain counts, hashes, statuses, chunk counts and timing only; never
+  text, chunks, vectors, embeddings, payloads, prompts, answers, headers,
+  secrets, raw exceptions or tracebacks.
+
+A0-PR02 rules:
+
+- Do not create a super-manifest.
+- Corpus roots are separate: `data/corpus/internal/` and
+  `data/corpus/financial/`.
+- Collection mapping is closed: `internal -> openclaw_internal`,
+  `financial -> openclaw_financial`.
+- `scripts/bootstrap_corpus.py` accepts only `--corpus internal|financial`.
+- No arbitrary `--collection` override in this PR.
+- `openclaw_knowledge` is explicitly rejected by namespace guard.
+- Verify-only never mutates Qdrant.
+- Commit path is mock-tested and guarded before ensure/upsert.
+- Idempotence uses document hashes, not collection existence or semantic dedup.
+- Query dry-run p95 is offline only: fake embed/search planning, no Qdrant and
+  no LLM answer generation.
 
 G2-PR06 rules:
 

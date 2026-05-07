@@ -1,0 +1,119 @@
+version: 1
+documents:
+  - source_id: financial-macro-juros-001
+    doc_id: financial_macro_ciclo_juros
+    origin_path: docs/macro_ciclo_juros_sintetico.md
+    source_type: md
+    domain: macroeconomia
+    financial_domain: macroeconomia
+    language: pt-BR
+    license: synthetic-internal
+    contains_pii: false
+    curation_status: approved
+    ingestion_policy: financial
+    enabled: true
+    expected_hash: 4b747cbbc7ebbf657dfa93df40d395bde498b6260ea20c91249b7aaf727ead9f
+  - source_id: financial-macro-riscos-001
+    doc_id: financial_macro_balanco_riscos
+    origin_path: docs/macro_balanco_riscos_sintetico.md
+    source_type: md
+    domain: macroeconomia
+    financial_domain: macroeconomia
+    language: pt-BR
+    license: synthetic-internal
+    contains_pii: false
+    curation_status: approved
+    ingestion_policy: financial
+    enabled: true
+    expected_hash: 50d7a42b717261b4f6807d7f282561c540bc6b7fb56e2806f99be7208edb3799
+  - source_id: financial-macro-expect-001
+    doc_id: financial_macro_expectativas
+    origin_path: docs/macro_expectativas_sinteticas.md
+    source_type: md
+    domain: macroeconomia
+    financial_domain: macroeconomia
+    language: pt-BR
+    license: synthetic-internal
+    contains_pii: false
+    curation_status: approved
+    ingestion_policy: financial
+    enabled: true
+    expected_hash: 8c88d5cca6dcb2e32fcdb7efa087eba7b99703726067e98a0baf249bc0da5cb3
+  - source_id: financial-rf-curva-001
+    doc_id: financial_renda_fixa_curva
+    origin_path: docs/renda_fixa_curva_sintetica.md
+    source_type: md
+    domain: renda_fixa
+    financial_domain: renda_fixa
+    language: pt-BR
+    license: synthetic-internal
+    contains_pii: false
+    curation_status: approved
+    ingestion_policy: financial
+    enabled: true
+    expected_hash: 62e76cb27071b94133e2611a154775ac7b940b92cbe5bd43dc60ddea7c762c47
+  - source_id: financial-rf-liquidez-001
+    doc_id: financial_renda_fixa_liquidez
+    origin_path: docs/renda_fixa_liquidez_sintetica.md
+    source_type: md
+    domain: renda_fixa
+    financial_domain: renda_fixa
+    language: pt-BR
+    license: synthetic-internal
+    contains_pii: false
+    curation_status: approved
+    ingestion_policy: financial
+    enabled: true
+    expected_hash: e0c5a62c5232a771a2b47e8c9893c348d166a4935274d32db5ff1ee17862c9b0
+  - source_id: financial-rf-credito-001
+    doc_id: financial_renda_fixa_risco_credito
+    origin_path: docs/renda_fixa_risco_credito_sintetico.md
+    source_type: md
+    domain: renda_fixa
+    financial_domain: renda_fixa
+    language: pt-BR
+    license: synthetic-internal
+    contains_pii: false
+    curation_status: approved
+    ingestion_policy: financial
+    enabled: true
+    expected_hash: 881e4a6a5a3987f2301beb9db75141aee8f9b593ec7898254bc7319c931bc7f1
+  - source_id: financial-val-growth-001
+    doc_id: financial_valuation_crescimento
+    origin_path: docs/valuation_crescimento_sintetico.md
+    source_type: md
+    domain: valuation
+    financial_domain: valuation
+    language: pt-BR
+    license: synthetic-internal
+    contains_pii: false
+    curation_status: approved
+    ingestion_policy: financial
+    enabled: true
+    expected_hash: b06b4bb6f5fb232a0167372b5e99516d779ed5f92da0b4f2ab07f64329d54807
+  - source_id: financial-val-capital-001
+    doc_id: financial_valuation_custo_capital
+    origin_path: docs/valuation_custo_capital_sintetico.md
+    source_type: md
+    domain: valuation
+    financial_domain: valuation
+    language: pt-BR
+    license: synthetic-internal
+    contains_pii: false
+    curation_status: approved
+    ingestion_policy: financial
+    enabled: true
+    expected_hash: 80499875e471c664d2cea7f8b2e3ab56666e821f20a554df922a6e529d0f5d2f
+  - source_id: financial-val-cenarios-001
+    doc_id: financial_valuation_cenarios
+    origin_path: docs/valuation_cenarios_sinteticos.md
+    source_type: md
+    domain: valuation
+    financial_domain: valuation
+    language: pt-BR
+    license: synthetic-internal
+    contains_pii: false
+    curation_status: approved
+    ingestion_policy: financial
+    enabled: true
+    expected_hash: fa3049f3677f82b4edee57b88a85e111ead2b21475a6c9acdbaa151919cdb293
