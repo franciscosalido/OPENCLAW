@@ -7,4 +7,3 @@ ingestao do Agent-0.
 Um modelo robusto separa crescimento, margem, reinvestimento e custo de capital.
 O resultado deve ser interpretado como intervalo, nao como numero absoluto ou
 recomendacao operacional.
-

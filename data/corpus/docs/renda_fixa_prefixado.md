@@ -6,4 +6,3 @@ usa emissores, contas, operacoes ou saldos reais.
 
 A avaliacao controlada compara prazo, convexidade e margem de seguranca. Em um
 pipeline local, esse texto deve gerar chunks compativeis com o RAG existente.
-

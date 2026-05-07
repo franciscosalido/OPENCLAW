@@ -55,4 +55,3 @@ def sanitize_parsed_text(text: str) -> SanitizerResult:
         if pattern.search(text):
             return SanitizerResult(status="pii_detected", pii_pattern_category=category)
     return SanitizerResult(status="accepted")
-

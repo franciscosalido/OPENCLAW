@@ -6,4 +6,3 @@ lucros e diferencas de risco.
 
 Multiplos podem parecer simples, mas exigem cuidado com eventos nao recorrentes
 e estrutura de capital. O corpus usa apenas texto seguro e revisavel.
-

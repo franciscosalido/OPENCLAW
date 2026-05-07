@@ -7,4 +7,3 @@ sensibilidade a juros reais e disciplina de liquidez.
 O documento foi criado apenas para validar manifesto, fingerprint e relatorio
 sanitizado. Nenhum trecho contem identificador pessoal, posicao real ou
 informacao confidencial.
-

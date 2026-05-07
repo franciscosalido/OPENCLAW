@@ -7,4 +7,3 @@ comercial, sempre em linguagem generica e sem dado pessoal.
 No uso analitico, o cambio deve ser tratado como variavel de risco e nao como
 previsao pontual. A ingestao deste conteudo valida apenas parsing, hash,
 deduplicacao e chunking.
-

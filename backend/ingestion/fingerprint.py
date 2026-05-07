@@ -56,4 +56,3 @@ def unique_hash_count(file_hashes: Iterable[str]) -> int:
     """Return the number of unique raw-file hashes."""
 
     return len(set(file_hashes))
-

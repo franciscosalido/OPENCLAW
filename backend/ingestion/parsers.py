@@ -51,4 +51,3 @@ def parse_document(path: Path, source_type: str) -> str:
     if source_type == "pdf":
         return parse_pdf(path)
     raise ParserRejectedError("unsupported_source_type")
-

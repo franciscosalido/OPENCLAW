@@ -7,4 +7,3 @@ ou documento privado.
 O conceito ajuda a lidar com erro de estimativa. Na ingestao controlada, o texto
 e pequeno o bastante para teste rapido e suficientemente variado para medir
 latencia de parsing, fingerprint e chunking.
-

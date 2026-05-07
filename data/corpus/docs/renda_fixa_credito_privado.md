@@ -7,4 +7,3 @@ nao descreve empresa, fundo, pessoa ou carteira real.
 A curadoria recomenda observar covenants, concentracao e qualidade das
 garantias. Para este sprint, a utilidade e medir ingestao offline com dados
 seguros.
-
