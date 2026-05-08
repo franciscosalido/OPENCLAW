@@ -11,6 +11,11 @@
       "command": "npx",
       "args": ["-y", "@upstash/context7-mcp"],
       "description": "Context7 — up-to-date library docs for any framework/package"
+    },
+    "code-sandbox-mcp": {
+      "command": "/Users/fas/.local/share/code-sandbox-mcp/code-sandbox-mcp",
+      "args": [],
+      "description": "Automata Labs — isolated Docker sandbox for safe code execution"
     }
   }
 }
