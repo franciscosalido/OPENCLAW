@@ -4,31 +4,32 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Last updated:** 2026-05-07
-**Updated by:** Codex — A0-PR03 golden questions citation contract
+**Last updated:** 2026-05-08
+**Updated by:** Codex — A0-PR04 deterministic domain routing
 
 ---
 
-## Active Sprint: Agent-0 / Golden Questions Citation Contract
+## Active Sprint: Agent-0 / Deterministic Domain Routing
 
-**Goal:** add six citation-only Agent-0 golden questions, a frozen `Citation`
-contract, an offline dry-run harness and a sanitized report proving expected
-source evidence by collection.
+**Goal:** add deterministic, local-only Agent-0 domain routing that classifies
+queries by keyword/regex, reads thresholds from `config/rag_config.yaml`, and
+chooses `local_rag`, `local_think` or `local_chat` from retrieval confidence and
+system state.
 
-Current branch: `feat/agent0-golden-questions`
-Current issue: `[A0-PR03] Add golden questions citation contract`
+Current branch: `feat/agent0-domain-routing`
+Current issue: <https://github.com/franciscosalido/OPENCLAW/issues/80>
 
-A0-PR03 starts after A0-PR02. It validates retrieval evidence and citation
-metadata only; it must not generate answers.
+A0-PR04 starts after A0-PR03. It routes evidence-seeking Agent-0 questions but
+does not retrieve live Qdrant data, mutate collections, call LLMs or generate
+answers.
 
 ```text
-tests/golden/internal_questions.yaml
-tests/golden/financial_questions.yaml
-  -> GoldenQuestion schema
-  -> A0-PR02 corpus manifest doc-id validation
-  -> FakeRetriever dry-run
-  -> frozen Citation metadata
-  -> sanitized report
+query/question_id
+  -> deterministic domain classifier
+  -> config-backed thresholds
+  -> injected retrieval confidence scorer
+  -> frozen RouteDecision
+  -> sanitized routing report
 ```
 
 Current runtime path:
@@ -83,35 +84,43 @@ Hard constraints remain:
 - No `openclaw_knowledge` mutation in verify-only.
 - No Qdrant mutation unless `--commit` is explicit and a future writer is wired.
 - No arbitrary collection override for dual corpus bootstrap.
-- No answer generation in A0-PR03 golden question harness.
+- No answer generation in A0-PR03 golden question harness or A0-PR04 routing.
 - No LLM-as-judge.
 - No Qdrant mutation or live Qdrant requirement in A0-PR03 unit tests.
+- No LLM classifier, embeddings, rerankers, remote providers or live Qdrant
+  dependency in A0-PR04 classifier/routing unit tests.
 - No final local merge into `main`; GitHub PR approval is the integration path.
 
-## A0-PR03 Current Work
+## A0-PR04 Current Work
 
-A0-PR03 adds citation-only golden question primitives:
+A0-PR04 adds deterministic domain routing primitives:
 
-- `tests/golden/internal_questions.yaml` with `iq-001` through `iq-003`.
-- `tests/golden/financial_questions.yaml` with `fq-001` through `fq-003`.
-- `backend/agent0/golden_questions.py` with frozen Pydantic question models,
-  frozen `Citation`, `GoldenRetriever` protocol and offline harness logic.
-- `scripts/run_golden_questions.py --dry-run`.
-- `docs/AGENT0_GOLDEN_QUESTIONS.md`.
+- `backend/agent0/domain_classifier.py` with pure keyword/regex rules.
+- `backend/agent0/domain_routing.py` with typed config, `SystemState`,
+  `ConfidenceScorer`, `FakeConfidenceScorer`, frozen `RouteDecision`,
+  golden-question gate and dry-run p95 measurement.
+- `backend/agent0/routing_report.py` with sanitized routing reports.
+- `config/rag_config.yaml` `agent0.domain_routing` thresholds and rule
+  metadata.
+- `docs/AGENT0_DOMAIN_ROUTING.md`.
 
 Rules:
 
-- Dry-run is default and uses `FakeRetriever`; no Qdrant, Ollama, LiteLLM or LLM
-  answer generation.
-- Smoke mode is guarded by `RUN_GOLDEN_SMOKE=1`.
-- Internal questions route only to `openclaw_internal`.
-- Financial questions route only to `openclaw_financial`.
-- Expected doc ids must exist in A0-PR02 corpus manifests.
-- Success is citation evidence only: expected doc id, expected corpus and
-  expected collection.
-- Reports remain sanitized and contain no answer, question text, chunks, vectors,
-  embeddings, payloads, prompts, secrets, headers, raw exceptions, tracebacks,
-  absolute paths or usernames.
+- Domain classifier imports no gateway clients, Ollama, LiteLLM, Qdrant,
+  embedders, retrievers or remote providers.
+- Thresholds are loaded from `rag_config.yaml`; do not hardcode route
+  thresholds in Python.
+- `iq-*` routes to `internal` / `openclaw_internal`; financial keywords route
+  to `macroeconomia`, `renda_fixa` or `valuation` in `openclaw_financial`.
+- Qdrant unavailable or unknown domain returns `local_chat` with safe
+  `reason_code`.
+- High confidence returns `local_rag`; medium confidence returns `local_think`;
+  low confidence returns `local_chat`.
+- A0-PR03 golden routing gate is currently 6/6 with fake high confidence.
+- Offline dry-run p95 is currently ~0.003 ms against a 100 ms budget.
+- Reports and `RouteDecision.to_dict()` contain safe metadata only; never query,
+  answer, prompt, chunks, vectors, embeddings, payloads, secrets, headers, raw
+  exceptions, tracebacks, absolute paths or usernames.
 
 ---
 
