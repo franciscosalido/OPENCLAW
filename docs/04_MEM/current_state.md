@@ -5,31 +5,30 @@
 > meaningful sessions.
 
 **Last updated:** 2026-05-08
-**Updated by:** Codex — A0-PR04 deterministic domain routing
+**Updated by:** Codex — A0-PR05 OpenClaw ask CLI and readiness
 
 ---
 
-## Active Sprint: Agent-0 / Deterministic Domain Routing
+## Active Sprint: Agent-0 / CLI and Readiness
 
-**Goal:** add deterministic, local-only Agent-0 domain routing that classifies
-queries by keyword/regex, reads thresholds from `config/rag_config.yaml`, and
-chooses `local_rag`, `local_think` or `local_chat` from retrieval confidence and
-system state.
+**Goal:** expose the first stable public Agent-0 interface,
+`OpenClaw.ask(question) -> Answer`, plus a local CLI, readiness checks,
+opt-in E2E SLO gates, sanitized reports and rollback docs.
 
-Current branch: `feat/agent0-domain-routing`
-Current issue: <https://github.com/franciscosalido/OPENCLAW/issues/80>
+Current branch: `feat/agent0-cli-and-readiness`
+Current issue: <https://github.com/franciscosalido/OPENCLAW/issues/82>
 
-A0-PR04 starts after A0-PR03. It routes evidence-seeking Agent-0 questions but
-does not retrieve live Qdrant data, mutate collections, call LLMs or generate
-answers.
+A0-PR05 starts after A0-PR04 and closes the Agent-0 MVP sprint surface. It
+does not add multi-agent orchestration, FastAPI, MCP, UI, remote providers,
+remote fallback, new ingestion, reindexing or Qdrant mutation in readiness.
 
 ```text
-query/question_id
-  -> deterministic domain classifier
-  -> config-backed thresholds
-  -> injected retrieval confidence scorer
-  -> frozen RouteDecision
-  -> sanitized routing report
+question
+  -> OpenClaw.ask
+  -> deterministic domain routing
+  -> existing local RAG path when route == local_rag
+  -> frozen Answer with metadata-only citations
+  -> CLI / sanitized E2E report
 ```
 
 Current runtime path:
@@ -89,38 +88,44 @@ Hard constraints remain:
 - No Qdrant mutation or live Qdrant requirement in A0-PR03 unit tests.
 - No LLM classifier, embeddings, rerankers, remote providers or live Qdrant
   dependency in A0-PR04 classifier/routing unit tests.
+- No Qdrant mutation, reindexing or bootstrap in A0-PR05 readiness checks.
+- A0-PR05 E2E is opt-in only via `RUN_AGENT0_E2E=1`; unit tests remain offline.
+- A0-PR05 reports must not serialize prompt, question text, answer text, chunks,
+  vectors, embeddings, payloads, headers, secrets, raw exceptions or tracebacks.
 - No final local merge into `main`; GitHub PR approval is the integration path.
 
-## A0-PR04 Current Work
+## A0-PR05 Current Work
 
-A0-PR04 adds deterministic domain routing primitives:
+A0-PR05 adds the final Agent-0 MVP public/readiness surface:
 
-- `backend/agent0/domain_classifier.py` with pure keyword/regex rules.
-- `backend/agent0/domain_routing.py` with typed config, `SystemState`,
-  `ConfidenceScorer`, `FakeConfidenceScorer`, frozen `RouteDecision`,
-  golden-question gate and dry-run p95 measurement.
-- `backend/agent0/routing_report.py` with sanitized routing reports.
-- `config/rag_config.yaml` `agent0.domain_routing` thresholds and rule
-  metadata.
-- `docs/AGENT0_DOMAIN_ROUTING.md`.
+- `backend/agent0/openclaw.py` with `OpenClaw.ask(...)` and frozen `Answer`.
+- `scripts/openclaw.py` with `ask` command and safe JSON/human output.
+- `scripts/check_agent0_readiness.py` with idempotent local readiness checks.
+- `backend/agent0/e2e_report.py` with sanitized E2E SLO report builder.
+- `tests/e2e/test_agent0_e2e.py`, guarded by `RUN_AGENT0_E2E=1`.
+- `docs/AGENT0_RUNBOOK.md` and `docs/AGENT0_ROLLBACK.md`.
 
 Rules:
 
-- Domain classifier imports no gateway clients, Ollama, LiteLLM, Qdrant,
-  embedders, retrievers or remote providers.
-- Thresholds are loaded from `rag_config.yaml`; do not hardcode route
-  thresholds in Python.
-- `iq-*` routes to `internal` / `openclaw_internal`; financial keywords route
-  to `macroeconomia`, `renda_fixa` or `valuation` in `openclaw_financial`.
-- Qdrant unavailable or unknown domain returns `local_chat` with safe
-  `reason_code`.
-- High confidence returns `local_rag`; medium confidence returns `local_think`;
-  low confidence returns `local_chat`.
-- A0-PR03 golden routing gate is currently 6/6 with fake high confidence.
-- Offline dry-run p95 is currently ~0.003 ms against a 100 ms budget.
-- Reports and `RouteDecision.to_dict()` contain safe metadata only; never query,
-  answer, prompt, chunks, vectors, embeddings, payloads, secrets, headers, raw
-  exceptions, tracebacks, absolute paths or usernames.
+- `OpenClaw.ask` must reuse existing routing, citation and RAG components; do
+  not duplicate the pipeline in the public API wrapper.
+- CLI must call `OpenClaw.ask`, support `--json`, avoid tracebacks by default
+  and never print prompt/chunks/vectors/payloads/secrets.
+- Readiness checks verify Qdrant reachability/collections, local LiteLLM,
+  Ollama models, aliases, remote routing disabled, corpus manifests and golden
+  questions. They do not mutate Qdrant or bootstrap collections.
+- E2E SLO gate is opt-in and expects already-bootstrapped
+  `openclaw_internal` / `openclaw_financial`.
+- Final SLOs: E2E p95 < 15s and citation hit rate >= 5/6 on the six golden
+  questions when local services and corpora are available.
+- Rollback deletes only `openclaw_internal` and `openclaw_financial`; never
+  delete `openclaw_knowledge`.
+- Validation on Python 3.12.13:
+  `pytest -v` 561 passed / 9 skipped / 217 subtests passed,
+  `mypy --strict .` 0 errors, `pyright` 0 errors, smoke 5 passed / 7 skipped.
+- Optional live check status: CLI returns a sanitized local auth failure when
+  local gateway credentials are absent; readiness reported 7/9 with only
+  Agent-0 Qdrant collections missing in this local environment.
 
 ---
 
