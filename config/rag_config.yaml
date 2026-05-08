@@ -125,3 +125,66 @@ gateway:
     token_estimation:
       chars_per_token: 4
       min_tokens: 1
+
+agent0:
+  domain_routing:
+    retrieval_score_min: 0.75
+    escalate_to_think_below: 0.45
+    p95_routing_budget_ms: 100.0
+    citation_weight: 0.2
+    domain_rules:
+      internal:
+        corpus: "internal"
+        collection_name: "openclaw_internal"
+        keywords:
+          - "gw-07"
+          - "gateway"
+          - "alias"
+          - "aliases"
+          - "claude"
+          - "current_state"
+          - "decisions"
+          - "timeout"
+        regex:
+          - "\\bgw-?\\d+\\b"
+      macroeconomia:
+        corpus: "financial"
+        collection_name: "openclaw_financial"
+        keywords:
+          - "selic"
+          - "inflacao"
+          - "inflação"
+          - "cambio"
+          - "câmbio"
+          - "juros"
+          - "ipca"
+          - "macroeconomia"
+        regex:
+          - "\\b(ipca|selic)\\b"
+      renda_fixa:
+        corpus: "financial"
+        collection_name: "openclaw_financial"
+        keywords:
+          - "duration"
+          - "renda fixa"
+          - "prefixado"
+          - "pos-fixado"
+          - "pós-fixado"
+          - "credito privado"
+          - "crédito privado"
+          - "curva de juros"
+        regex:
+          - "\\bduration\\b"
+      valuation:
+        corpus: "financial"
+        collection_name: "openclaw_financial"
+        keywords:
+          - "valuation"
+          - "ebitda"
+          - "fluxo de caixa"
+          - "multiplo"
+          - "múltiplo"
+          - "margem de seguranca"
+          - "margem de segurança"
+        regex:
+          - "\\bebitda\\b"
