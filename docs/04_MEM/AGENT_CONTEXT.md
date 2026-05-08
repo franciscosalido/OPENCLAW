@@ -264,7 +264,8 @@ data/corpus/manifest.yaml
 | A0-PR01 | `feat/agent0-ingestion` | Controlled verify-only corpus ingestion pipeline | ✅ Complete |
 | A0-PR02 | `feat/agent0-dual-corpus-bootstrap` | Bootstrap internal and financial corpora into isolated Qdrant collections | ✅ Complete |
 | A0-PR03 | `feat/agent0-golden-questions` | Six golden questions and frozen citation contract | ✅ Complete |
-| A0-PR04 | `feat/agent0-domain-routing` | Deterministic domain routing by rules, confidence and state | 🚧 Current |
+| A0-PR04 | `feat/agent0-domain-routing` | Deterministic domain routing by rules, confidence and state | ✅ Complete |
+| A0-PR05 | `feat/agent0-cli-and-readiness` | OpenClaw ask CLI, readiness, opt-in E2E SLO gates and rollback docs | 🚧 Current |
 
 A0-PR01 rules:
 
@@ -337,6 +338,31 @@ A0-PR04 rules:
 - Routing reports contain safe metadata only; never query, text, answer, prompt,
   chunks, vectors, embeddings, payloads, headers, secrets, raw exceptions,
   tracebacks, absolute paths or usernames.
+
+A0-PR05 rules:
+
+- `backend/agent0/openclaw.py` exposes the first stable public interface:
+  `OpenClaw.ask(question: str) -> Answer`.
+- `Answer` is frozen and allowlisted. It may contain answer text and safe
+  citation metadata, but not prompt, chunks, chunk text, vectors, embeddings,
+  payloads, headers, API keys, Authorization values, raw exceptions or
+  tracebacks.
+- `scripts/openclaw.py ask "..."` is the supported CLI path for this PR.
+  It delegates to `OpenClaw.ask`, supports `--json`, and prints safe errors
+  without tracebacks by default.
+- Readiness lives in `scripts/check_agent0_readiness.py`. It checks local
+  Qdrant, `openclaw_internal`, `openclaw_financial`, LiteLLM, Ollama models,
+  required aliases, remote routing disabled, corpus manifests and golden
+  questions. It must not mutate Qdrant, bootstrap, ingest or reindex.
+- E2E lives in `tests/e2e/test_agent0_e2e.py` and is opt-in only via
+  `RUN_AGENT0_E2E=1`. If local services or bootstrapped corpora are unavailable,
+  it skips with a clear reason.
+- E2E report SLOs are p95 latency < 15s and citation hit rate >= 5/6 on the
+  six A0-PR03 golden questions. Reports omit answer text and question text.
+- Remote-call audit covers public Agent-0 modules and rejects imports of remote
+  provider SDKs such as OpenAI, Anthropic, Gemini/OpenRouter and Azure AI.
+- Rollback docs may delete only `openclaw_internal` and `openclaw_financial`.
+  Never delete or mutate `openclaw_knowledge` as part of Agent-0 rollback.
 
 G2-PR06 rules:
 
