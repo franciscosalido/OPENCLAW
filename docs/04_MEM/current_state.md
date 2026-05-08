@@ -4,28 +4,31 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Last updated:** 2026-05-06
-**Updated by:** Codex — A0-PR02 dual corpus bootstrap
+**Last updated:** 2026-05-07
+**Updated by:** Codex — A0-PR03 golden questions citation contract
 
 ---
 
-## Active Sprint: Agent-0 / Dual Corpus Bootstrap
+## Active Sprint: Agent-0 / Golden Questions Citation Contract
 
-**Goal:** bootstrap internal and financial Agent-0 corpora into isolated,
-closed Qdrant collection namespaces.
+**Goal:** add six citation-only Agent-0 golden questions, a frozen `Citation`
+contract, an offline dry-run harness and a sanitized report proving expected
+source evidence by collection.
 
-Current branch: `feat/agent0-dual-corpus-bootstrap`
-Current issue: `[A0-PR02] Bootstrap internal and financial corpora into isolated Qdrant collections`
+Current branch: `feat/agent0-golden-questions`
+Current issue: `[A0-PR03] Add golden questions citation contract`
 
-A0-PR02 starts after A0-PR01. It keeps A0 ingestion local-first and extends the
-pipeline to two independent corpus roots and two mapped Qdrant collections:
+A0-PR03 starts after A0-PR02. It validates retrieval evidence and citation
+metadata only; it must not generate answers.
 
 ```text
-data/corpus/internal/manifest.yaml
-  -> openclaw_internal
-
-data/corpus/financial/manifest.yaml
-  -> openclaw_financial
+tests/golden/internal_questions.yaml
+tests/golden/financial_questions.yaml
+  -> GoldenQuestion schema
+  -> A0-PR02 corpus manifest doc-id validation
+  -> FakeRetriever dry-run
+  -> frozen Citation metadata
+  -> sanitized report
 ```
 
 Current runtime path:
@@ -80,39 +83,35 @@ Hard constraints remain:
 - No `openclaw_knowledge` mutation in verify-only.
 - No Qdrant mutation unless `--commit` is explicit and a future writer is wired.
 - No arbitrary collection override for dual corpus bootstrap.
+- No answer generation in A0-PR03 golden question harness.
+- No LLM-as-judge.
+- No Qdrant mutation or live Qdrant requirement in A0-PR03 unit tests.
 - No final local merge into `main`; GitHub PR approval is the integration path.
 
-## A0-PR02 Current Work
+## A0-PR03 Current Work
 
-A0-PR02 adds controlled dual-corpus bootstrap primitives:
+A0-PR03 adds citation-only golden question primitives:
 
-- `data/corpus/internal/manifest.yaml` and versioned internal document copies.
-- `data/corpus/financial/manifest.yaml` with 3 synthetic docs each for
-  `macroeconomia`, `renda_fixa` and `valuation`.
-- Closed mapping: `internal -> openclaw_internal`,
-  `financial -> openclaw_financial`.
-- `scripts/bootstrap_corpus.py --corpus internal|financial`.
-- `backend/ingestion/bootstrap.py` wrapping A0-PR01 ingestion without
-  duplicating parsing, sanitization or chunking.
-- `backend/ingestion/commit_store.py` for mockable Qdrant commit behavior.
-- `CollectionGuard.assert_collection_namespace(...)` for closed namespace
-  validation.
-- `docs/AGENT0_DUAL_CORPUS_BOOTSTRAP.md`.
+- `tests/golden/internal_questions.yaml` with `iq-001` through `iq-003`.
+- `tests/golden/financial_questions.yaml` with `fq-001` through `fq-003`.
+- `backend/agent0/golden_questions.py` with frozen Pydantic question models,
+  frozen `Citation`, `GoldenRetriever` protocol and offline harness logic.
+- `scripts/run_golden_questions.py --dry-run`.
+- `docs/AGENT0_GOLDEN_QUESTIONS.md`.
 
 Rules:
 
-- Verify-only is the default and never mutates Qdrant.
-- Commit mode writes only to the mapped collection for the selected corpus.
-- `openclaw_knowledge`, arbitrary names and empty collection names are rejected.
-- Financial docs must use `ingestion_policy: financial` and declare
-  `financial_domain`.
-- Internal docs must use `ingestion_policy: internal` and no `financial_domain`.
-- Idempotence is document-hash based; collection existence alone never skips all
-  docs.
-- Query dry-run p95 is offline, uses fake embed/search planning and never
-  generates LLM answers.
-- Reports remain sanitized and contain no text, chunks, vectors, embeddings,
-  payloads, prompts, answers, secrets, headers, raw exceptions or tracebacks.
+- Dry-run is default and uses `FakeRetriever`; no Qdrant, Ollama, LiteLLM or LLM
+  answer generation.
+- Smoke mode is guarded by `RUN_GOLDEN_SMOKE=1`.
+- Internal questions route only to `openclaw_internal`.
+- Financial questions route only to `openclaw_financial`.
+- Expected doc ids must exist in A0-PR02 corpus manifests.
+- Success is citation evidence only: expected doc id, expected corpus and
+  expected collection.
+- Reports remain sanitized and contain no answer, question text, chunks, vectors,
+  embeddings, payloads, prompts, secrets, headers, raw exceptions, tracebacks,
+  absolute paths or usernames.
 
 ---
 
