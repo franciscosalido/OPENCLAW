@@ -40,6 +40,19 @@ Keyword examples:
 - `ebitda`, `valuation`, `fluxo de caixa` -> `valuation`
 - `gw-07`, `alias`, `timeout`, `decisions` -> `internal`
 
+In A0-PR04 the executable classifier rules are code-owned in
+`domain_classifier.py` so the classifier can remain tiny, auditable and free of
+config-loader imports. The `agent0.domain_routing.domain_rules` YAML section is
+validated routing metadata for review, documentation and future config-driven
+classifier work; changing YAML rule text alone does not change classifier
+behavior in this PR.
+
+Financial question IDs without a financial-domain keyword are treated as
+financial collection hints only. They produce `corpus=financial` and
+`collection_name=openclaw_financial` at the classifier boundary, but keep
+`domain=unknown`; `route(...)` then falls back to `local_chat` with
+`no_domain_match` until a concrete domain rule matches.
+
 ## Configuration
 
 Thresholds and domain-rule metadata live in `config/rag_config.yaml`:
@@ -105,7 +118,8 @@ embeddings, payloads, secrets, headers, tracebacks or absolute paths.
 `validate_routing_against_golden_questions()` reuses A0-PR03 golden questions
 with a fake high-confidence scorer. The gate checks that at least 5 of 6
 questions route to the expected corpus and collection. The current deterministic
-rules route all 6 of 6 to `local_rag` with the expected namespace.
+rules route all 6 of 6 to `local_rag` with the expected namespace. Failures are
+reported explicitly through `failed_question_ids`.
 
 ## Dry-Run Latency Gate
 

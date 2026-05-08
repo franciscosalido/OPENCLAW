@@ -148,9 +148,24 @@ class DomainRoutingTests(unittest.TestCase):
         self.assertGreaterEqual(result.accuracy, 0.833)
         self.assertEqual(result.passed, 6)
         self.assertEqual(result.failed, 0)
+        self.assertEqual(result.failed_question_ids, ())
         self.assertTrue(
             all(decision.route == "local_rag" for decision in result.decisions)
         )
+
+    def test_golden_question_gate_reports_failed_question_ids(self) -> None:
+        result = validate_routing_against_golden_questions(
+            config=self.config,
+            scorer=FakeConfidenceScorer(
+                default_score=self.config.retrieval_score_min,
+                scores_by_domain={"valuation": 0.01},
+            ),
+        )
+
+        self.assertEqual(result.total_questions, 6)
+        self.assertEqual(result.passed, 5)
+        self.assertEqual(result.failed, 1)
+        self.assertEqual(result.failed_question_ids, ("fq-002",))
 
     def test_p95_routing_dry_run_under_config_budget(self) -> None:
         p95 = route_dry_run_p95(config=self.config)

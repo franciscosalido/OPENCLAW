@@ -214,6 +214,7 @@ class GoldenRoutingGateResult:
     total_questions: int
     passed: int
     failed: int
+    failed_question_ids: tuple[str, ...]
     accuracy: float
     p95_routing_ms: float
     decisions: tuple[RouteDecision, ...]
@@ -356,6 +357,7 @@ def validate_routing_against_golden_questions(
     )
     questions = tuple(question for question in load_all_golden_questions() if question.enabled)
     decisions: list[RouteDecision] = []
+    failed_question_ids: list[str] = []
     passed = 0
     for question in questions:
         decision = route(
@@ -372,6 +374,8 @@ def validate_routing_against_golden_questions(
             and decision.route == "local_rag"
         ):
             passed += 1
+        else:
+            failed_question_ids.append(question.question_id)
 
     total = len(questions)
     latencies = [decision.latency_ms for decision in decisions]
@@ -379,6 +383,7 @@ def validate_routing_against_golden_questions(
         total_questions=total,
         passed=passed,
         failed=total - passed,
+        failed_question_ids=tuple(failed_question_ids),
         accuracy=_ratio(passed, total),
         p95_routing_ms=_percentile(latencies, 95),
         decisions=tuple(decisions),
