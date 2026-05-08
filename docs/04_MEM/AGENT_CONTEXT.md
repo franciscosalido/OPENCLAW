@@ -263,7 +263,8 @@ data/corpus/manifest.yaml
 |---|---|---|---|
 | A0-PR01 | `feat/agent0-ingestion` | Controlled verify-only corpus ingestion pipeline | ✅ Complete |
 | A0-PR02 | `feat/agent0-dual-corpus-bootstrap` | Bootstrap internal and financial corpora into isolated Qdrant collections | ✅ Complete |
-| A0-PR03 | `feat/agent0-golden-questions` | Six golden questions and frozen citation contract | 🚧 Current |
+| A0-PR03 | `feat/agent0-golden-questions` | Six golden questions and frozen citation contract | ✅ Complete |
+| A0-PR04 | `feat/agent0-domain-routing` | Deterministic domain routing by rules, confidence and state | 🚧 Current |
 
 A0-PR01 rules:
 
@@ -314,6 +315,28 @@ A0-PR03 rules:
 - Reports contain IDs, expected collections, matched doc ids and latency only;
   never answer text, question text, chunks, vectors, embeddings, payloads,
   prompts, secrets, raw exceptions, tracebacks, absolute paths or usernames.
+
+A0-PR04 rules:
+
+- `backend/agent0/domain_classifier.py` is pure keyword/regex logic and must not
+  import gateway clients, Ollama, LiteLLM, Qdrant, embedders, retrievers or
+  remote providers.
+- Route thresholds live under `agent0.domain_routing` in
+  `config/rag_config.yaml`; do not hardcode threshold constants in Python.
+- `RouteDecision` is frozen and serializes through an explicit allowlist.
+- `route(...)` classifies first, then combines `SystemState` and injected
+  `ConfidenceScorer` results; it never calls Qdrant directly and never mutates
+  collections.
+- `openclaw_knowledge` remains forbidden for Agent-0 routing; only
+  `openclaw_internal`, `openclaw_financial` and `none` are valid routing
+  collection values.
+- Golden routing gate reuses A0-PR03 questions and currently routes 6/6 to the
+  expected corpus/collection with fake high confidence.
+- Offline routing dry-run p95 is currently ~0.003 ms against the configured
+  100 ms budget.
+- Routing reports contain safe metadata only; never query, text, answer, prompt,
+  chunks, vectors, embeddings, payloads, headers, secrets, raw exceptions,
+  tracebacks, absolute paths or usernames.
 
 G2-PR06 rules:
 
