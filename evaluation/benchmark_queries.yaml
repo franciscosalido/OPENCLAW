@@ -1,0 +1,289 @@
+# Benchmark Financeiro BR v0 — Sprint RAG-1A / PR 01 / RC-1
+# Contract only: no retrieval, embeddings, Qdrant or portfolio data.
+# RC-1 rule: every query is anchored to a synthetic local corpus detail so it
+# cannot be answered reliably from parametric model knowledge alone.
+
+- id: TICKER_001
+  query: "No documento sintético de PETR4, qual evento da janela Atlas explica os dividendos extraordinários de 2025?"
+  category: ticker
+  expected_doc_ids:
+    - "doc_petr4_div_2025"
+  expected_terms:
+    - "PETR4"
+    - "janela Atlas"
+    - "dividendos extraordinários"
+  notes: >
+    Exige recuperar o documento local com ticker exato e marcador sintético.
+
+- id: TICKER_002
+  query: "Segundo o documento sintético de VALE3, qual ajuste do cenário Serra Norte altera o guidance de produção de minério?"
+  category: ticker
+  expected_doc_ids:
+    - "doc_vale3_producao"
+  expected_terms:
+    - "VALE3"
+    - "cenário Serra Norte"
+    - "guidance"
+
+- id: TICKER_003
+  query: "No corpus sintético de ITUB4, qual métrica do bloco Horizonte ROE é usada para explicar eficiência bancária?"
+  category: ticker
+  expected_doc_ids:
+    - "doc_itub4_resultado"
+  expected_terms:
+    - "ITUB4"
+    - "bloco Horizonte ROE"
+    - "eficiência bancária"
+
+- id: TICKER_004
+  query: "No documento sintético de WEGE3, qual gatilho da trilha Motor Azul conecta margem EBITDA e crescimento?"
+  category: ticker
+  expected_doc_ids:
+    - "doc_wege3_margem"
+  expected_terms:
+    - "WEGE3"
+    - "trilha Motor Azul"
+    - "margem EBITDA"
+
+- id: TICKER_005
+  query: "Segundo o documento sintético de BBAS3, qual regra local Ponte Safra qualifica o yield de dividendos?"
+  category: ticker
+  expected_doc_ids:
+    - "doc_bbas3_dividendos"
+  expected_terms:
+    - "BBAS3"
+    - "regra local Ponte Safra"
+    - "yield de dividendos"
+
+- id: FII_001
+  query: "No documento sintético do MXRF11, qual marcador Cota Prisma define o DY dos últimos 12 meses?"
+  category: fii
+  expected_doc_ids:
+    - "doc_mxrf11_dy"
+  expected_terms:
+    - "MXRF11"
+    - "marcador Cota Prisma"
+    - "DY"
+  notes: >
+    Query adversarial para dense-only por combinar ticker de FII, sigla curta e
+    marcador local inexistente no conhecimento paramétrico.
+
+- id: FII_002
+  query: "Segundo o documento sintético de HGLG11, qual alerta Galpão Leste relaciona vacância logística e taxa de ocupação?"
+  category: fii
+  expected_doc_ids:
+    - "doc_hglg11_vacancia"
+  expected_terms:
+    - "HGLG11"
+    - "alerta Galpão Leste"
+    - "vacância logística"
+
+- id: FII_003
+  query: "No corpus sintético de KNRI11, qual cláusula Mosaico separa escritório e logística no portfólio diversificado?"
+  category: fii
+  expected_doc_ids:
+    - "doc_knri11_portfolio"
+  expected_terms:
+    - "KNRI11"
+    - "cláusula Mosaico"
+    - "escritório"
+
+- id: FII_004
+  query: "No documento sintético de XPML11, qual nota Mall Delta liga shopping, dividend yield e ABL?"
+  category: fii
+  expected_doc_ids:
+    - "doc_xpml11_shopping"
+  expected_terms:
+    - "XPML11"
+    - "nota Mall Delta"
+    - "ABL"
+
+- id: FII_005
+  query: "Segundo o documento sintético de BCFF11, qual critério FoF Espelho explica desconto nas cotas de fundos de fundos?"
+  category: fii
+  expected_doc_ids:
+    - "doc_bcff11_fof"
+  expected_terms:
+    - "BCFF11"
+    - "critério FoF Espelho"
+    - "fundos de fundos"
+
+- id: RENDA_FIXA_001
+  query: "No documento sintético de LCI, qual cláusula Carência Clara diferencia isenção de IR e prazo de carência?"
+  category: renda_fixa
+  expected_doc_ids:
+    - "doc_lci_isencao"
+  expected_terms:
+    - "LCI"
+    - "cláusula Carência Clara"
+    - "isenção de IR"
+
+- id: RENDA_FIXA_002
+  query: "Segundo o documento sintético de CRI, qual marcador Lastro Ônix separa high grade de securitização frágil?"
+  category: renda_fixa
+  expected_doc_ids:
+    - "doc_cri_high_grade"
+  expected_terms:
+    - "CRI"
+    - "marcador Lastro Ônix"
+    - "high grade"
+
+- id: RENDA_FIXA_003
+  query: "No corpus sintético de debêntures incentivadas, qual regra Trilho Verde vincula infraestrutura e isenção de IR?"
+  category: renda_fixa
+  expected_doc_ids:
+    - "doc_debentures_incentivadas"
+  expected_terms:
+    - "debêntures incentivadas"
+    - "regra Trilho Verde"
+    - "infraestrutura"
+
+- id: RENDA_FIXA_004
+  query: "No documento sintético de CDB, qual gatilho Caixa Média relaciona liquidez diária, banco médio e spread CDI?"
+  category: renda_fixa
+  expected_doc_ids:
+    - "doc_cdb_liquidez"
+  expected_terms:
+    - "CDB"
+    - "gatilho Caixa Média"
+    - "spread CDI"
+
+- id: MACRO_BR_001
+  query: "Segundo o documento sintético macro, qual hipótese Selic-Papel descreve impacto da Selic em FII de papel e duration?"
+  category: macro_br
+  expected_doc_ids:
+    - "doc_selic_fii_papel"
+  expected_terms:
+    - "hipótese Selic-Papel"
+    - "FII de papel"
+    - "duration"
+
+- id: MACRO_BR_002
+  query: "No documento sintético de curva prefixada, qual tratamento Curva Invertida compara duration longa e marcação a mercado?"
+  category: macro_br
+  expected_doc_ids:
+    - "doc_prefixado_duration"
+  expected_terms:
+    - "tratamento Curva Invertida"
+    - "duration longa"
+    - "marcação a mercado"
+
+- id: MACRO_BR_003
+  query: "No corpus sintético de NTN-B, qual régua Real Norte explica o spread entre ponta longa, ponta curta e juro real?"
+  category: macro_br
+  expected_doc_ids:
+    - "doc_ntnb_spread"
+  expected_terms:
+    - "NTN-B"
+    - "régua Real Norte"
+    - "juro real"
+
+- id: MACRO_BR_004
+  query: "Segundo o documento sintético de IPCA+, qual cenário Inflação Prisma conecta FIIs, CRI e indexação à inflação?"
+  category: macro_br
+  expected_doc_ids:
+    - "doc_ipca_fii_cri"
+  expected_terms:
+    - "IPCA+"
+    - "cenário Inflação Prisma"
+    - "CRI"
+
+- id: MACRO_BR_005
+  query: "No documento sintético de ciclo de juros, qual sinal SMID Aurora liga corte de juros, renda variável e small caps?"
+  category: macro_br
+  expected_doc_ids:
+    - "doc_corte_juros_rv"
+  expected_terms:
+    - "sinal SMID Aurora"
+    - "corte de juros"
+    - "small caps"
+
+- id: STRAT_001
+  query: "No documento sintético de rebalanceamento, qual gatilho Banda 5/25 ativa a regra 5/25 na alocação-modelo?"
+  category: estrategia
+  expected_doc_ids:
+    - "doc_regra_5_25"
+  expected_terms:
+    - "gatilho Banda 5/25"
+    - "rebalanceamento"
+    - "alocação-modelo"
+
+- id: STRAT_002
+  query: "Segundo o documento sintético de diversificação, qual matriz Tijolo-Papel descreve correlação entre FII tijolo e FII papel em alta Selic?"
+  category: estrategia
+  expected_doc_ids:
+    - "doc_correlacao_fii"
+  expected_terms:
+    - "matriz Tijolo-Papel"
+    - "correlação"
+    - "alta Selic"
+
+- id: STRAT_003
+  query: "No corpus sintético de risco, qual limite Farol Único controla concentração em ativo único na alocação-modelo?"
+  category: estrategia
+  expected_doc_ids:
+    - "doc_risco_concentracao"
+  expected_terms:
+    - "limite Farol Único"
+    - "concentração"
+    - "ativo único"
+
+- id: STRAT_004
+  query: "No documento sintético de regime macro, qual postura Escudo Beta define posicionamento defensivo em contração?"
+  category: estrategia
+  expected_doc_ids:
+    - "doc_regime_macro"
+  expected_terms:
+    - "postura Escudo Beta"
+    - "regime macro"
+    - "contração"
+
+- id: SIGLA_001
+  query: "No documento sintético de indicadores FII, qual nota VPA/PVPA Rubi diferencia desconto e valor patrimonial?"
+  category: siglas
+  expected_doc_ids:
+    - "doc_vpa_pvpa"
+  expected_terms:
+    - "VPA"
+    - "PVPA Rubi"
+    - "valor patrimonial"
+
+- id: SIGLA_002
+  query: "Segundo o documento sintético de taxas, qual marcador CDI Over Ponte separa CDI over, Selic e overnight operacional?"
+  category: siglas
+  expected_doc_ids:
+    - "doc_cdi_selic"
+  expected_terms:
+    - "CDI Over Ponte"
+    - "Selic"
+    - "overnight operacional"
+
+- id: MULTI_001
+  query: "No corpus sintético de valuation, qual proxy Yield Gap Ímã compara earnings yield e bond yield gap?"
+  category: multilingual
+  expected_doc_ids:
+    - "doc_earnings_yield"
+  expected_terms:
+    - "proxy Yield Gap Ímã"
+    - "earnings yield"
+    - "bond yield gap"
+
+- id: MULTI_002
+  query: "Segundo o documento sintético de liquidez B3, qual filtro Float SMID Janus combina free float e SMID cap?"
+  category: multilingual
+  expected_doc_ids:
+    - "doc_free_float_smid"
+  expected_terms:
+    - "filtro Float SMID Janus"
+    - "free float"
+    - "SMID cap"
+
+- id: MULTI_003
+  query: "No documento sintético de múltiplos, qual regra PEG Ponte compara P/L, crescimento, growth e value Brasil?"
+  category: multilingual
+  expected_doc_ids:
+    - "doc_peg_ratio"
+  expected_terms:
+    - "regra PEG Ponte"
+    - "P/L"
+    - "growth e value"

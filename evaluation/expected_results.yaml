@@ -1,0 +1,94 @@
+# Expected Results — Benchmark Financeiro BR v0
+# Relevance grade: 2 = highly relevant, 1 = partially relevant, 0 = irrelevant.
+# Placeholder document IDs are intentional until real corpus validation lands.
+
+TICKER_001:
+  doc_petr4_div_2025: 2
+  doc_petr4_relatorio_2025: 1
+TICKER_002:
+  doc_vale3_producao: 2
+  doc_vale3_release_operacional: 1
+TICKER_003:
+  doc_itub4_resultado: 2
+  doc_setor_bancario_roe: 1
+TICKER_004:
+  doc_wege3_margem: 2
+  doc_industria_motores_crescimento: 1
+TICKER_005:
+  doc_bbas3_dividendos: 2
+  doc_bancos_publicos_proventos: 1
+
+FII_001:
+  doc_mxrf11_dy: 2
+  doc_fii_papel_dy: 1
+FII_002:
+  doc_hglg11_vacancia: 2
+  doc_fii_logistica_ocupacao: 1
+FII_003:
+  doc_knri11_portfolio: 2
+  doc_fii_hibrido_diversificacao: 1
+FII_004:
+  doc_xpml11_shopping: 2
+  doc_fii_shopping_abl: 1
+FII_005:
+  doc_bcff11_fof: 2
+  doc_fii_fundos_de_fundos: 1
+
+RENDA_FIXA_001:
+  doc_lci_isencao: 2
+  doc_renda_fixa_isencao_pf: 1
+RENDA_FIXA_002:
+  doc_cri_high_grade: 2
+  doc_securitizacao_lastro: 1
+RENDA_FIXA_003:
+  doc_debentures_incentivadas: 2
+  doc_infraestrutura_credito_privado: 1
+RENDA_FIXA_004:
+  doc_cdb_liquidez: 2
+  doc_credito_bancario_cdi: 1
+
+MACRO_BR_001:
+  doc_selic_fii_papel: 2
+  doc_juros_fundos_imobiliarios: 1
+MACRO_BR_002:
+  doc_prefixado_duration: 2
+  doc_marcacao_mercado_titulos: 1
+MACRO_BR_003:
+  doc_ntnb_spread: 2
+  doc_juro_real_curva: 1
+MACRO_BR_004:
+  doc_ipca_fii_cri: 2
+  doc_inflacao_credito_imobiliario: 1
+MACRO_BR_005:
+  doc_corte_juros_rv: 2
+  doc_selic_small_caps: 1
+
+STRAT_001:
+  doc_regra_5_25: 2
+  doc_rebalanceamento_bandas: 1
+STRAT_002:
+  doc_correlacao_fii: 2
+  doc_diversificacao_fii_segmentos: 1
+STRAT_003:
+  doc_risco_concentracao: 2
+  doc_limite_alocacao_carteira: 1
+STRAT_004:
+  doc_regime_macro: 2
+  doc_posicionamento_defensivo: 1
+
+SIGLA_001:
+  doc_vpa_pvpa: 2
+  doc_indicadores_fii_patrimonial: 1
+SIGLA_002:
+  doc_cdi_selic: 2
+  doc_taxas_referencia_brasil: 1
+
+MULTI_001:
+  doc_earnings_yield: 2
+  doc_valuation_yield_gap: 1
+MULTI_002:
+  doc_free_float_smid: 2
+  doc_liquidez_b3_smid: 1
+MULTI_003:
+  doc_peg_ratio: 2
+  doc_multiplos_growth_value: 1
