@@ -328,11 +328,13 @@ def run_golden_questions(
         latency_ms = round((time.perf_counter() - started_at) * 1000, 3)
         durations.append(latency_ms)
         matched_doc_ids = tuple(
-            citation.doc_id
-            for citation in citations
-            if citation.doc_id in question.expected_doc_ids
-            and citation.collection_name == question.expected_collection
-            and citation.corpus == question.expected_corpus
+            dict.fromkeys(
+                citation.doc_id
+                for citation in citations
+                if citation.doc_id in question.expected_doc_ids
+                and citation.collection_name == question.expected_collection
+                and citation.corpus == question.expected_corpus
+            )
         )
         citation_present = bool(matched_doc_ids)
         if citation_present:

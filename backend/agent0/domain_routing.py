@@ -404,9 +404,12 @@ def route_dry_run_p95(
     scorer = FakeConfidenceScorer(default_score=active_config.retrieval_score_min)
     queries = (
         "qual o estado atual do GW-07?",
-        "como a Selic afeta a inflacao?",
-        "o que e duration de renda fixa?",
-        "como calcular o EBITDA?",
+        "segundo o documento sintetico local de ciclo de juros, "
+        "quais fatores explicam a trajetoria hipotetica da Selic?",
+        "segundo o documento sintetico local de curva de renda fixa, "
+        "quais movimentos de duration precisam ser citados?",
+        "no texto sintetico local de crescimento em valuation, "
+        "qual tratamento conceitual do EBITDA aparece?",
         "pergunta sem dominio conhecido",
     )
     latencies: list[float] = []

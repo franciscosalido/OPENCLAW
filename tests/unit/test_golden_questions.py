@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import re
 import tempfile
 import unittest
 from collections import Counter
 from pathlib import Path
 
+import yaml
 from pydantic import ValidationError
 
 from backend.agent0.golden_questions import (
@@ -19,8 +21,20 @@ from backend.agent0.golden_questions import (
 )
 
 
+GENERIC_FINANCIAL_QUERY_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"^o que [ée]\b", re.IGNORECASE),
+    re.compile(r"^como [ée]\b", re.IGNORECASE),
+    re.compile(r"^o que significa\b", re.IGNORECASE),
+    re.compile(r"^defina\b", re.IGNORECASE),
+    re.compile(r"^explique o que\b", re.IGNORECASE),
+    re.compile(r"^como calcular\b", re.IGNORECASE),
+    re.compile(r"^como .+ afeta\b", re.IGNORECASE),
+)
+
+
 class GoldenQuestionManifestTests(unittest.TestCase):
     MIN_FINANCIAL_QUESTIONS_PER_DOMAIN = 2
+    MIN_FINANCIAL_QUERY_WORDS = 9
 
     def test_internal_manifest_loads(self) -> None:
         manifest = load_golden_manifest(DEFAULT_INTERNAL_QUESTIONS_PATH)
@@ -55,6 +69,28 @@ class GoldenQuestionManifestTests(unittest.TestCase):
                 for question in manifest.questions
             )
         )
+
+    def test_financial_queries_are_not_trivially_parametric(self) -> None:
+        manifest = load_golden_manifest(DEFAULT_FINANCIAL_QUESTIONS_PATH)
+
+        for question in manifest.questions:
+            if not question.enabled:
+                continue
+            clean_text = question.text.strip()
+            with self.subTest(question_id=question.question_id):
+                for pattern in GENERIC_FINANCIAL_QUERY_PATTERNS:
+                    self.assertIsNone(
+                        pattern.match(clean_text),
+                        f"{question.question_id}: '{clean_text}' matches "
+                        f"parametric pattern '{pattern.pattern}'",
+                    )
+                word_count = len(clean_text.split())
+                self.assertGreaterEqual(
+                    word_count,
+                    self.MIN_FINANCIAL_QUERY_WORDS,
+                    f"{question.question_id}: '{clean_text}' has only "
+                    f"{word_count} words",
+                )
 
     def test_financial_manifest_covers_all_financial_corpus_documents(self) -> None:
         manifest = load_golden_manifest(DEFAULT_FINANCIAL_QUESTIONS_PATH)
@@ -93,6 +129,28 @@ class GoldenQuestionManifestTests(unittest.TestCase):
         self.assertIn("financial_macro_balanco_riscos", expected_doc_ids)
         self.assertIn("financial_macro_expectativas", expected_doc_ids)
         self.assertIn("financial_valuation_custo_capital", expected_doc_ids)
+
+    def test_financial_manifest_yaml_round_trips_stably(self) -> None:
+        original = load_golden_manifest(DEFAULT_FINANCIAL_QUESTIONS_PATH)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            roundtrip_path = Path(tmpdir) / "financial_questions.yaml"
+            roundtrip_path.write_text(
+                yaml.safe_dump(
+                    {
+                        "questions": [
+                            question.model_dump(mode="json")
+                            for question in original.questions
+                        ]
+                    },
+                    allow_unicode=True,
+                    sort_keys=True,
+                ),
+                encoding="utf-8",
+            )
+            reloaded = load_golden_manifest(roundtrip_path)
+
+        self.assertEqual(original, reloaded)
 
     def test_question_id_format_enforced(self) -> None:
         with self.assertRaises(ValidationError):

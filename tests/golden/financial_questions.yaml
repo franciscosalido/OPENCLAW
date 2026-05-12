@@ -1,6 +1,6 @@
 questions:
   - question_id: fq-001
-    text: segundo o documento sintetico local de curva de renda fixa, quais tres movimentos da curva ficticia precisam ser citados?
+    text: segundo o documento sintetico local de curva de renda fixa, quais tres caracteristicas da curva ficticia devem ser recuperadas e por que o exemplo permanece abstrato?
     expected_corpus: financial
     expected_collection: openclaw_financial
     expected_doc_ids:
@@ -9,7 +9,7 @@ questions:
     language: pt-BR
     enabled: true
   - question_id: fq-002
-    text: no material sintetico local de liquidez em renda fixa, quais fatores diferenciam vencimento, mercado secundario e premio de liquidez?
+    text: no material sintetico local de liquidez em renda fixa, quais tres dimensoes diferenciam a analise e qual restricao sobre emissores reais aparece?
     expected_corpus: financial
     expected_collection: openclaw_financial
     expected_doc_ids:
@@ -18,7 +18,7 @@ questions:
     language: pt-BR
     enabled: true
   - question_id: fq-003
-    text: segundo o documento sintetico local de risco de credito, quais tres criterios hipoteticos organizam capacidade de pagamento, garantias e covenants?
+    text: segundo o documento sintetico local de risco de credito, quais tres eixos hipoteticos estruturam a avaliacao e quais entidades reais sao explicitamente excluidas?
     expected_corpus: financial
     expected_collection: openclaw_financial
     expected_doc_ids:
@@ -27,7 +27,7 @@ questions:
     language: pt-BR
     enabled: true
   - question_id: fq-004
-    text: no texto sintetico local de crescimento em valuation, qual tratamento conceitual do EBITDA aparece no exemplo educacional?
+    text: no texto sintetico local de crescimento em valuation, como o exemplo educacional trata EBITDA e que tipo de dados o calculo declara nao usar?
     expected_corpus: financial
     expected_collection: openclaw_financial
     expected_doc_ids:
@@ -36,7 +36,7 @@ questions:
     language: pt-BR
     enabled: true
   - question_id: fq-005
-    text: segundo o documento sintetico local de custo de capital, quais tres componentes separam risco operacional, estrutura de capital e incerteza macro?
+    text: segundo o documento sintetico local de custo de capital, quais tres componentes formam a taxa de desconto hipotetica e qual limite de dados reais e declarado?
     expected_corpus: financial
     expected_collection: openclaw_financial
     expected_doc_ids:
@@ -45,7 +45,7 @@ questions:
     language: pt-BR
     enabled: true
   - question_id: fq-006
-    text: no material sintetico local de cenarios de valuation, quais tres cenarios para ativo ficticio precisam ser recuperados?
+    text: no material sintetico local de cenarios de valuation, quais tres cenarios para o ativo ficticio devem ser recuperados e quais referencias reais sao proibidas?
     expected_corpus: financial
     expected_collection: openclaw_financial
     expected_doc_ids:
@@ -54,7 +54,7 @@ questions:
     language: pt-BR
     enabled: true
   - question_id: fq-007
-    text: segundo o documento sintetico local de ciclo de juros, quais fatores explicam a trajetoria hipotetica de juros?
+    text: segundo o documento sintetico local de ciclo de juros, quais tres fatores explicam a trajetoria hipotetica e que dado sensivel o texto exclui?
     expected_corpus: financial
     expected_collection: openclaw_financial
     expected_doc_ids:
@@ -63,7 +63,7 @@ questions:
     language: pt-BR
     enabled: true
   - question_id: fq-008
-    text: no material sintetico local de balanco de riscos macro, quais tres grupos de risco macroeconomico devem aparecer?
+    text: no material sintetico local de balanco de riscos macro, quais tres grupos de risco devem aparecer e qual aviso sobre previsao ou carteira real acompanha o exemplo?
     expected_corpus: financial
     expected_collection: openclaw_financial
     expected_doc_ids:
@@ -72,7 +72,7 @@ questions:
     language: pt-BR
     enabled: true
   - question_id: fq-009
-    text: segundo o documento sintetico local de expectativas macro, quais propriedades de expectativas ficticias sao comparadas?
+    text: segundo o documento sintetico local de expectativas macro, quais tres propriedades das expectativas ficticias sao comparadas e quais fontes privadas sao excluidas?
     expected_corpus: financial
     expected_collection: openclaw_financial
     expected_doc_ids:

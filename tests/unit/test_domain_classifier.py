@@ -55,14 +55,20 @@ class DomainClassifierTests(unittest.TestCase):
         self.assertEqual(result.reason_code, "question_id_financial")
 
     def test_keyword_selic_routes_to_macroeconomia(self) -> None:
-        result = classify_domain("como a Selic afeta a inflacao?")
+        result = classify_domain(
+            "segundo o documento sintetico local de ciclo de juros, "
+            "quais fatores explicam a trajetoria hipotetica da Selic?"
+        )
 
         self.assertEqual(result.domain, "macroeconomia")
         self.assertEqual(result.corpus, "financial")
         self.assertEqual(result.reason_code, "keyword_selic")
 
     def test_keyword_duration_routes_to_renda_fixa(self) -> None:
-        result = classify_domain("o que e duration de renda fixa?")
+        result = classify_domain(
+            "segundo o documento sintetico local de curva de renda fixa, "
+            "quais movimentos de duration precisam ser citados?"
+        )
 
         self.assertEqual(result.domain, "renda_fixa")
         self.assertEqual(result.corpus, "financial")
@@ -79,7 +85,10 @@ class DomainClassifierTests(unittest.TestCase):
         self.assertEqual(result.corpus, "financial")
 
     def test_keyword_ebitda_routes_to_valuation(self) -> None:
-        result = classify_domain("como calcular o EBITDA?")
+        result = classify_domain(
+            "no texto sintetico local de crescimento em valuation, "
+            "qual tratamento conceitual do EBITDA aparece?"
+        )
 
         self.assertEqual(result.domain, "valuation")
         self.assertEqual(result.corpus, "financial")

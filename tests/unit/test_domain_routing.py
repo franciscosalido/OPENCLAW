@@ -44,7 +44,8 @@ class DomainRoutingTests(unittest.TestCase):
 
     def test_high_confidence_routes_local_rag(self) -> None:
         decision = route(
-            "como calcular o EBITDA?",
+            "no texto sintetico local de crescimento em valuation, "
+            "qual tratamento conceitual do EBITDA aparece?",
             self.state,
             self.config,
             FakeConfidenceScorer(default_score=self.config.retrieval_score_min),
@@ -60,7 +61,8 @@ class DomainRoutingTests(unittest.TestCase):
             self.config.retrieval_score_min + self.config.escalate_to_think_below
         ) / 2
         decision = route(
-            "o que e duration de renda fixa?",
+            "segundo o documento sintetico local de curva de renda fixa, "
+            "quais movimentos de duration precisam ser citados?",
             self.state,
             self.config,
             FakeConfidenceScorer(default_score=medium_score),
@@ -72,7 +74,8 @@ class DomainRoutingTests(unittest.TestCase):
 
     def test_low_confidence_routes_local_chat(self) -> None:
         decision = route(
-            "como a Selic afeta a inflacao?",
+            "segundo o documento sintetico local de ciclo de juros, "
+            "quais fatores explicam a trajetoria hipotetica da Selic?",
             self.state,
             self.config,
             FakeConfidenceScorer(default_score=0.01),
@@ -84,7 +87,8 @@ class DomainRoutingTests(unittest.TestCase):
 
     def test_qdrant_unavailable_routes_local_chat(self) -> None:
         decision = route(
-            "como calcular o EBITDA?",
+            "no texto sintetico local de crescimento em valuation, "
+            "qual tratamento conceitual do EBITDA aparece?",
             SystemState(qdrant_available=False),
             self.config,
             FakeConfidenceScorer(default_score=1.0),
