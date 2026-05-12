@@ -68,6 +68,12 @@ _KEYWORD_RULES: tuple[tuple[DomainName, str, tuple[str, ...]], ...] = (
             "juros",
             "ipca",
             "macroeconomia",
+            "politica monetaria",
+            "ciclo de juros",
+            "balanco de riscos",
+            "risco macroeconomico",
+            "expectativas macro",
+            "expectativas ficticias",
         ),
     ),
     (
@@ -80,6 +86,11 @@ _KEYWORD_RULES: tuple[tuple[DomainName, str, tuple[str, ...]], ...] = (
             "pos-fixado",
             "credito privado",
             "curva de juros",
+            "liquidez em renda fixa",
+            "mercado secundario",
+            "premio de liquidez",
+            "risco de credito",
+            "covenants",
         ),
     ),
     (
@@ -91,15 +102,32 @@ _KEYWORD_RULES: tuple[tuple[DomainName, str, tuple[str, ...]], ...] = (
             "fluxo de caixa",
             "multiplo",
             "margem de seguranca",
+            "crescimento em valuation",
+            "custo de capital",
+            "taxa de desconto",
+            "cenarios de valuation",
+            "ativo ficticio",
         ),
     ),
 )
 
 _REGEX_RULES: tuple[tuple[DomainName, str, re.Pattern[str]], ...] = (
     ("internal", "regex_gateway_id", re.compile(r"\bgw-?\d+\b")),
-    ("macroeconomia", "regex_macro_index", re.compile(r"\b(ipca|selic)\b")),
-    ("renda_fixa", "regex_duration", re.compile(r"\bduration\b")),
-    ("valuation", "regex_ebitda", re.compile(r"\bebitda\b")),
+    (
+        "macroeconomia",
+        "regex_macro_index",
+        re.compile(r"\b(ipca|selic|macro|macroeconomico)\b"),
+    ),
+    (
+        "renda_fixa",
+        "regex_renda_fixa",
+        re.compile(r"\b(duration|covenants?|liquidez|credito)\b"),
+    ),
+    (
+        "valuation",
+        "regex_valuation",
+        re.compile(r"\b(ebitda|valuation|wacc|capital|desconto)\b"),
+    ),
 )
 
 

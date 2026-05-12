@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from collections import Counter
 from pathlib import Path
 
 from pydantic import ValidationError
@@ -19,6 +20,8 @@ from backend.agent0.golden_questions import (
 
 
 class GoldenQuestionManifestTests(unittest.TestCase):
+    MIN_FINANCIAL_QUESTIONS_PER_DOMAIN = 2
+
     def test_internal_manifest_loads(self) -> None:
         manifest = load_golden_manifest(DEFAULT_INTERNAL_QUESTIONS_PATH)
 
@@ -39,7 +42,7 @@ class GoldenQuestionManifestTests(unittest.TestCase):
     def test_financial_manifest_loads(self) -> None:
         manifest = load_golden_manifest(DEFAULT_FINANCIAL_QUESTIONS_PATH)
 
-        self.assertEqual(len(manifest.questions), 3)
+        self.assertEqual(len(manifest.questions), 9)
         self.assertTrue(
             all(question.question_id.startswith("fq-") for question in manifest.questions)
         )
@@ -52,6 +55,44 @@ class GoldenQuestionManifestTests(unittest.TestCase):
                 for question in manifest.questions
             )
         )
+
+    def test_financial_manifest_covers_all_financial_corpus_documents(self) -> None:
+        manifest = load_golden_manifest(DEFAULT_FINANCIAL_QUESTIONS_PATH)
+        documents = load_corpus_documents()["financial"]
+        enabled_doc_ids = {
+            doc_id
+            for question in manifest.questions
+            if question.enabled
+            for doc_id in question.expected_doc_ids
+        }
+
+        self.assertEqual(enabled_doc_ids, set(documents))
+
+    def test_financial_manifest_has_minimum_domain_coverage(self) -> None:
+        manifest = load_golden_manifest(DEFAULT_FINANCIAL_QUESTIONS_PATH)
+        counts = Counter(
+            question.domain for question in manifest.questions if question.enabled
+        )
+
+        for domain in ("renda_fixa", "valuation", "macroeconomia"):
+            with self.subTest(domain=domain):
+                self.assertGreaterEqual(
+                    counts[domain],
+                    self.MIN_FINANCIAL_QUESTIONS_PER_DOMAIN,
+                )
+
+    def test_financial_manifest_includes_required_specialized_topics(self) -> None:
+        manifest = load_golden_manifest(DEFAULT_FINANCIAL_QUESTIONS_PATH)
+        expected_doc_ids = {
+            doc_id
+            for question in manifest.questions
+            for doc_id in question.expected_doc_ids
+        }
+
+        self.assertIn("financial_renda_fixa_risco_credito", expected_doc_ids)
+        self.assertIn("financial_macro_balanco_riscos", expected_doc_ids)
+        self.assertIn("financial_macro_expectativas", expected_doc_ids)
+        self.assertIn("financial_valuation_custo_capital", expected_doc_ids)
 
     def test_question_id_format_enforced(self) -> None:
         with self.assertRaises(ValidationError):
@@ -105,7 +146,7 @@ class GoldenQuestionManifestTests(unittest.TestCase):
         questions = load_all_golden_questions()
         question_ids = [question.question_id for question in questions]
 
-        self.assertEqual(len(question_ids), 6)
+        self.assertEqual(len(question_ids), 12)
         self.assertEqual(len(question_ids), len(set(question_ids)))
 
     def test_duplicate_question_id_across_manifests_rejected(self) -> None:

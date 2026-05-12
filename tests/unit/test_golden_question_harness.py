@@ -77,12 +77,15 @@ class TrackingRetriever:
 
 
 class GoldenQuestionHarnessTests(unittest.TestCase):
+    TOTAL_GOLDEN_QUESTIONS = 12
+    FINANCIAL_GOLDEN_QUESTIONS = 9
+
     def test_dry_run_uses_fake_retriever_and_passes_all_questions(self) -> None:
         result = run_golden_questions()
 
         self.assertEqual(result.report["mode"], "dry_run")
-        self.assertEqual(result.report["total_questions"], 6)
-        self.assertEqual(result.report["passed"], 6)
+        self.assertEqual(result.report["total_questions"], self.TOTAL_GOLDEN_QUESTIONS)
+        self.assertEqual(result.report["passed"], self.TOTAL_GOLDEN_QUESTIONS)
         self.assertEqual(result.report["failed"], 0)
 
     def test_custom_retriever_receives_mapped_collections(self) -> None:
@@ -90,9 +93,10 @@ class GoldenQuestionHarnessTests(unittest.TestCase):
 
         run_golden_questions(retriever=retriever)
 
-        self.assertEqual(len(retriever.calls), 6)
+        self.assertEqual(len(retriever.calls), self.TOTAL_GOLDEN_QUESTIONS)
         self.assertIn(("iq-001", "openclaw_internal"), retriever.calls)
         self.assertIn(("fq-001", "openclaw_financial"), retriever.calls)
+        self.assertIn(("fq-009", "openclaw_financial"), retriever.calls)
 
     def test_dry_run_does_not_generate_answer(self) -> None:
         result = run_golden_questions()
@@ -124,7 +128,7 @@ class GoldenQuestionHarnessTests(unittest.TestCase):
         result = run_golden_questions(retriever=WrongDocRetriever())
 
         self.assertEqual(result.report["passed"], 0)
-        self.assertEqual(result.report["failed"], 6)
+        self.assertEqual(result.report["failed"], self.TOTAL_GOLDEN_QUESTIONS)
         self.assertTrue(
             all(
                 not question["citation_present"]
@@ -136,10 +140,16 @@ class GoldenQuestionHarnessTests(unittest.TestCase):
         passing = run_golden_questions(retriever=TrackingRetriever())
         failing = run_golden_questions(retriever=EmptyRetriever())
 
-        self.assertEqual(passing.report["total_questions"], 6)
-        self.assertEqual(passing.report["enabled_questions"], 6)
+        self.assertEqual(passing.report["total_questions"], self.TOTAL_GOLDEN_QUESTIONS)
+        self.assertEqual(
+            passing.report["enabled_questions"],
+            self.TOTAL_GOLDEN_QUESTIONS,
+        )
         self.assertEqual(passing.report["skipped_questions"], 0)
-        self.assertEqual(passing.report["evaluated_questions"], 6)
+        self.assertEqual(
+            passing.report["evaluated_questions"],
+            self.TOTAL_GOLDEN_QUESTIONS,
+        )
         self.assertEqual(passing.report["coverage"], 1.0)
         self.assertEqual(passing.report["citation_hit_rate"], 1.0)
         self.assertEqual(failing.report["coverage"], 1.0)
@@ -206,7 +216,7 @@ questions:
             report = json.loads(report_path.read_text(encoding="utf-8"))
 
         self.assertEqual(exit_code, 0)
-        self.assertEqual(report["total_questions"], 6)
+        self.assertEqual(report["total_questions"], self.TOTAL_GOLDEN_QUESTIONS)
         assert_golden_report_sanitized(report)
 
     def test_sanitizer_rejects_ingestion_forbidden_keys_too(self) -> None:

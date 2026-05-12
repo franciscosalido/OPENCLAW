@@ -68,12 +68,40 @@ class DomainClassifierTests(unittest.TestCase):
         self.assertEqual(result.corpus, "financial")
         self.assertEqual(result.reason_code, "keyword_duration")
 
+    def test_financial_liquidity_query_routes_to_renda_fixa(self) -> None:
+        result = classify_domain(
+            "no material sintetico local de liquidez em renda fixa, "
+            "quais fatores diferenciam vencimento, mercado secundario "
+            "e premio de liquidez?"
+        )
+
+        self.assertEqual(result.domain, "renda_fixa")
+        self.assertEqual(result.corpus, "financial")
+
     def test_keyword_ebitda_routes_to_valuation(self) -> None:
         result = classify_domain("como calcular o EBITDA?")
 
         self.assertEqual(result.domain, "valuation")
         self.assertEqual(result.corpus, "financial")
         self.assertEqual(result.reason_code, "keyword_ebitda")
+
+    def test_cost_of_capital_query_routes_to_valuation(self) -> None:
+        result = classify_domain(
+            "segundo o documento sintetico local de custo de capital, "
+            "quais componentes separam risco operacional e estrutura de capital?"
+        )
+
+        self.assertEqual(result.domain, "valuation")
+        self.assertEqual(result.corpus, "financial")
+
+    def test_macro_expectations_query_routes_to_macroeconomia(self) -> None:
+        result = classify_domain(
+            "segundo o documento sintetico local de expectativas macro, "
+            "quais propriedades de expectativas ficticias sao comparadas?"
+        )
+
+        self.assertEqual(result.domain, "macroeconomia")
+        self.assertEqual(result.corpus, "financial")
 
     def test_unknown_routes_to_unknown(self) -> None:
         result = classify_domain("pergunta generica sem dominio mapeado")

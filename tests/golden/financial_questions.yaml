@@ -1,6 +1,6 @@
 questions:
   - question_id: fq-001
-    text: o que e duration de renda fixa?
+    text: segundo o documento sintetico local de curva de renda fixa, quais tres movimentos da curva ficticia precisam ser citados?
     expected_corpus: financial
     expected_collection: openclaw_financial
     expected_doc_ids:
@@ -9,7 +9,25 @@ questions:
     language: pt-BR
     enabled: true
   - question_id: fq-002
-    text: como calcular o EBITDA?
+    text: no material sintetico local de liquidez em renda fixa, quais fatores diferenciam vencimento, mercado secundario e premio de liquidez?
+    expected_corpus: financial
+    expected_collection: openclaw_financial
+    expected_doc_ids:
+      - financial_renda_fixa_liquidez
+    domain: renda_fixa
+    language: pt-BR
+    enabled: true
+  - question_id: fq-003
+    text: segundo o documento sintetico local de risco de credito, quais tres criterios hipoteticos organizam capacidade de pagamento, garantias e covenants?
+    expected_corpus: financial
+    expected_collection: openclaw_financial
+    expected_doc_ids:
+      - financial_renda_fixa_risco_credito
+    domain: renda_fixa
+    language: pt-BR
+    enabled: true
+  - question_id: fq-004
+    text: no texto sintetico local de crescimento em valuation, qual tratamento conceitual do EBITDA aparece no exemplo educacional?
     expected_corpus: financial
     expected_collection: openclaw_financial
     expected_doc_ids:
@@ -17,12 +35,48 @@ questions:
     domain: valuation
     language: pt-BR
     enabled: true
-  - question_id: fq-003
-    text: como a Selic afeta a inflacao?
+  - question_id: fq-005
+    text: segundo o documento sintetico local de custo de capital, quais tres componentes separam risco operacional, estrutura de capital e incerteza macro?
+    expected_corpus: financial
+    expected_collection: openclaw_financial
+    expected_doc_ids:
+      - financial_valuation_custo_capital
+    domain: valuation
+    language: pt-BR
+    enabled: true
+  - question_id: fq-006
+    text: no material sintetico local de cenarios de valuation, quais tres cenarios para ativo ficticio precisam ser recuperados?
+    expected_corpus: financial
+    expected_collection: openclaw_financial
+    expected_doc_ids:
+      - financial_valuation_cenarios
+    domain: valuation
+    language: pt-BR
+    enabled: true
+  - question_id: fq-007
+    text: segundo o documento sintetico local de ciclo de juros, quais fatores explicam a trajetoria hipotetica de juros?
     expected_corpus: financial
     expected_collection: openclaw_financial
     expected_doc_ids:
       - financial_macro_ciclo_juros
+    domain: macroeconomia
+    language: pt-BR
+    enabled: true
+  - question_id: fq-008
+    text: no material sintetico local de balanco de riscos macro, quais tres grupos de risco macroeconomico devem aparecer?
+    expected_corpus: financial
+    expected_collection: openclaw_financial
+    expected_doc_ids:
+      - financial_macro_balanco_riscos
+    domain: macroeconomia
+    language: pt-BR
+    enabled: true
+  - question_id: fq-009
+    text: segundo o documento sintetico local de expectativas macro, quais propriedades de expectativas ficticias sao comparadas?
+    expected_corpus: financial
+    expected_collection: openclaw_financial
+    expected_doc_ids:
+      - financial_macro_expectativas
     domain: macroeconomia
     language: pt-BR
     enabled: true

@@ -36,6 +36,8 @@ FORBIDDEN_SERIALIZED_KEYS = {
 
 
 class DomainRoutingTests(unittest.TestCase):
+    TOTAL_GOLDEN_QUESTIONS = 12
+
     def setUp(self) -> None:
         self.config = load_domain_routing_config()
         self.state = SystemState(qdrant_available=True)
@@ -142,11 +144,12 @@ class DomainRoutingTests(unittest.TestCase):
             },
         )
 
-    def test_golden_question_gate_routes_at_least_five_of_six(self) -> None:
+    def test_golden_question_gate_routes_all_covered_questions(self) -> None:
         result = validate_routing_against_golden_questions(config=self.config)
 
-        self.assertGreaterEqual(result.accuracy, 0.833)
-        self.assertEqual(result.passed, 6)
+        self.assertEqual(result.accuracy, 1.0)
+        self.assertEqual(result.total_questions, self.TOTAL_GOLDEN_QUESTIONS)
+        self.assertEqual(result.passed, self.TOTAL_GOLDEN_QUESTIONS)
         self.assertEqual(result.failed, 0)
         self.assertEqual(result.failed_question_ids, ())
         self.assertTrue(
@@ -162,10 +165,10 @@ class DomainRoutingTests(unittest.TestCase):
             ),
         )
 
-        self.assertEqual(result.total_questions, 6)
-        self.assertEqual(result.passed, 5)
-        self.assertEqual(result.failed, 1)
-        self.assertEqual(result.failed_question_ids, ("fq-002",))
+        self.assertEqual(result.total_questions, self.TOTAL_GOLDEN_QUESTIONS)
+        self.assertEqual(result.passed, 9)
+        self.assertEqual(result.failed, 3)
+        self.assertEqual(result.failed_question_ids, ("fq-004", "fq-005", "fq-006"))
 
     def test_p95_routing_dry_run_under_config_budget(self) -> None:
         p95 = route_dry_run_p95(config=self.config)
