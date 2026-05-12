@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import unittest
 from collections.abc import Sequence
 from pathlib import Path
+from unittest.mock import patch
 
 from backend.agent0.golden_questions import (
     Citation,
@@ -226,7 +228,8 @@ questions:
             assert_golden_report_sanitized({"local_absolute_path": "/tmp/example"})
 
     def test_smoke_requires_guard_env(self) -> None:
-        self.assertEqual(golden_script.main(["--smoke"]), 2)
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(golden_script.main(["--smoke"]), 2)
 
 
 def _per_question(report: dict[str, object]) -> Sequence[dict[str, object]]:
