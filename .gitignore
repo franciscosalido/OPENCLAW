@@ -78,6 +78,7 @@ reports/g2_alias_comparison/
 # Evaluation results — local only, never commit
 evaluation/results/*.csv
 evaluation/results/*.json
+evaluation/results/*.jsonl
 evaluation/results/*.txt
 
 # Claude Code — local session artifacts (NOT hooks.json/settings.json — esses são versionados)

@@ -16,6 +16,14 @@ BENCHMARK_FILE = EVAL_DIR / "benchmark_queries.yaml"
 EXPECTED_RESULTS_FILE = EVAL_DIR / "expected_results.yaml"
 GITIGNORE_FILE = REPO_ROOT / ".gitignore"
 GITKEEP_FILE = EVAL_DIR / "results" / ".gitkeep"
+IGNORED_EVALUATION_RESULT_PATTERNS = frozenset(
+    {
+        "evaluation/results/*.csv",
+        "evaluation/results/*.json",
+        "evaluation/results/*.jsonl",
+        "evaluation/results/*.txt",
+    }
+)
 
 MIN_QUERY_COUNT = 28
 REQUIRED_FIELDS = frozenset(
@@ -144,21 +152,13 @@ class EvaluationContractTests(unittest.TestCase):
 
     def test_results_gitignore_exists(self) -> None:
         content = GITIGNORE_FILE.read_text(encoding="utf-8")
-        self.assertIn(
-            "evaluation/results/*.json",
-            content,
-            ".gitignore não protege resultados JSON de evaluation/results/",
-        )
-        self.assertIn(
-            "evaluation/results/*.csv",
-            content,
-            ".gitignore não protege resultados CSV de evaluation/results/",
-        )
-        self.assertIn(
-            "evaluation/results/*.txt",
-            content,
-            ".gitignore não protege resultados TXT de evaluation/results/",
-        )
+        for pattern in sorted(IGNORED_EVALUATION_RESULT_PATTERNS):
+            with self.subTest(pattern=pattern):
+                self.assertIn(
+                    pattern,
+                    content,
+                    f".gitignore não protege {pattern}",
+                )
 
     def test_results_gitkeep_exists(self) -> None:
         self.assertTrue(GITKEEP_FILE.exists(), "evaluation/results/.gitkeep não existe")
