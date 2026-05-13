@@ -26,3 +26,21 @@ questions:
     domain: internal
     language: pt-BR
     enabled: true
+  - question_id: iq-004
+    text: segundo o ADR-001 sintetico local, quais componentes definem o RAG-0 local-only e quais tecnologias ficam explicitamente excluidas?
+    expected_corpus: internal
+    expected_collection: openclaw_internal
+    expected_doc_ids:
+      - internal_adr_rag_local_only
+    domain: internal
+    language: pt-BR
+    enabled: true
+  - question_id: iq-005
+    text: no runbook sintetico local de RAG, quais comandos validam ingestao e consulta locais sem usar dados reais?
+    expected_corpus: internal
+    expected_collection: openclaw_internal
+    expected_doc_ids:
+      - internal_rag_runbook
+    domain: internal
+    language: pt-BR
+    enabled: true

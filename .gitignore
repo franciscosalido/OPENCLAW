@@ -75,6 +75,12 @@ reports/g2_alias_comparison/
 !tests/golden/baseline/gateway2_baseline_scores.jsonl
 !tests/golden/baseline/gateway2_regression_thresholds.yaml
 
+# Evaluation results — local only, never commit
+evaluation/results/*.csv
+evaluation/results/*.json
+evaluation/results/*.jsonl
+evaluation/results/*.txt
+
 # Claude Code — local session artifacts (NOT hooks.json/settings.json — esses são versionados)
 *.claude_session
 .claude/todos/

@@ -36,13 +36,16 @@ FORBIDDEN_SERIALIZED_KEYS = {
 
 
 class DomainRoutingTests(unittest.TestCase):
+    TOTAL_GOLDEN_QUESTIONS = 14
+
     def setUp(self) -> None:
         self.config = load_domain_routing_config()
         self.state = SystemState(qdrant_available=True)
 
     def test_high_confidence_routes_local_rag(self) -> None:
         decision = route(
-            "como calcular o EBITDA?",
+            "no texto sintetico local de crescimento em valuation, "
+            "qual tratamento conceitual do EBITDA aparece?",
             self.state,
             self.config,
             FakeConfidenceScorer(default_score=self.config.retrieval_score_min),
@@ -58,7 +61,8 @@ class DomainRoutingTests(unittest.TestCase):
             self.config.retrieval_score_min + self.config.escalate_to_think_below
         ) / 2
         decision = route(
-            "o que e duration de renda fixa?",
+            "segundo o documento sintetico local de curva de renda fixa, "
+            "quais movimentos de duration precisam ser citados?",
             self.state,
             self.config,
             FakeConfidenceScorer(default_score=medium_score),
@@ -70,7 +74,8 @@ class DomainRoutingTests(unittest.TestCase):
 
     def test_low_confidence_routes_local_chat(self) -> None:
         decision = route(
-            "como a Selic afeta a inflacao?",
+            "segundo o documento sintetico local de ciclo de juros, "
+            "quais fatores explicam a trajetoria hipotetica da Selic?",
             self.state,
             self.config,
             FakeConfidenceScorer(default_score=0.01),
@@ -82,7 +87,8 @@ class DomainRoutingTests(unittest.TestCase):
 
     def test_qdrant_unavailable_routes_local_chat(self) -> None:
         decision = route(
-            "como calcular o EBITDA?",
+            "no texto sintetico local de crescimento em valuation, "
+            "qual tratamento conceitual do EBITDA aparece?",
             SystemState(qdrant_available=False),
             self.config,
             FakeConfidenceScorer(default_score=1.0),
@@ -104,6 +110,36 @@ class DomainRoutingTests(unittest.TestCase):
         self.assertEqual(decision.route, "local_chat")
         self.assertEqual(decision.domain, "unknown")
         self.assertEqual(decision.reason_code, "no_domain_match")
+
+    def test_fq_prefix_without_keyword_preserves_financial_route(self) -> None:
+        decision = route(
+            "pergunta sintetica sem termos financeiros mapeados",
+            self.state,
+            self.config,
+            FakeConfidenceScorer(default_score=self.config.retrieval_score_min),
+            question_id="fq-999",
+        )
+
+        self.assertEqual(decision.route, "local_rag")
+        self.assertEqual(decision.domain, "unknown")
+        self.assertEqual(decision.corpus, "financial")
+        self.assertEqual(decision.collection_name, "openclaw_financial")
+        self.assertEqual(decision.reason_code, "retrieval_confident")
+
+    def test_low_confidence_fq_prefix_without_keyword_keeps_financial_context(self) -> None:
+        decision = route(
+            "pergunta sintetica sem termos financeiros mapeados",
+            self.state,
+            self.config,
+            FakeConfidenceScorer(default_score=0.01),
+            question_id="fq-999",
+        )
+
+        self.assertEqual(decision.route, "local_chat")
+        self.assertEqual(decision.domain, "unknown")
+        self.assertEqual(decision.corpus, "financial")
+        self.assertEqual(decision.collection_name, "openclaw_financial")
+        self.assertEqual(decision.fallback_reason, "retrieval_low_confidence")
 
     def test_route_decision_is_frozen(self) -> None:
         decision = route(
@@ -142,11 +178,12 @@ class DomainRoutingTests(unittest.TestCase):
             },
         )
 
-    def test_golden_question_gate_routes_at_least_five_of_six(self) -> None:
+    def test_golden_question_gate_routes_all_covered_questions(self) -> None:
         result = validate_routing_against_golden_questions(config=self.config)
 
-        self.assertGreaterEqual(result.accuracy, 0.833)
-        self.assertEqual(result.passed, 6)
+        self.assertEqual(result.accuracy, 1.0)
+        self.assertEqual(result.total_questions, self.TOTAL_GOLDEN_QUESTIONS)
+        self.assertEqual(result.passed, self.TOTAL_GOLDEN_QUESTIONS)
         self.assertEqual(result.failed, 0)
         self.assertEqual(result.failed_question_ids, ())
         self.assertTrue(
@@ -162,10 +199,10 @@ class DomainRoutingTests(unittest.TestCase):
             ),
         )
 
-        self.assertEqual(result.total_questions, 6)
-        self.assertEqual(result.passed, 5)
-        self.assertEqual(result.failed, 1)
-        self.assertEqual(result.failed_question_ids, ("fq-002",))
+        self.assertEqual(result.total_questions, self.TOTAL_GOLDEN_QUESTIONS)
+        self.assertEqual(result.passed, 11)
+        self.assertEqual(result.failed, 3)
+        self.assertEqual(result.failed_question_ids, ("fq-004", "fq-005", "fq-006"))
 
     def test_p95_routing_dry_run_under_config_budget(self) -> None:
         p95 = route_dry_run_p95(config=self.config)

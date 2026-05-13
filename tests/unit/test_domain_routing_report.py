@@ -26,7 +26,8 @@ class DomainRoutingReportTests(unittest.TestCase):
                 FakeConfidenceScorer(default_score=1.0),
             ),
             route(
-                "como calcular o EBITDA?",
+                "no texto sintetico local de crescimento em valuation, "
+                "qual tratamento conceitual do EBITDA aparece?",
                 SystemState(qdrant_available=True),
                 config,
                 FakeConfidenceScorer(default_score=1.0),

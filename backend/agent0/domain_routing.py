@@ -287,7 +287,7 @@ def route(
             collection_name="none",
             fallback_reason="qdrant_unavailable",
         )
-    if classification.domain == "unknown":
+    if classification.domain == "unknown" and classification.corpus == "none":
         return _decision(
             started_at=started_at,
             route_name="local_chat",
@@ -329,6 +329,11 @@ def route(
             threshold_used="escalate_to_think_below",
             reason_code="retrieval_uncertain",
         )
+    fallback_corpus: CorpusName | None = None
+    fallback_collection: CollectionName | None = None
+    if classification.domain != "unknown":
+        fallback_corpus = "none"
+        fallback_collection = "none"
     return _decision(
         started_at=started_at,
         route_name="local_chat",
@@ -336,8 +341,8 @@ def route(
         confidence_score=confidence.score,
         threshold_used="escalate_to_think_below",
         reason_code="retrieval_low_confidence",
-        corpus="none",
-        collection_name="none",
+        corpus=fallback_corpus,
+        collection_name=fallback_collection,
         fallback_reason="retrieval_low_confidence",
     )
 
@@ -404,9 +409,12 @@ def route_dry_run_p95(
     scorer = FakeConfidenceScorer(default_score=active_config.retrieval_score_min)
     queries = (
         "qual o estado atual do GW-07?",
-        "como a Selic afeta a inflacao?",
-        "o que e duration de renda fixa?",
-        "como calcular o EBITDA?",
+        "segundo o documento sintetico local de ciclo de juros, "
+        "quais fatores explicam a trajetoria hipotetica da Selic?",
+        "segundo o documento sintetico local de curva de renda fixa, "
+        "quais movimentos de duration precisam ser citados?",
+        "no texto sintetico local de crescimento em valuation, "
+        "qual tratamento conceitual do EBITDA aparece?",
         "pergunta sem dominio conhecido",
     )
     latencies: list[float] = []
