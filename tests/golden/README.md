@@ -51,7 +51,8 @@ A0-PR03 uses only the split citation manifests:
 
 Current registry shape:
 
-- 3 internal questions cover operational memory and coordination documents.
+- 5 internal questions cover every enabled document in
+  `data/corpus/internal/manifest.yaml`.
 - 9 financial questions cover every enabled document in
   `data/corpus/financial/manifest.yaml`.
 - Financial coverage is balanced across the current synthetic domains:

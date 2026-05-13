@@ -50,6 +50,10 @@ Internal questions:
 | `iq-001` | `qual o estado atual do GW-07?` | `internal_current_state` |
 | `iq-002` | `qual o ultimo alias canonico de embeddings?` | `internal_decisions` |
 | `iq-003` | `quais aliases tem timeout maior que 60s?` | `internal_claude_contract` |
+| `iq-004` | `segundo o ADR-001 sintetico local, quais componentes definem o RAG-0 local-only e quais tecnologias ficam explicitamente excluidas?` | `internal_adr_rag_local_only` |
+| `iq-005` | `no runbook sintetico local de RAG, quais comandos validam ingestao e consulta locais sem usar dados reais?` | `internal_rag_runbook` |
+
+Internal questions cover every enabled synthetic internal document.
 
 Financial questions:
 
@@ -80,6 +84,11 @@ Question IDs define the namespace contract:
 The harness validates the expected collection through
 `assert_collection_namespace(...)` before retrieval. `openclaw_knowledge` is not
 allowed.
+
+`iq-*` and `fq-*` prefixes are namespace hints. When an `fq-*` question lacks a
+domain keyword, routing still preserves `financial` / `openclaw_financial`
+instead of silently falling back to `none`; confidence thresholds decide the
+route, but the namespace evidence is not discarded.
 
 ## Citation Contract
 

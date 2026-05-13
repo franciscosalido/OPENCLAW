@@ -36,7 +36,7 @@ FORBIDDEN_SERIALIZED_KEYS = {
 
 
 class DomainRoutingTests(unittest.TestCase):
-    TOTAL_GOLDEN_QUESTIONS = 12
+    TOTAL_GOLDEN_QUESTIONS = 14
 
     def setUp(self) -> None:
         self.config = load_domain_routing_config()
@@ -111,6 +111,36 @@ class DomainRoutingTests(unittest.TestCase):
         self.assertEqual(decision.domain, "unknown")
         self.assertEqual(decision.reason_code, "no_domain_match")
 
+    def test_fq_prefix_without_keyword_preserves_financial_route(self) -> None:
+        decision = route(
+            "pergunta sintetica sem termos financeiros mapeados",
+            self.state,
+            self.config,
+            FakeConfidenceScorer(default_score=self.config.retrieval_score_min),
+            question_id="fq-999",
+        )
+
+        self.assertEqual(decision.route, "local_rag")
+        self.assertEqual(decision.domain, "unknown")
+        self.assertEqual(decision.corpus, "financial")
+        self.assertEqual(decision.collection_name, "openclaw_financial")
+        self.assertEqual(decision.reason_code, "retrieval_confident")
+
+    def test_low_confidence_fq_prefix_without_keyword_keeps_financial_context(self) -> None:
+        decision = route(
+            "pergunta sintetica sem termos financeiros mapeados",
+            self.state,
+            self.config,
+            FakeConfidenceScorer(default_score=0.01),
+            question_id="fq-999",
+        )
+
+        self.assertEqual(decision.route, "local_chat")
+        self.assertEqual(decision.domain, "unknown")
+        self.assertEqual(decision.corpus, "financial")
+        self.assertEqual(decision.collection_name, "openclaw_financial")
+        self.assertEqual(decision.fallback_reason, "retrieval_low_confidence")
+
     def test_route_decision_is_frozen(self) -> None:
         decision = route(
             "qual o estado atual do GW-07?",
@@ -170,7 +200,7 @@ class DomainRoutingTests(unittest.TestCase):
         )
 
         self.assertEqual(result.total_questions, self.TOTAL_GOLDEN_QUESTIONS)
-        self.assertEqual(result.passed, 9)
+        self.assertEqual(result.passed, 11)
         self.assertEqual(result.failed, 3)
         self.assertEqual(result.failed_question_ids, ("fq-004", "fq-005", "fq-006"))
 

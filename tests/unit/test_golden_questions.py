@@ -39,7 +39,7 @@ class GoldenQuestionManifestTests(unittest.TestCase):
     def test_internal_manifest_loads(self) -> None:
         manifest = load_golden_manifest(DEFAULT_INTERNAL_QUESTIONS_PATH)
 
-        self.assertEqual(len(manifest.questions), 3)
+        self.assertEqual(len(manifest.questions), 5)
         self.assertTrue(
             all(question.question_id.startswith("iq-") for question in manifest.questions)
         )
@@ -52,6 +52,18 @@ class GoldenQuestionManifestTests(unittest.TestCase):
                 for question in manifest.questions
             )
         )
+
+    def test_internal_manifest_covers_all_internal_corpus_documents(self) -> None:
+        manifest = load_golden_manifest(DEFAULT_INTERNAL_QUESTIONS_PATH)
+        documents = load_corpus_documents()["internal"]
+        enabled_doc_ids = {
+            doc_id
+            for question in manifest.questions
+            if question.enabled
+            for doc_id in question.expected_doc_ids
+        }
+
+        self.assertEqual(enabled_doc_ids, set(documents))
 
     def test_financial_manifest_loads(self) -> None:
         manifest = load_golden_manifest(DEFAULT_FINANCIAL_QUESTIONS_PATH)
@@ -204,7 +216,7 @@ class GoldenQuestionManifestTests(unittest.TestCase):
         questions = load_all_golden_questions()
         question_ids = [question.question_id for question in questions]
 
-        self.assertEqual(len(question_ids), 12)
+        self.assertEqual(len(question_ids), 14)
         self.assertEqual(len(question_ids), len(set(question_ids)))
 
     def test_duplicate_question_id_across_manifests_rejected(self) -> None:

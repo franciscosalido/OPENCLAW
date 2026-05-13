@@ -239,7 +239,8 @@ class DuplicateCitationRetriever:
 
 
 class GoldenQuestionHarnessTests(unittest.TestCase):
-    TOTAL_GOLDEN_QUESTIONS = 12
+    TOTAL_GOLDEN_QUESTIONS = 14
+    INTERNAL_GOLDEN_QUESTIONS = 5
     FINANCIAL_GOLDEN_QUESTIONS = 9
 
     def test_dry_run_uses_fake_retriever_and_passes_all_questions(self) -> None:
@@ -257,6 +258,7 @@ class GoldenQuestionHarnessTests(unittest.TestCase):
 
         self.assertEqual(len(retriever.calls), self.TOTAL_GOLDEN_QUESTIONS)
         self.assertIn(("iq-001", "openclaw_internal"), retriever.calls)
+        self.assertIn(("iq-005", "openclaw_internal"), retriever.calls)
         self.assertIn(("fq-001", "openclaw_financial"), retriever.calls)
         self.assertIn(("fq-009", "openclaw_financial"), retriever.calls)
 
