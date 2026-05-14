@@ -114,6 +114,10 @@ class ReciprocalRankTests(unittest.TestCase):
         score = reciprocal_rank(["a", "b"], frozenset({"a"}))
         self.assertEqual(score, 1.0)  # proof: first relevant rank is 1, so 1/1.
 
+    def test_reciprocal_rank_hit_at_first_despite_duplicates(self) -> None:
+        score = reciprocal_rank(["a", "a", "a"], frozenset({"a"}))
+        self.assertEqual(score, 1.0)  # proof: first a is rank 1, so RR = 1/1; later duplicates are ignored.
+
     def test_reciprocal_rank_second_result_hit(self) -> None:
         score = reciprocal_rank(["x", "a"], frozenset({"a"}))
         self.assertEqual(score, 0.5)  # proof: first relevant rank is 2, so 1/2.
