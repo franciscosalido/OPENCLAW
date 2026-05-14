@@ -109,3 +109,17 @@ substituí-los por IDs reais do corpus validado, mas sem renumerar queries.
   ficar fora do versionamento, exceto `.gitkeep`.
 - Código de retrieval, embeddings, Qdrant, BM25, LiteLLM, MemoryOS, LangGraph,
   MCP, ColBERT ou DBSF.
+
+## PR 02 — Decisão de escopo sobre MAP
+
+O motor matemático do PR 02 exporta apenas as funções do contrato final do PR:
+precision@k, recall@k, reciprocal rank, MRR, DCG/NDCG e percentis de latência.
+
+`mean_average_precision(results, k)` aparece no planejamento técnico como uma
+possível macro-métrica, mas não aparece na lista final de funções obrigatórias
+do PR 02. Por isso, MAP está explicitamente fora do escopo deste PR.
+
+Motivo: adicionar MAP sem um contrato próprio exigiria escolher silenciosamente
+a definição de AP@k, incluindo denominador, tratamento de duplicatas, cutoff e
+queries sem hits. Essa decisão matemática precisa ser feita em PR separado,
+com testes analíticos próprios, antes de entrar na API pública.
