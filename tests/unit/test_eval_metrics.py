@@ -282,6 +282,12 @@ class MetricInvariantTests(unittest.TestCase):
         self.assertEqual(first, 1.0)  # proof: rank1 gain is (2^1 - 1) / log2(2) = 1.
         self.assertGreater(second, first)  # proof: rank2 has positive gain, so adding it increases DCG.
 
+    def test_reciprocal_rank_is_positive_whenever_there_is_a_hit(self) -> None:
+        for retrieved in (["a"], ["x", "a"], ["x", "y", "a"]):
+            with self.subTest(retrieved=retrieved):
+                score = reciprocal_rank(retrieved, frozenset({"a"}))
+                self.assertGreater(score, 0.0)  # proof: finite positive first-hit rank means 1/rank in (0,1].
+
     def test_latency_percentiles_are_monotonic_non_decreasing(self) -> None:
         result = latency_percentiles([1.0, 2.0, 3.0, 4.0], (50, 95, 99))
         self.assertLessEqual(result[50], result[95])  # proof: sorted empirical quantiles preserve order.
