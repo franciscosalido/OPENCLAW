@@ -1,4 +1,11 @@
-"""Pure retrieval evaluation metrics for OpenClaw."""
+"""Pure retrieval evaluation metrics for OpenClaw.
+
+The public API intentionally matches the Sprint RAG-1A PR-02 implementation
+contract. ``mean_average_precision`` is not exported in this PR because the
+final contract lists precision, recall, reciprocal-rank, NDCG and latency
+metrics only; MAP needs a separate mathematical convention for AP@k before it
+can be added safely.
+"""
 
 from __future__ import annotations
 
