@@ -197,6 +197,10 @@ class DcgNdcgTests(unittest.TestCase):
         score = ndcg_at_k([2.0, 1.0], 2)
         self.assertEqual(score, 1.0)  # proof: actual DCG equals ideal DCG, so ratio is 1.
 
+    def test_ndcg_is_one_when_all_relevance_scores_are_equal(self) -> None:
+        score = ndcg_at_k([2.0, 2.0, 2.0], 3)
+        self.assertEqual(score, 1.0)  # proof: DCG([2,2,2]) equals IDCG([2,2,2]) because sorting changes no scores.
+
     def test_ndcg_penalizes_misordered_relevance(self) -> None:
         score = ndcg_at_k([1.0, 0.0, 2.0], 3)
         actual = 1.0 + 0.0 + (3.0 / 2.0)  # proof: 1/log2(2) + 0 + 3/log2(4).
