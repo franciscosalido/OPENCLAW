@@ -219,6 +219,12 @@ class LatencyPercentileTests(unittest.TestCase):
         result = latency_percentiles([0.0, 100.0], (95,))
         self.assertEqual(result, {95: 95.0})  # proof: rank=0.95, so 0 + 0.95*(100-0).
 
+    def test_latency_p95_canonical_interpolation_case(self) -> None:
+        result = latency_percentiles([10.0, 20.0, 30.0, 40.0, 100.0], (50, 95))
+        # proof p50: rank=0.50*(5-1)=2.0, exact index 2, value 30.0.
+        # proof p95: rank=0.95*(5-1)=3.8, lower=40, upper=100, weight=0.8, so 40+0.8*60=88.0.
+        self.assertEqual(result, {50: 30.0, 95: 88.0})
+
     def test_latency_percentile_sorts_inputs(self) -> None:
         result = latency_percentiles([30.0, 10.0, 20.0], (50,))
         self.assertEqual(result, {50: 20.0})  # proof: sorted values [10,20,30], rank 1.

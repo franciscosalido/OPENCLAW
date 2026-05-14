@@ -42,9 +42,9 @@ def latency_percentiles(
         if percentile < 0 or percentile > 100:
             raise ValueError("percentiles must be in [0, 100]")
 
-        rank = (float(percentile) / 100.0) * float(max_index)
-        lower_index = math.floor(rank)
-        upper_index = math.ceil(rank)
+        rank_numerator = percentile * max_index
+        lower_index = rank_numerator // 100
+        upper_index = math.ceil(float(rank_numerator) / 100.0)
 
         if lower_index == upper_index:
             result[percentile] = float(sorted_latencies[lower_index])
@@ -52,7 +52,7 @@ def latency_percentiles(
 
         lower_value = sorted_latencies[lower_index]
         upper_value = sorted_latencies[upper_index]
-        weight = rank - float(lower_index)
+        weight = float(rank_numerator % 100) / 100.0
         result[percentile] = lower_value + (upper_value - lower_value) * weight
 
     return result
