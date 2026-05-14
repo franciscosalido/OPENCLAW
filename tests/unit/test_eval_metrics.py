@@ -40,6 +40,10 @@ class PrecisionAtKTests(unittest.TestCase):
         score = precision_at_k(["a"], frozenset({"a", "b"}), 4)
         self.assertAlmostEqual(score, 1.0 / 4.0)  # proof: 1 hit / requested k=4.
 
+    def test_precision_canonical_denominator_k_case(self) -> None:
+        score = precision_at_k(["a"], frozenset({"a"}), 5)
+        self.assertAlmostEqual(score, 0.2)  # proof: 1 hit / k=5, denominator is k, not min(k, len(retrieved)).
+
     def test_precision_respects_cutoff(self) -> None:
         score = precision_at_k(["x", "a"], frozenset({"a"}), 1)
         self.assertEqual(score, 0.0)  # proof: top-1 is x, so 0 hits / k=1.
