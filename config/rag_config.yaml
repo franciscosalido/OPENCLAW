@@ -47,7 +47,7 @@ agentic_policy:
 
 tool_metadata:
   name: "search_knowledge"
-  description: "Read-only retrieval tool contract for future Agentic RAG wiring."
+  description: "Busca os top-k trechos mais relevantes dos corpora do QUIMERA. Use antes de gerar qualquer resposta que dependa de informação factual de documentos internos ou ativos financeiros."
   parameters:
     - name: "query"
       type: "string"

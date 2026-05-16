@@ -65,7 +65,11 @@ def _valid_config() -> dict[str, Any]:
         },
         "tool_metadata": {
             "name": "search_knowledge",
-            "description": "Read-only retrieval tool contract.",
+            "description": (
+                "Busca os top-k trechos mais relevantes dos corpora do QUIMERA. "
+                "Use antes de gerar qualquer resposta que dependa de informação "
+                "factual de documentos internos ou ativos financeiros."
+            ),
             "parameters": [
                 {"name": "query", "type": "string", "required": True},
                 {
@@ -127,6 +131,14 @@ class RagConfigModelTests(unittest.TestCase):
             "openclaw_internal",
         )
 
+    def test_retrieval_max_rounds_defaults_to_one(self) -> None:
+        data = _valid_config()
+        del _section(data, "retrieval")["max_rounds"]
+
+        config = _load_config(data)
+
+        self.assertEqual(config.retrieval.max_rounds, 1)
+
     def test_project_rag_config_example_loads(self) -> None:
         config = load_rag_config(PROJECT_RAG_CONFIG)
 
@@ -136,6 +148,14 @@ class RagConfigModelTests(unittest.TestCase):
         self.assertIsNotNone(config.rag)
         self.assertIsNotNone(config.gateway)
         self.assertIsNotNone(config.agent0)
+
+    def test_project_tool_description_is_actionable_for_function_calling(self) -> None:
+        config = load_rag_config(PROJECT_RAG_CONFIG)
+
+        self.assertIn("Busca os top-k trechos", config.tool_metadata.description)
+        self.assertIn("Use antes de gerar", config.tool_metadata.description)
+        self.assertIn("documentos internos", config.tool_metadata.description)
+        self.assertIn("ativos financeiros", config.tool_metadata.description)
 
     def test_dense_only_contract_preserves_current_runtime_fields(self) -> None:
         config = _load_config(_valid_config())
@@ -180,14 +200,14 @@ class RagConfigModelTests(unittest.TestCase):
         data = _valid_config()
         _section(data, "hybrid_search")["enabled"] = True
 
-        with self.assertRaisesRegex(ValueError, "hybrid_search.enabled"):
+        with self.assertRaisesRegex(ValidationError, "hybrid_search.enabled"):
             _load_config(data)
 
     def test_agentic_policy_enabled_not_allowed(self) -> None:
         data = _valid_config()
         _section(data, "agentic_policy")["enabled"] = True
 
-        with self.assertRaisesRegex(ValueError, "agentic_policy.enabled"):
+        with self.assertRaisesRegex(ValidationError, "agentic_policy.enabled"):
             _load_config(data)
 
     def test_query_rewrite_enabled_not_allowed(self) -> None:
@@ -195,7 +215,7 @@ class RagConfigModelTests(unittest.TestCase):
         retrieval = _section(data, "retrieval")
         _section(retrieval, "query_rewrite")["enabled"] = True
 
-        with self.assertRaisesRegex(ValueError, "query_rewrite.enabled"):
+        with self.assertRaisesRegex(ValidationError, "query_rewrite.enabled"):
             _load_config(data)
 
     def test_invalid_fusion_strategy(self) -> None:
@@ -205,7 +225,7 @@ class RagConfigModelTests(unittest.TestCase):
 
         with self.assertRaises(ValidationError) as ctx:
             _load_config(data)
-        self.assertIn("rrf", str(ctx.exception))
+        self.assertIn("fusion.strategy accepts only 'rrf' in RAG-1A PR04", str(ctx.exception))
 
     def test_invalid_no_result_fallback(self) -> None:
         data = _valid_config()
@@ -221,6 +241,25 @@ class RagConfigModelTests(unittest.TestCase):
             config.hybrid_search.sparse.tokenizer_language,
             "portuguese",
         )
+
+    def test_tool_parameter_type_accepts_function_calling_json_schema_types(self) -> None:
+        data = _valid_config()
+        tool_metadata = _section(data, "tool_metadata")
+        parameters = tool_metadata["parameters"]
+        if not isinstance(parameters, list):
+            raise AssertionError("tool_metadata.parameters is not a list")
+        parameters.extend(
+            [
+                {"name": "include_metadata", "type": "boolean", "required": False},
+                {"name": "filters", "type": "object", "required": False},
+                {"name": "tags", "type": "array", "required": False},
+            ]
+        )
+
+        config = _load_config(data)
+        observed_types = {parameter.type for parameter in config.tool_metadata.parameters}
+
+        self.assertTrue({"boolean", "object", "array"}.issubset(observed_types))
 
     def test_extra_fields_forbidden(self) -> None:
         data = _valid_config()

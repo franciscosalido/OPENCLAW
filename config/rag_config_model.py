@@ -12,14 +12,14 @@ from pathlib import Path
 from typing import Literal, cast
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 RetrievalMode = Literal["dense", "hybrid", "agentic"]
 FusionStrategy = Literal["rrf"]
 NoResultFallback = Literal["empty", "relax_threshold", "rewrite_query"]
 DenseProvider = Literal["ollama"]
 SparseProvider = Literal["fastembed"]
-ToolParameterType = Literal["string", "integer"]
+ToolParameterType = Literal["string", "integer", "boolean", "array", "object"]
 
 STRICT_MODEL_CONFIG = ConfigDict(extra="forbid", frozen=True)
 
@@ -32,13 +32,21 @@ class FusionConfig(BaseModel):
     strategy: FusionStrategy
     rrf_k: int = Field(gt=0)
 
+    @field_validator("strategy", mode="before")
+    @classmethod
+    def strategy_must_be_rrf(cls, value: object) -> object:
+        """Reject future fusion strategies with a sprint-specific message."""
+        if value != "rrf":
+            raise ValueError("fusion.strategy accepts only 'rrf' in RAG-1A PR04")
+        return value
+
 
 class QueryRewriteConfig(BaseModel):
     """Future query rewrite policy, disabled in PR-04."""
 
     model_config = STRICT_MODEL_CONFIG
 
-    enabled: bool
+    enabled: Literal[False] = False
     model: str | None
     max_attempts: int = Field(ge=1)
 
@@ -49,7 +57,7 @@ class RetrievalConfig(BaseModel):
     model_config = STRICT_MODEL_CONFIG
 
     mode: RetrievalMode
-    max_rounds: int = Field(ge=1)
+    max_rounds: int = Field(default=1, ge=1)
     top_k: int = Field(gt=0)
     fusion: FusionConfig
     min_score: float | None
@@ -94,7 +102,7 @@ class HybridSearchConfig(BaseModel):
 
     model_config = STRICT_MODEL_CONFIG
 
-    enabled: bool
+    enabled: Literal[False] = False
     dense_vector_name: str
     sparse_vector_name: str
     collections: HybridCollectionsConfig
@@ -107,7 +115,7 @@ class AgenticPolicyConfig(BaseModel):
 
     model_config = STRICT_MODEL_CONFIG
 
-    enabled: bool
+    enabled: Literal[False] = False
     allow_query_decomposition: bool
     allow_iterative_retrieval: bool
     max_retrieval_steps: int = Field(ge=1)
