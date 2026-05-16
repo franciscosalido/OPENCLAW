@@ -79,3 +79,35 @@ def ndcg_at_k(relevance_scores: Sequence[float], k: int) -> float:
         return 0.0
 
     return actual / ideal
+
+
+def mean_ndcg_at_k(
+    results: Sequence[Sequence[float]],
+    k: int,
+) -> float:
+    """Return the macro-average of NDCG at k over relevance-score rankings.
+
+    Args:
+        results: Sequence of per-query ranked relevance-score sequences.
+        k: Cutoff rank forwarded to ``ndcg_at_k``.
+
+    Returns:
+        Arithmetic mean of per-query NDCG scores.
+
+    Raises:
+        ValueError: If ``results`` is empty, ``k <= 0``, or any relevance score
+            is negative or non-finite.
+
+    Example:
+        >>> mean_ndcg_at_k([[2.0, 1.0], [0.0, 0.0]], 2)
+        0.5
+    """
+
+    if not results:
+        raise ValueError("results must not be empty")
+
+    total = 0.0
+    for relevance_scores in results:
+        total += ndcg_at_k(relevance_scores, k)
+
+    return total / float(len(results))

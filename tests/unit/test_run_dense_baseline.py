@@ -91,6 +91,7 @@ class DenseBaselineRunnerTests(unittest.TestCase):
             self.assertIn("global", result.aggregate)
             self.assertIn("by_category", result.aggregate)
             self.assertEqual(result.results[0]["status"], "ok")
+            self.assertEqual(result.results[0]["relevance_scores"], [2.0, 0.0, 0.0, 0.0, 0.0])
 
             snapshot = _read_json(result.paths.json_path)
             self.assertIn("metadata", snapshot)

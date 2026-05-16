@@ -11,6 +11,7 @@ from evaluation import (
     latency_percentiles,
     mean_precision_at_k,
     mean_recall_at_k,
+    mean_ndcg_at_k,
     mean_reciprocal_rank,
     ndcg_at_k,
     precision_at_k,
@@ -342,6 +343,10 @@ class MacroAverageTests(unittest.TestCase):
         score = mean_recall_at_k(results, 2)
         self.assertEqual(score, 0.75)  # proof: per-query recall scores are 1/2 and 1; mean=1.5/2.
 
+    def test_mean_ndcg_at_k_averages_query_scores(self) -> None:
+        score = mean_ndcg_at_k([[2.0, 1.0], [0.0, 0.0]], 2)
+        self.assertEqual(score, 0.5)  # proof: per-query NDCG scores are 1 and 0; mean=(1+0)/2.
+
     def test_mean_precision_at_k_rejects_empty_results(self) -> None:
         with self.assertRaises(ValueError):  # proof: macro precision mean denominator would be 0.
             mean_precision_at_k([], 1)
@@ -349,3 +354,7 @@ class MacroAverageTests(unittest.TestCase):
     def test_mean_recall_at_k_rejects_empty_results(self) -> None:
         with self.assertRaises(ValueError):  # proof: macro recall mean denominator would be 0.
             mean_recall_at_k([], 1)
+
+    def test_mean_ndcg_at_k_rejects_empty_results(self) -> None:
+        with self.assertRaises(ValueError):  # proof: macro NDCG mean denominator would be 0.
+            mean_ndcg_at_k([], 1)

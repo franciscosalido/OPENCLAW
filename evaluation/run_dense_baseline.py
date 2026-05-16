@@ -29,6 +29,7 @@ from loguru import logger
 
 from evaluation import (
     latency_percentiles,
+    mean_ndcg_at_k,
     mean_precision_at_k,
     mean_recall_at_k,
     mean_reciprocal_rank,
@@ -285,6 +286,7 @@ def run_dense_baseline(
         include_cold_start=active_config.include_cold_start,
         cutoff_precision=active_config.cutoff_precision,
         cutoff_recall=active_config.cutoff_recall,
+        cutoff_ndcg=active_config.cutoff_ndcg,
     )
     snapshot = {
         "metadata": metadata,
@@ -428,6 +430,7 @@ def _run_one_query(
     error_type: str | None = None
     error_message: str | None = None
     metrics = _zero_metrics()
+    relevance_scores: list[float] = []
 
     try:
         expected_ids = frozenset(query.expected_doc_ids)
@@ -470,6 +473,7 @@ def _run_one_query(
         "expected_doc_ids": list(query.expected_doc_ids),
         "retrieved_ids": retrieved_ids,
         "scores": scores,
+        "relevance_scores": relevance_scores,
         "latency_ms": latency_ms,
         "cold_start": cold_start,
         "metrics": metrics,
@@ -508,6 +512,7 @@ def _build_aggregate(
     include_cold_start: bool,
     cutoff_precision: int,
     cutoff_recall: int,
+    cutoff_ndcg: int,
 ) -> dict[str, object]:
     ok_rows = [row for row in rows if row.get("status") == "ok"]
     global_aggregate = _aggregate_rows(
@@ -515,6 +520,7 @@ def _build_aggregate(
         include_cold_start=include_cold_start,
         cutoff_precision=cutoff_precision,
         cutoff_recall=cutoff_recall,
+        cutoff_ndcg=cutoff_ndcg,
     )
 
     rows_by_category: dict[str, list[Mapping[str, object]]] = defaultdict(list)
@@ -529,6 +535,7 @@ def _build_aggregate(
             include_cold_start=include_cold_start,
             cutoff_precision=cutoff_precision,
             cutoff_recall=cutoff_recall,
+            cutoff_ndcg=cutoff_ndcg,
         )
         for category, category_rows in sorted(rows_by_category.items())
     }
@@ -545,6 +552,7 @@ def _aggregate_rows(
     include_cold_start: bool,
     cutoff_precision: int,
     cutoff_recall: int,
+    cutoff_ndcg: int,
 ) -> dict[str, object]:
     if not rows:
         return {
@@ -558,7 +566,7 @@ def _aggregate_rows(
 
     precision_recall_inputs: list[tuple[Sequence[str], frozenset[str]]] = []
     rr_scores: list[float] = []
-    ndcg_scores: list[float] = []
+    ndcg_inputs: list[Sequence[float]] = []
     latencies: list[float] = []
     for row in rows:
         retrieved_ids = _string_list(row.get("retrieved_ids"))
@@ -566,7 +574,7 @@ def _aggregate_rows(
         precision_recall_inputs.append((retrieved_ids, expected_doc_ids))
         metrics = _mapping_value(row.get("metrics"))
         rr_scores.append(_float_metric(metrics, "reciprocal_rank"))
-        ndcg_scores.append(_float_metric(metrics, "ndcg_at_5"))
+        ndcg_inputs.append(_float_list(row.get("relevance_scores")))
         if include_cold_start or row.get("cold_start") is not True:
             latencies.append(_float_value(row.get("latency_ms"), "latency_ms"))
 
@@ -586,7 +594,7 @@ def _aggregate_rows(
             cutoff_recall,
         ),
         "mean_reciprocal_rank": mean_reciprocal_rank(rr_scores),
-        "mean_ndcg_at_5": sum(ndcg_scores) / float(len(ndcg_scores)),
+        "mean_ndcg_at_5": mean_ndcg_at_k(ndcg_inputs, cutoff_ndcg),
         "latency_ms": latency_output,
     }
 
