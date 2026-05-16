@@ -1,6 +1,69 @@
 # RAG Pipeline Configuration — OPENCLAW RAG-0
 # All runtime values live here. Never hardcode in Python files.
 
+config_version: "1.0.0"
+
+retrieval:
+  mode: "dense"
+  max_rounds: 1
+  top_k: 10
+  fusion:
+    strategy: "rrf"
+    rrf_k: 60
+  min_score: null
+  no_result_fallback: "empty"
+  query_rewrite:
+    enabled: false
+    model: null
+    max_attempts: 1
+
+hybrid_search:
+  enabled: false
+  dense_vector_name: "dense"
+  sparse_vector_name: "sparse"
+  collections:
+    internal: "openclaw_internal"
+    financial: "openclaw_financial"
+    default: "openclaw_internal"
+  dense:
+    provider: "ollama"
+    model: "nomic-embed-text"
+    dimensions: 768
+    model_version: "1.0"
+  sparse:
+    provider: "fastembed"
+    model: "Qdrant/bm25"
+    tokenizer_language: "portuguese"
+    model_version: "1.0"
+
+agentic_policy:
+  enabled: false
+  allow_query_decomposition: false
+  allow_iterative_retrieval: false
+  max_retrieval_steps: 1
+  max_tool_calls: 1
+  max_query_rewrites: 0
+  max_context_reads: 1
+
+tool_metadata:
+  name: "search_knowledge"
+  description: "Read-only retrieval tool contract for future Agentic RAG wiring."
+  parameters:
+    - name: "query"
+      type: "string"
+      required: true
+    - name: "corpus"
+      type: "string"
+      required: false
+      enum:
+        - "internal"
+        - "financial"
+      default: "internal"
+    - name: "top_k"
+      type: "integer"
+      required: false
+      default: 10
+
 rag:
   chunking:
     max_tokens: 400
