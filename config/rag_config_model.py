@@ -30,14 +30,14 @@ class FusionConfig(BaseModel):
     model_config = STRICT_MODEL_CONFIG
 
     strategy: FusionStrategy
-    rrf_k: int = Field(gt=0)
+    rrf_k: int = Field(default=60, gt=0)
 
     @field_validator("strategy", mode="before")
     @classmethod
     def strategy_must_be_rrf(cls, value: object) -> object:
         """Reject future fusion strategies with a sprint-specific message."""
         if value != "rrf":
-            raise ValueError("fusion.strategy accepts only 'rrf' in RAG-1A PR04")
+            raise ValueError("fusion.strategy only supports 'rrf' in RAG-1A")
         return value
 
 
@@ -49,6 +49,14 @@ class QueryRewriteConfig(BaseModel):
     enabled: Literal[False] = False
     model: str | None
     max_attempts: int = Field(ge=1)
+
+    @field_validator("enabled", mode="before")
+    @classmethod
+    def enabled_must_be_false(cls, value: object) -> object:
+        """Keep query rewriting impossible before its dedicated sprint."""
+        if value is not False:
+            raise ValueError("query_rewrite.enabled must be false in PR04")
+        return value
 
 
 class RetrievalConfig(BaseModel):
@@ -109,6 +117,14 @@ class HybridSearchConfig(BaseModel):
     dense: DenseVectorConfig
     sparse: SparseVectorConfig
 
+    @field_validator("enabled", mode="before")
+    @classmethod
+    def enabled_must_be_false(cls, value: object) -> object:
+        """Keep hybrid retrieval impossible before its dedicated sprint."""
+        if value is not False:
+            raise ValueError("hybrid_search.enabled must be false in PR04")
+        return value
+
 
 class AgenticPolicyConfig(BaseModel):
     """Agentic retrieval policy block, present but disabled in PR-04."""
@@ -122,6 +138,14 @@ class AgenticPolicyConfig(BaseModel):
     max_tool_calls: int = Field(ge=1)
     max_query_rewrites: int = Field(ge=0)
     max_context_reads: int = Field(ge=1)
+
+    @field_validator("enabled", mode="before")
+    @classmethod
+    def enabled_must_be_false(cls, value: object) -> object:
+        """Keep agentic policy inactive until the Agentic RAG sprint."""
+        if value is not False:
+            raise ValueError("agentic_policy.enabled must be false in PR04")
+        return value
 
 
 class ToolParameterConfig(BaseModel):
@@ -204,25 +228,19 @@ def _validate_pr04_runtime_guards(config: RagConfig) -> None:
         raise ValueError("retrieval.mode 'hybrid' requires future RAG sprint")
 
     if config.retrieval.mode == "agentic":
-        raise ValueError(
-            "retrieval.mode 'agentic' reserved for Agentic RAG sprint"
-        )
+        raise ValueError("retrieval.mode 'agentic' not implemented in RAG-1A")
 
     if config.hybrid_search.enabled:
-        raise ValueError("hybrid_search.enabled must be false in RAG-1A PR04")
+        raise ValueError("hybrid_search.enabled must be false in PR04")
 
     if config.retrieval.no_result_fallback != "empty":
-        raise ValueError(
-            "retrieval.no_result_fallback must be 'empty' in RAG-1A PR04"
-        )
+        raise ValueError("no_result_fallback must be 'empty' in PR04")
 
     if config.retrieval.query_rewrite.enabled:
-        raise ValueError(
-            "retrieval.query_rewrite.enabled must be false in RAG-1A PR04"
-        )
+        raise ValueError("query_rewrite.enabled must be false in PR04")
 
     if config.agentic_policy.enabled:
-        raise ValueError("agentic_policy.enabled must be false in RAG-1A PR04")
+        raise ValueError("agentic_policy.enabled must be false in PR04")
 
 
 __all__ = [

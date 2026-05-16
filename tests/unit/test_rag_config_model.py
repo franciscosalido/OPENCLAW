@@ -124,6 +124,7 @@ class RagConfigModelTests(unittest.TestCase):
         self.assertEqual(config.retrieval.mode, "dense")
         self.assertEqual(config.retrieval.top_k, 10)
         self.assertEqual(config.retrieval.fusion.strategy, "rrf")
+        self.assertEqual(config.retrieval.fusion.rrf_k, 60)
         self.assertFalse(config.hybrid_search.enabled)
         self.assertEqual(config.hybrid_search.dense.model, "nomic-embed-text")
         self.assertEqual(
@@ -138,6 +139,15 @@ class RagConfigModelTests(unittest.TestCase):
         config = _load_config(data)
 
         self.assertEqual(config.retrieval.max_rounds, 1)
+
+    def test_fusion_rrf_k_defaults_to_sixty(self) -> None:
+        data = _valid_config()
+        retrieval = _section(data, "retrieval")
+        del _section(retrieval, "fusion")["rrf_k"]
+
+        config = _load_config(data)
+
+        self.assertEqual(config.retrieval.fusion.rrf_k, 60)
 
     def test_project_rag_config_example_loads(self) -> None:
         config = load_rag_config(PROJECT_RAG_CONFIG)
@@ -192,7 +202,7 @@ class RagConfigModelTests(unittest.TestCase):
 
         with self.assertRaisesRegex(
             ValueError,
-            "retrieval.mode 'agentic' reserved for Agentic RAG sprint",
+            "retrieval.mode 'agentic' not implemented in RAG-1A",
         ):
             _load_config(data)
 
@@ -200,23 +210,35 @@ class RagConfigModelTests(unittest.TestCase):
         data = _valid_config()
         _section(data, "hybrid_search")["enabled"] = True
 
-        with self.assertRaisesRegex(ValidationError, "hybrid_search.enabled"):
+        with self.assertRaises(ValidationError) as ctx:
             _load_config(data)
+        self.assertIn(
+            "hybrid_search.enabled must be false in PR04",
+            str(ctx.exception),
+        )
 
     def test_agentic_policy_enabled_not_allowed(self) -> None:
         data = _valid_config()
         _section(data, "agentic_policy")["enabled"] = True
 
-        with self.assertRaisesRegex(ValidationError, "agentic_policy.enabled"):
+        with self.assertRaises(ValidationError) as ctx:
             _load_config(data)
+        self.assertIn(
+            "agentic_policy.enabled must be false in PR04",
+            str(ctx.exception),
+        )
 
     def test_query_rewrite_enabled_not_allowed(self) -> None:
         data = _valid_config()
         retrieval = _section(data, "retrieval")
         _section(retrieval, "query_rewrite")["enabled"] = True
 
-        with self.assertRaisesRegex(ValidationError, "query_rewrite.enabled"):
+        with self.assertRaises(ValidationError) as ctx:
             _load_config(data)
+        self.assertIn(
+            "query_rewrite.enabled must be false in PR04",
+            str(ctx.exception),
+        )
 
     def test_invalid_fusion_strategy(self) -> None:
         data = _valid_config()
@@ -225,13 +247,19 @@ class RagConfigModelTests(unittest.TestCase):
 
         with self.assertRaises(ValidationError) as ctx:
             _load_config(data)
-        self.assertIn("fusion.strategy accepts only 'rrf' in RAG-1A PR04", str(ctx.exception))
+        self.assertIn(
+            "fusion.strategy only supports 'rrf' in RAG-1A",
+            str(ctx.exception),
+        )
 
     def test_invalid_no_result_fallback(self) -> None:
         data = _valid_config()
         _section(data, "retrieval")["no_result_fallback"] = "rewrite_query"
 
-        with self.assertRaisesRegex(ValueError, "no_result_fallback"):
+        with self.assertRaisesRegex(
+            ValueError,
+            "no_result_fallback must be 'empty' in PR04",
+        ):
             _load_config(data)
 
     def test_sparse_tokenizer_language_present(self) -> None:
