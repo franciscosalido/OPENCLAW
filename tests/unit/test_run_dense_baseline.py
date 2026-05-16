@@ -151,7 +151,13 @@ Q_002:
             rows = _read_jsonl(result.paths.jsonl_path)
             self.assertEqual([row["status"] for row in rows], ["error", "ok"])
             self.assertEqual(rows[0]["error_type"], "ValueError")
-            self.assertEqual(retriever.calls, [("query beta", 10)])
+            self.assertEqual(retriever.calls, [("query beta", 20)])
+
+    def test_config_rejects_top_k_equal_to_recall_cutoff(self) -> None:
+        config = DenseBaselineConfig(top_k=10, cutoff_recall=10)
+
+        with self.assertRaises(ValueError):
+            config.normalized()
 
     def test_dry_run_does_not_call_retrieve_or_write_results(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

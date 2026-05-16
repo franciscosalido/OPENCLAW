@@ -40,7 +40,7 @@ from evaluation import (
 
 
 RUNNER_VERSION = "rag-1a-pr03"
-DEFAULT_TOP_K = 10
+DEFAULT_TOP_K = 20
 DEFAULT_CUTOFF_PRECISION = 5
 DEFAULT_CUTOFF_RECALL = 10
 DEFAULT_CUTOFF_NDCG = 5
@@ -142,6 +142,12 @@ class DenseBaselineConfig:
             raise ValueError("cutoff_recall must be greater than zero")
         if self.cutoff_ndcg <= 0:
             raise ValueError("cutoff_ndcg must be greater than zero")
+        max_cutoff = max(self.cutoff_precision, self.cutoff_recall, self.cutoff_ndcg)
+        if self.top_k <= max_cutoff:
+            raise ValueError(
+                "top_k must be greater than all metric cutoffs "
+                f"(max cutoff is {max_cutoff})"
+            )
         run_id = self.run_id or uuid4().hex
         return DenseBaselineConfig(
             benchmark_file=self.benchmark_file,
