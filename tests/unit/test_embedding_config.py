@@ -308,6 +308,14 @@ class EmbeddingConfigTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "version must match"):
             _load_config(data)
 
+    def test_version_format_strips_outer_whitespace_before_validation(self) -> None:
+        data = _valid_embeddings_config()
+        _profile(data, "nomic_dense_v1")["version"] = " v1 "
+
+        config = _load_config(data)
+
+        self.assertEqual(config.profiles["nomic_dense_v1"].version, "v1")
+
     def test_profile_fingerprint_is_computed_and_validated_when_declared(self) -> None:
         data = _valid_embeddings_config()
         profile = EmbeddingProfileConfig.model_validate(

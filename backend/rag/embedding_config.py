@@ -69,9 +69,12 @@ class EmbeddingProfileConfig(BaseModel):
     @classmethod
     def validate_version_format(cls, value: object) -> object:
         """Require profile versions like ``v1`` or ``v1.2``."""
-        if not isinstance(value, str) or VERSION_PATTERN.fullmatch(value) is None:
+        if not isinstance(value, str):
             raise ValueError("version must match 'v<major>' or 'v<major>.<minor>'")
-        return value
+        clean = value.strip()
+        if VERSION_PATTERN.fullmatch(clean) is None:
+            raise ValueError("version must match 'v<major>' or 'v<major>.<minor>'")
+        return clean
 
     @field_validator("distance", mode="after")
     @classmethod
