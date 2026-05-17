@@ -191,6 +191,14 @@ class EmbeddingConfigTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "dimensions=4096"):
             _load_config(wrong_qwen3)
 
+    def test_numeric_strings_are_rejected_for_dimensions(self) -> None:
+        data = _valid_embeddings_config()
+        _profile(data, "nomic_dense_v1")["dimensions"] = "768"
+
+        with self.assertRaises(ValidationError) as ctx:
+            _load_config(data)
+        self.assertIn("Input should be a valid integer", str(ctx.exception))
+
     def test_mrl_inconsistent_effective_dimensions(self) -> None:
         unsupported_mrl = _valid_embeddings_config()
         _profile(unsupported_mrl, "nomic_dense_v1")["effective_dimensions"] = 512
@@ -219,6 +227,31 @@ class EmbeddingConfigTests(unittest.TestCase):
         ] = "Use this query instruction."
         with self.assertRaisesRegex(ValueError, "query_instruction=null"):
             _load_config(nomic_with_instruction)
+
+    def test_query_instruction_rejects_null_byte(self) -> None:
+        data = _valid_embeddings_config()
+        _profile(data, "qwen3_dense_8b_v1")["query_instruction"] = "\x00"
+
+        with self.assertRaisesRegex(ValueError, "cannot contain null bytes"):
+            _load_config(data)
+
+    def test_document_instruction_blank_normalizes_to_none_for_fingerprint(self) -> None:
+        data = _valid_embeddings_config()
+        blank_document_instruction = deepcopy(_profile(data, "nomic_dense_v1"))
+        blank_document_instruction["document_instruction"] = ""
+
+        blank_profile = EmbeddingProfileConfig.model_validate(
+            blank_document_instruction
+        )
+        none_profile = EmbeddingProfileConfig.model_validate(
+            _profile(data, "nomic_dense_v1")
+        )
+
+        self.assertIsNone(blank_profile.document_instruction)
+        self.assertEqual(
+            compute_profile_fingerprint(blank_profile),
+            compute_profile_fingerprint(none_profile),
+        )
 
     def test_distance_normalization_contract(self) -> None:
         invalid_normalized = _valid_embeddings_config()

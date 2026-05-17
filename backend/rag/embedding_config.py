@@ -3,6 +3,9 @@
 This module validates embedding metadata only. It must not instantiate
 embedding models, connect to vector stores, create collections, or alter the
 current dense-only runtime behavior.
+
+Pydantic ``frozen=True`` protects normal assignment/deletion. It is not a
+security boundary against CPython escape hatches such as ``object.__setattr__``.
 """
 
 from __future__ import annotations
@@ -15,7 +18,7 @@ from typing import cast
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-STRICT_MODEL_CONFIG = ConfigDict(extra="forbid", frozen=True)
+STRICT_MODEL_CONFIG = ConfigDict(extra="forbid", frozen=True, strict=True)
 RAG1A_ALLOWED_ACTIVE_PROFILES = frozenset({"nomic_dense_v1"})
 KNOWN_MODEL_DIMENSIONS = {
     "nomic": 768,
@@ -87,6 +90,17 @@ class EmbeddingProfileConfig(BaseModel):
     def normalize_model_family(cls, value: str) -> str:
         """Normalize model family names for deterministic guards."""
         return value.strip().lower()
+
+    @field_validator("query_instruction", "document_instruction", mode="before")
+    @classmethod
+    def normalize_optional_instruction(cls, value: object) -> object:
+        """Normalize blank instructions and reject null-byte payloads."""
+        if value is None or not isinstance(value, str):
+            return value
+        if "\x00" in value:
+            raise ValueError("instruction fields cannot contain null bytes")
+        clean = value.strip()
+        return clean if clean else None
 
     @model_validator(mode="after")
     def validate_known_dimensions(self) -> EmbeddingProfileConfig:
@@ -298,7 +312,7 @@ def load_embeddings_config(path: Path) -> EmbeddingsConfig:
 
 
 def _has_text(value: str | None) -> bool:
-    return value is not None and bool(value.strip())
+    return value is not None and "\x00" not in value and bool(value.strip())
 
 
 __all__ = [
