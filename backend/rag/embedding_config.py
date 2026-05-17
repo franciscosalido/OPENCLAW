@@ -153,6 +153,7 @@ class EmbeddingProfileConfig(BaseModel):
         """Validate a declared fingerprint without requiring one in YAML."""
         if self.profile_fingerprint is None:
             return self
+        # deferred import: breaks circular dependency with embedding_metadata.
         from backend.rag.embedding_metadata import compute_profile_fingerprint
 
         expected = compute_profile_fingerprint(self)
@@ -206,6 +207,14 @@ class EmbeddingsConfig(BaseModel):
             raise ValueError("active_profile cannot be empty")
         return clean
 
+    @field_validator("candidate_profiles", mode="after")
+    @classmethod
+    def candidate_profiles_must_be_unique(cls, value: list[str]) -> list[str]:
+        """Reject duplicate candidate profile identifiers."""
+        if len(value) != len(set(value)):
+            raise ValueError("candidate_profiles must not contain duplicates")
+        return value
+
     @model_validator(mode="after")
     def validate_active_profile_exists(self) -> EmbeddingsConfig:
         """Require the active profile to exist in the profile registry."""
@@ -237,7 +246,11 @@ class EmbeddingsConfig(BaseModel):
 
     @model_validator(mode="after")
     def validate_sprint_guards(self) -> EmbeddingsConfig:
-        """Keep RAG-1A runtime on the current Nomic profile only."""
+        """Keep RAG-1A runtime on the current Nomic profile only.
+
+        Sprint guard: relax this when Qwen3 becomes an allowed
+        ``active_profile`` during the embedding migration sprint.
+        """
         if self.active_profile not in RAG1A_ALLOWED_ACTIVE_PROFILES:
             allowed = sorted(RAG1A_ALLOWED_ACTIVE_PROFILES)
             raise ValueError(

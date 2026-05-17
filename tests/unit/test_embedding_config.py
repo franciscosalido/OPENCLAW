@@ -264,6 +264,16 @@ class EmbeddingConfigTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "candidate_profiles"):
             _load_config(data)
 
+    def test_candidate_profiles_must_not_contain_duplicates(self) -> None:
+        data = _valid_embeddings_config()
+        _embeddings_section(data)["candidate_profiles"] = [
+            "qwen3_dense_8b_v1",
+            "qwen3_dense_8b_v1",
+        ]
+
+        with self.assertRaisesRegex(ValueError, "must not contain duplicates"):
+            _load_config(data)
+
     def test_collection_bindings_must_remain_on_active_nomic_in_rag1a(self) -> None:
         data = _valid_embeddings_config()
         _collection_bindings(data)["openclaw_financial"] = {
