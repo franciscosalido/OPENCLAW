@@ -19,6 +19,8 @@ from evaluation.compare_dense_embeddings import (
     compare_dense_embeddings,
     decide_promotion,
     ensure_fair_comparison,
+    load_benchmark,
+    main,
 )
 
 
@@ -174,6 +176,52 @@ class DenseEmbeddingABTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "identical corpus snapshot"):
             ensure_fair_comparison(nomic, qwen3)
+
+    def test_benchmark_hash_includes_expected_results(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            benchmark_path, expected_path = _write_inputs(root)
+            first = load_benchmark(benchmark_path, expected_path)
+
+            expected_path.write_text(
+                """
+Q_001:
+  doc_a: 1
+  doc_b: 1
+Q_002:
+  doc_c: 2
+""".lstrip(),
+                encoding="utf-8",
+            )
+            second = load_benchmark(benchmark_path, expected_path)
+
+            self.assertNotEqual(first.expected_results_hash, second.expected_results_hash)
+            self.assertNotEqual(first.benchmark_hash, second.benchmark_hash)
+
+    def test_cli_dry_run_validates_inputs_without_writing_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            benchmark_path, expected_path = _write_inputs(root)
+            output_dir = root / "results"
+            adr_path = root / "adr.md"
+
+            exit_code = main(
+                [
+                    "--benchmark",
+                    str(benchmark_path),
+                    "--expected-results",
+                    str(expected_path),
+                    "--output-dir",
+                    str(output_dir),
+                    "--adr-path",
+                    str(adr_path),
+                    "--dry-run",
+                ]
+            )
+
+            self.assertEqual(exit_code, 0)
+            self.assertFalse(output_dir.exists())
+            self.assertFalse(adr_path.exists())
 
 
 def _write_inputs(root: Path) -> tuple[Path, Path]:

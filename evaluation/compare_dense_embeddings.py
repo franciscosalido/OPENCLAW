@@ -240,15 +240,22 @@ def load_benchmark(
     benchmark_file: Path = DEFAULT_BENCHMARK_FILE,
     expected_results_file: Path = DEFAULT_EXPECTED_RESULTS_FILE,
 ) -> DenseEmbeddingBenchmark:
-    """Load PR-01 benchmark inputs and compute file hashes."""
+    """Load PR-01 benchmark inputs and compute fairness hashes.
+
+    ``benchmark_hash`` intentionally covers both the query manifest and the
+    expected-results manifest. The A/B guard must fail if either the queries or
+    the ground truth changes between profile runs.
+    """
     queries = tuple(load_benchmark_queries(benchmark_file))
     expected_results = load_expected_results(expected_results_file)
     _validate_expected_compatibility(queries, expected_results)
+    benchmark_file_hash = _sha256_file(benchmark_file)
+    expected_results_hash = _sha256_file(expected_results_file)
     return DenseEmbeddingBenchmark(
         queries=queries,
         expected_results=expected_results,
-        benchmark_hash=_sha256_file(benchmark_file),
-        expected_results_hash=_sha256_file(expected_results_file),
+        benchmark_hash=_combined_hash(benchmark_file_hash, expected_results_hash),
+        expected_results_hash=expected_results_hash,
     )
 
 
@@ -829,6 +836,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_RESULTS_DIR)
     parser.add_argument("--adr-path", type=Path, default=DEFAULT_ADR_PATH)
     parser.add_argument("--top-k", type=int, default=DEFAULT_TOP_K)
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Validate benchmark inputs and config without running profiles or writing artifacts.",
+    )
     return parser.parse_args(argv)
 
 
@@ -839,7 +851,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     intentionally injected by future wiring or tests, not auto-created here.
     """
     args = parse_args(argv)
-    DenseEmbeddingABConfig(
+    active_config = DenseEmbeddingABConfig(
         benchmark_file=args.benchmark,
         expected_results_file=args.expected_results,
         output_dir=args.output_dir,
@@ -848,6 +860,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         candidate_profile=str(args.candidate_profile),
         top_k=int(args.top_k),
     ).normalized()
+    if bool(args.dry_run):
+        benchmark = load_benchmark(
+            active_config.benchmark_file,
+            active_config.expected_results_file,
+        )
+        logger.info(
+            "dense embedding A/B dry-run validated {count} queries; "
+            "no profile runners executed and no artifacts written",
+            count=len(benchmark.queries),
+        )
+        return 0
     logger.error(
         "dense embedding A/B runner requires injected profile runners; "
         "no production retrieval wiring is changed in PR-04C"
@@ -923,6 +946,14 @@ def _sha256_file(path: Path) -> str:
     with path.open("rb") as file:
         for chunk in iter(lambda: file.read(65536), b""):
             digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _combined_hash(*parts: str) -> str:
+    digest = hashlib.sha256()
+    for part in parts:
+        digest.update(part.encode("ascii"))
+        digest.update(b"\0")
     return digest.hexdigest()
 
 

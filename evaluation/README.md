@@ -154,7 +154,24 @@ decisão de promoção.
 
 ### Comando esperado
 
-Quando o runner do PR 04C estiver disponível, execute localmente:
+Primeiro valide os inputs sem executar runners reais e sem escrever artefatos:
+
+```bash
+uv run python -m evaluation.compare_dense_embeddings \
+  --baseline-profile nomic_dense_v1 \
+  --candidate-profile qwen3_dense_8b_v1 \
+  --benchmark evaluation/benchmark_queries.yaml \
+  --expected-results evaluation/expected_results.yaml \
+  --output-dir evaluation/results \
+  --dry-run
+```
+
+O modo `--dry-run` valida o parse das queries, o ground truth e a
+compatibilidade entre IDs. Ele não chama Qwen3, não toca em Qdrant, não roda
+retrieval e não escreve CSV/JSON/Markdown.
+
+Quando os runners de perfil estiverem injetados no ambiente local de benchmark,
+execute:
 
 ```bash
 uv run python -m evaluation.compare_dense_embeddings \
