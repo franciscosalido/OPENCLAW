@@ -126,7 +126,11 @@ class PromotionThresholds:
 
 @dataclass(frozen=True)
 class PromotionDecision:
-    """Decision gate result for the dense profile A/B benchmark."""
+    """Decision gate result for the dense profile A/B benchmark.
+
+    RAG-1B should add structured ``rejection_codes`` alongside ``reason`` if
+    another system starts consuming the JSON decision programmatically.
+    """
 
     promote_qwen3_dense: bool
     accepted_profile: str
@@ -426,7 +430,13 @@ def summarize_profile_run(
     benchmark: DenseEmbeddingBenchmark,
     config: DenseEmbeddingABConfig,
 ) -> DenseProfileResult:
-    """Aggregate per-query rows into one profile result."""
+    """Aggregate per-query rows into one profile result.
+
+    Latency percentiles deliberately delegate to the PR-02
+    ``evaluation.latency_percentiles`` contract, which uses linear
+    interpolation. This module does not define a private nearest-rank
+    percentile variant, avoiding hidden convention drift.
+    """
     ok_rows = [row for row in rows if row.status == "ok"]
     if not ok_rows:
         latency = {50: 0.0, 95: 0.0}
@@ -560,6 +570,8 @@ def decide_promotion(
 
 def write_csv(rows: Sequence[ProfileEvaluationRow], path: Path) -> None:
     """Write per-query A/B rows without query text or document content."""
+    if not rows:
+        raise ValueError("cannot write dense embedding A/B CSV without result rows")
     fieldnames = [
         "profile_id",
         "query_id",
@@ -871,6 +883,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             count=len(benchmark.queries),
         )
         return 0
+    # TODO(PR-05): inject concrete dense profile runners here once the real
+    # benchmark execution path is allowed to wire retrievers/collections.
     logger.error(
         "dense embedding A/B runner requires injected profile runners; "
         "no production retrieval wiring is changed in PR-04C"

@@ -21,6 +21,7 @@ from evaluation.compare_dense_embeddings import (
     ensure_fair_comparison,
     load_benchmark,
     main,
+    write_csv,
 )
 
 
@@ -222,6 +223,15 @@ Q_002:
             self.assertEqual(exit_code, 0)
             self.assertFalse(output_dir.exists())
             self.assertFalse(adr_path.exists())
+
+    def test_write_csv_rejects_empty_result_rows(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output_path = Path(tmp) / "empty.csv"
+
+            with self.assertRaisesRegex(ValueError, "without result rows"):
+                write_csv([], output_path)
+
+            self.assertFalse(output_path.exists())
 
 
 def _write_inputs(root: Path) -> tuple[Path, Path]:
