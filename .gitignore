@@ -79,6 +79,7 @@ reports/g2_alias_comparison/
 evaluation/results/*.csv
 evaluation/results/*.json
 evaluation/results/*.jsonl
+evaluation/results/*.md
 evaluation/results/*.txt
 
 # Claude Code — local session artifacts (NOT hooks.json/settings.json — esses são versionados)
