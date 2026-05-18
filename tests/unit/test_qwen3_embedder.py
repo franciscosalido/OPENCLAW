@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import unittest
 from collections.abc import Sequence
+from pathlib import Path
 from unittest.mock import patch
 
 from backend.rag.embedder_protocol import DenseEmbedder
@@ -81,6 +82,14 @@ class Qwen3EmbedderTests(unittest.TestCase):
 
         self.assertNotEqual(fake.embed_query(text), fake.embed_document(text))
 
+    def test_fake_embedder_is_deterministic_for_same_query(self) -> None:
+        fake = FakeQwen3Embedder()
+
+        first = fake.embed_query("criterio sintetico")
+        second = fake.embed_query("criterio sintetico")
+
+        self.assertEqual(first, second)
+
     def test_adapter_rejects_wrong_model_family(self) -> None:
         profile = _qwen3_profile().model_copy(update={"model_family": "nomic"})
 
@@ -144,6 +153,7 @@ class Qwen3EmbedderTests(unittest.TestCase):
         norm = math.sqrt(sum(value * value for value in vector))
 
         self.assertEqual(len(vector), 2)
+        # MRL proof: truncation keeps 2 dims, then L2 normalization restores norm 1.
         self.assertAlmostEqual(norm, 1.0, places=6)
 
     def test_adapter_validates_vector_dimensions(self) -> None:
@@ -167,6 +177,26 @@ class Qwen3EmbedderTests(unittest.TestCase):
         ):
             with self.assertRaisesRegex(ImportError, "openclaw\\[qwen3\\]"):
                 Qwen3Embedder(_qwen3_profile())
+
+    def test_qwen3_adapter_is_not_imported_by_existing_rag_runtime_modules(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        rag_files = sorted((repo_root / "backend" / "rag").glob("*.py"))
+        scanned = [
+            path
+            for path in rag_files
+            if path.name
+            not in {
+                "qwen3_embedder.py",
+            }
+        ]
+
+        offenders = [
+            path.name
+            for path in scanned
+            if "qwen3_embedder" in path.read_text(encoding="utf-8")
+        ]
+
+        self.assertEqual(offenders, [])
 
 
 if __name__ == "__main__":
