@@ -79,8 +79,8 @@ class BM25SparseEmbedderContractTests(unittest.TestCase):
 
         vector = embedder.embed_sparse("texto valido")
 
-        self.assertEqual(vector.indices, [1, 3, 5])
-        self.assertEqual(vector.values, [1.0, 0.75, 0.5])
+        self.assertEqual(vector.indices, (1, 3, 5))
+        self.assertEqual(vector.values, (1.0, 0.75, 0.5))
         self.assertEqual(encoder.calls, [(["texto valido"], 1)])
 
     def test_batch_empty_returns_empty_without_encoder_call(self) -> None:

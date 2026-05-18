@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import math
 import unittest
+from dataclasses import FrozenInstanceError
+from typing import cast
 
 from backend.rag.sparse_vector import SparseVector
 
@@ -49,8 +51,58 @@ class SparseVectorTests(unittest.TestCase):
         indices.append(2)
         values.append(2.0)
 
-        self.assertEqual(vector.indices, [1])
-        self.assertEqual(vector.values, [1.0])
+        self.assertEqual(vector.indices, (1,))
+        self.assertEqual(vector.values, (1.0,))
+
+    def test_sparse_vector_payload_returns_defensive_lists(self) -> None:
+        vector = SparseVector(indices=[1], values=[1.0])
+        payload = vector.to_qdrant_payload()
+
+        cast(list[int], payload["indices"]).append(2)
+        cast(list[float], payload["values"]).append(2.0)
+
+        self.assertEqual(vector.indices, (1,))
+        self.assertEqual(vector.values, (1.0,))
+
+
+class SparseVectorFrozenTests(unittest.TestCase):
+    def test_sparse_vector_is_frozen(self) -> None:
+        vector = SparseVector(indices=[1], values=[1.0])
+
+        with self.assertRaises(FrozenInstanceError):
+            vector.indices = [2]  # type: ignore[misc]
+
+    def test_sparse_vector_equality_matches_same_payload(self) -> None:
+        first = SparseVector(indices=[1, 2], values=[1.0, 2.0])
+        second = SparseVector(indices=[1, 2], values=[1.0, 2.0])
+
+        self.assertEqual(first, second)
+
+    def test_sparse_vector_inequality_detects_different_indices(self) -> None:
+        first = SparseVector(indices=[1, 2], values=[1.0, 2.0])
+        second = SparseVector(indices=[1, 3], values=[1.0, 2.0])
+
+        self.assertNotEqual(first, second)
+
+    def test_sparse_vector_inequality_detects_different_values(self) -> None:
+        first = SparseVector(indices=[1, 2], values=[1.0, 2.0])
+        second = SparseVector(indices=[1, 2], values=[1.0, 3.0])
+
+        self.assertNotEqual(first, second)
+
+    def test_sparse_vector_is_hashable(self) -> None:
+        vector = SparseVector(indices=[1, 2], values=[1.0, 2.0])
+
+        self.assertEqual({vector}, {SparseVector(indices=[1, 2], values=[1.0, 2.0])})
+
+    def test_sparse_vector_can_be_used_as_dict_key(self) -> None:
+        vector = SparseVector(indices=[1, 2], values=[1.0, 2.0])
+        lookup = {vector: "ok"}
+
+        self.assertEqual(
+            lookup[SparseVector(indices=[1, 2], values=[1.0, 2.0])],
+            "ok",
+        )
 
 
 if __name__ == "__main__":

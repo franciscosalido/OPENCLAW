@@ -7,6 +7,7 @@ metadata shape Qdrant sparse vectors use: ``indices`` plus ``values``.
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 
@@ -23,12 +24,12 @@ class SparseVector:
             values are non-finite.
     """
 
-    indices: list[int]
-    values: list[float]
+    indices: Sequence[int]
+    values: Sequence[float]
 
     def __post_init__(self) -> None:
-        copied_indices = [int(index) for index in self.indices]
-        copied_values = [float(value) for value in self.values]
+        copied_indices = tuple(int(index) for index in self.indices)
+        copied_values = tuple(float(value) for value in self.values)
         object.__setattr__(self, "indices", copied_indices)
         object.__setattr__(self, "values", copied_values)
 
