@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import unittest
 from datetime import datetime, timezone
+from types import SimpleNamespace
+from typing import cast
 
 from backend.rag.embedding_config import EmbeddingProfileConfig
 from backend.rag.embedding_metadata import compute_profile_fingerprint
@@ -51,6 +53,10 @@ class ShadowCollectionContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "not a declared shadow collection"):
             assert_collection_is_shadow("custom_qwen3_collection")
 
+    def test_collection_name_rejects_null_bytes(self) -> None:
+        with self.assertRaisesRegex(ValueError, "null bytes"):
+            assert_collection_is_shadow(f"{QWEN3_SHADOW_COLLECTION}\x00")
+
     def test_shadow_collection_namespace_is_exact(self) -> None:
         self.assertEqual(
             SHADOW_COLLECTIONS,
@@ -84,6 +90,15 @@ class ShadowCollectionContractTests(unittest.TestCase):
 
         self.assertEqual(metadata.dimensions, 4096)
         self.assertEqual(metadata.effective_dimensions, 1024)
+
+    def test_payload_metadata_rejects_non_positive_effective_dimensions(self) -> None:
+        invalid_profile = cast(
+            EmbeddingProfileConfig,
+            SimpleNamespace(dimensions=0, effective_dimensions=None),
+        )
+
+        with self.assertRaisesRegex(ValueError, "greater than zero"):
+            VectorPayloadMetadata.from_profile(invalid_profile)
 
 
 if __name__ == "__main__":

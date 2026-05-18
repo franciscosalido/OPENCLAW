@@ -90,6 +90,11 @@ class Qwen3EmbedderTests(unittest.TestCase):
 
         self.assertEqual(first, second)
 
+    def test_fake_embedder_exposes_stable_profile_fingerprint(self) -> None:
+        fake = FakeQwen3Embedder()
+
+        self.assertEqual(fake.profile_fingerprint, "fake-qwen3-deterministic-v1")
+
     def test_adapter_rejects_wrong_model_family(self) -> None:
         profile = _qwen3_profile().model_copy(update={"model_family": "nomic"})
 

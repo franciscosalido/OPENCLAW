@@ -57,6 +57,16 @@ def register(provider: str, factory: EmbedderFactory) -> None:
         _REGISTRY[provider_key] = factory
 
 
+def clear_registry_for_tests() -> None:
+    """Clear registered providers for isolated unit tests.
+
+    Production code should not call this helper. It exists so randomized test
+    order and repeated local test runs do not depend on global module state.
+    """
+    with _REGISTRY_LOCK:
+        _REGISTRY.clear()
+
+
 def _normalize_provider(provider: str) -> str:
     if "\x00" in provider:
         raise ValueError("provider cannot contain null bytes")
@@ -66,4 +76,4 @@ def _normalize_provider(provider: str) -> str:
     return provider_key
 
 
-__all__ = ["EmbedderFactory", "get_registry", "register"]
+__all__ = ["EmbedderFactory", "clear_registry_for_tests", "get_registry", "register"]

@@ -13,6 +13,7 @@ class FakeQwen3Embedder(DenseEmbedder):
 
     dimensions: int = 4096
     model_family: str = "qwen3"
+    profile_fingerprint: str = "fake-qwen3-deterministic-v1"
 
     def embed_query(self, text: str) -> list[float]:
         """Embed a query using a mode-specific deterministic prefix."""

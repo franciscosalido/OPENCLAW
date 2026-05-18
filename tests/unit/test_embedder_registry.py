@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from backend.rag.embedder_registry import get_registry, register
+from backend.rag.embedder_registry import clear_registry_for_tests, get_registry, register
 from backend.rag.embedder_protocol import DenseEmbedder
 from backend.rag.embedding_config import EmbeddingProfileConfig
 from tests.fakes.fake_qwen3_embedder import FakeQwen3Embedder
@@ -17,6 +17,12 @@ def _factory(profile: EmbeddingProfileConfig) -> DenseEmbedder:
 
 class EmbedderRegistryTests(unittest.TestCase):
     """Registry tests that avoid loading real embedding models."""
+
+    def setUp(self) -> None:
+        clear_registry_for_tests()
+
+    def tearDown(self) -> None:
+        clear_registry_for_tests()
 
     def test_get_registry_returns_read_only_snapshot(self) -> None:
         provider = "rc01_snapshot_provider"

@@ -199,4 +199,4 @@ def _tolist(value: object) -> object:
     return value
 
 
-__all__ = ["Qwen3Embedder", "SentenceTransformerLike"]
+__all__ = ["DEFAULT_QWEN3_BATCH_SIZE", "Qwen3Embedder", "SentenceTransformerLike"]

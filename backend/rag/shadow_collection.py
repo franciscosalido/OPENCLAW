@@ -21,6 +21,8 @@ PROTECTED_COLLECTIONS: Final[frozenset[str]] = frozenset(
 
 def assert_collection_is_shadow(name: str) -> None:
     """Validate that *name* is an explicitly declared shadow collection."""
+    if "\x00" in name:
+        raise ValueError("collection name cannot contain null bytes")
     clean_name = name.strip()
     if clean_name in PROTECTED_COLLECTIONS:
         raise ValueError(
@@ -58,6 +60,8 @@ class VectorPayloadMetadata:
     ) -> VectorPayloadMetadata:
         """Build payload metadata from a validated PR-04A profile."""
         effective_dimensions = profile.effective_dimensions or profile.dimensions
+        if effective_dimensions <= 0:
+            raise ValueError("effective_dimensions must be greater than zero")
         timestamp = indexed_at or datetime.now(tz=timezone.utc)
         return cls(
             model=profile.model,
