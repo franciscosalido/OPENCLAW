@@ -261,7 +261,7 @@ class HybridPointTests(unittest.TestCase):
         self.assertEqual(payload["embedding_model"], QWEN3_EMBEDDING_MODEL)
 
     def test_build_hybrid_point_rejects_wrong_dense_dimension(self) -> None:
-        with self.assertRaisesRegex(ValueError, "expected vector size"):
+        with self.assertRaisesRegex(ValueError, "dense_vector has 1d, spec expects 1024d"):
             build_hybrid_point(
                 point_id="point-1",
                 dense_vector=[0.1],
@@ -283,6 +283,25 @@ class HybridPointTests(unittest.TestCase):
         self.assertEqual(len(client.upserts), 1)
         self.assertEqual(client.upserts[0]["collection_name"], HYBRID_COLLECTION_NAME)
         self.assertTrue(client.upserts[0]["wait"])
+
+    def test_upsert_hybrid_point_rejects_wrong_dense_dimension_before_client_call(
+        self,
+    ) -> None:
+        client = FakeSyncQdrantClient()
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "dense_vector has 768d, spec expects 1024d",
+        ):
+            upsert_hybrid_point(
+                client,
+                point_id=1,
+                dense_vector=[0.0] * 768,
+                sparse_vector=SparseVector(indices=[1], values=[1.0]),
+                payload=_valid_payload(),
+            )
+
+        self.assertEqual(client.upserts, [])
 
 
 class AsyncQdrantHybridStoreTests(unittest.IsolatedAsyncioTestCase):
@@ -308,6 +327,25 @@ class AsyncQdrantHybridStoreTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(len(client.upserts), 1)
         self.assertEqual(client.upserts[0]["collection_name"], HYBRID_COLLECTION_NAME)
+
+    async def test_async_upsert_rejects_wrong_dense_dimension_before_client_call(
+        self,
+    ) -> None:
+        client = FakeAsyncQdrantClient()
+        store = AsyncQdrantHybridStore(client=client)
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "dense_vector has 768d, spec expects 1024d",
+        ):
+            await store.upsert_hybrid_point(
+                point_id="point-1",
+                dense_vector=[0.0] * 768,
+                sparse_vector=SparseVector(indices=[1], values=[1.0]),
+                payload=_valid_payload(),
+            )
+
+        self.assertEqual(client.upserts, [])
 
 
 if __name__ == "__main__":

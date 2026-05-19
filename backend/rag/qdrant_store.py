@@ -51,6 +51,7 @@ SCHEMA_VERSION: str = "qdrant-hybrid-v2"
 # Do NOT use modifier=models.Modifier.IDF here. That would apply server-side
 # IDF a second time, silently degrading recall without raising an exception.
 SPARSE_VECTOR_PARAMS: models.SparseVectorParams = models.SparseVectorParams()
+# modifier=None is mandatory for FastEmbed BM25 sparse vectors.
 
 
 class HybridPointPayload(TypedDict):
@@ -520,6 +521,7 @@ def build_hybrid_point(
 
     resolved_config = config or HybridCollectionConfig()
     clean_payload = validate_hybrid_payload(payload, resolved_config)
+    _validate_dense_vector_dimension(dense_vector, resolved_config)
     dense = _validate_vector(dense_vector, resolved_config.dense_dimensions)
     sparse = models.SparseVector(
         indices=list(sparse_vector.indices),
@@ -602,6 +604,18 @@ def _validate_vector(vector: Sequence[float], vector_size: int) -> list[float]:
             raise ValueError("vector values must be finite")
         values.append(float(value))
     return values
+
+
+def _validate_dense_vector_dimension(
+    dense_vector: Sequence[float],
+    config: HybridCollectionConfig,
+) -> None:
+    actual_dimensions = len(dense_vector)
+    if actual_dimensions != config.dense_dimensions:
+        raise ValueError(
+            f"dense_vector has {actual_dimensions}d, "
+            f"spec expects {config.dense_dimensions}d"
+        )
 
 
 def _validate_non_empty(value: str, field_name: str) -> str:
