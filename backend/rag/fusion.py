@@ -24,10 +24,23 @@ DEFAULT_SPARSE_WEIGHT: Final[float] = 1.0
 _FORBIDDEN_PAYLOAD_KEYS: Final[frozenset[str]] = frozenset(
     {
         "answer",
+        "chunk",
         "chunk_text",
+        "completion",
+        "content",
+        "dense_vector",
+        "document",
+        "documents",
         "embedding",
         "embeddings",
+        "messages",
+        "page_content",
         "prompt",
+        "query",
+        "question",
+        "raw_text",
+        "response",
+        "sparse_vector",
         "text",
         "vector",
         "vectors",
@@ -115,7 +128,10 @@ class RankedResult:
 
 @dataclass(frozen=True, slots=True)
 class RRFWeightProfile:
-    """Immutable Weighted RRF configuration."""
+    """Immutable Weighted RRF configuration.
+
+    ``k`` is stored as float to support future benchmark sweeps.
+    """
 
     dense_weight: float = DEFAULT_DENSE_WEIGHT
     sparse_weight: float = DEFAULT_SPARSE_WEIGHT
@@ -295,10 +311,15 @@ def fuse(
 ) -> list[FusedResult]:
     """Fuse dense and sparse rankings with deterministic Weighted RRF.
 
+    The function trusts ``RankedResult.rank``. Callers must assign ranks from
+    the retrieval order before calling ``fuse()``; raw scores are diagnostic
+    only and are never used in the RRF formula.
+
     ``first_seen_order`` in each output is the 0-based index in the
     concatenated ``[*dense_results, *sparse_results]`` input sequence where
     the ``result_id`` first appeared. Inputs are iterated as provided and are
-    never sorted or mutated in place.
+    never sorted or mutated in place. ``limit`` is applied after full fusion
+    and deterministic sorting.
     """
 
     clean_limit = _validate_optional_limit(limit)
@@ -348,6 +369,29 @@ class RRFFusion:
             profile=self.profile,
             limit=limit,
         )
+
+
+def ranked_result_from_position(
+    *,
+    result_id: str,
+    doc_id: str,
+    zero_based_position: int,
+    raw_score: float | None = None,
+    payload: Mapping[str, object] | None = None,
+) -> RankedResult:
+    """Build a ``RankedResult`` from a retriever's 0-based ordered position."""
+
+    clean_position = _validate_non_negative_int(
+        zero_based_position,
+        "zero_based_position",
+    )
+    return RankedResult(
+        result_id=result_id,
+        doc_id=doc_id,
+        rank=clean_position + 1,
+        raw_score=raw_score,
+        payload={} if payload is None else payload,
+    )
 
 
 def _consume_ranking(
@@ -499,12 +543,18 @@ def _fused_sort_key(result: FusedResult) -> tuple[float, int, int, str]:
 
 
 def _freeze_payload(payload: Mapping[str, object]) -> Mapping[str, object]:
-    normalized_keys = {str(key).casefold() for key in payload}
+    clean_payload: dict[str, object] = {}
+    for key, value in payload.items():
+        if not isinstance(key, str):
+            raise TypeError("payload keys must be strings")
+        clean_payload[key] = value
+
+    normalized_keys = {key.casefold() for key in clean_payload}
     forbidden = _FORBIDDEN_PAYLOAD_KEYS.intersection(normalized_keys)
     if forbidden:
         keys = ", ".join(sorted(forbidden))
         raise ValueError(f"payload cannot contain sensitive keys: {keys}")
-    return MappingProxyType(dict(payload))
+    return MappingProxyType(clean_payload)
 
 
 def _validate_source(source: str) -> str:
@@ -550,10 +600,14 @@ __all__ = [
     "SOURCE_SPARSE",
     "DENSE_SOURCE",
     "SPARSE_SOURCE",
+    "DEFAULT_RRF_K",
+    "DEFAULT_DENSE_WEIGHT",
+    "DEFAULT_SPARSE_WEIGHT",
     "RankedResult",
     "FusedResult",
     "RRFWeightProfile",
     "DEFAULT_PROFILE",
     "RRFFusion",
+    "ranked_result_from_position",
     "fuse",
 ]

@@ -6,12 +6,16 @@ import ast
 import inspect
 from collections.abc import Mapping
 from dataclasses import FrozenInstanceError
+from typing import cast
 
 import pytest
 
 import backend.rag.fusion as fusion_module
 from backend.rag.fusion import (
+    DEFAULT_DENSE_WEIGHT,
     DEFAULT_PROFILE,
+    DEFAULT_RRF_K,
+    DEFAULT_SPARSE_WEIGHT,
     FusedResult,
     RRFFusion,
     RRFWeightProfile,
@@ -19,6 +23,7 @@ from backend.rag.fusion import (
     SOURCE_DENSE,
     SOURCE_SPARSE,
     fuse,
+    ranked_result_from_position,
 )
 
 
@@ -97,9 +102,9 @@ def test_ranked_result_is_frozen_and_payload_is_defensive_mapping() -> None:
 
 
 def test_rrf_weight_profile_defaults_and_validation() -> None:
-    assert DEFAULT_PROFILE.dense_weight == 1.0
-    assert DEFAULT_PROFILE.sparse_weight == 1.0
-    assert DEFAULT_PROFILE.k == 60.0
+    assert DEFAULT_PROFILE.dense_weight == DEFAULT_DENSE_WEIGHT
+    assert DEFAULT_PROFILE.sparse_weight == DEFAULT_SPARSE_WEIGHT
+    assert DEFAULT_PROFILE.k == DEFAULT_RRF_K
 
     with pytest.raises(ValueError, match="RRF weights must be non-negative"):
         RRFWeightProfile(dense_weight=-0.1)
@@ -217,7 +222,7 @@ def test_conflicting_doc_id_for_same_result_id_fails() -> None:
         )
 
 
-def test_first_seen_order_uses_concatenated_dense_sparse_index() -> None:
+def test_first_seen_order_uses_concatenated_input_position_even_with_duplicates() -> None:
     fused = fuse(
         dense_results=[rr("A", rank=1), rr("A", rank=2), rr("B", rank=3)],
         sparse_results=[rr("C", rank=1)],
@@ -281,6 +286,33 @@ def test_rank1_k60_weight1_contribution_is_correct() -> None:
     )[0]
 
     assert result.rrf_score == pytest.approx(1.0 / 61.0, abs=1e-15)
+
+
+def test_ranked_result_from_position_assigns_one_based_rank() -> None:
+    result = ranked_result_from_position(
+        result_id="chunk-1",
+        doc_id="doc-1",
+        zero_based_position=2,
+        raw_score=0.42,
+        payload={"kind": "dense"},
+    )
+
+    assert result == rr(
+        "chunk-1",
+        doc_id="doc-1",
+        rank=3,
+        raw_score=0.42,
+        payload={"kind": "dense"},
+    )
+
+
+def test_ranked_result_from_position_rejects_negative_position() -> None:
+    with pytest.raises(ValueError, match="zero_based_position must be non-negative"):
+        ranked_result_from_position(
+            result_id="chunk-1",
+            doc_id="doc-1",
+            zero_based_position=-1,
+        )
 
 
 def test_determinism_across_repeated_calls() -> None:
@@ -419,11 +451,36 @@ def test_payload_selection_uses_best_rank_and_dense_wins_rank_tie() -> None:
 
 @pytest.mark.parametrize(
     "bad_key",
-    ["answer", "chunk_text", "embedding", "prompt", "text", "vector", "Text", "VECTOR"],
+    [
+        "answer",
+        "chunk_text",
+        "content",
+        "dense_vector",
+        "embedding",
+        "messages",
+        "page_content",
+        "prompt",
+        "query",
+        "raw_text",
+        "sparse_vector",
+        "text",
+        "vector",
+        "Text",
+        "VECTOR",
+        "Embedding",
+        "Prompt",
+    ],
 )
 def test_payload_rejects_sensitive_keys(bad_key: str) -> None:
     with pytest.raises(ValueError, match="payload cannot contain sensitive keys"):
         rr("A", payload={bad_key: "blocked"})
+
+
+def test_payload_rejects_non_string_keys() -> None:
+    payload = cast(Mapping[str, object], {1: "not-json-friendly"})
+
+    with pytest.raises(TypeError, match="payload keys must be strings"):
+        rr("A", payload=payload)
 
 
 def test_to_dict_is_stable_and_json_friendly() -> None:
@@ -470,6 +527,17 @@ def test_function_matches_wrapper_class() -> None:
         sparse_results=sparse,
         profile=profile,
     )
+
+
+def test_public_exports_include_benchmark_constants_and_helper() -> None:
+    assert {
+        "DEFAULT_RRF_K",
+        "DEFAULT_DENSE_WEIGHT",
+        "DEFAULT_SPARSE_WEIGHT",
+        "SOURCE_DENSE",
+        "SOURCE_SPARSE",
+        "ranked_result_from_position",
+    } <= set(fusion_module.__all__)
 
 
 def test_snapshot_fixed_weighted_rrf_output() -> None:
