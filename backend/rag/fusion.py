@@ -8,14 +8,16 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from math import isfinite
+from math import isclose, isfinite
 from types import MappingProxyType
 from typing import Any, Final
 
-DENSE_SOURCE: Final[str] = "dense"
-SPARSE_SOURCE: Final[str] = "sparse"
+SOURCE_DENSE: Final[str] = "dense"
+SOURCE_SPARSE: Final[str] = "sparse"
+DENSE_SOURCE: Final[str] = SOURCE_DENSE
+SPARSE_SOURCE: Final[str] = SOURCE_SPARSE
 
-DEFAULT_RRF_K: Final[int] = 60
+DEFAULT_RRF_K: Final[float] = 60.0
 DEFAULT_DENSE_WEIGHT: Final[float] = 1.0
 DEFAULT_SPARSE_WEIGHT: Final[float] = 1.0
 
@@ -70,29 +72,44 @@ def _validate_positive_int(value: int, field_name: str) -> int:
     return value
 
 
+def _validate_positive_float(value: float, field_name: str) -> float:
+    clean_value = _validate_numeric(value, field_name)
+    if clean_value <= 0.0:
+        if field_name == "RRF k":
+            raise ValueError("RRF k must be > 0")
+        raise ValueError(f"{field_name} must be > 0")
+    return clean_value
+
+
 @dataclass(frozen=True, slots=True)
 class RankedResult:
-    """One retrieval result in an already-ranked list."""
+    """One retrieval result in an already-ranked list.
+
+    ``rank`` is the only retrieval signal used by RRF. ``raw_score`` is kept
+    for diagnostics and never participates in the fusion formula.
+    """
 
     result_id: str
     doc_id: str
     rank: int
-    score: float | None = None
+    raw_score: float | None = None
     payload: Mapping[str, object] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         clean_result_id = _validate_text_id(self.result_id, "result_id")
         clean_doc_id = _validate_text_id(self.doc_id, "doc_id")
         clean_rank = _validate_positive_int(self.rank, "rank")
-        clean_score = (
-            None if self.score is None else _validate_optional_score(self.score, "score")
+        clean_raw_score = (
+            None
+            if self.raw_score is None
+            else _validate_optional_score(self.raw_score, "raw_score")
         )
         clean_payload = _freeze_payload(self.payload)
 
         object.__setattr__(self, "result_id", clean_result_id)
         object.__setattr__(self, "doc_id", clean_doc_id)
         object.__setattr__(self, "rank", clean_rank)
-        object.__setattr__(self, "score", clean_score)
+        object.__setattr__(self, "raw_score", clean_raw_score)
         object.__setattr__(self, "payload", clean_payload)
 
 
@@ -102,14 +119,14 @@ class RRFWeightProfile:
 
     dense_weight: float = DEFAULT_DENSE_WEIGHT
     sparse_weight: float = DEFAULT_SPARSE_WEIGHT
-    k: int = DEFAULT_RRF_K
+    k: float = DEFAULT_RRF_K
     name: str = "default"
 
     def __post_init__(self) -> None:
         clean_name = _validate_text_id(self.name, "RRF profile name")
         clean_dense_weight = _validate_weight(self.dense_weight, "dense_weight")
         clean_sparse_weight = _validate_weight(self.sparse_weight, "sparse_weight")
-        clean_k = _validate_positive_int(self.k, "RRF k")
+        clean_k = _validate_positive_float(self.k, "RRF k")
 
         if clean_dense_weight == 0.0 and clean_sparse_weight == 0.0:
             raise ValueError("at least one RRF weight must be positive")
@@ -135,7 +152,12 @@ DEFAULT_PROFILE: Final[RRFWeightProfile] = RRFWeightProfile()
 
 @dataclass(frozen=True, slots=True)
 class FusedResult:
-    """Final result produced by Weighted RRF."""
+    """Final result produced by Weighted RRF.
+
+    ``first_seen_order`` is the 0-based index in the concatenated
+    ``[*dense_results, *sparse_results]`` input sequence where ``result_id``
+    first appeared.
+    """
 
     result_id: str
     doc_id: str
@@ -146,6 +168,8 @@ class FusedResult:
     sparse_contribution: float
     best_rank: int
     first_seen_order: int
+    dense_raw_score: float | None = None
+    sparse_raw_score: float | None = None
     payload: Mapping[str, object] = field(default_factory=dict)
     sources: frozenset[str] = frozenset()
 
@@ -167,6 +191,15 @@ class FusedResult:
             self.sparse_contribution,
             "sparse_contribution",
         )
+        if not isclose(
+            clean_rrf_score,
+            clean_dense_contribution + clean_sparse_contribution,
+            rel_tol=0.0,
+            abs_tol=1e-12,
+        ):
+            raise ValueError(
+                "rrf_score must equal dense_contribution + sparse_contribution"
+            )
         clean_best_rank = _validate_positive_int(self.best_rank, "best_rank")
         clean_first_seen_order = _validate_non_negative_int(
             self.first_seen_order,
@@ -183,6 +216,23 @@ class FusedResult:
         clean_sources = frozenset(_validate_source(source) for source in self.sources)
         if not clean_sources:
             raise ValueError("sources cannot be empty")
+        expected_sources: set[str] = set()
+        if clean_dense_rank is not None:
+            expected_sources.add(SOURCE_DENSE)
+        if clean_sparse_rank is not None:
+            expected_sources.add(SOURCE_SPARSE)
+        if clean_sources != expected_sources:
+            raise ValueError("sources must match present source ranks")
+        clean_dense_raw_score = (
+            None
+            if self.dense_raw_score is None
+            else _validate_optional_score(self.dense_raw_score, "dense_raw_score")
+        )
+        clean_sparse_raw_score = (
+            None
+            if self.sparse_raw_score is None
+            else _validate_optional_score(self.sparse_raw_score, "sparse_raw_score")
+        )
         clean_payload = _freeze_payload(self.payload)
 
         object.__setattr__(self, "result_id", clean_result_id)
@@ -194,6 +244,8 @@ class FusedResult:
         object.__setattr__(self, "sparse_contribution", clean_sparse_contribution)
         object.__setattr__(self, "best_rank", clean_best_rank)
         object.__setattr__(self, "first_seen_order", clean_first_seen_order)
+        object.__setattr__(self, "dense_raw_score", clean_dense_raw_score)
+        object.__setattr__(self, "sparse_raw_score", clean_sparse_raw_score)
         object.__setattr__(self, "payload", clean_payload)
         object.__setattr__(self, "sources", clean_sources)
 
@@ -210,6 +262,8 @@ class FusedResult:
             "sparse_contribution": self.sparse_contribution,
             "best_rank": self.best_rank,
             "first_seen_order": self.first_seen_order,
+            "dense_raw_score": self.dense_raw_score,
+            "sparse_raw_score": self.sparse_raw_score,
             "sources": sorted(self.sources),
             "payload": dict(self.payload),
         }
@@ -225,6 +279,8 @@ class _RRFAccumulator:
     sparse_rank: int | None = None
     dense_contribution: float = 0.0
     sparse_contribution: float = 0.0
+    dense_raw_score: float | None = None
+    sparse_raw_score: float | None = None
     payload: Mapping[str, object] = field(default_factory=dict)
     payload_rank: int | None = None
     payload_source: str | None = None
@@ -237,7 +293,13 @@ def fuse(
     profile: RRFWeightProfile = DEFAULT_PROFILE,
     limit: int | None = None,
 ) -> list[FusedResult]:
-    """Fuse dense and sparse rankings with deterministic Weighted RRF."""
+    """Fuse dense and sparse rankings with deterministic Weighted RRF.
+
+    ``first_seen_order`` in each output is the 0-based index in the
+    concatenated ``[*dense_results, *sparse_results]`` input sequence where
+    the ``result_id`` first appeared. Inputs are iterated as provided and are
+    never sorted or mutated in place.
+    """
 
     clean_limit = _validate_optional_limit(limit)
     accumulators: dict[str, _RRFAccumulator] = {}
@@ -249,7 +311,7 @@ def fuse(
         weight=profile.dense_weight,
         k=profile.k,
         accumulators=accumulators,
-        next_order=next_order,
+        start_order=next_order,
     )
     _consume_ranking(
         source=SPARSE_SOURCE,
@@ -257,7 +319,7 @@ def fuse(
         weight=profile.sparse_weight,
         k=profile.k,
         accumulators=accumulators,
-        next_order=next_order,
+        start_order=next_order,
     )
 
     fused = [_build_fused_result(accumulator) for accumulator in accumulators.values()]
@@ -293,36 +355,41 @@ def _consume_ranking(
     source: str,
     results: Sequence[RankedResult],
     weight: float,
-    k: int,
+    k: float,
     accumulators: dict[str, _RRFAccumulator],
-    next_order: int,
+    start_order: int,
 ) -> int:
     if weight == 0.0:
-        return next_order
+        return start_order + len(results)
 
     seen_in_source: set[str] = set()
-    accepted_order = next_order
-    for result in results:
+    for zero_based_position, result in enumerate(results):
         if result.result_id in seen_in_source:
+            _validate_doc_id_consistency(
+                accumulator=accumulators.get(result.result_id),
+                result=result,
+            )
             continue
         seen_in_source.add(result.result_id)
 
-        contribution = weight / float(k + result.rank)
+        contribution = weight / (k + float(result.rank))
         accumulator = accumulators.get(result.result_id)
         if accumulator is None:
             accumulator = _RRFAccumulator(
                 result_id=result.result_id,
                 doc_id=result.doc_id,
-                first_seen_order=accepted_order,
+                first_seen_order=start_order + zero_based_position,
             )
             accumulators[result.result_id] = accumulator
-            accepted_order += 1
+        else:
+            _validate_doc_id_consistency(accumulator=accumulator, result=result)
 
         _apply_contribution(
             accumulator=accumulator,
             source=source,
             rank=result.rank,
             contribution=contribution,
+            raw_score=result.raw_score,
         )
         _maybe_update_payload(
             accumulator=accumulator,
@@ -330,7 +397,19 @@ def _consume_ranking(
             source=source,
         )
 
-    return accepted_order
+    return start_order + len(results)
+
+
+def _validate_doc_id_consistency(
+    *,
+    accumulator: _RRFAccumulator | None,
+    result: RankedResult,
+) -> None:
+    if accumulator is not None and accumulator.doc_id != result.doc_id:
+        raise ValueError(
+            "conflicting doc_id for the same result_id: "
+            f"{result.result_id}"
+        )
 
 
 def _apply_contribution(
@@ -339,15 +418,18 @@ def _apply_contribution(
     source: str,
     rank: int,
     contribution: float,
+    raw_score: float | None,
 ) -> None:
     accumulator.rrf_score += contribution
     if source == DENSE_SOURCE:
         accumulator.dense_rank = rank
         accumulator.dense_contribution = contribution
+        accumulator.dense_raw_score = raw_score
         return
     if source == SPARSE_SOURCE:
         accumulator.sparse_rank = rank
         accumulator.sparse_contribution = contribution
+        accumulator.sparse_raw_score = raw_score
         return
     raise ValueError(f"unsupported RRF source: {source}")
 
@@ -400,17 +482,25 @@ def _build_fused_result(accumulator: _RRFAccumulator) -> FusedResult:
         sparse_contribution=accumulator.sparse_contribution,
         best_rank=min(ranks),
         first_seen_order=accumulator.first_seen_order,
+        dense_raw_score=accumulator.dense_raw_score,
+        sparse_raw_score=accumulator.sparse_raw_score,
         payload=accumulator.payload,
         sources=frozenset(sources),
     )
 
 
 def _fused_sort_key(result: FusedResult) -> tuple[float, int, int, str]:
-    return (-result.rrf_score, result.best_rank, result.first_seen_order, result.result_id)
+    return (
+        -result.rrf_score,
+        result.best_rank,
+        result.first_seen_order,
+        result.result_id,
+    )
 
 
 def _freeze_payload(payload: Mapping[str, object]) -> Mapping[str, object]:
-    forbidden = _FORBIDDEN_PAYLOAD_KEYS.intersection(payload)
+    normalized_keys = {str(key).casefold() for key in payload}
+    forbidden = _FORBIDDEN_PAYLOAD_KEYS.intersection(normalized_keys)
     if forbidden:
         keys = ", ".join(sorted(forbidden))
         raise ValueError(f"payload cannot contain sensitive keys: {keys}")
@@ -456,6 +546,10 @@ def _validate_optional_limit(value: int | None) -> int | None:
 
 
 __all__ = [
+    "SOURCE_DENSE",
+    "SOURCE_SPARSE",
+    "DENSE_SOURCE",
+    "SPARSE_SOURCE",
     "RankedResult",
     "FusedResult",
     "RRFWeightProfile",
