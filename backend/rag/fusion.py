@@ -14,38 +14,10 @@ from typing import Any, Final
 
 SOURCE_DENSE: Final[str] = "dense"
 SOURCE_SPARSE: Final[str] = "sparse"
-DENSE_SOURCE: Final[str] = SOURCE_DENSE
-SPARSE_SOURCE: Final[str] = SOURCE_SPARSE
 
 DEFAULT_RRF_K: Final[float] = 60.0
 DEFAULT_DENSE_WEIGHT: Final[float] = 1.0
 DEFAULT_SPARSE_WEIGHT: Final[float] = 1.0
-
-_FORBIDDEN_PAYLOAD_KEYS: Final[frozenset[str]] = frozenset(
-    {
-        "answer",
-        "chunk",
-        "chunk_text",
-        "completion",
-        "content",
-        "dense_vector",
-        "document",
-        "documents",
-        "embedding",
-        "embeddings",
-        "messages",
-        "page_content",
-        "prompt",
-        "query",
-        "question",
-        "raw_text",
-        "response",
-        "sparse_vector",
-        "text",
-        "vector",
-        "vectors",
-    }
-)
 
 
 def _validate_numeric(value: float, field_name: str) -> float:
@@ -320,6 +292,10 @@ def fuse(
     the ``result_id`` first appeared. Inputs are iterated as provided and are
     never sorted or mutated in place. ``limit`` is applied after full fusion
     and deterministic sorting.
+
+    Disabled channels still advance the concatenated input boundary. For
+    example, with ``dense_weight=0.0``, sparse-only results keep
+    ``first_seen_order`` offsets after ``len(dense_results)``.
     """
 
     clean_limit = _validate_optional_limit(limit)
@@ -327,7 +303,7 @@ def fuse(
     next_order = 0
 
     next_order = _consume_ranking(
-        source=DENSE_SOURCE,
+        source=SOURCE_DENSE,
         results=dense_results,
         weight=profile.dense_weight,
         k=profile.k,
@@ -335,7 +311,7 @@ def fuse(
         start_order=next_order,
     )
     _consume_ranking(
-        source=SPARSE_SOURCE,
+        source=SOURCE_SPARSE,
         results=sparse_results,
         weight=profile.sparse_weight,
         k=profile.k,
@@ -465,12 +441,12 @@ def _apply_contribution(
     raw_score: float | None,
 ) -> None:
     accumulator.rrf_score += contribution
-    if source == DENSE_SOURCE:
+    if source == SOURCE_DENSE:
         accumulator.dense_rank = rank
         accumulator.dense_contribution = contribution
         accumulator.dense_raw_score = raw_score
         return
-    if source == SPARSE_SOURCE:
+    if source == SOURCE_SPARSE:
         accumulator.sparse_rank = rank
         accumulator.sparse_contribution = contribution
         accumulator.sparse_raw_score = raw_score
@@ -493,8 +469,8 @@ def _maybe_update_payload(
 
     if (
         result.rank == current_rank
-        and source == DENSE_SOURCE
-        and accumulator.payload_source != DENSE_SOURCE
+        and source == SOURCE_DENSE
+        and accumulator.payload_source != SOURCE_DENSE
     ):
         accumulator.payload = result.payload
         accumulator.payload_rank = result.rank
@@ -512,9 +488,9 @@ def _build_fused_result(accumulator: _RRFAccumulator) -> FusedResult:
 
     sources: set[str] = set()
     if accumulator.dense_rank is not None:
-        sources.add(DENSE_SOURCE)
+        sources.add(SOURCE_DENSE)
     if accumulator.sparse_rank is not None:
-        sources.add(SPARSE_SOURCE)
+        sources.add(SOURCE_SPARSE)
 
     return FusedResult(
         result_id=accumulator.result_id,
@@ -548,18 +524,12 @@ def _freeze_payload(payload: Mapping[str, object]) -> Mapping[str, object]:
         if not isinstance(key, str):
             raise TypeError("payload keys must be strings")
         clean_payload[key] = value
-
-    normalized_keys = {key.casefold() for key in clean_payload}
-    forbidden = _FORBIDDEN_PAYLOAD_KEYS.intersection(normalized_keys)
-    if forbidden:
-        keys = ", ".join(sorted(forbidden))
-        raise ValueError(f"payload cannot contain sensitive keys: {keys}")
     return MappingProxyType(clean_payload)
 
 
 def _validate_source(source: str) -> str:
     clean_source = _validate_text_id(source, "source")
-    if clean_source not in {DENSE_SOURCE, SPARSE_SOURCE}:
+    if clean_source not in {SOURCE_DENSE, SOURCE_SPARSE}:
         raise ValueError(f"unsupported RRF source: {clean_source}")
     return clean_source
 
@@ -598,8 +568,6 @@ def _validate_optional_limit(value: int | None) -> int | None:
 __all__ = [
     "SOURCE_DENSE",
     "SOURCE_SPARSE",
-    "DENSE_SOURCE",
-    "SPARSE_SOURCE",
     "DEFAULT_RRF_K",
     "DEFAULT_DENSE_WEIGHT",
     "DEFAULT_SPARSE_WEIGHT",

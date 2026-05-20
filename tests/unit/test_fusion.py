@@ -89,6 +89,17 @@ def test_ranked_result_validates_rank_and_ids() -> None:
         rr("A", doc_id="doc\x00A")
 
 
+def test_ranked_result_rank_boundary_values() -> None:
+    valid = rr("A", rank=1)
+    assert valid.rank == 1
+
+    with pytest.raises(ValueError, match="rank must be >= 1"):
+        rr("A", rank=0)
+
+    with pytest.raises(ValueError, match="rank must be >= 1"):
+        rr("A", rank=-1)
+
+
 def test_ranked_result_is_frozen_and_payload_is_defensive_mapping() -> None:
     payload = {"source": "dense"}
     result = rr("A", payload=payload)
@@ -118,6 +129,24 @@ def test_rrf_weight_profile_defaults_and_validation() -> None:
     assert RRFWeightProfile(dense_weight=0.0).dense_weight == 0.0
     assert RRFWeightProfile(sparse_weight=0.0).sparse_weight == 0.0
     assert RRFWeightProfile(k=60.5).k == 60.5
+
+
+def test_rrf_weight_profile_bva_symmetric_and_k_boundary() -> None:
+    with pytest.raises(ValueError, match="RRF weights must be non-negative"):
+        RRFWeightProfile(sparse_weight=-0.1)
+
+    profile = RRFWeightProfile(k=1.0)
+    assert profile.k == 1.0
+
+    result = fuse(
+        dense_results=[rr("A", rank=1)],
+        sparse_results=[],
+        profile=profile,
+    )
+    assert result[0].rrf_score == pytest.approx(1.0 / 2.0)
+
+    with pytest.raises(ValueError, match="RRF k must be > 0"):
+        RRFWeightProfile(k=-1.0)
 
 
 def test_fuse_empty_and_single_channel_cases() -> None:
@@ -220,6 +249,22 @@ def test_conflicting_doc_id_for_same_result_id_fails() -> None:
             dense_results=[rr("chunk-1", doc_id="doc-a", rank=1)],
             sparse_results=[rr("chunk-1", doc_id="doc-b", rank=1)],
         )
+
+
+def test_two_chunks_same_doc_id_different_result_id_do_not_collapse() -> None:
+    """Checklist 2: result_id is the dedup key, not doc_id."""
+
+    fused = fuse(
+        dense_results=[
+            rr("chunk-1", doc_id="doc-a", rank=1),
+            rr("chunk-2", doc_id="doc-a", rank=2),
+        ],
+        sparse_results=[],
+    )
+
+    assert len(fused) == 2
+    assert {result.result_id for result in fused} == {"chunk-1", "chunk-2"}
+    assert {result.doc_id for result in fused} == {"doc-a"}
 
 
 def test_first_seen_order_uses_concatenated_input_position_even_with_duplicates() -> None:
@@ -449,31 +494,19 @@ def test_payload_selection_uses_best_rank_and_dense_wins_rank_tie() -> None:
     assert dict(dense_tie[0].payload) == {"source": "dense"}
 
 
-@pytest.mark.parametrize(
-    "bad_key",
-    [
-        "answer",
-        "chunk_text",
-        "content",
-        "dense_vector",
-        "embedding",
-        "messages",
-        "page_content",
-        "prompt",
-        "query",
-        "raw_text",
-        "sparse_vector",
-        "text",
-        "vector",
-        "Text",
-        "VECTOR",
-        "Embedding",
-        "Prompt",
-    ],
-)
-def test_payload_rejects_sensitive_keys(bad_key: str) -> None:
-    with pytest.raises(ValueError, match="payload cannot contain sensitive keys"):
-        rr("A", payload={bad_key: "blocked"})
+def test_payload_allows_schema_content_because_fusion_is_schema_agnostic() -> None:
+    result = rr(
+        "A",
+        payload={
+            "text": "chunk text belongs to retriever/schema layers",
+            "vector": [1.0, 2.0],
+        },
+    )
+
+    assert dict(result.payload) == {
+        "text": "chunk text belongs to retriever/schema layers",
+        "vector": [1.0, 2.0],
+    }
 
 
 def test_payload_rejects_non_string_keys() -> None:
@@ -538,6 +571,8 @@ def test_public_exports_include_benchmark_constants_and_helper() -> None:
         "SOURCE_SPARSE",
         "ranked_result_from_position",
     } <= set(fusion_module.__all__)
+    assert "DENSE_SOURCE" not in fusion_module.__all__
+    assert "SPARSE_SOURCE" not in fusion_module.__all__
 
 
 def test_snapshot_fixed_weighted_rrf_output() -> None:
