@@ -38,6 +38,13 @@ from evaluation import (
     recall_at_k,
     reciprocal_rank,
 )
+from backend.rag.retrieval_logger import (
+    FusionLogSummary,
+    NullRetrievalLogger,
+    RetrievalLoggerProtocol,
+    build_retrieval_event,
+    safe_log_retrieval_event,
+)
 
 
 RUNNER_VERSION = "rag-1a-pr03"
@@ -251,6 +258,7 @@ def run_dense_baseline(
     retriever_metadata: RetrieverMetadata,
     git_commit: str | None = None,
     clock: Callable[[], float] = time.perf_counter,
+    retrieval_logger: RetrievalLoggerProtocol | None = None,
 ) -> DenseBaselineResult:
     """Run the dense-only baseline and write JSONL, JSON and CSV artifacts."""
 
@@ -265,6 +273,7 @@ def run_dense_baseline(
 
     paths = _output_paths(active_config.output_dir)
     active_config.output_dir.mkdir(parents=True, exist_ok=True)
+    active_logger = retrieval_logger or NullRetrievalLogger()
 
     with paths.jsonl_path.open("a", encoding="utf-8") as jsonl_file:
         for index, query in enumerate(queries):
@@ -275,6 +284,7 @@ def run_dense_baseline(
                 config=active_config,
                 cold_start=index == 0,
                 clock=clock,
+                retrieval_logger=active_logger,
             )
             _assert_safe_output(row)
             jsonl_file.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
@@ -422,6 +432,7 @@ def _run_one_query(
     config: DenseBaselineConfig,
     cold_start: bool,
     clock: Callable[[], float],
+    retrieval_logger: RetrievalLoggerProtocol,
 ) -> dict[str, object]:
     start = clock()
     retrieved_ids: list[str] = []
@@ -465,6 +476,18 @@ def _run_one_query(
         error_message = _sanitize_error_message(str(exc))
 
     latency_ms = (clock() - start) * 1000.0
+    event = build_retrieval_event(
+        query=query.query,
+        mode="dense_only",
+        embed_dense_ms=0.0,
+        embed_sparse_ms=0.0,
+        search_ms=latency_ms,
+        total_ms=latency_ms,
+        top_k_scores=scores,
+        fusion=FusionLogSummary(strategy="none"),
+        chunks_returned=len(retrieved_ids),
+    )
+    safe_log_retrieval_event(retrieval_logger, event)
     return {
         "run_id": config.run_id,
         "query_id": query.query_id,

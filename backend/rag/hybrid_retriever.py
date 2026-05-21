@@ -28,6 +28,14 @@ from backend.rag.fusion import (
     RankedResult,
     ranked_result_from_position,
 )
+from backend.rag.retrieval_logger import (
+    FusionLogSummary,
+    NullRetrievalLogger,
+    RetrievalLoggerProtocol,
+    build_retrieval_event,
+    extract_scores_from_results,
+    safe_log_retrieval_event,
+)
 from backend.rag.sparse_vector import SparseVector
 
 
@@ -254,6 +262,7 @@ class AsyncHybridRetriever:
     config: HybridRetrieverConfig
     fusion: RRFFusion = field(default_factory=RRFFusion)
     clock: ClockProtocol = field(default_factory=lambda: _DEFAULT_CLOCK)
+    retrieval_logger: RetrievalLoggerProtocol = field(default_factory=NullRetrievalLogger)
 
     async def retrieve(
         self,
@@ -366,7 +375,45 @@ class AsyncHybridRetriever:
             fusion_ms=fusion_ms,
             total_ms=total_ms,
         )
-        return HybridRetrievalResult(results=final, trace=trace)
+        result = HybridRetrievalResult(results=final, trace=trace)
+        self._log_retrieval_event(query=query, cfg=cfg, result=result)
+        return result
+
+    def _log_retrieval_event(
+        self,
+        *,
+        query: str,
+        cfg: HybridRetrieverConfig,
+        result: HybridRetrievalResult,
+    ) -> None:
+        if cfg.mode is RetrievalMode.SPARSE_ONLY:
+            return
+
+        is_hybrid = cfg.mode is RetrievalMode.HYBRID
+        profile = getattr(self.fusion, "profile", None)
+        fusion = (
+            FusionLogSummary(
+                strategy="weighted_rrf",
+                profile=getattr(profile, "name", None),
+                dense_weight=getattr(profile, "dense_weight", None),
+                sparse_weight=getattr(profile, "sparse_weight", None),
+                k=getattr(profile, "k", None),
+            )
+            if is_hybrid
+            else FusionLogSummary(strategy="none")
+        )
+        event = build_retrieval_event(
+            query=query,
+            mode="hybrid" if is_hybrid else "dense_only",
+            embed_dense_ms=result.trace.embed_ms,
+            embed_sparse_ms=result.trace.embed_ms if is_hybrid else 0.0,
+            search_ms=result.trace.search_ms,
+            total_ms=result.trace.total_ms,
+            top_k_scores=extract_scores_from_results(result.results),
+            fusion=fusion,
+            chunks_returned=len(result.results),
+        )
+        safe_log_retrieval_event(self.retrieval_logger, event)
 
     async def _embed_dense(self, query: str, cfg: HybridRetrieverConfig) -> list[float]:
         try:
