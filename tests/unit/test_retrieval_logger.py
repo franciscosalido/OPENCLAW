@@ -282,6 +282,9 @@ def test_score_sanitization_and_stats() -> None:
     two = compute_score_stats((0.9, 0.2))
     assert two.rank1_gap == 0.7
 
+    ascending = compute_score_stats((0.1, 0.9))
+    assert ascending.rank1_gap == -0.8
+
 
 def test_extract_scores_from_result_like_objects() -> None:
     scores = extract_scores_from_results(
@@ -467,6 +470,12 @@ def test_retrieval_logger_static_guards() -> None:
                 assert node.func.id not in forbidden_calls
             elif isinstance(node.func, ast.Attribute):
                 assert node.func.attr not in forbidden_calls
+        elif isinstance(node, ast.Dict):
+            for key in node.keys:
+                if isinstance(key, ast.Constant) and isinstance(key.value, str):
+                    assert key.value not in FORBIDDEN_LOG_KEYS, (
+                        f"forbidden key in dict literal: {key.value!r}"
+                    )
 
     assert imported_roots.isdisjoint(forbidden_imports)
 
@@ -479,3 +488,10 @@ def test_event_dict_keys_do_not_use_forbidden_log_keys() -> None:
     assert FORBIDDEN_LOG_KEYS.isdisjoint(
         cast(Mapping[str, object], payload["score_stats"]).keys()
     )
+
+
+def test_forbidden_key_validation_recurses_into_list_of_dicts() -> None:
+    with pytest.raises(ValueError, match="forbidden log key"):
+        retrieval_logger_module._validate_no_forbidden_keys(
+            {"safe": [{"payload": "blocked"}]}
+        )

@@ -312,7 +312,13 @@ class LoguruRetrievalLogger:
 
 
 def compute_score_stats(scores: Sequence[float]) -> ScoreStats:
-    """Compute deterministic score stats."""
+    """Compute deterministic score stats.
+
+    ``scores`` must be in rank order, best score first. ``rank1_gap`` is
+    computed as ``scores[0] - scores[1]``. Passing scores in ascending order
+    intentionally produces a negative gap; the logger records that signal
+    instead of clamping it.
+    """
 
     clean_scores = tuple(_validate_finite_number(score, "score") for score in scores)
     if not clean_scores:
@@ -585,11 +591,22 @@ def _level_to_logging(level: str) -> int:
 
 
 def _validate_no_forbidden_keys(payload: dict[str, object]) -> None:
+    """Raise ValueError if a forbidden key appears anywhere in a mapping.
+
+    Recurses into nested dictionaries and lists. Current ``to_dict()`` shapes
+    are shallow apart from ``score_stats`` and ``fusion``, but the recursive
+    check keeps the helper safe if future fields add nested structures.
+    """
+
     for key, value in payload.items():
         if key in FORBIDDEN_LOG_KEYS:
             raise ValueError(f"forbidden log key: {key}")
         if isinstance(value, dict):
             _validate_no_forbidden_keys(value)
+        elif isinstance(value, list):
+            for item in value:
+                if isinstance(item, dict):
+                    _validate_no_forbidden_keys(item)
 
 
 __all__ = [
