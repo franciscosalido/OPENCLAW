@@ -102,3 +102,29 @@ Before touching Docker or dependencies:
   `integer` for Q18-04, although the low-level allowlist knows more Qdrant
   field types. Future float/datetime indexes require an explicit validator
   change and tests.
+
+## Q18-05 Result
+
+- Tuning module path: `backend/rag/qdrant_tuning.py`.
+- Tuning docs path: `docs/specs/qdrant-1-18-upgrade/tuning_profiles.md`.
+- Unit test path: `tests/unit/test_qdrant_tuning_profiles.py`.
+- Default tuning profile: `balanced_local`.
+- Profile registry order:
+  - `baseline_ram`
+  - `balanced_local`
+  - `low_memory`
+  - `turboquant_experimental`
+  - `high_precision_disk`
+- `turboquant_experimental` is experimental, requires benchmark evidence and
+  must not be promoted before Q18-07.
+- Monitoring probe config is declarative only:
+  - `/metrics?per_collection=true`
+  - `/telemetry`
+  - OpenTelemetry-compatible attributes such as `qdrant.profile` and
+    `qdrant.quantization`
+- Q18-05 does not import Qdrant, OpenTelemetry, requests or httpx; it performs
+  no network calls and no collection mutation.
+- Q18-06 consumes the profile registry for Python RRF vs native Qdrant RRF
+  comparisons.
+- Q18-07 consumes `QdrantTuningRunSummary` for memory, latency and quality
+  decision reporting.

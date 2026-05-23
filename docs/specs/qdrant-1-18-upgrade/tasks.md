@@ -100,6 +100,22 @@ Q18-04 adds the Qdrant 1.18 hybrid benchmark schema contract:
 - snapshot path for live opt-in: `docs/specs/qdrant-1-18-upgrade/benchmark_schema_snapshot.json`
 - retrieval, ingest, tuning and benchmark changes: none
 
+## Q18-05 Result Draft
+
+Q18-05 adds local-first Qdrant tuning profile contracts:
+
+- tuning module: `backend/rag/qdrant_tuning.py`
+- tuning docs: `docs/specs/qdrant-1-18-upgrade/tuning_profiles.md`
+- unit tests: `tests/unit/test_qdrant_tuning_profiles.py`
+- default profile: `balanced_local`
+- profiles: `baseline_ram`, `balanced_local`, `low_memory`,
+  `turboquant_experimental`, `high_precision_disk`
+- TurboQuant policy: experimental only, benchmark required, never default
+- monitoring handoff: `/metrics?per_collection=true`, `/telemetry`, and
+  OpenTelemetry-compatible attribute keys without importing OpenTelemetry
+- benchmark handoff: `QdrantTuningRunSummary`
+- Qdrant mutation, benchmark execution and retrieval changes: none
+
 ## Q18-02 Gate Draft
 
 Q18-02 may begin only after:
