@@ -233,6 +233,11 @@ def test_get_profile_rejects_unknown() -> None:
         get_profile("unknown")
 
 
+def test_get_profile_rejects_empty_name_as_malformed_input() -> None:
+    with pytest.raises(ValueError, match="name cannot be empty"):
+        get_profile("")
+
+
 def test_registry_is_immutable() -> None:
     registry = profile_registry()
 
