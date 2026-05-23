@@ -314,9 +314,13 @@ class QdrantHybridSchemaClient118:
         self._client = client
 
     async def collection_exists(self, collection_name: str) -> bool:
+        """Return whether the benchmark collection already exists."""
+
         return bool(await self._client.collection_exists(collection_name=collection_name))
 
     async def create_collection(self, spec: HybridCollectionSpec118) -> None:
+        """Create only the Q18-04 benchmark collection from the validated spec."""
+
         from qdrant_client import models
 
         await self._client.create_collection(
@@ -333,6 +337,8 @@ class QdrantHybridSchemaClient118:
         )
 
     async def create_payload_indexes(self, spec: HybridCollectionSpec118) -> None:
+        """Create the required safe metadata payload indexes for the spec."""
+
         from qdrant_client import models
 
         for index in build_payload_index_specs(spec):
@@ -343,6 +349,8 @@ class QdrantHybridSchemaClient118:
             )
 
     async def get_collection_info(self, collection_name: str) -> Mapping[str, object]:
+        """Return simplified collection schema info without point payloads or vectors."""
+
         info = await self._client.get_collection(collection_name=collection_name)
         raw = _model_to_mapping(info)
         config = _safe_mapping(raw.get("config"))

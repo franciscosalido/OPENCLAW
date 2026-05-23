@@ -439,6 +439,32 @@ def test_schema_module_does_not_import_fusion() -> None:
             assert "fusion" not in node.module
 
 
+def test_concrete_schema_adapter_public_methods_have_docstrings() -> None:
+    tree = ast.parse(MODULE_PATH.read_text(encoding="utf-8"))
+    adapter = next(
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ClassDef)
+        and node.name == "QdrantHybridSchemaClient118"
+    )
+    expected_methods = {
+        "collection_exists",
+        "create_collection",
+        "create_payload_indexes",
+        "get_collection_info",
+        "get_qdrant_versions",
+    }
+    docstrings = {
+        node.name: ast.get_docstring(node)
+        for node in adapter.body
+        if isinstance(node, ast.AsyncFunctionDef)
+        and node.name in expected_methods
+    }
+
+    assert set(docstrings) == expected_methods
+    assert all(docstring for docstring in docstrings.values())
+
+
 def test_schema_module_forbidden_call_denylist() -> None:
     tree = ast.parse(MODULE_PATH.read_text(encoding="utf-8"))
     forbidden = {
