@@ -72,3 +72,21 @@ Before touching Docker or dependencies:
 - Benchmark recreation is protocol/fake-supported, but real schema creation is
   deferred to Q18-04.
 - Schema changes: none.
+
+## Q18-04 Result
+
+- Schema module path: `backend/rag/qdrant_hybrid_118.py`.
+- Schema CLI path: `scripts/qdrant_create_hybrid_schema_118.py`.
+- Unit test path: `tests/unit/test_qdrant_hybrid_118_schema.py`.
+- Benchmark collection: `quimera_benchmark_hybrid_118`.
+- Candidate collection `quimera_knowledge_v2`: not touched.
+- Legacy collection `quimera_knowledge`: not touched.
+- Dense vector: `dense`, 1024 dimensions, Cosine.
+- Sparse vector: `sparse`.
+- Payload indexes: `doc_id`, `chunk_id`, `chunk_index`, `source`,
+  `schema_version`, `embedding_model`, `embedding_provider`,
+  `embedding_dimensions`, `embedding_version`, `corpus_id`, `security_level`.
+- Snapshot format: `HybridCollectionSnapshot.to_safe_dict()`.
+- Live creation is opt-in via `RUN_QDRANT_SCHEMA_118=1 --execute`.
+- Q18-05 consumes the spec, snapshot and metrics probe config.
+- Q18-06 consumes the same schema for Python RRF vs native Qdrant RRF comparison.

@@ -86,6 +86,20 @@ Q18-03 adds destructive local reset governance:
 - schema changes: none
 - benchmark recreation: protocol/fake support only; real schema creation remains Q18-04
 
+## Q18-04 Result Draft
+
+Q18-04 adds the Qdrant 1.18 hybrid benchmark schema contract:
+
+- schema module: `backend/rag/qdrant_hybrid_118.py`
+- CLI: `scripts/qdrant_create_hybrid_schema_118.py`
+- unit tests: `tests/unit/test_qdrant_hybrid_118_schema.py`
+- benchmark collection: `quimera_benchmark_hybrid_118`
+- dense vector: `dense`, 1024 dimensions, Cosine
+- sparse vector: `sparse`
+- payload index contract: explicit keyword/integer fields
+- snapshot path for live opt-in: `docs/specs/qdrant-1-18-upgrade/benchmark_schema_snapshot.json`
+- retrieval, ingest, tuning and benchmark changes: none
+
 ## Q18-02 Gate Draft
 
 Q18-02 may begin only after:

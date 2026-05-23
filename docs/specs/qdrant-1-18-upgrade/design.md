@@ -193,6 +193,21 @@ Future PRs should record:
 - audit/tracing feature availability
 - per-collection metrics availability
 
+## Q18-04 Benchmark Schema Contract
+
+Q18-04 fixes the benchmark schema for Q18-05/Q18-06/Q18-07:
+
+| Field | Value |
+|---|---|
+| Collection | `quimera_benchmark_hybrid_118` |
+| Dense vector | `dense`, 1024 dimensions, Cosine |
+| Sparse vector | `sparse` |
+| Schema version | `qdrant-hybrid-118-v1` |
+| Snapshot | `docs/specs/qdrant-1-18-upgrade/benchmark_schema_snapshot.json` |
+
+Q18-04 does not promote `quimera_knowledge_v2`, does not touch
+`quimera_knowledge`, does not ingest points and does not benchmark.
+
 ## Rollback Decision Tree
 
 | Failure mode | Local action | Rollback |
