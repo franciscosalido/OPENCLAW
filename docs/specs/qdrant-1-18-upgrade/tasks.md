@@ -116,6 +116,24 @@ Q18-05 adds local-first Qdrant tuning profile contracts:
 - benchmark handoff: `QdrantTuningRunSummary`
 - Qdrant mutation, benchmark execution and retrieval changes: none
 
+## Q18-06 Result Draft
+
+Q18-06 adds an experimental Python RRF vs Qdrant native RRF comparison adapter:
+
+- native fusion module: `backend/rag/qdrant_native_fusion.py`
+- native RRF docs: `docs/specs/qdrant-1-18-upgrade/native_rrf_adapter.md`
+- unit tests: `tests/unit/test_qdrant_native_fusion.py`
+- default behavior: disabled; Python `RRFFusion` remains source of truth
+- modeled native paths: `qdrant_rrf` and `qdrant_weighted_rrf`
+- future MCP profiles: `neutral`, `semantic_hybrid`, `lexical_hybrid`
+- future MCP recommendation: one MCP server with two tools, not two mandatory
+  TCP ports
+- comparison metrics: overlap, Jaccard, order equality, set equality, rank delta
+  and tie-break notes
+- observability: OTel-compatible dicts only, with query hash/id and no query text
+- Qdrant mutation, MCP live server, benchmark execution and retrieval default
+  changes: none
+
 ## Q18-02 Gate Draft
 
 Q18-02 may begin only after:
