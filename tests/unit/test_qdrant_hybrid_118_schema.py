@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import importlib
 import json
 from collections.abc import Mapping
 from pathlib import Path
@@ -17,6 +18,7 @@ from backend.rag.qdrant_hybrid_118 import (
     HybridCollectionSnapshot,
     HybridCollectionSpec118,
     HybridSchemaError,
+    QdrantHybridSchemaClient118,
     build_collection_create_payload,
     build_payload_index_specs,
     build_metrics_probe_config,
@@ -63,6 +65,11 @@ class FakeHybridSchemaClient:
             "qdrant_server_version": "1.18.0",
             "qdrant_client_version": "1.18.0",
         }
+
+
+class FakeInfoClient:
+    async def info(self) -> Mapping[str, object]:
+        return {"version": "1.18.0", "title": "qdrant"}
 
 
 def _valid_collection_info() -> dict[str, object]:
@@ -184,6 +191,13 @@ def test_config_builders_are_pure_and_idempotent() -> None:
     assert spec == default_hybrid_collection_spec_118()
 
 
+def test_spec_is_hashable_for_future_set_usage() -> None:
+    spec = default_hybrid_collection_spec_118()
+
+    assert hash(spec) == hash(default_hybrid_collection_spec_118())
+    assert {spec} == {default_hybrid_collection_spec_118()}
+
+
 def test_validate_spec_rejects_legacy_collection() -> None:
     with pytest.raises(ValueError, match="quimera_benchmark_hybrid_118"):
         HybridCollectionSpec118(collection_name=LEGACY_COLLECTION)
@@ -192,6 +206,11 @@ def test_validate_spec_rejects_legacy_collection() -> None:
 def test_validate_spec_rejects_candidate_collection() -> None:
     with pytest.raises(ValueError, match="quimera_benchmark_hybrid_118"):
         HybridCollectionSpec118(collection_name=CANDIDATE_COLLECTION)
+
+
+def test_validate_spec_rejects_null_byte_collection_name() -> None:
+    with pytest.raises(ValueError, match="null bytes"):
+        HybridCollectionSpec118(collection_name=f"{BENCHMARK_COLLECTION}\x00")
 
 
 def test_validate_spec_rejects_vector_name_collision() -> None:
@@ -316,6 +335,16 @@ def test_schema_snapshot_contains_key_fields() -> None:
     assert snapshot.dense_dimensions == 1024
 
 
+@pytest.mark.asyncio
+async def test_adapter_reads_server_version_from_info_endpoint() -> None:
+    adapter = QdrantHybridSchemaClient118(FakeInfoClient())
+
+    versions = await adapter.get_qdrant_versions()
+
+    assert versions["qdrant_server_version"] == "1.18.0"
+    assert versions["qdrant_client_version"] == "1.18.0"
+
+
 def test_schema_snapshot_has_no_points_payload_vectors_embeddings() -> None:
     snapshot = schema_snapshot_from_collection_info(
         _valid_collection_info(),
@@ -339,12 +368,49 @@ def test_write_schema_snapshot_json_parseable(tmp_path: Path) -> None:
     assert json.loads(path.read_text(encoding="utf-8"))["collection_name"] == BENCHMARK_COLLECTION
 
 
+def test_snapshot_path_default_is_under_docs_specs() -> None:
+    root = (ROOT / "docs/specs/qdrant-1-18-upgrade").resolve()
+    resolved = (ROOT / schema_cli.DEFAULT_SNAPSHOT_PATH).resolve()
+
+    assert root in resolved.parents
+    assert resolved.name == "benchmark_schema_snapshot.json"
+
+
 def test_metrics_probe_config_points_to_metrics_and_telemetry() -> None:
     config = build_metrics_probe_config(BENCHMARK_COLLECTION)
 
     assert config["metrics_endpoint"] == "/metrics?per_collection=true"
     assert config["telemetry_endpoint"] == "/telemetry"
     assert config["collection"] == BENCHMARK_COLLECTION
+
+
+def test_metrics_probe_config_makes_no_network_call() -> None:
+    tree = ast.parse(MODULE_PATH.read_text(encoding="utf-8"))
+    target = next(
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef)
+        and node.name == "build_metrics_probe_config"
+    )
+    forbidden_calls = {"get", "post", "connect", "request", "send"}
+
+    for node in ast.walk(target):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+            assert node.func.attr not in forbidden_calls
+        elif isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+            assert node.func.id not in forbidden_calls
+
+
+def test_schema_module_import_is_side_effect_free() -> None:
+    tree = ast.parse(MODULE_PATH.read_text(encoding="utf-8"))
+    top_level_calls = [
+        node
+        for node in tree.body
+        if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call)
+    ]
+
+    assert top_level_calls == []
+    assert importlib.import_module("backend.rag.qdrant_hybrid_118") is schema_module
 
 
 def test_no_retrieval_functions_in_schema_module() -> None:
@@ -373,28 +439,27 @@ def test_schema_module_does_not_import_fusion() -> None:
             assert "fusion" not in node.module
 
 
-def test_schema_module_does_not_call_delete_collection() -> None:
+def test_schema_module_forbidden_call_denylist() -> None:
     tree = ast.parse(MODULE_PATH.read_text(encoding="utf-8"))
+    forbidden = {
+        "delete_collection",
+        "recreate_collection",
+        "upsert",
+        "set_payload",
+        "delete_payload",
+        "update_collection",
+        "upload_collection",
+        "delete_vectors",
+        "scroll",
+        "search",
+        "search_batch",
+        "retrieve",
+        "query_points",
+    }
 
     for node in ast.walk(tree):
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
-            assert node.func.attr != "delete_collection"
-
-
-def test_schema_module_does_not_call_recreate_collection() -> None:
-    tree = ast.parse(MODULE_PATH.read_text(encoding="utf-8"))
-
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
-            assert node.func.attr != "recreate_collection"
-
-
-def test_schema_module_does_not_call_upsert() -> None:
-    tree = ast.parse(MODULE_PATH.read_text(encoding="utf-8"))
-
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
-            assert node.func.attr != "upsert"
+            assert node.func.attr not in forbidden
 
 
 def test_script_requires_env_for_execute() -> None:
@@ -412,12 +477,67 @@ def test_parse_args_defaults_to_dry_run() -> None:
     assert args.dry_run is True
 
 
+def test_execute_flag_switches_dry_run_false() -> None:
+    args = schema_cli.parse_args(["--execute"])
+
+    assert args.dry_run is False
+
+
 @pytest.mark.asyncio
 async def test_execute_requires_env_var() -> None:
     client = FakeHybridSchemaClient(exists=False)
 
     with pytest.raises(RuntimeError, match="RUN_QDRANT_SCHEMA_118"):
         await schema_cli.async_main(["--execute"], client=client, env={})
+
+
+@pytest.mark.asyncio
+async def test_async_main_passes_grpc_port_to_real_client_builder(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    captured: dict[str, int | str] = {}
+
+    def fake_build_client(
+        *,
+        host: str,
+        port: int,
+        grpc_port: int,
+    ) -> FakeHybridSchemaClient:
+        captured["host"] = host
+        captured["port"] = port
+        captured["grpc_port"] = grpc_port
+        return FakeHybridSchemaClient(exists=False)
+
+    def fake_write_snapshot(
+        snapshot: HybridCollectionSnapshot,
+        path: Path,
+    ) -> None:
+        captured["snapshot_path"] = str(path)
+
+    monkeypatch.setattr(schema_cli, "_build_client", fake_build_client)
+    monkeypatch.setattr(schema_cli, "write_schema_snapshot", fake_write_snapshot)
+
+    exit_code = await schema_cli.async_main(
+        [
+            "--execute",
+            "--port",
+            "7333",
+            "--grpc-port",
+            "7444",
+            "--snapshot-path",
+            str(tmp_path / "snapshot.json"),
+        ],
+        env={schema_cli.RUN_SCHEMA_ENV_VAR: schema_cli.RUN_SCHEMA_REQUIRED_VALUE},
+    )
+
+    assert exit_code == 0
+    assert captured == {
+        "host": "localhost",
+        "port": 7333,
+        "grpc_port": 7444,
+        "snapshot_path": str(tmp_path / "snapshot.json"),
+    }
 
 
 @pytest.mark.asyncio

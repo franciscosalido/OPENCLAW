@@ -208,6 +208,20 @@ Q18-04 fixes the benchmark schema for Q18-05/Q18-06/Q18-07:
 Q18-04 does not promote `quimera_knowledge_v2`, does not touch
 `quimera_knowledge`, does not ingest points and does not benchmark.
 
+Q18-04 RC-01 hardening notes:
+
+- The spec is hashable for future cache/set use even though it stores payload
+  index types behind an immutable mapping.
+- Snapshot version metadata uses the Qdrant client `info()` call when a live
+  client is available. If an intermediate proxy/client cannot expose server
+  version, the value remains null and later benchmark gates must fail closed.
+- The schema factory records future metrics and telemetry endpoints only. Q18-05
+  must implement the actual scrape and decide tuning profiles from measured
+  memory/latency data.
+- Payload index validation is deliberately narrowed to `keyword` and `integer`
+  for the benchmark schema. Adding `float`, `datetime` or other schemas is a
+  future explicit schema change, not an implicit allowance.
+
 ## Rollback Decision Tree
 
 | Failure mode | Local action | Rollback |

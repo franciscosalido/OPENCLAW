@@ -2,6 +2,10 @@
 
 This module owns schema factory, validation and safe snapshots only. It does
 not implement retrieval, ingest, fusion, tuning or benchmark logic.
+
+The canonical spec stores dense distance as ``COSINE``. Conceptual REST-shaped
+dicts use ``Cosine`` because that is the common Qdrant API representation, and
+the real adapter uses ``models.Distance.COSINE``.
 """
 
 from __future__ import annotations
@@ -164,6 +168,26 @@ class HybridCollectionSpec118:
         """Return the exact required payload metadata fields."""
 
         return frozenset(self.payload_indexes)
+
+    def __hash__(self) -> int:
+        """Return a stable hash despite the internal MappingProxyType field."""
+
+        return hash(
+            (
+                self.collection_name,
+                self.dense_vector_name,
+                self.sparse_vector_name,
+                self.dense_dimensions,
+                self.dense_distance,
+                self.schema_version,
+                self.embedding_model,
+                self.embedding_provider,
+                self.embedding_dimensions,
+                self.embedding_version,
+                self.payload_indexes,
+                tuple(sorted(self.payload_index_types.items())),
+            )
+        )
 
     def to_safe_dict(self) -> dict[str, object]:
         """Return a safe schema summary without point payloads or vectors."""
@@ -334,10 +358,28 @@ class QdrantHybridSchemaClient118:
         }
 
     async def get_qdrant_versions(self) -> Mapping[str, str | None]:
+        """Return versions available from the live client.
+
+        Qdrant's async client exposes ``info()`` as a non-mutating service call
+        that returns server version metadata. If an older client/proxy does not
+        expose the field, the server version remains ``None`` so downstream
+        benchmark gates can fail closed instead of assuming parity.
+        """
+
+        server_version = await self._fetch_server_version()
         return {
-            "qdrant_server_version": None,
+            "qdrant_server_version": server_version,
             "qdrant_client_version": importlib.metadata.version("qdrant-client"),
         }
+
+    async def _fetch_server_version(self) -> str | None:
+        try:
+            info = await self._client.info()
+        except Exception:
+            return None
+        raw = _model_to_mapping(info)
+        version = raw.get("version")
+        return version if isinstance(version, str) and version else None
 
 
 def _validate_text(value: str, field_name: str) -> str:

@@ -88,5 +88,17 @@ Before touching Docker or dependencies:
   `embedding_dimensions`, `embedding_version`, `corpus_id`, `security_level`.
 - Snapshot format: `HybridCollectionSnapshot.to_safe_dict()`.
 - Live creation is opt-in via `RUN_QDRANT_SCHEMA_118=1 --execute`.
-- Q18-05 consumes the spec, snapshot and metrics probe config.
+- RC-01 hardening made `HybridCollectionSpec118` hashable, connected
+  `--grpc-port` to the live client builder and records Qdrant server version
+  through the non-mutating client `info()` endpoint when available.
+- Q18-05 consumes the spec, snapshot and metrics probe config; it must implement
+  the actual `/metrics?per_collection=true` and `/telemetry` scrape before
+  deciding low-memory, scalar quantization or TurboQuant profiles.
 - Q18-06 consumes the same schema for Python RRF vs native Qdrant RRF comparison.
+  Any schema change after Q18-04 must be coordinated with that comparison.
+- Q18-07 consumes Q18-04 snapshots only as schema evidence. Performance and ADR
+  promotion still require measured Q18-05/Q18-06 results.
+- Current payload index validation intentionally allows only `keyword` and
+  `integer` for Q18-04, although the low-level allowlist knows more Qdrant
+  field types. Future float/datetime indexes require an explicit validator
+  change and tests.

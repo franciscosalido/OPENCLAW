@@ -169,10 +169,12 @@ def _spec_from_collection(collection_name: str) -> HybridCollectionSpec118:
     return default_hybrid_collection_spec_118()
 
 
-def _build_client(*, host: str, port: int) -> QdrantHybridSchemaClient118:
+def _build_client(*, host: str, port: int, grpc_port: int) -> QdrantHybridSchemaClient118:
     from qdrant_client import AsyncQdrantClient
 
-    return QdrantHybridSchemaClient118(AsyncQdrantClient(host=host, port=port))
+    return QdrantHybridSchemaClient118(
+        AsyncQdrantClient(host=host, port=port, grpc_port=grpc_port)
+    )
 
 
 async def async_main(
@@ -189,10 +191,15 @@ async def async_main(
     active_env = os.environ if env is None else env
     if not args.dry_run:
         ensure_execute_env(active_env)
-    active_client = client if client is not None else _build_client(
-        host=clean_host,
-        port=args.port,
-    )
+    active_client = client
+    if active_client is None and not args.dry_run:
+        active_client = _build_client(
+            host=clean_host,
+            port=args.port,
+            grpc_port=args.grpc_port,
+        )
+    if active_client is None:
+        active_client = _DryRunSchemaClient()
     report = await run_schema_create(
         client=active_client,
         spec=spec,
@@ -203,6 +210,23 @@ async def async_main(
     sys.stdout.write(json.dumps(report.to_safe_dict(), indent=2, sort_keys=True))
     sys.stdout.write("\n")
     return 0
+
+
+class _DryRunSchemaClient:
+    async def collection_exists(self, collection_name: str) -> bool:
+        raise RuntimeError("dry-run client should not be used")
+
+    async def create_collection(self, spec: HybridCollectionSpec118) -> None:
+        raise RuntimeError("dry-run client should not be used")
+
+    async def create_payload_indexes(self, spec: HybridCollectionSpec118) -> None:
+        raise RuntimeError("dry-run client should not be used")
+
+    async def get_collection_info(self, collection_name: str) -> Mapping[str, object]:
+        raise RuntimeError("dry-run client should not be used")
+
+    async def get_qdrant_versions(self) -> Mapping[str, str | None]:
+        raise RuntimeError("dry-run client should not be used")
 
 
 def main(argv: Sequence[str] | None = None) -> int:
