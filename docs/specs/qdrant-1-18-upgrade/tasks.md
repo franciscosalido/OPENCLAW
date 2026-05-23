@@ -73,6 +73,19 @@ Legend:
 | T-E05 | Define Q18-06 native fusion experiment. | Codex/Cowork | medium | future | T-D07 |
 | T-E06 | Define Q18-07 benchmark/ADR outcome. | Human/Codex | medium | future | T-E01..T-E05 |
 
+## Q18-03 Result Draft
+
+Q18-03 adds destructive local reset governance:
+
+- reset policy: `docs/specs/qdrant-1-18-upgrade/reset_policy.md`
+- script: `scripts/qdrant_reset_local_collections.py`
+- unit tests: `tests/unit/test_qdrant_reset_local_collections.py`
+- default behavior: dry-run
+- destructive gates: local host + `QDRANT_LOCAL_RESET=1` + long confirmation flag
+- deletion policy: exact names or approved prefixes only
+- schema changes: none
+- benchmark recreation: protocol/fake support only; real schema creation remains Q18-04
+
 ## Q18-02 Gate Draft
 
 Q18-02 may begin only after:

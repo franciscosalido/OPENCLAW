@@ -55,3 +55,20 @@ Before touching Docker or dependencies:
 - Schema changes: none.
 - Collection mutations: none.
 - Strict mode, quantization and low-memory mode: not enabled in Q18-02.
+
+## Q18-03 Result
+
+- Reset policy path: `docs/specs/qdrant-1-18-upgrade/reset_policy.md`.
+- Reset script path: `scripts/qdrant_reset_local_collections.py`.
+- Unit test path: `tests/unit/test_qdrant_reset_local_collections.py`.
+- Dry-run is default.
+- Destructive execution requires:
+  - local host only
+  - `QDRANT_LOCAL_RESET=1`
+  - `--execute`
+  - `--i-understand-this-deletes-local-qdrant-collections`
+- Delete targets use exact names or explicit prefixes only.
+- Wildcards, substring deletion and remote hosts are blocked.
+- Benchmark recreation is protocol/fake-supported, but real schema creation is
+  deferred to Q18-04.
+- Schema changes: none.
