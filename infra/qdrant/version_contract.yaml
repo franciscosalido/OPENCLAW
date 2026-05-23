@@ -1,0 +1,7 @@
+qdrant:
+  target_version: "1.18.0"
+  server_image: "qdrant/qdrant:v1.18.0"
+  client_dependency: "qdrant-client==1.18.0"
+  rest_port: 6333
+  grpc_port: 6334
+  config_schema_version: "qdrant-local-config-v1"
