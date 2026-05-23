@@ -276,7 +276,12 @@ async def execute_reset_plan(
     plan: ResetPlan,
     env: Mapping[str, str],
 ) -> ResetReport:
-    """Execute or dry-run a reset plan."""
+    """Execute or dry-run a reset plan.
+
+    Operational failures raise ``ResetRefused`` and do not return a partial
+    report. The ``errors`` report field is reserved for a future non-aborting
+    mode and remains empty in Q18-03.
+    """
 
     skipped = _skipped_collections(plan)
     if plan.dry_run:

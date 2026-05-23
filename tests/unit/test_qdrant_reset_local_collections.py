@@ -139,6 +139,15 @@ def test_is_deletable_rejects_substring_match() -> None:
     assert not reset.is_deletable_collection("contains_smoke_inside")
 
 
+def test_collection_with_null_byte_rejected_in_is_deletable() -> None:
+    with pytest.raises(ValueError, match="null bytes"):
+        reset.is_deletable_collection("q18_smoke_\x00bad")
+
+
+def test_prod_prefixed_benchmark_not_deletable() -> None:
+    assert not reset.is_deletable_collection("prod_q18_benchmark_x")
+
+
 def test_allowed_reset_collections_contract_is_explicit() -> None:
     assert reset.EXPLICIT_DELETE_ALLOWED == frozenset(
         {
@@ -263,6 +272,18 @@ def test_dry_run_is_default_in_parse_args() -> None:
     args = reset.parse_args([])
 
     assert args.dry_run is True
+    assert args.confirmed is False
+
+
+def test_execute_flag_switches_dry_run_false() -> None:
+    args = reset.parse_args(["--execute"])
+
+    assert args.dry_run is False
+
+
+def test_parse_args_confirmed_defaults_false() -> None:
+    args = reset.parse_args([])
+
     assert args.confirmed is False
 
 
@@ -523,7 +544,37 @@ def test_report_has_no_payload_vector_embedding_text() -> None:
         errors=(),
     ).to_safe_dict()
 
-    forbidden = {"payload", "vector", "vectors", "embedding", "text", "schema"}
+    forbidden = {
+        "documents",
+        "embedding",
+        "payload",
+        "points",
+        "schema",
+        "secrets",
+        "text",
+        "vector",
+        "vectors",
+    }
+    assert forbidden.isdisjoint(keys)
+
+
+def test_report_forbidden_terms_extended() -> None:
+    keys = reset.ResetReport(
+        schema_version=reset.RESET_REPORT_SCHEMA_VERSION,
+        dry_run=True,
+        host="localhost",
+        confirmed=False,
+        env_flag_present=False,
+        collections_before=(),
+        delete_targets=(),
+        deleted=(),
+        skipped=(),
+        collections_after=(),
+        recreated=(),
+        errors=(),
+    ).to_safe_dict()
+
+    forbidden = {"points", "documents", "secrets"}
     assert forbidden.isdisjoint(keys)
 
 
@@ -598,15 +649,19 @@ def test_script_does_not_call_recreate_collection() -> None:
 def test_script_does_not_touch_payload_schema_vectors() -> None:
     tree = ast.parse(SCRIPT_PATH.read_text(encoding="utf-8"))
     forbidden_calls = {
-        "get_collection",
-        "scroll",
-        "retrieve",
-        "query_points",
-        "upsert",
-        "update_collection",
         "create_collection",
         "create_payload_index",
+        "delete_payload",
         "delete_payload_index",
+        "delete_vectors",
+        "get_collection",
+        "query_points",
+        "retrieve",
+        "scroll",
+        "set_payload",
+        "update_collection",
+        "upload_collection",
+        "upsert",
     }
 
     for node in ast.walk(tree):

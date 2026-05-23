@@ -2,7 +2,7 @@
 
 ## Scope
 
-Este reset e apenas para ambiente local de desenvolvimento/benchmark.
+Este reset é apenas para ambiente local de desenvolvimento/benchmark.
 
 Q18-03 cria governanca destrutiva controlada. Ele nao cria schema hibrido, nao
 configura named vectors, nao faz ingestao, nao roda benchmark e nao toca Qdrant
@@ -14,6 +14,12 @@ remoto.
 - `QDRANT_LOCAL_RESET=1`
 - `--i-understand-this-deletes-local-qdrant-collections`
 - `--execute`
+
+## Dry-run gates
+
+Dry-run requires only a local host. `QDRANT_LOCAL_RESET=1` and
+`--i-understand-this-deletes-local-qdrant-collections` are NOT required for
+dry-run. No collection is deleted or created.
 
 ## Default behavior
 
