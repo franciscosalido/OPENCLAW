@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-Q18-07 remains inconclusive because required benchmark artifacts are missing; Python RRFFusion remains default, TurboQuant remains experimental, and PostgreSQL/GraphRAG remain out of scope.
+Qdrant 1.18 promotion is deferred due to measured regression; retain the previous safe profile and Python RRFFusion default.
 
 This report is artifact-only by default. It records missing evidence as missing
 evidence and never invents benchmark numbers.
@@ -20,7 +20,7 @@ evidence and never invents benchmark numbers.
 - Q18-05 tuning profiles: `baseline_ram`, `balanced_local`,
   `turboquant_experimental`.
 - Q18-06 native RRF comparison contracts.
-- Historical Qdrant 1.13 baseline present: `false`.
+- Historical Qdrant 1.13 baseline present: `true`.
 
 ## Documentation Paths
 
@@ -37,11 +37,11 @@ reported as `null`/TBD and excluded from promotion claims.
 
 | Scenario | Profile A | Profile B | Decision hint | Evidence complete |
 |---|---|---|---|---|
-| `qdrant_113_vs_118_baseline` | `qdrant_113_historical_baseline` | `qdrant_118_baseline_ram` | `inconclusive_missing_evidence` | false |
-| `qdrant_118_baseline_vs_balanced` | `qdrant_118_baseline_ram` | `qdrant_118_balanced_local` | `inconclusive_missing_evidence` | false |
-| `qdrant_118_python_rrf_vs_native_rrf` | `qdrant_118_python_rrf` | `qdrant_118_native_rrf` | `inconclusive_missing_evidence` | false |
-| `qdrant_118_no_quant_vs_turboquant` | `qdrant_118_no_quantization` | `qdrant_118_turboquant_experimental` | `inconclusive_missing_evidence` | false |
-| `qdrant_118_dense_only_vs_hybrid` | `qdrant_118_dense_only` | `qdrant_118_hybrid` | `inconclusive_missing_evidence` | false |
+| `qdrant_113_vs_118_baseline` | `qdrant_113_historical_baseline` | `qdrant_118_baseline_ram` | `defer_due_to_regression` | true |
+| `qdrant_118_baseline_vs_balanced` | `qdrant_118_baseline_ram` | `qdrant_118_balanced_local` | `defer_due_to_regression` | true |
+| `qdrant_118_python_rrf_vs_native_rrf` | `qdrant_118_python_rrf` | `qdrant_118_native_rrf` | `keep_python_rrf_default` | true |
+| `qdrant_118_no_quant_vs_turboquant` | `qdrant_118_no_quantization` | `qdrant_118_turboquant_experimental` | `defer_due_to_regression` | true |
+| `qdrant_118_dense_only_vs_hybrid` | `qdrant_118_dense_only` | `qdrant_118_hybrid` | `accept_qdrant_118_baseline` | true |
 
 ## Results
 
@@ -54,7 +54,7 @@ See `evaluation/results/qdrant_118_benchmark_charts.svg`.
 
 ## Decision
 
-`inconclusive_missing_evidence`
+`defer_due_to_regression`
 
 Python RRFFusion default: `true`.
 Native RRF decision: `keep_python_rrf_default`.
@@ -87,8 +87,8 @@ this cycle.
 <!-- machine-readable: qdrant-118-decision-v1 -->
 ```json
 {
-  "baseline_113_present": false,
-  "decision": "inconclusive_missing_evidence",
+  "baseline_113_present": true,
+  "decision": "defer_due_to_regression",
   "native_rrf": "keep_python_rrf_default",
   "postgresql": "out_of_scope",
   "python_rrf_default": true,
