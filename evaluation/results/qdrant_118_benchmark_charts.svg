@@ -1,0 +1,67 @@
+
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="760" viewBox="0 0 980 760" role="img" aria-label="Qdrant 1.18 benchmark dashboard">
+  <rect width="100%" height="100%" fill="#f8fafc"/>
+  <text x="30" y="40" font-family="Arial, sans-serif" font-size="24" font-weight="700" fill="#111827">Qdrant 1.18 Benchmark Dashboard</text>
+  <text x="30" y="66" font-family="Arial, sans-serif" font-size="13" fill="#475569">Decision: inconclusive_missing_evidence | Artifact-only: true</text>
+  <text x="30" y="90" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#111827">Quality</text>
+  <text x="30" y="132" font-family="Arial, sans-serif" font-size="10" fill="#334155">113_vs_118_baseline</text>
+  <rect x="200" y="118" width="0" height="16" fill="#2563eb" opacity="0.82"/>
+  <text x="468" y="131" font-family="Arial, sans-serif" font-size="11" fill="#334155">TBD</text>
+  <text x="30" y="166" font-family="Arial, sans-serif" font-size="10" fill="#334155">baseline_vs_balanced</text>
+  <rect x="200" y="152" width="0" height="16" fill="#2563eb" opacity="0.82"/>
+  <text x="468" y="165" font-family="Arial, sans-serif" font-size="11" fill="#334155">TBD</text>
+  <text x="30" y="200" font-family="Arial, sans-serif" font-size="10" fill="#334155">python_rrf_vs_native_rrf</text>
+  <rect x="200" y="186" width="0" height="16" fill="#2563eb" opacity="0.82"/>
+  <text x="468" y="199" font-family="Arial, sans-serif" font-size="11" fill="#334155">TBD</text>
+  <text x="30" y="234" font-family="Arial, sans-serif" font-size="10" fill="#334155">no_quant_vs_turboquant</text>
+  <rect x="200" y="220" width="0" height="16" fill="#2563eb" opacity="0.82"/>
+  <text x="468" y="233" font-family="Arial, sans-serif" font-size="11" fill="#334155">TBD</text>
+  <text x="30" y="268" font-family="Arial, sans-serif" font-size="10" fill="#334155">dense_only_vs_hybrid</text>
+  <rect x="200" y="254" width="0" height="16" fill="#2563eb" opacity="0.82"/>
+  <text x="468" y="267" font-family="Arial, sans-serif" font-size="11" fill="#334155">TBD</text>
+  <text x="520" y="90" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#111827">Latency</text>
+  <text x="520" y="132" font-family="Arial, sans-serif" font-size="10" fill="#334155">113_vs_118_baseline</text>
+  <rect x="690" y="118" width="0" height="16" fill="#b45309" opacity="0.82"/>
+  <text x="958" y="131" font-family="Arial, sans-serif" font-size="11" fill="#334155">TBD</text>
+  <text x="520" y="166" font-family="Arial, sans-serif" font-size="10" fill="#334155">baseline_vs_balanced</text>
+  <rect x="690" y="152" width="0" height="16" fill="#b45309" opacity="0.82"/>
+  <text x="958" y="165" font-family="Arial, sans-serif" font-size="11" fill="#334155">TBD</text>
+  <text x="520" y="200" font-family="Arial, sans-serif" font-size="10" fill="#334155">python_rrf_vs_native_rrf</text>
+  <rect x="690" y="186" width="0" height="16" fill="#b45309" opacity="0.82"/>
+  <text x="958" y="199" font-family="Arial, sans-serif" font-size="11" fill="#334155">TBD</text>
+  <text x="520" y="234" font-family="Arial, sans-serif" font-size="10" fill="#334155">no_quant_vs_turboquant</text>
+  <rect x="690" y="220" width="0" height="16" fill="#b45309" opacity="0.82"/>
+  <text x="958" y="233" font-family="Arial, sans-serif" font-size="11" fill="#334155">TBD</text>
+  <text x="520" y="268" font-family="Arial, sans-serif" font-size="10" fill="#334155">dense_only_vs_hybrid</text>
+  <rect x="690" y="254" width="0" height="16" fill="#b45309" opacity="0.82"/>
+  <text x="958" y="267" font-family="Arial, sans-serif" font-size="11" fill="#334155">TBD</text>
+  <text x="30" y="360" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#111827">Resources</text>
+  <text x="30" y="402" font-family="Arial, sans-serif" font-size="10" fill="#334155">113_vs_118_baseline</text>
+  <rect x="200" y="388" width="0" height="16" fill="#15803d" opacity="0.82"/>
+  <text x="468" y="401" font-family="Arial, sans-serif" font-size="11" fill="#334155">TBD</text>
+  <text x="30" y="436" font-family="Arial, sans-serif" font-size="10" fill="#334155">baseline_vs_balanced</text>
+  <rect x="200" y="422" width="0" height="16" fill="#15803d" opacity="0.82"/>
+  <text x="468" y="435" font-family="Arial, sans-serif" font-size="11" fill="#334155">TBD</text>
+  <text x="30" y="470" font-family="Arial, sans-serif" font-size="10" fill="#334155">python_rrf_vs_native_rrf</text>
+  <rect x="200" y="456" width="0" height="16" fill="#15803d" opacity="0.82"/>
+  <text x="468" y="469" font-family="Arial, sans-serif" font-size="11" fill="#334155">TBD</text>
+  <text x="30" y="504" font-family="Arial, sans-serif" font-size="10" fill="#334155">no_quant_vs_turboquant</text>
+  <rect x="200" y="490" width="0" height="16" fill="#15803d" opacity="0.82"/>
+  <text x="468" y="503" font-family="Arial, sans-serif" font-size="11" fill="#334155">TBD</text>
+  <text x="30" y="538" font-family="Arial, sans-serif" font-size="10" fill="#334155">dense_only_vs_hybrid</text>
+  <rect x="200" y="524" width="0" height="16" fill="#15803d" opacity="0.82"/>
+  <text x="468" y="537" font-family="Arial, sans-serif" font-size="11" fill="#334155">TBD</text>
+  <text x="520" y="360" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#111827">Decision</text>
+  <text x="520" y="401" font-family="Arial, sans-serif" font-size="10" fill="#334155">qdrant_113_vs_118_baseline</text>
+  <text x="770" y="401" font-family="Arial, sans-serif" font-size="11" fill="#0f172a">TBD</text>
+  <text x="520" y="435" font-family="Arial, sans-serif" font-size="10" fill="#334155">qdrant_118_baseline_vs_balanced</text>
+  <text x="770" y="435" font-family="Arial, sans-serif" font-size="11" fill="#0f172a">TBD</text>
+  <text x="520" y="469" font-family="Arial, sans-serif" font-size="10" fill="#334155">qdrant_118_python_rrf_vs_native_rrf</text>
+  <text x="770" y="469" font-family="Arial, sans-serif" font-size="11" fill="#0f172a">TBD</text>
+  <text x="520" y="503" font-family="Arial, sans-serif" font-size="10" fill="#334155">qdrant_118_no_quant_vs_turboquant</text>
+  <text x="770" y="503" font-family="Arial, sans-serif" font-size="11" fill="#0f172a">TBD</text>
+  <text x="520" y="537" font-family="Arial, sans-serif" font-size="10" fill="#334155">qdrant_118_dense_only_vs_hybrid</text>
+  <text x="770" y="537" font-family="Arial, sans-serif" font-size="11" fill="#0f172a">TBD</text>
+  <text x="30" y="650" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#111827">Fusion comparison</text>
+  <text x="30" y="676" font-family="Arial, sans-serif" font-size="13" fill="#334155">Python RRF vs native RRF: inconclusive_missing_evidence</text>
+</svg>

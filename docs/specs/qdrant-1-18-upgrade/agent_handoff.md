@@ -154,3 +154,30 @@ Before touching Docker or dependencies:
   - ambiguous queries -> `neutral`
 - Q18-06 does not import MCP, OpenTelemetry or qdrant-client, and performs no
   collection mutation, schema change, ingest, benchmark or live retrieval.
+
+## Q18-07 Result
+
+- Comparator path: `evaluation/compare_qdrant_113_vs_118.py`.
+- Unit test path: `tests/unit/test_compare_qdrant_113_vs_118.py`.
+- Decision report path: `docs/rag/qdrant_118_upgrade_results.md`.
+- Final ADR path: `docs/ADR/ADR-0XX-qdrant-118-upgrade.md`.
+- Generated artifact paths:
+  - `evaluation/results/qdrant_118_benchmark_summary.json`
+  - `evaluation/results/qdrant_118_benchmark_rows.csv`
+  - `evaluation/results/qdrant_118_benchmark_report.md`
+  - `evaluation/results/qdrant_118_benchmark_charts.svg`
+- Artifact-only is the default and does not call Qdrant.
+- Live benchmark is gated by `RUN_QDRANT_118_BENCHMARK=1` plus
+  `--execute-live-benchmark`.
+- Official scenarios:
+  - Qdrant 1.13 historical baseline vs Qdrant 1.18 `baseline_ram`
+  - Qdrant 1.18 `baseline_ram` vs `balanced_local`
+  - Qdrant 1.18 Python RRF vs native RRF
+  - no quantization vs `turboquant_experimental`
+  - `dense_only` vs `hybrid`
+- With no live artifacts committed, current decision is
+  `inconclusive_missing_evidence`.
+- Python RRFFusion remains default. Native RRF remains experimental unless
+  strong overlap/quality/latency evidence is supplied.
+- TurboQuant remains experimental only.
+- PostgreSQL and GraphRAG remain outside Q18.

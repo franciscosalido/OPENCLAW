@@ -134,6 +134,27 @@ Q18-06 adds an experimental Python RRF vs Qdrant native RRF comparison adapter:
 - Qdrant mutation, MCP live server, benchmark execution and retrieval default
   changes: none
 
+## Q18-07 Result Draft
+
+Q18-07 adds the final benchmark comparison and decision artifact contract:
+
+- comparator module: `evaluation/compare_qdrant_113_vs_118.py`
+- unit tests: `tests/unit/test_compare_qdrant_113_vs_118.py`
+- decision report: `docs/rag/qdrant_118_upgrade_results.md`
+- final ADR: `docs/ADR/ADR-0XX-qdrant-118-upgrade.md`
+- generated artifact paths:
+  - `evaluation/results/qdrant_118_benchmark_summary.json`
+  - `evaluation/results/qdrant_118_benchmark_rows.csv`
+  - `evaluation/results/qdrant_118_benchmark_report.md`
+  - `evaluation/results/qdrant_118_benchmark_charts.svg`
+- default mode: artifact-only, no Qdrant calls
+- live benchmark gate: `RUN_QDRANT_118_BENCHMARK=1 --execute-live-benchmark`
+- official scenarios: 1.13 vs 1.18 baseline, baseline vs balanced, Python RRF
+  vs native RRF, no quantization vs TurboQuant, dense-only vs hybrid
+- current decision without live artifacts: `inconclusive_missing_evidence`
+- Python RRFFusion remains default; TurboQuant remains experimental; PostgreSQL
+  and GraphRAG remain outside Q18
+
 ## Q18-02 Gate Draft
 
 Q18-02 may begin only after:
