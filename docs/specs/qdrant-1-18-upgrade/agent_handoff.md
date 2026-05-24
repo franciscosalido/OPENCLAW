@@ -128,3 +128,29 @@ Before touching Docker or dependencies:
   comparisons.
 - Q18-07 consumes `QdrantTuningRunSummary` for memory, latency and quality
   decision reporting.
+
+## Q18-06 Result
+
+- Native fusion module path: `backend/rag/qdrant_native_fusion.py`.
+- Native fusion docs path:
+  `docs/specs/qdrant-1-18-upgrade/native_rrf_adapter.md`.
+- Unit test path: `tests/unit/test_qdrant_native_fusion.py`.
+- Python `RRFFusion` remains source of truth.
+- Native Qdrant RRF / Weighted RRF is experimental and opt-in only.
+- Adapter default is disabled.
+- Comparison focuses on overlap, Jaccard, order equality, set equality, rank
+  deltas, tie-break notes and latency. Exact native score equivalence is not a
+  promotion criterion.
+- Future RAG-03 MCP design is documented as:
+  - one MCP server
+  - `semantic_hybrid_search` tool
+  - `lexical_hybrid_search` tool
+  - same Qdrant collection
+  - same `dense` and `sparse` named vectors
+  - different RRF weight profiles only
+- Deterministic query-style routing is offline and heuristic-only:
+  - ticker/acronym/code-heavy queries -> `lexical_hybrid`
+  - long natural-language questions -> `semantic_hybrid`
+  - ambiguous queries -> `neutral`
+- Q18-06 does not import MCP, OpenTelemetry or qdrant-client, and performs no
+  collection mutation, schema change, ingest, benchmark or live retrieval.
