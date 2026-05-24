@@ -50,6 +50,69 @@ from backend.rag.qdrant_native_fusion import (
 ROOT = Path(__file__).resolve().parents[2]
 MODULE_PATH = ROOT / "backend/rag/qdrant_native_fusion.py"
 DOC_PATH = ROOT / "docs/specs/qdrant-1-18-upgrade/native_rrf_adapter.md"
+NETWORK_METHOD_NAMES = frozenset(
+    {"get", "post", "put", "patch", "delete", "request", "send", "connect"}
+)
+NETWORK_RECEIVER_ROOTS = frozenset({"aiohttp", "httpx", "requests", "urllib"})
+NETWORK_RECEIVER_NAMES = frozenset(
+    {
+        "api_client",
+        "async_client",
+        "client",
+        "connection",
+        "conn",
+        "http_client",
+        "session",
+        "_client",
+    }
+)
+
+
+def _ast_root_name(node: ast.AST) -> str | None:
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        return _ast_root_name(node.value)
+    if isinstance(node, ast.Call):
+        return _ast_root_name(node.func)
+    return None
+
+
+def _ast_leaf_name(node: ast.AST) -> str | None:
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        return node.attr
+    if isinstance(node, ast.Call):
+        return _ast_leaf_name(node.func)
+    return None
+
+
+def _looks_like_http_receiver(node: ast.AST) -> bool:
+    root = _ast_root_name(node)
+    leaf = _ast_leaf_name(node)
+    return (
+        root in NETWORK_RECEIVER_ROOTS
+        or root in NETWORK_RECEIVER_NAMES
+        or leaf in NETWORK_RECEIVER_ROOTS
+        or leaf in NETWORK_RECEIVER_NAMES
+    )
+
+
+def _network_call_violations(tree: ast.AST) -> tuple[str, ...]:
+    violations: list[str] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        if isinstance(node.func, ast.Name) and node.func.id in NETWORK_METHOD_NAMES:
+            violations.append(node.func.id)
+        elif (
+            isinstance(node.func, ast.Attribute)
+            and node.func.attr in NETWORK_METHOD_NAMES
+            and _looks_like_http_receiver(node.func.value)
+        ):
+            violations.append(node.func.attr)
+    return tuple(violations)
 
 
 @dataclass(frozen=True, slots=True)
@@ -540,6 +603,26 @@ def test_module_does_not_import_mcp_sdk() -> None:
 
 def test_module_does_not_import_opentelemetry() -> None:
     assert _imported_roots().isdisjoint({"opentelemetry"})
+
+
+def test_network_call_detector_allows_mapping_get_but_flags_http_clients() -> None:
+    tree = ast.parse(
+        """
+payload.get("doc_id")
+response.get("points")
+http_client.get("/health")
+requests.post("/events")
+self._client.request("GET", "/collections")
+"""
+    )
+
+    assert _network_call_violations(tree) == ("get", "post", "request")
+
+
+def test_module_has_no_http_network_calls() -> None:
+    tree = ast.parse(MODULE_PATH.read_text(encoding="utf-8"))
+
+    assert _network_call_violations(tree) == ()
 
 
 def test_module_does_not_call_create_delete_upsert_collection() -> None:
