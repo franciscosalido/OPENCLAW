@@ -291,7 +291,14 @@ def test_svg_dashboard_renders() -> None:
 def test_svg_contains_quality_latency_resources_decision() -> None:
     svg = render_svg_dashboard(build_summary(runs=_complete_runs()))
 
-    for label in ("Quality", "Latency", "Resources", "Decision"):
+    for label in ("Quality", "Latency", "Resources", "Decision", "Fusion"):
+        assert label in svg
+
+
+def test_svg_decision_matrix_contains_winner_confidence_decision() -> None:
+    svg = render_svg_dashboard(build_summary(runs=()))
+
+    for label in ("Winner", "Confidence", "Decision"):
         assert label in svg
 
 
@@ -430,3 +437,19 @@ def test_render_adr_status_is_proposed_when_missing_evidence() -> None:
     adr = render_adr(build_summary(runs=()))
 
     assert "Status: Proposed" in adr
+
+
+def test_results_gitkeep_documents_header_only_csv() -> None:
+    text = (ROOT / "evaluation/results/.gitkeep").read_text(encoding="utf-8")
+
+    assert "only a header" in text
+    assert "artifact-only mode" in text
+
+
+def test_report_and_adr_document_canonical_adr_directory() -> None:
+    report = render_markdown_report(build_summary(runs=()))
+    adr = render_adr(build_summary(runs=()))
+
+    assert "canonical ADR directory" in report
+    assert "docs/ADR" in report
+    assert "p95_multiplier <= 1.0" in adr

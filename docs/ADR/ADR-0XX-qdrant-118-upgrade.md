@@ -40,6 +40,10 @@ Recommended profile: `TBD`.
 
 Native RRF decision: `keep_python_rrf_default`.
 
+Native RRF promotion is intentionally conservative: it requires strong overlap,
+no material quality regression, no tie-break regressions and p95 latency that is
+equal to or faster than Python RRFFusion (`p95_multiplier <= 1.0`).
+
 ## TurboQuant Decision
 
 TurboQuant decision: `accept_turboquant_experimental_only`.
@@ -62,6 +66,8 @@ TurboQuant decision: `accept_turboquant_experimental_only`.
 - NDCG@5 delta below `-0.01`.
 - p95 latency multiplier above `2.5`.
 - Native RRF tie-break regressions appear.
+- Native RRF p95 latency is slower than Python RRFFusion when promotion is
+  being considered (`native/python p95 multiplier > 1.0`).
 - Memory reporting contradicts local-first resource goals.
 
 ## Follow-ups

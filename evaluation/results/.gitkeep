@@ -1,1 +1,5 @@
+Q18 benchmark result files are generated artifacts.
 
+The comparator writes qdrant_118_benchmark_rows.csv with only a header when no
+benchmark runs are available. That is expected in artifact-only mode; rows are
+populated only after a live or imported benchmark provides run artifacts.

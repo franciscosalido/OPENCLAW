@@ -22,6 +22,11 @@ evidence and never invents benchmark numbers.
 - Q18-06 native RRF comparison contracts.
 - Historical Qdrant 1.13 baseline present: `false`.
 
+## Documentation Paths
+
+The canonical ADR directory in this repository is `docs/ADR`. Lowercase
+`docs/adr` references should be treated as legacy/case-insensitive aliases.
+
 ## Methodology
 
 Each scenario compares two named artifact profiles. Quality metrics are higher

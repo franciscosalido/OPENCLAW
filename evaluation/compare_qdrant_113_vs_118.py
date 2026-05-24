@@ -836,6 +836,11 @@ evidence and never invents benchmark numbers.
 - Q18-06 native RRF comparison contracts.
 - Historical Qdrant 1.13 baseline present: `{str(summary.baseline_113_present).lower()}`.
 
+## Documentation Paths
+
+The canonical ADR directory in this repository is `docs/ADR`. Lowercase
+`docs/adr` references should be treated as legacy/case-insensitive aliases.
+
 ## Methodology
 
 Each scenario compares two named artifact profiles. Quality metrics are higher
@@ -947,6 +952,10 @@ Recommended profile: `{summary.recommended_default_profile or "TBD"}`.
 
 Native RRF decision: `{summary.native_rrf_decision}`.
 
+Native RRF promotion is intentionally conservative: it requires strong overlap,
+no material quality regression, no tie-break regressions and p95 latency that is
+equal to or faster than Python RRFFusion (`p95_multiplier <= 1.0`).
+
 ## TurboQuant Decision
 
 TurboQuant decision: `{summary.turboquant_decision}`.
@@ -969,6 +978,8 @@ TurboQuant decision: `{summary.turboquant_decision}`.
 - NDCG@5 delta below `-0.01`.
 - p95 latency multiplier above `2.5`.
 - Native RRF tie-break regressions appear.
+- Native RRF p95 latency is slower than Python RRFFusion when promotion is
+  being considered (`native/python p95 multiplier > 1.0`).
 - Memory reporting contradicts local-first resource goals.
 
 ## Follow-ups
@@ -1318,14 +1329,37 @@ def _svg_decision_matrix(
     y: int,
 ) -> str:
     parts = [
-        f'<text x="{x}" y="{y}" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#111827">Decision</text>'
+        f'<text x="{x}" y="{y}" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#111827">Decision</text>',
+        f'<text x="{x}" y="{y + 26}" font-family="Arial, sans-serif" font-size="10" font-weight="700" fill="#475569">Scenario</text>',
+        f'<text x="{x + 190}" y="{y + 26}" font-family="Arial, sans-serif" font-size="10" font-weight="700" fill="#475569">Winner</text>',
+        f'<text x="{x + 260}" y="{y + 26}" font-family="Arial, sans-serif" font-size="10" font-weight="700" fill="#475569">Confidence</text>',
+        f'<text x="{x + 345}" y="{y + 26}" font-family="Arial, sans-serif" font-size="10" font-weight="700" fill="#475569">Decision</text>',
     ]
     for index, scenario in enumerate(scenarios[:5]):
-        row_y = y + 28 + (index * 34)
-        status = "complete" if scenario.evidence_complete else "TBD"
+        row_y = y + 44 + (index * 34)
+        winner = _scenario_winner(scenario)
+        confidence = "complete" if scenario.evidence_complete else "TBD"
         parts.append(f'<text x="{x}" y="{row_y + 13}" font-family="Arial, sans-serif" font-size="10" fill="#334155">{html.escape(scenario.scenario[:36])}</text>')
-        parts.append(f'<text x="{x + 250}" y="{row_y + 13}" font-family="Arial, sans-serif" font-size="11" fill="#0f172a">{html.escape(status)}</text>')
+        parts.append(f'<text x="{x + 190}" y="{row_y + 13}" font-family="Arial, sans-serif" font-size="10" fill="#0f172a">{html.escape(winner)}</text>')
+        parts.append(f'<text x="{x + 260}" y="{row_y + 13}" font-family="Arial, sans-serif" font-size="10" fill="#0f172a">{html.escape(confidence)}</text>')
+        parts.append(f'<text x="{x + 345}" y="{row_y + 13}" font-family="Arial, sans-serif" font-size="10" fill="#0f172a">{html.escape(scenario.decision_hint[:28])}</text>')
     return "\n  ".join(parts)
+
+
+def _scenario_winner(scenario: BenchmarkScenarioResult) -> str:
+    if not scenario.evidence_complete:
+        return "TBD"
+    counts = {"profile_a": 0, "profile_b": 0}
+    for value in scenario.deltas.values():
+        if isinstance(value, Mapping):
+            winner = value.get("winner")
+            if winner in counts:
+                counts[winner] += 1
+    if counts["profile_b"] > counts["profile_a"]:
+        return "profile_b"
+    if counts["profile_a"] > counts["profile_b"]:
+        return "profile_a"
+    return "tie"
 
 
 def _svg_fusion_panel(
