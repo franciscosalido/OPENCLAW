@@ -68,6 +68,15 @@ class EmbeddingContractConfigTests(unittest.TestCase):
         self.assertIn("quimera_embed", aliases)
         self.assertIn("local_embed", aliases)
 
+    def test_infra_litellm_config_is_canonical_runtime_config(self) -> None:
+        reference_text = REFERENCE_LITELLM_CONFIG.read_text(encoding="utf-8")
+
+        self.assertIn(
+            "Canonical runtime config: infra/litellm/litellm_config.yaml",
+            reference_text,
+        )
+        self.assertTrue(OPERATIONAL_LITELLM_CONFIG.exists())
+
     def test_embedding_aliases_share_same_current_backend(self) -> None:
         for path in (REFERENCE_LITELLM_CONFIG, OPERATIONAL_LITELLM_CONFIG):
             with self.subTest(path=path):

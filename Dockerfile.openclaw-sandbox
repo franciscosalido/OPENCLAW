@@ -1,0 +1,27 @@
+FROM python:3.14-slim
+
+# Install uv and minimal build tools
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends gcc python3-dev && \
+    rm -rf /var/lib/apt/lists/* && \
+    pip install uv --no-cache-dir
+
+# Pre-install project dependencies into /opt/openclaw-venv
+# This path is NOT under /workspace so it survives the volume mount.
+WORKDIR /tmp/setup
+COPY pyproject.toml uv.lock ./
+
+# Minimal stub so uv sync does not complain about a missing package source
+RUN mkdir -p backend && touch backend/__init__.py
+
+# Sync all deps (including dev) — skip installing the project itself
+RUN uv sync --frozen && \
+    mv .venv /opt/openclaw-venv && \
+    rm -rf /tmp/setup
+
+ENV VIRTUAL_ENV=/opt/openclaw-venv
+ENV PATH=/opt/openclaw-venv/bin:$PATH
+# Project source arrives via volume mount at runtime
+ENV PYTHONPATH=/workspace
+
+WORKDIR /workspace

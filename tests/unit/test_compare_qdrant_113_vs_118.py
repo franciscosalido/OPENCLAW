@@ -39,7 +39,7 @@ from evaluation.compare_qdrant_113_vs_118 import (
 ROOT = Path(__file__).resolve().parents[2]
 MODULE_PATH = ROOT / "evaluation/compare_qdrant_113_vs_118.py"
 DOC_REPORT = ROOT / "docs/rag/qdrant_118_upgrade_results.md"
-ADR_PATH = ROOT / "docs/ADR/ADR-0XX-qdrant-118-upgrade.md"
+ADR_PATH = ROOT / "docs/ADR/ADR-018-qdrant-118-upgrade.md"
 
 
 def _run(
@@ -228,18 +228,24 @@ def test_inconclusive_when_baseline_missing() -> None:
     assert summary.final_decision == BenchmarkDecision.INCONCLUSIVE_MISSING_EVIDENCE.value
 
 
-def test_all_five_scenarios_are_declared() -> None:
-    assert len(COMPARISONS) == 5
+def test_all_five_nomic_scenarios_are_declared() -> None:
+    nomic_ids = {s.scenario.value for s in COMPARISONS if "qwen3" not in s.scenario.value and "nomic_vs_qwen" not in s.scenario.value}
+    assert len(nomic_ids) == 5
+
+
+def test_all_qwen3_scenarios_are_declared() -> None:
+    qwen3_ids = {s.scenario.value for s in COMPARISONS if "qwen3" in s.scenario.value or "nomic_vs_qwen3" in s.scenario.value}
+    assert len(qwen3_ids) == 6
 
 
 def test_scenario_ids_are_stable() -> None:
-    assert tuple(item.scenario.value for item in COMPARISONS) == (
-        "qdrant_113_vs_118_baseline",
-        "qdrant_118_baseline_vs_balanced",
-        "qdrant_118_python_rrf_vs_native_rrf",
-        "qdrant_118_no_quant_vs_turboquant",
-        "qdrant_118_dense_only_vs_hybrid",
-    )
+    ids = tuple(item.scenario.value for item in COMPARISONS)
+    assert "qdrant_113_vs_118_baseline" in ids
+    assert "qdrant_118_baseline_vs_balanced" in ids
+    assert "qdrant_118_python_rrf_vs_native_rrf" in ids
+    assert "qdrant_118_no_quant_vs_turboquant" in ids
+    assert "qdrant_118_dense_only_vs_hybrid" in ids
+    assert "qdrant_118_nomic_vs_qwen3_embedding" in ids
 
 
 def test_scenario_summary_has_profile_a_and_b() -> None:
@@ -453,3 +459,43 @@ def test_report_and_adr_document_canonical_adr_directory() -> None:
     assert "canonical ADR directory" in report
     assert "docs/ADR" in report
     assert "p95_multiplier <= 1.0" in adr
+
+
+# ── safe-text guard correctness ───────────────────────────────────────────────
+
+def test_safe_text_allows_dense_vector_name_metadata() -> None:
+    """dense_vector_name is safe metadata; the guard must not block it."""
+    compare._assert_safe_text('{"dense_vector_name": "dense", "sparse_vector_name": "sparse"}')
+
+
+def test_safe_text_allows_sparse_vector_name_metadata() -> None:
+    compare._assert_safe_text('{"sparse_vector_name": "sparse", "embedding_model": "Qwen/Qwen3-Embedding-0.6B"}')
+
+
+def test_safe_text_allows_embedding_model_metadata() -> None:
+    compare._assert_safe_text('{"embedding_model": "nomic-embed-text", "embedding_dimensions": 768}')
+
+
+def test_safe_text_blocks_dense_vector_key() -> None:
+    with pytest.raises(ValueError, match="unsafe benchmark output"):
+        compare._assert_safe_text('{"dense_vector": [0.1, 0.2, 0.3]}')
+
+
+def test_safe_text_blocks_sparse_vector_key() -> None:
+    with pytest.raises(ValueError, match="unsafe benchmark output"):
+        compare._assert_safe_text('{"sparse_vector": {"indices": [], "values": []}}')
+
+
+def test_safe_text_blocks_payload_key() -> None:
+    with pytest.raises(ValueError, match="unsafe benchmark output"):
+        compare._assert_safe_text('{"payload": {"doc_id": "doc_001"}}')
+
+
+def test_safe_text_blocks_embedding_key() -> None:
+    with pytest.raises(ValueError, match="unsafe benchmark output"):
+        compare._assert_safe_text('{"embedding": [0.1, 0.2, 0.3]}')
+
+
+def test_safe_text_blocks_query_text_key() -> None:
+    with pytest.raises(ValueError, match="unsafe benchmark output"):
+        compare._assert_safe_text('{"query_text": "qual a selic?"}')

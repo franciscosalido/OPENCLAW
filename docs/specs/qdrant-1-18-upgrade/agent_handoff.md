@@ -160,7 +160,7 @@ Before touching Docker or dependencies:
 - Comparator path: `evaluation/compare_qdrant_113_vs_118.py`.
 - Unit test path: `tests/unit/test_compare_qdrant_113_vs_118.py`.
 - Decision report path: `docs/rag/qdrant_118_upgrade_results.md`.
-- Final ADR path: `docs/ADR/ADR-0XX-qdrant-118-upgrade.md`.
+- Final ADR path: `docs/ADR/ADR-018-qdrant-118-upgrade.md`.
 - Generated artifact paths:
   - `evaluation/results/qdrant_118_benchmark_summary.json`
   - `evaluation/results/qdrant_118_benchmark_rows.csv`

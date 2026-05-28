@@ -1,5 +1,10 @@
 # LiteLLM Gateway Configuration — Quimera/OpenClaw Gateway-0
 #
+# Canonical runtime config: infra/litellm/litellm_config.yaml.
+# This file is retained as a static/reference gateway contract for older tests
+# and scripts. Keep global settings aligned with the infra config, but prefer
+# the infra path for live LiteLLM startup.
+#
 # Local-only MVP:
 # - LiteLLM is the single future gateway for model calls.
 # - This file defines semantic aliases only; existing runtime code is not wired
@@ -80,6 +85,8 @@ model_list:
 litellm_settings:
   drop_params: true
   set_verbose: false
+  num_retries: 1
+  request_timeout: 35
 
 # Future sanitized remote fallback placeholder:
 # - Remote provider aliases must be added only by explicit architecture approval.

@@ -141,7 +141,7 @@ Q18-07 adds the final benchmark comparison and decision artifact contract:
 - comparator module: `evaluation/compare_qdrant_113_vs_118.py`
 - unit tests: `tests/unit/test_compare_qdrant_113_vs_118.py`
 - decision report: `docs/rag/qdrant_118_upgrade_results.md`
-- final ADR: `docs/ADR/ADR-0XX-qdrant-118-upgrade.md`
+- final ADR: `docs/ADR/ADR-018-qdrant-118-upgrade.md`
 - generated artifact paths:
   - `evaluation/results/qdrant_118_benchmark_summary.json`
   - `evaluation/results/qdrant_118_benchmark_rows.csv`

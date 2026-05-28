@@ -16,17 +16,29 @@ import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
+from pathlib import Path
 
 import httpx
+import yaml
 from qdrant_client import AsyncQdrantClient
 
 READINESS_SCHEMA_VERSION = "qdrant-readiness-v1"
-EXPECTED_QDRANT_VERSION = "1.18.0"
-EXPECTED_REST_PORT = 6333
-EXPECTED_GRPC_PORT = 6334
 DEFAULT_HOST = "localhost"
 DEFAULT_TIMEOUT_S = 5.0
+DEFAULT_VERSION_CONTRACT_PATH = (
+    Path(__file__).resolve().parents[1] / "infra/qdrant/version_contract.yaml"
+)
+
+
+@dataclass(frozen=True, slots=True)
+class QdrantVersionContract:
+    """Version contract for Qdrant server/client readiness."""
+
+    server_target_version: str
+    client_target_version: str
+    version_family: str
+    rest_port: int
+    grpc_port: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,10 +47,13 @@ class QdrantReadiness:
 
     schema_version: str
     checked_at_utc: str
-    target_version: str
+    target_server_version: str
+    target_client_version: str
     qdrant_client_version: str
     qdrant_server_version: str | None
-    version_parity_ok: bool
+    version_family: str
+    version_family_ok: bool
+    version_exact_parity_ok: bool
     rest_port: int
     grpc_port: int
     rest_ok: bool
@@ -51,10 +66,13 @@ class QdrantReadiness:
         return {
             "schema_version": self.schema_version,
             "checked_at_utc": self.checked_at_utc,
-            "target_version": self.target_version,
+            "target_server_version": self.target_server_version,
+            "target_client_version": self.target_client_version,
             "qdrant_client_version": self.qdrant_client_version,
             "qdrant_server_version": self.qdrant_server_version,
-            "version_parity_ok": self.version_parity_ok,
+            "version_family": self.version_family,
+            "version_family_ok": self.version_family_ok,
+            "version_exact_parity_ok": self.version_exact_parity_ok,
             "rest_port": self.rest_port,
             "grpc_port": self.grpc_port,
             "rest_ok": self.rest_ok,
@@ -69,6 +87,41 @@ def _utc_now_iso() -> str:
 
 def _client_version() -> str:
     return importlib.metadata.version("qdrant-client")
+
+
+def load_version_contract(path: Path = DEFAULT_VERSION_CONTRACT_PATH) -> QdrantVersionContract:
+    """Load the local Qdrant version contract from YAML."""
+
+    with path.open("r", encoding="utf-8") as contract_file:
+        raw = yaml.safe_load(contract_file)
+    if not isinstance(raw, dict):
+        raise ValueError("version contract must be a mapping")
+    qdrant = raw.get("qdrant")
+    if not isinstance(qdrant, dict):
+        raise ValueError("version contract must contain qdrant mapping")
+
+    server_target_version = qdrant.get("server_target_version")
+    client_target_version = qdrant.get("client_target_version")
+    version_family = qdrant.get("version_family")
+    rest_port = qdrant.get("rest_port")
+    grpc_port = qdrant.get("grpc_port")
+    if not isinstance(server_target_version, str) or not server_target_version:
+        raise ValueError("server_target_version must be a non-empty string")
+    if not isinstance(client_target_version, str) or not client_target_version:
+        raise ValueError("client_target_version must be a non-empty string")
+    if not isinstance(version_family, str) or not version_family:
+        raise ValueError("version_family must be a non-empty string")
+    if not isinstance(rest_port, int):
+        raise TypeError("rest_port must be an integer")
+    if not isinstance(grpc_port, int):
+        raise TypeError("grpc_port must be an integer")
+    return QdrantVersionContract(
+        server_target_version=server_target_version,
+        client_target_version=client_target_version,
+        version_family=version_family,
+        rest_port=_validate_port(rest_port, "rest_port"),
+        grpc_port=_validate_port(grpc_port, "grpc_port"),
+    )
 
 
 def _validate_port(value: int, field_name: str) -> int:
@@ -146,7 +199,9 @@ async def check_grpc_probe(host: str, grpc_port: int, timeout_s: float) -> bool:
 
 def build_readiness_report(
     *,
-    target_version: str,
+    target_server_version: str,
+    target_client_version: str,
+    version_family: str,
     qdrant_client_version: str,
     qdrant_server_version: str | None,
     rest_port: int,
@@ -159,18 +214,32 @@ def build_readiness_report(
 
     clean_rest_port = _validate_port(rest_port, "rest_port")
     clean_grpc_port = _validate_port(grpc_port, "grpc_port")
-    version_parity_ok = (
-        qdrant_client_version == target_version
-        and qdrant_server_version == target_version
+    version_exact_parity_ok = (
+        qdrant_server_version is not None
+        and qdrant_client_version == qdrant_server_version
     )
-    ready = bool(rest_ok and grpc_ok and version_parity_ok)
+    version_family_ok = (
+        qdrant_server_version is not None
+        and qdrant_server_version.startswith(f"{version_family}.")
+        and qdrant_client_version.startswith(f"{version_family}.")
+    )
+    ready = bool(
+        rest_ok
+        and grpc_ok
+        and version_family_ok
+        and qdrant_server_version == target_server_version
+        and qdrant_client_version == target_client_version
+    )
     return QdrantReadiness(
         schema_version=READINESS_SCHEMA_VERSION,
         checked_at_utc=checked_at_utc if checked_at_utc is not None else _utc_now_iso(),
-        target_version=target_version,
+        target_server_version=target_server_version,
+        target_client_version=target_client_version,
         qdrant_client_version=qdrant_client_version,
         qdrant_server_version=qdrant_server_version,
-        version_parity_ok=version_parity_ok,
+        version_family=version_family,
+        version_family_ok=version_family_ok,
+        version_exact_parity_ok=version_exact_parity_ok,
         rest_port=clean_rest_port,
         grpc_port=clean_grpc_port,
         rest_ok=rest_ok,
@@ -182,10 +251,12 @@ def build_readiness_report(
 def assert_qdrant_118_ready(report: QdrantReadiness) -> None:
     """Raise RuntimeError if the local Qdrant 1.18 readiness contract is not met."""
 
-    if report.qdrant_client_version != report.target_version:
+    if report.qdrant_client_version != report.target_client_version:
         raise RuntimeError("unexpected qdrant client version")
-    if report.qdrant_server_version != report.target_version:
+    if report.qdrant_server_version != report.target_server_version:
         raise RuntimeError("unexpected qdrant server version")
+    if not report.version_family_ok:
+        raise RuntimeError("qdrant client/server version family mismatch")
     if not report.rest_ok:
         raise RuntimeError("qdrant REST probe failed")
     if not report.grpc_ok:
@@ -197,9 +268,16 @@ def assert_qdrant_118_ready(report: QdrantReadiness) -> None:
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Check local Qdrant 1.18 readiness.")
     parser.add_argument("--host", default=DEFAULT_HOST)
-    parser.add_argument("--rest-port", type=int, default=EXPECTED_REST_PORT)
-    parser.add_argument("--grpc-port", type=int, default=EXPECTED_GRPC_PORT)
-    parser.add_argument("--target-version", default=EXPECTED_QDRANT_VERSION)
+    parser.add_argument("--rest-port", type=int, default=None)
+    parser.add_argument("--grpc-port", type=int, default=None)
+    parser.add_argument("--target-server-version", default=None)
+    parser.add_argument("--target-client-version", default=None)
+    parser.add_argument("--version-family", default=None)
+    parser.add_argument(
+        "--version-contract",
+        type=Path,
+        default=DEFAULT_VERSION_CONTRACT_PATH,
+    )
     parser.add_argument("--timeout-s", type=float, default=DEFAULT_TIMEOUT_S)
     return parser
 
@@ -208,9 +286,29 @@ async def async_main(argv: Sequence[str] | None = None) -> int:
     """Run the async readiness probes and emit safe JSON to stdout."""
 
     args = _build_parser().parse_args(argv)
+    contract = load_version_contract(args.version_contract)
     timeout_s = _validate_timeout(args.timeout_s)
-    rest_port = _validate_port(args.rest_port, "rest_port")
-    grpc_port = _validate_port(args.grpc_port, "grpc_port")
+    rest_port = _validate_port(
+        contract.rest_port if args.rest_port is None else args.rest_port,
+        "rest_port",
+    )
+    grpc_port = _validate_port(
+        contract.grpc_port if args.grpc_port is None else args.grpc_port,
+        "grpc_port",
+    )
+    target_server_version = (
+        contract.server_target_version
+        if args.target_server_version is None
+        else args.target_server_version
+    )
+    target_client_version = (
+        contract.client_target_version
+        if args.target_client_version is None
+        else args.target_client_version
+    )
+    version_family = (
+        contract.version_family if args.version_family is None else args.version_family
+    )
 
     rest_ok, server_version, grpc_ok = await asyncio.gather(
         check_rest_health(args.host, rest_port, timeout_s),
@@ -218,7 +316,9 @@ async def async_main(argv: Sequence[str] | None = None) -> int:
         check_grpc_probe(args.host, grpc_port, timeout_s),
     )
     report = build_readiness_report(
-        target_version=args.target_version,
+        target_server_version=target_server_version,
+        target_client_version=target_client_version,
+        version_family=version_family,
         qdrant_client_version=_client_version(),
         qdrant_server_version=server_version,
         rest_port=rest_port,

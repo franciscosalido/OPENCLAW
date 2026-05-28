@@ -1,93 +1,158 @@
-# ADR-0XX: Qdrant 1.18 Upgrade Decision
+# ADR-D2P-018: Qdrant 1.18.1 Local-First Upgrade
 
-Status: Deferred
+Status: Accepted-D2P
+
+Decision Type: D2P / Two-Way Door / Reversible
 
 ## Context
 
 Q18 evaluated Qdrant 1.18 as the next local-first vector backend for Quimera
-after RAG-1A established dense+sparse hybrid retrieval and Python RRFFusion.
+after RAG-1A established dense+sparse hybrid retrieval and Python Weighted RRF.
+The previous Q18-07 benchmark artifacts were produced against Qdrant Server
+1.18.0 and recorded regressions, so they do not automatically promote a new
+default profile.
+
+Qdrant Server 1.18.1 is a patch release with fixes that matter for local-first
+benchmarking: async update safety, empty vector handling, TurboQuant memory
+reporting, payload index/filter correctness, worker/optimizer behavior and
+snapshot/resharding stability. The Python package index currently exposes
+`qdrant-client==1.18.0` as the latest Python client, so this ADR intentionally
+accepts a documented server/client patch mismatch.
 
 ## Decision
 
-Qdrant 1.18 promotion is deferred due to measured regression; retain the previous safe profile and Python RRFFusion default.
+Target Qdrant Server `qdrant/qdrant:v1.18.1` for local-first runtime
+evaluation.
+
+Keep Python client dependency `qdrant-client==1.18.0`.
+
+Python Weighted RRF remains the ground truth. Native Qdrant RRF remains
+experimental. TurboQuant remains experimental and is not a default. PostgreSQL/GraphRAG remain outside Q18.
+
+## Why D2P
+
+This is a two-way-door decision because it is reversible and scoped to local
+development/benchmark runtime:
+
+- Reversion is cheap: change the Docker tag and `infra/qdrant/version_contract.yaml`.
+- There is no production migration.
+- Benchmark collections can be recreated from source corpus.
+- `quimera_knowledge` and `quimera_knowledge_v2` remain protected by existing
+  governance.
+- The Python client pin remains stable at `1.18.0`.
 
 ## Evidence
 
-Evidence is recorded in `docs/rag/qdrant_118_upgrade_results.md` and, when
-generated, `evaluation/results/qdrant_118_benchmark_summary.json`.
+Evidence is recorded in `docs/rag/qdrant_118_upgrade_results.md` and generated
+artifacts under `evaluation/results/` when present.
+
+This ADR does not reinterpret Qdrant 1.18.0 benchmark conclusions as 1.18.1
+results. It accepts 1.18.1 as a reversible local target because the patch fixes
+reduce operational risk and can be rolled back if readiness, smoke or benchmark
+results regress.
+
+## Server/Client Version Policy
+
+- Server target: `1.18.1`.
+- Docker image: `qdrant/qdrant:v1.18.1`.
+- Client target: `1.18.0`.
+- Client dependency: `qdrant-client==1.18.0`.
+- Version family: `1.18`.
+
+Readiness requires exact server target, exact client target and same `1.18`
+family. Exact server/client patch parity is recorded as diagnostic
+`version_exact_parity_ok=false`, but it does not block readiness while
+`qdrant-client==1.18.1` is unavailable on PyPI.
+
+## YAML Configuration Policy
+
+`infra/qdrant/config.yaml` is local-first and conservative:
+
+- REST `6333` and gRPC `6334` remain enabled.
+- `on_disk_payload=true` saves RAM for non-indexed payload values.
+- CPU/search workers use Qdrant auto mode (`0`) for local machine variability.
+- HNSW remains RAM-first (`on_disk=false`) for the reversible baseline.
+- Collection-level vector `on_disk` and quantization defaults remain `null`.
+- Strict mode is documented but not enabled globally.
+- TLS, API keys, cluster mode and audit logs are not enabled in local YAML.
+- TurboQuant and low-memory behavior remain benchmark decisions, not defaults.
 
 ## Alternatives Considered
 
-1. Keep Qdrant 1.13.x historical baseline.
-2. Accept Qdrant 1.18 baseline profile.
-3. Accept Qdrant 1.18 `balanced_local`.
-4. Promote native Qdrant RRF.
-5. Migrate to PostgreSQL/pgvector or GraphRAG now.
+1. Keep Qdrant Server 1.18.0.
+2. Target Qdrant Server 1.18.1 with `qdrant-client==1.18.0`.
+3. Revert to Qdrant 1.13.2 immediately.
+4. Promote TurboQuant or native RRF as part of the patch upgrade.
+5. Move PostgreSQL/GraphRAG into this cycle.
+
+Option 2 is selected because it preserves the Q18 architecture while allowing
+patch-level server fixes to be evaluated without a production migration.
 
 ## Consequences
 
-- Python RRFFusion remains the default unless native RRF earns explicit strong
-  evidence.
-- TurboQuant remains experimental unless quality, latency and memory thresholds
-  are all satisfied.
-- PostgreSQL/GraphRAG stay outside Q18.
+Positive:
 
-## Default Config
+- Bugfix server release is evaluated locally.
+- Python client remains on the latest available PyPI release.
+- Readiness output explicitly records target server, target client, family
+  compatibility and patch mismatch.
+- Rollback path remains simple.
 
-Recommended profile: `TBD`.
+Negative:
 
-## Python vs Native RRF
-
-Native RRF decision: `keep_python_rrf_default`.
-
-Native RRF promotion is intentionally conservative: it requires strong overlap,
-no material quality regression, no tie-break regressions and p95 latency that is
-equal to or faster than Python RRFFusion (`p95_multiplier <= 1.0`).
-
-## TurboQuant Decision
-
-TurboQuant decision: `accept_turboquant_experimental_only`.
-
-## PostgreSQL/GraphRAG Scope
-
-`out_of_scope_for_q18`
+- Q18-07 benchmark conclusions for 1.18.0 must be repeated for 1.18.1.
+- Patch mismatch can expose subtle API compatibility issues.
+- Local YAML needs to stay conservative until benchmark evidence is refreshed.
 
 ## Rollback
 
-1. Keep Python RRFFusion.
-2. Disable TurboQuant.
-3. Return to the previous accepted profile.
-4. Re-run Q18-07 artifact-only comparison.
-5. Revert Qdrant version only through a dedicated rollback PR.
+1. Stop Qdrant 1.18.1 container.
+2. Change `server_image` in `infra/qdrant/version_contract.yaml`.
+3. Change compose image to `qdrant/qdrant:v1.18.0` or `qdrant/qdrant:v1.13.2`.
+4. Start Qdrant and run readiness.
+5. Re-run smoke/benchmark before any default promotion.
+
+Rollback targets:
+
+- `qdrant/qdrant:v1.18.0`
+- `qdrant/qdrant:v1.13.2`
 
 ## Conditions for Reversal
 
-- Recall@10 delta below `-0.01`.
-- NDCG@5 delta below `-0.01`.
-- p95 latency multiplier above `2.5`.
-- Native RRF tie-break regressions appear.
-- Native RRF p95 latency is slower than Python RRFFusion when promotion is
-  being considered (`native/python p95 multiplier > 1.0`).
-- Memory reporting contradicts local-first resource goals.
+- Readiness fails.
+- Qdrant 1.18.1 fails smoke.
+- p95 latency regression exceeds the agreed threshold.
+- NDCG/Recall regression persists with Qwen3 benchmark.
+- Memory reporting indicates higher local footprint.
+- Client/server incompatibility becomes blocking.
 
 ## Follow-ups
 
-- Generate real Q18 artifacts with `RUN_QDRANT_118_BENCHMARK=1`.
-- Expand corpus and query categories before any production-style promotion.
-- Keep PostgreSQL/GraphRAG as a future architecture discussion, not Q18 scope.
+- Save 1.18.1 readiness output in `evaluation/results/qdrant_1181_readiness.json`.
+- Repeat Qwen3 benchmark with server version `1.18.1` recorded.
+- Keep Python Weighted RRF as default until native RRF earns benchmark evidence.
+- Keep TurboQuant experimental until quality, latency and memory evidence pass
+  thresholds.
 
 ## Machine-readable block
 
-<!-- machine-readable: qdrant-118-decision-v1 -->
+<!-- machine-readable: adr-d2p-qdrant-upgrade-v1 -->
 ```json
 {
-  "baseline_113_present": true,
-  "decision": "defer_due_to_regression",
-  "native_rrf": "keep_python_rrf_default",
-  "postgresql": "out_of_scope",
+  "schema_version": "adr-d2p-qdrant-upgrade-v1",
+  "decision_type": "D2P",
+  "reversible": true,
+  "server_target_version": "1.18.1",
+  "client_target_version": "1.18.0",
+  "client_patch_version_note": "qdrant-client 1.18.1 not available on PyPI at decision time",
+  "docker_image": "qdrant/qdrant:v1.18.1",
   "python_rrf_default": true,
-  "recommended_default_profile": null,
-  "schema_version": "qdrant-118-decision-v1",
-  "turboquant": "experimental_only"
+  "native_rrf_default": false,
+  "turboquant_default": false,
+  "postgresql_scope": "out_of_scope",
+  "rollback_targets": [
+    "qdrant/qdrant:v1.18.0",
+    "qdrant/qdrant:v1.13.2"
+  ]
 }
 ```
