@@ -1,0 +1,21 @@
+ollama:
+  decision_type: "D2P"
+  reversible: true
+  runtime_location: "local_host_outside_docker"
+  target_version: "0.24.0"
+  version_contract_last_verified: "2026-05-28"
+  known_prereleases:
+    - "0.30.0"
+  api_base_url: "http://localhost:11434"
+  embedding_endpoint: "/api/embed"
+  legacy_embedding_endpoint: "/api/embeddings"
+  default_embedding_baseline: "nomic-embed-text"
+  qwen3_4b_architecture_model_id: "Qwen/Qwen3-Embedding-4B"
+  qwen3_4b_ollama_model_id: "qwen3-embedding:4b"
+  qwen3_4b_dimensions: 2560
+  keep_alive_for_benchmark: "30m"
+  notes:
+    - "Ollama is upgraded manually or through the local app/package manager."
+    - "Scripts must not auto-pull or auto-delete models."
+    - "qwen3-embedding:4b must be pulled manually before Gate 4 live bakeoff."
+    - "Nomic remains fallback until benchmark evidence promotes Qwen3-Embedding-4B."

@@ -61,8 +61,8 @@ ROOT = Path(__file__).resolve().parents[2]
 # Probe: known models registry
 # ──────────────────────────────────────────────────────────────────────────────
 
-def test_qwen3_0_6b_default_dimensions_1024() -> None:
-    assert KNOWN_MODELS["Qwen/Qwen3-Embedding-0.6B"]["expected_dimensions"] == 1024
+def test_qwen3_4b_default_dimensions_2560() -> None:
+    assert KNOWN_MODELS["Qwen/Qwen3-Embedding-4B"]["expected_dimensions"] == 2560
 
 
 def test_nomic_profile_uses_768_dimensions() -> None:
@@ -77,10 +77,10 @@ def test_qwen3_4b_dimensions_2560() -> None:
 def test_probe_result_to_safe_dict_has_no_vectors() -> None:
     result = ProbeResult(
         provider="ollama",
-        model="Qwen/Qwen3-Embedding-0.6B",
+        model="Qwen/Qwen3-Embedding-4B",
         available=False,
         dimensions=None,
-        expected_dimensions=1024,
+        expected_dimensions=2560,
         dimension_matches_expected=None,
         probe_latency_ms=None,
         error="ConnectionRefusedError",
@@ -156,7 +156,7 @@ def test_embedding_dimension_mismatch_is_detectable() -> None:
 
 
 def test_benchmark_collections_are_allowed() -> None:
-    _validate_collection_name("quimera_benchmark_hybrid_118_qwen3")
+    _validate_collection_name("quimera_benchmark_hybrid_118_qwen3_4b")
     _validate_collection_name("quimera_benchmark_hybrid_118_nomic")
     _validate_collection_name("quimera_benchmark_hybrid_118")
 
@@ -248,11 +248,11 @@ def test_qwen3_summary_does_not_leak_query_payload_vectors() -> None:
 # Qwen3 profiles: dimensions are correct
 # ──────────────────────────────────────────────────────────────────────────────
 
-def test_all_qwen3_profile_specs_use_1024_dimensions() -> None:
+def test_all_qwen3_profile_specs_use_2560_dimensions() -> None:
     for name in QWEN3_PROFILES:
         spec = PROFILE_SPECS[name]
-        assert spec.embedding_dimensions == 1024, \
-            f"Qwen3 profile {name!r} should use 1024 dims, got {spec.embedding_dimensions}"
+        assert spec.embedding_dimensions == 2560, \
+            f"Qwen3 profile {name!r} should use 2560 dims, got {spec.embedding_dimensions}"
 
 
 def test_all_nomic_profile_specs_use_768_dimensions() -> None:

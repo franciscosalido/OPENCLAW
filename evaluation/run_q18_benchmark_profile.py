@@ -28,7 +28,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from types import MappingProxyType
-from typing import Literal
+from typing import Any, Literal
 
 from qdrant_client import AsyncQdrantClient, models
 
@@ -38,7 +38,7 @@ PROFILE_RUN_ENV = "RUN_Q18_BENCHMARK_PROFILE"
 PROFILE_RUN_REQUIRED = "1"
 BENCHMARK_COLLECTION = "quimera_benchmark_hybrid_118"
 BENCHMARK_COLLECTION_NOMIC = "quimera_benchmark_hybrid_118_nomic"
-BENCHMARK_COLLECTION_QWEN3 = "quimera_benchmark_hybrid_118_qwen3"
+BENCHMARK_COLLECTION_QWEN3 = "quimera_benchmark_hybrid_118_qwen3_4b"
 LOCALHOST_ALLOWED = frozenset({"localhost", "127.0.0.1", "::1"})
 DENSE_VECTOR_NAME = "dense"
 SPARSE_VECTOR_NAME = "sparse"
@@ -52,12 +52,12 @@ DEFAULT_EMBEDDING_VERSION = "nomic-embed-text@benchmark"
 OLLAMA_EMBED_URL = "http://localhost:11434/api/embed"
 
 # Qwen3 embedding defaults
-QWEN3_EMBEDDING_MODEL = "Qwen/Qwen3-Embedding-0.6B"
-QWEN3_EMBEDDING_DIMENSIONS = 1024
-QWEN3_EMBEDDING_VERSION = "qwen3-embedding-0.6b@benchmark"
+QWEN3_EMBEDDING_MODEL = "qwen3-embedding:4b"
+QWEN3_EMBEDDING_DIMENSIONS = 2560
+QWEN3_EMBEDDING_VERSION = "qwen3-embedding-4b@benchmark"
 QWEN3_QUERY_INSTRUCTION = (
-    "Given a financial advisory retrieval query in Portuguese, "
-    "retrieve relevant passages from the Quimera financial knowledge base."
+    "Given a Portuguese financial advisory retrieval query, retrieve relevant "
+    "passages from the Quimera financial knowledge base."
 )
 
 # Profiles that target Qwen3 embedding
@@ -200,7 +200,7 @@ PROFILE_SPECS: Mapping[str, ProfileSpec] = MappingProxyType(
             on_disk_vectors=False,
             on_disk_hnsw=False,
         ),
-        # ── Qwen3 1024d profiles ────────────────────────────────────────────
+        # ── Qwen3-Embedding-4B 2560d profiles ───────────────────────────────
         "qdrant_113_qwen3_historical_baseline": _make_qwen3_spec(
             fusion_backend="python_rrf",
             retrieval_mode="hybrid",
@@ -365,9 +365,23 @@ def build_synthetic_corpus(
 
 # ─── embedding helpers ────────────────────────────────────────────────────────
 
-def _embed_sync(texts: list[str], model: str = DEFAULT_EMBEDDING_MODEL) -> list[list[float]]:
+def _embed_sync(
+    texts: list[str],
+    model: str = DEFAULT_EMBEDDING_MODEL,
+    dimensions: int | None = None,
+    keep_alive: str | None = "30m",
+) -> list[list[float]]:
     """Embed via Ollama. Returns list of float vectors."""
-    body = json.dumps({"model": model, "input": texts}).encode("utf-8")
+    payload: dict[str, object] = {
+        "model": model,
+        "input": texts,
+        "truncate": True,
+    }
+    if dimensions is not None:
+        payload["dimensions"] = dimensions
+    if keep_alive is not None:
+        payload["keep_alive"] = keep_alive
+    body = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
         OLLAMA_EMBED_URL,
         data=body,
@@ -538,9 +552,7 @@ def _python_rrf(
     return [doc_id for doc_id, _ in sorted(scores.items(), key=lambda x: -x[1])]
 
 
-def _scored_to_pairs(
-    results: models.QueryResponse, id_to_doc: dict[int, str]
-) -> list[tuple[str, float]]:
+def _scored_to_pairs(results: Any, id_to_doc: dict[int, str]) -> list[tuple[str, float]]:
     out = []
     for r in results.points:
         pid = int(r.id)
@@ -792,7 +804,7 @@ async def run_benchmark(
     # Embed corpus texts (documents — no instruction for Qwen3)
     doc_texts = [" ".join(doc.terms) for doc in corpus]
     t_embed_start = time.perf_counter()
-    dense_embeddings = _embed_sync(doc_texts, model=embedding_model)
+    dense_embeddings = _embed_sync(doc_texts, model=embedding_model, dimensions=embedding_dims)
     t_embed_end = time.perf_counter()
     embed_ms = (t_embed_end - t_embed_start) * 1000 / max(len(doc_texts), 1)
 
@@ -832,7 +844,7 @@ async def run_benchmark(
     else:
         query_texts = [" ".join(_query_terms_from_entry(q)) for q in queries]
 
-    query_embeddings = _embed_sync(query_texts, model=embedding_model) if query_texts else []
+    query_embeddings = _embed_sync(query_texts, model=embedding_model, dimensions=embedding_dims) if query_texts else []
 
     total_ms_list: list[float] = []
     p_at_5_list: list[float] = []

@@ -17,6 +17,7 @@ import json
 import math
 import sys
 import time
+import urllib.error
 import urllib.request
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -92,10 +93,26 @@ def _ensure_localhost(host: str) -> str:
     return clean
 
 
-def _probe_ollama(model: str, host: str, port: int, timeout_s: float) -> tuple[int | None, float | None, str | None]:
+def _probe_ollama(
+    model: str,
+    host: str,
+    port: int,
+    timeout_s: float,
+    dimensions: int | None = None,
+    keep_alive: str | None = None,
+) -> tuple[int | None, float | None, str | None]:
     """Probe Ollama /api/embed. Returns (dimensions, latency_ms, error)."""
     url = f"http://{host}:{port}/api/embed"
-    body = json.dumps({"model": model, "input": [PROBE_SAMPLE_TEXT]}).encode("utf-8")
+    payload: dict[str, object] = {
+        "model": model,
+        "input": [PROBE_SAMPLE_TEXT],
+        "truncate": True,
+    }
+    if dimensions is not None:
+        payload["dimensions"] = dimensions
+    if keep_alive is not None:
+        payload["keep_alive"] = keep_alive
+    body = json.dumps(payload).encode("utf-8")
     t0 = time.perf_counter()
     try:
         req = urllib.request.Request(
@@ -178,18 +195,27 @@ def probe_embedding_model(
     port: int = 11434,
     timeout_s: float = 15.0,
     openai_path: str = "/v1/embeddings",
+    dimensions: int | None = None,
+    keep_alive: str | None = None,
 ) -> ProbeResult:
     """Run a single-text probe and return safe dimension/latency metadata."""
     clean_host = _ensure_localhost(host)
     known = KNOWN_MODELS.get(model, {})
-    expected_dims: int | None = known.get("expected_dimensions")  # type: ignore[assignment]
+    expected_dims: int | None = dimensions or known.get("expected_dimensions")  # type: ignore[assignment]
 
     dims: int | None
     latency_ms: float | None
     error: str | None
 
     if provider == "ollama":
-        dims, latency_ms, error = _probe_ollama(model, clean_host, port, timeout_s)
+        dims, latency_ms, error = _probe_ollama(
+            model,
+            clean_host,
+            port,
+            timeout_s,
+            dimensions=dimensions,
+            keep_alive=keep_alive,
+        )
     elif provider == "tei":
         dims, latency_ms, error = _probe_tei(model, clean_host, port, timeout_s)
     elif provider == "openai-compatible":
@@ -222,8 +248,8 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--provider", default="ollama", choices=["ollama", "tei", "openai-compatible"],
                         help="Embedding provider type (default: ollama)")
-    parser.add_argument("--model", default="Qwen/Qwen3-Embedding-0.6B",
-                        help="Model name to probe (default: Qwen/Qwen3-Embedding-0.6B)")
+    parser.add_argument("--model", default="Qwen/Qwen3-Embedding-4B",
+                        help="Model name to probe (default: Qwen/Qwen3-Embedding-4B)")
     parser.add_argument("--host", default="localhost",
                         help="Host (must be localhost / 127.0.0.1 / ::1)")
     parser.add_argument("--port", type=int, default=11434,
@@ -232,6 +258,10 @@ def _build_parser() -> argparse.ArgumentParser:
                         help="Probe timeout in seconds (default: 15)")
     parser.add_argument("--openai-path", default="/v1/embeddings",
                         help="Path for openai-compatible provider (default: /v1/embeddings)")
+    parser.add_argument("--dimensions", type=int, default=None,
+                        help="Optional Ollama /api/embed dimensions request")
+    parser.add_argument("--keep-alive", default=None,
+                        help="Optional Ollama keep_alive value for the probe")
     return parser
 
 
@@ -246,6 +276,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             port=args.port,
             timeout_s=args.timeout_s,
             openai_path=args.openai_path,
+            dimensions=args.dimensions,
+            keep_alive=args.keep_alive,
         )
     except ValueError as exc:
         sys.stderr.write(f"probe failed: {exc}\n")
