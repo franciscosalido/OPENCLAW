@@ -214,7 +214,7 @@ COMPARISONS: tuple[ComparisonSpec, ...] = (
         purpose="embedding_model_comparison",
         required_artifacts=("qdrant_118_python_rrf", "qdrant_118_qwen3_python_rrf"),
         decision_question=(
-            "Does Qwen3-Embedding-0.6B (1024d) outperform nomic-embed-text (768d) "
+            "Does Qwen3-Embedding-4B (2560d) outperform nomic-embed-text (768d) "
             "in NDCG@5, Recall@10, and P95 latency on Qdrant 1.18?"
         ),
     ),
