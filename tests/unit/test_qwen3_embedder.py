@@ -203,6 +203,13 @@ class Qwen3EmbedderTests(unittest.TestCase):
 
         self.assertEqual(offenders, [])
 
+    def test_sentence_transformers_not_in_project_dependencies(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        pyproject = (repo_root / "pyproject.toml").read_text(encoding="utf-8")
+
+        self.assertNotIn("sentence-transformers", pyproject)
+        self.assertNotIn("sentence_transformers", pyproject)
+
 
 if __name__ == "__main__":
     unittest.main()

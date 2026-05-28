@@ -108,6 +108,24 @@ class LiteLLMSettings(BaseModel):
 
     drop_params: bool = True
     set_verbose: bool = False
+    num_retries: int = 1
+    request_timeout: int = 35
+
+    @field_validator("num_retries")
+    @classmethod
+    def num_retries_must_be_small(cls, v: int) -> int:
+        """Keep local Ollama failures from becoming retry storms."""
+        if v < 0 or v > 3:
+            raise ValueError("num_retries must be between 0 and 3")
+        return v
+
+    @field_validator("request_timeout")
+    @classmethod
+    def request_timeout_must_be_positive(cls, v: int) -> int:
+        """Reject invalid global LiteLLM timeout values."""
+        if v <= 0:
+            raise ValueError("request_timeout must be greater than zero")
+        return v
 
 
 class GatewayConfig(BaseModel):

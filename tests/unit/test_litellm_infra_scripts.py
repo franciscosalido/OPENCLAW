@@ -83,7 +83,12 @@ class LiteLLMInfraScriptTests(unittest.TestCase):
                 self.assertTrue(mode & stat.S_IXUSR, f"{path} is not executable")
 
     def test_start_refuses_missing_master_key(self) -> None:
-        result = _run_start({"LITELLM_MASTER_KEY": None})
+        result = _run_start(
+            {
+                "LITELLM_MASTER_KEY": None,
+                "LITELLM_DISABLE_AUTO_ENV": "1",
+            }
+        )
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("LITELLM_MASTER_KEY is required", result.stderr)
@@ -150,6 +155,14 @@ class LiteLLMInfraScriptTests(unittest.TestCase):
 
         self.assertIn("!=1.82.7", text)
         self.assertIn("!=1.82.8", text)
+
+    def test_litellm_config_has_retry_and_timeout_budget(self) -> None:
+        config = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
+        self.assertIsInstance(config, dict)
+        settings = config["litellm_settings"]
+
+        self.assertEqual(settings["num_retries"], 1)
+        self.assertEqual(settings["request_timeout"], 35)
 
 
 class HealthcheckConfigGuardTests(unittest.TestCase):

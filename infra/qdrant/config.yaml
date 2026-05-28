@@ -1,23 +1,108 @@
-# Qdrant local config for Quimera Q18.
-# Q18-02 scope: server/client upgrade and readiness only.
-# Do not configure collection schema, strict mode, quantization or low-memory mode here.
+# Qdrant local-first config for Quimera Q18.
+# Decision type: ADR-D2P / reversible two-way-door.
+# Scope: local benchmark + development, not production cloud.
+
+log_level: INFO
+
+storage:
+  storage_path: ./storage
+  snapshots_path: ./snapshots
+
+  # Saves RAM by reading non-indexed payloads from disk.
+  # Indexed payload fields used for filters remain in RAM.
+  on_disk_payload: true
+
+  performance:
+    # 0 = auto-select based on available CPU.
+    # Keep auto for local-first machines with varying CPU counts.
+    max_search_threads: 0
+
+    # 0 = auto; Qdrant keeps CPU budget adaptive.
+    optimizer_cpu_budget: 0
+
+    # Keep null for Q18; do not rate-limit updates before ingestion benchmark.
+    update_rate_limit: null
+
+  optimizers:
+    deleted_threshold: 0.2
+    vacuum_min_vector_number: 1000
+    default_segment_number: 0
+    indexing_threshold_kb: 10000
+    flush_interval_sec: 5
+    max_optimization_threads: null
+
+  hnsw_index:
+    m: 16
+    ef_construct: 100
+    full_scan_threshold_kb: 10000
+    max_indexing_threads: 0
+
+    # Q18-05/Q18-07 will decide on-disk HNSW by benchmark.
+    # Keep RAM-first default for reversible baseline.
+    on_disk: false
+
+  collection:
+    replication_factor: 1
+    write_consistency_factor: 1
+
+    vectors:
+      # Keep null so collection-level spec controls this.
+      # Q18-04/Q18-05 profiles decide on_disk per benchmark collection.
+      on_disk: null
+
+    # Default quantization must remain null.
+    # TurboQuant is experimental until benchmark + ADR acceptance.
+    quantization: null
+
+    # Strict mode is documented but not enabled globally yet.
+    # Enable per collection only after schema/index contracts are stable.
+    # strict_mode:
+    #   enabled: false
+    #   max_query_limit: 10000
+    #   max_timeout: 60
+    #   unindexed_filtering_retrieve: false
+    #   unindexed_filtering_update: false
+    #   search_max_hnsw_ef: 256
+    #   search_allow_exact: true
+    #   search_max_oversampling: 4.0
 
 service:
   host: 0.0.0.0
   http_port: 6333
   grpc_port: 6334
   max_request_size_mb: 32
+
+  # 0 = number of available cores.
   max_workers: 0
 
-log_level: INFO
+  # Local dev convenience. If exposed outside localhost, revisit.
+  enable_cors: true
 
-# Reserved for Q18-04/Q18-05.
-# strict_mode_config is not enabled in Q18-02.
-# strict_mode_config:
+  # Local Docker only. Do not send API keys over plain HTTP.
+  enable_tls: false
+  verify_https_client_certificate: false
+
+  # Q18 keeps secrets out of YAML.
+  # api_key: null
+  # read_only_api_key: null
+
+  # Useful for future observability; keep default unless dashboard needs prefixing.
+  metrics_prefix: qdrant_
+
+cluster:
+  enabled: false
+  p2p:
+    port: 6335
+    enable_tls: false
+
+# Keep telemetry enabled locally because Q18 benchmarks inspect observability.
+telemetry_disabled: false
+
+# Audit logging remains disabled locally.
+# Enable in a separate observability PR if needed.
+# audit:
 #   enabled: false
-#   max_query_limit: 10000
-#   max_timeout: 60
-#   max_resident_memory_percent: 0
-
-# Reserved for Q18-05.
-# low_memory_mode is not enabled in Q18-02.
+#   dir: ./storage/audit
+#   rotation: daily
+#   max_log_files: 7
+#   trust_forwarded_headers: false

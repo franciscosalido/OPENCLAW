@@ -1,7 +1,15 @@
 qdrant:
-  target_version: "1.18.0"
-  server_image: "qdrant/qdrant:v1.18.0"
+  decision_type: "D2P"
+  reversible: true
+  server_target_version: "1.18.1"
+  server_image: "qdrant/qdrant:v1.18.1"
+  client_target_version: "1.18.0"
   client_dependency: "qdrant-client==1.18.0"
+  version_family: "1.18"
   rest_port: 6333
   grpc_port: 6334
-  config_schema_version: "qdrant-local-config-v1"
+  config_schema_version: "qdrant-local-config-v2"
+  notes:
+    - "Server 1.18.1 is latest."
+    - "Client 1.18.0 is latest available on PyPI at decision time."
+    - "Patch mismatch is accepted as D2P until qdrant-client 1.18.1 exists."

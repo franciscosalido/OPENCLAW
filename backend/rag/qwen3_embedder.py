@@ -3,6 +3,11 @@
 The adapter is intentionally isolated from the current dense runtime. It does
 not touch retrievers, vector stores, or Qdrant collections; it only formats
 texts, calls an injected or lazily loaded encoder, and validates output vectors.
+
+EXPERIMENTAL: this module is isolated from the main pipeline. The optional
+``sentence-transformers`` dependency must not be added to ``pyproject.toml``;
+see ADR-003. Use this adapter only for offline shadow experiments with explicit
+authorization.
 """
 
 from __future__ import annotations

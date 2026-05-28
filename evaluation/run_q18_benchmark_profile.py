@@ -37,15 +37,47 @@ from qdrant_client import AsyncQdrantClient, models
 PROFILE_RUN_ENV = "RUN_Q18_BENCHMARK_PROFILE"
 PROFILE_RUN_REQUIRED = "1"
 BENCHMARK_COLLECTION = "quimera_benchmark_hybrid_118"
+BENCHMARK_COLLECTION_NOMIC = "quimera_benchmark_hybrid_118_nomic"
+BENCHMARK_COLLECTION_QWEN3 = "quimera_benchmark_hybrid_118_qwen3"
 LOCALHOST_ALLOWED = frozenset({"localhost", "127.0.0.1", "::1"})
 DENSE_VECTOR_NAME = "dense"
 SPARSE_VECTOR_NAME = "sparse"
-DENSE_DIMENSIONS = 768         # nomic-embed-text operational dimension
-OLLAMA_EMBED_URL = "http://localhost:11434/api/embed"
-OLLAMA_MODEL = "nomic-embed-text"
 ARTIFACT_SCHEMA_VERSION = "qdrant-benchmark-run-v1"
 
-PROFILE_NAMES = frozenset(
+# Default embedding: Nomic (kept for backward compatibility with existing artifacts)
+DEFAULT_EMBEDDING_MODEL = "nomic-embed-text"
+DEFAULT_EMBEDDING_PROVIDER = "ollama"
+DEFAULT_EMBEDDING_DIMENSIONS = 768
+DEFAULT_EMBEDDING_VERSION = "nomic-embed-text@benchmark"
+OLLAMA_EMBED_URL = "http://localhost:11434/api/embed"
+
+# Qwen3 embedding defaults
+QWEN3_EMBEDDING_MODEL = "Qwen/Qwen3-Embedding-0.6B"
+QWEN3_EMBEDDING_DIMENSIONS = 1024
+QWEN3_EMBEDDING_VERSION = "qwen3-embedding-0.6b@benchmark"
+QWEN3_QUERY_INSTRUCTION = (
+    "Given a financial advisory retrieval query in Portuguese, "
+    "retrieve relevant passages from the Quimera financial knowledge base."
+)
+
+# Profiles that target Qwen3 embedding
+QWEN3_PROFILE_PREFIX = "qdrant_118_qwen3_"
+QWEN3_PROFILES = frozenset(
+    {
+        "qdrant_113_qwen3_historical_baseline",
+        "qdrant_118_qwen3_baseline_ram",
+        "qdrant_118_qwen3_balanced_local",
+        "qdrant_118_qwen3_python_rrf",
+        "qdrant_118_qwen3_native_rrf",
+        "qdrant_118_qwen3_no_quantization",
+        "qdrant_118_qwen3_turboquant_experimental",
+        "qdrant_118_qwen3_dense_only",
+        "qdrant_118_qwen3_hybrid",
+    }
+)
+
+# Original Nomic profiles
+NOMIC_PROFILES = frozenset(
     {
         "qdrant_113_historical_baseline",
         "qdrant_118_baseline_ram",
@@ -59,6 +91,8 @@ PROFILE_NAMES = frozenset(
     }
 )
 
+PROFILE_NAMES = NOMIC_PROFILES | QWEN3_PROFILES
+
 FusionBackend = Literal["python_rrf", "qdrant_rrf", "qdrant_weighted_rrf", "none"]
 RetrievalMode = Literal["dense_only", "hybrid"]
 
@@ -70,10 +104,39 @@ class ProfileSpec:
     quantization: str
     on_disk_vectors: bool | None
     on_disk_hnsw: bool | None
+    embedding_model: str = DEFAULT_EMBEDDING_MODEL
+    embedding_provider: str = DEFAULT_EMBEDDING_PROVIDER
+    embedding_dimensions: int = DEFAULT_EMBEDDING_DIMENSIONS
+    embedding_version: str = DEFAULT_EMBEDDING_VERSION
+    query_instruction_used: bool = False
+    default_collection: str = BENCHMARK_COLLECTION_NOMIC
+
+
+def _make_qwen3_spec(
+    fusion_backend: FusionBackend,
+    retrieval_mode: RetrievalMode,
+    quantization: str,
+    on_disk_vectors: bool | None,
+    on_disk_hnsw: bool | None,
+) -> ProfileSpec:
+    return ProfileSpec(
+        fusion_backend=fusion_backend,
+        retrieval_mode=retrieval_mode,
+        quantization=quantization,
+        on_disk_vectors=on_disk_vectors,
+        on_disk_hnsw=on_disk_hnsw,
+        embedding_model=QWEN3_EMBEDDING_MODEL,
+        embedding_provider=DEFAULT_EMBEDDING_PROVIDER,
+        embedding_dimensions=QWEN3_EMBEDDING_DIMENSIONS,
+        embedding_version=QWEN3_EMBEDDING_VERSION,
+        query_instruction_used=True,
+        default_collection=BENCHMARK_COLLECTION_QWEN3,
+    )
 
 
 PROFILE_SPECS: Mapping[str, ProfileSpec] = MappingProxyType(
     {
+        # ── Nomic 768d profiles (backward-compatible) ───────────────────────
         "qdrant_113_historical_baseline": ProfileSpec(
             fusion_backend="python_rrf",
             retrieval_mode="hybrid",
@@ -137,6 +200,70 @@ PROFILE_SPECS: Mapping[str, ProfileSpec] = MappingProxyType(
             on_disk_vectors=False,
             on_disk_hnsw=False,
         ),
+        # ── Qwen3 1024d profiles ────────────────────────────────────────────
+        "qdrant_113_qwen3_historical_baseline": _make_qwen3_spec(
+            fusion_backend="python_rrf",
+            retrieval_mode="hybrid",
+            quantization="none",
+            on_disk_vectors=None,
+            on_disk_hnsw=None,
+        ),
+        "qdrant_118_qwen3_baseline_ram": _make_qwen3_spec(
+            fusion_backend="python_rrf",
+            retrieval_mode="hybrid",
+            quantization="none",
+            on_disk_vectors=False,
+            on_disk_hnsw=False,
+        ),
+        "qdrant_118_qwen3_balanced_local": _make_qwen3_spec(
+            fusion_backend="python_rrf",
+            retrieval_mode="hybrid",
+            quantization="none",
+            on_disk_vectors=True,
+            on_disk_hnsw=False,
+        ),
+        "qdrant_118_qwen3_python_rrf": _make_qwen3_spec(
+            fusion_backend="python_rrf",
+            retrieval_mode="hybrid",
+            quantization="none",
+            on_disk_vectors=False,
+            on_disk_hnsw=False,
+        ),
+        "qdrant_118_qwen3_native_rrf": _make_qwen3_spec(
+            fusion_backend="qdrant_rrf",
+            retrieval_mode="hybrid",
+            quantization="none",
+            on_disk_vectors=False,
+            on_disk_hnsw=False,
+        ),
+        "qdrant_118_qwen3_no_quantization": _make_qwen3_spec(
+            fusion_backend="python_rrf",
+            retrieval_mode="hybrid",
+            quantization="none",
+            on_disk_vectors=False,
+            on_disk_hnsw=False,
+        ),
+        "qdrant_118_qwen3_turboquant_experimental": _make_qwen3_spec(
+            fusion_backend="python_rrf",
+            retrieval_mode="hybrid",
+            quantization="turboquant",
+            on_disk_vectors=False,
+            on_disk_hnsw=False,
+        ),
+        "qdrant_118_qwen3_dense_only": _make_qwen3_spec(
+            fusion_backend="none",
+            retrieval_mode="dense_only",
+            quantization="none",
+            on_disk_vectors=False,
+            on_disk_hnsw=False,
+        ),
+        "qdrant_118_qwen3_hybrid": _make_qwen3_spec(
+            fusion_backend="python_rrf",
+            retrieval_mode="hybrid",
+            quantization="none",
+            on_disk_vectors=False,
+            on_disk_hnsw=False,
+        ),
     }
 )
 
@@ -177,7 +304,7 @@ def _assert_safe(mapping: Mapping[str, object]) -> dict[str, object]:
 # ─── corpus / query loading ───────────────────────────────────────────────────
 
 def _load_yaml_safe(path: Path) -> object:
-    import yaml  # type: ignore[import-untyped]
+    import yaml
 
     return yaml.safe_load(path.read_text(encoding="utf-8"))
 
@@ -238,9 +365,9 @@ def build_synthetic_corpus(
 
 # ─── embedding helpers ────────────────────────────────────────────────────────
 
-def _embed_sync(texts: list[str]) -> list[list[float]]:
-    """Embed via Ollama nomic-embed-text. Returns list of float vectors."""
-    body = json.dumps({"model": OLLAMA_MODEL, "input": texts}).encode("utf-8")
+def _embed_sync(texts: list[str], model: str = DEFAULT_EMBEDDING_MODEL) -> list[list[float]]:
+    """Embed via Ollama. Returns list of float vectors."""
+    body = json.dumps({"model": model, "input": texts}).encode("utf-8")
     req = urllib.request.Request(
         OLLAMA_EMBED_URL,
         data=body,
@@ -250,6 +377,38 @@ def _embed_sync(texts: list[str]) -> list[list[float]]:
     resp = urllib.request.urlopen(req, timeout=30)
     data = json.loads(resp.read().decode("utf-8"))
     return [list(v) for v in data["embeddings"]]
+
+
+def _apply_query_instruction(terms: list[str], instruction: str) -> str:
+    """Build an instruction-prefixed query string for models that require it (e.g. Qwen3)."""
+    query_text = " ".join(terms)
+    return f"Instruct: {instruction}\nQuery: {query_text}"
+
+
+def _probe_embedding_available(model: str) -> bool:
+    """Return True if the embedding model responds to a single-text probe."""
+    try:
+        vecs = _embed_sync(["probe"], model=model)
+        return bool(vecs and vecs[0])
+    except Exception:
+        return False
+
+
+def _validate_collection_name(collection: str) -> str:
+    """Reject collection names that could mutate production data."""
+    forbidden_prefixes = frozenset({"quimera_knowledge", "openclaw_knowledge"})
+    allowed_prefix = "quimera_benchmark_hybrid_118"
+    clean = collection.strip()
+    if not clean:
+        raise ValueError("collection name must not be empty")
+    for fp in forbidden_prefixes:
+        if clean == fp or clean.startswith(fp + "_v") or clean.startswith(fp + "/"):
+            raise ValueError(f"collection name is protected: {clean!r}")
+    if not clean.startswith(allowed_prefix):
+        raise ValueError(
+            f"collection name must start with '{allowed_prefix}', got: {clean!r}"
+        )
+    return clean
 
 
 def _normalize(v: list[float]) -> list[float]:
@@ -292,6 +451,7 @@ async def _create_collection(
     name: str,
     quantization: str,
     on_disk_vectors: bool | None,
+    dense_dimensions: int = DEFAULT_EMBEDDING_DIMENSIONS,
 ) -> None:
     quantization_config: models.QuantizationConfig | None = None
     if quantization == "scalar":
@@ -315,7 +475,7 @@ async def _create_collection(
 
     vectors_config: dict[str, models.VectorParams] = {
         DENSE_VECTOR_NAME: models.VectorParams(
-            size=DENSE_DIMENSIONS,
+            size=dense_dimensions,
             distance=models.Distance.COSINE,
             on_disk=bool(on_disk_vectors) if on_disk_vectors is not None else False,
         )
@@ -515,12 +675,12 @@ def _dcg(ranked: list[str], grades: dict[str, int], k: int) -> float:
 
 def _ndcg_at_k(ranked: list[str], grades: dict[str, int], k: int) -> float:
     ideal_docs = sorted(grades.keys(), key=lambda d: -grades[d])[:k]
-    ideal_dcg = sum(
+    ideal_dcg: float = sum(
         (2 ** grades[d] - 1) / math.log2(i + 2) for i, d in enumerate(ideal_docs)
     )
     if ideal_dcg <= 0:
         return 0.0
-    return _dcg(ranked, grades, k) / ideal_dcg
+    return float(_dcg(ranked, grades, k) / ideal_dcg)
 
 
 # ─── p-tiles ─────────────────────────────────────────────────────────────────
@@ -551,8 +711,12 @@ def _probe_collection_size(host: str, port: int, collection: str) -> int | None:
     try:
         url = f"http://{host}:{port}/collections/{collection}"
         data = urllib.request.urlopen(url, timeout=5).read().decode("utf-8")
-        parsed = json.loads(data)
-        return parsed.get("result", {}).get("segments_count")
+        parsed: dict[str, object] = json.loads(data)
+        result = parsed.get("result", {})
+        if not isinstance(result, dict):
+            return None
+        count = result.get("segments_count")
+        return int(count) if isinstance(count, int) else None
     except Exception:
         return None
 
@@ -605,6 +769,19 @@ async def run_benchmark(
     client_version = importlib.metadata.version("qdrant-client")
     server_version = _probe_server_version(host, port)
 
+    embedding_model = spec.embedding_model
+    embedding_dims = spec.embedding_dimensions
+    embedding_provider = spec.embedding_provider
+    embedding_version = spec.embedding_version
+    query_instruction_used = spec.query_instruction_used
+
+    # Guard: fail early if embedding model is unavailable rather than silently ingest wrong data
+    if not _probe_embedding_available(embedding_model):
+        raise RuntimeError(
+            f"embedding model unavailable: {embedding_model!r} — "
+            "pull it via 'ollama pull' or configure another provider"
+        )
+
     queries = _load_benchmark_queries(root)
     expected = _load_expected_results(root)
     corpus = build_synthetic_corpus(queries, expected)
@@ -612,12 +789,20 @@ async def run_benchmark(
     if not corpus:
         raise RuntimeError("empty synthetic corpus — check benchmark_queries.yaml and expected_results.yaml")
 
-    # Embed corpus once
-    texts = [" ".join(doc.terms) for doc in corpus]
+    # Embed corpus texts (documents — no instruction for Qwen3)
+    doc_texts = [" ".join(doc.terms) for doc in corpus]
     t_embed_start = time.perf_counter()
-    dense_embeddings = _embed_sync(texts)
+    dense_embeddings = _embed_sync(doc_texts, model=embedding_model)
     t_embed_end = time.perf_counter()
-    embed_ms = (t_embed_end - t_embed_start) * 1000 / max(len(texts), 1)
+    embed_ms = (t_embed_end - t_embed_start) * 1000 / max(len(doc_texts), 1)
+
+    # Validate embedding dimension against spec
+    if dense_embeddings and len(dense_embeddings[0]) != embedding_dims:
+        actual = len(dense_embeddings[0])
+        raise RuntimeError(
+            f"embedding dimension mismatch: spec={embedding_dims}, actual={actual} — "
+            "check --embedding-dimensions or the model configuration"
+        )
 
     # id_to_doc: point ID (1-based) -> doc_id
     id_to_doc = {idx + 1: doc.doc_id for idx, doc in enumerate(corpus)}
@@ -629,7 +814,7 @@ async def run_benchmark(
             await client.delete_collection(collection)
             exists = False
         if not exists:
-            await _create_collection(client, collection, spec.quantization, spec.on_disk_vectors)
+            await _create_collection(client, collection, spec.quantization, spec.on_disk_vectors, embedding_dims)
             await _ingest_corpus(client, collection, corpus, dense_embeddings)
         else:
             # Re-ingest to be safe (upsert is idempotent)
@@ -638,9 +823,16 @@ async def run_benchmark(
         await client.close()
         raise RuntimeError(f"collection setup failed: {exc}") from exc
 
-    # Build query dense+sparse vectors
-    query_texts = [" ".join(_query_terms_from_entry(q)) for q in queries]
-    query_embeddings = _embed_sync(query_texts) if query_texts else []
+    # Build query vectors — Qwen3 profiles use an instruction prefix on the query side
+    if query_instruction_used:
+        query_texts = [
+            _apply_query_instruction(_query_terms_from_entry(q), QWEN3_QUERY_INSTRUCTION)
+            for q in queries
+        ]
+    else:
+        query_texts = [" ".join(_query_terms_from_entry(q)) for q in queries]
+
+    query_embeddings = _embed_sync(query_texts, model=embedding_model) if query_texts else []
 
     total_ms_list: list[float] = []
     p_at_5_list: list[float] = []
@@ -709,9 +901,6 @@ async def run_benchmark(
 
     p50 = _percentile(total_ms_list, 50)
     p95 = _percentile(total_ms_list, 95)
-    avg_search_dense = _avg(search_dense_ms_list)
-    avg_search_sparse = _avg(search_sparse_ms_list)
-    avg_fusion = _avg(fusion_ms_list)
 
     precision_mean = _avg(p_at_5_list)
     recall_mean = _avg(recall_at_10_list)
@@ -767,7 +956,7 @@ async def run_benchmark(
                 "peak_ram_mb": None,
                 "collection_size_bytes": collection_bytes,
                 "storage_config": {
-                    "dense_dimensions": DENSE_DIMENSIONS,
+                    "dense_dimensions": embedding_dims,
                     "on_disk_vectors": spec.on_disk_vectors,
                     "on_disk_hnsw": spec.on_disk_hnsw,
                 },
@@ -780,8 +969,14 @@ async def run_benchmark(
             "profile_config": {
                 "dense_name": DENSE_VECTOR_NAME,
                 "sparse_name": SPARSE_VECTOR_NAME,
-                "dense_dimensions": DENSE_DIMENSIONS,
-                "embedding_model": OLLAMA_MODEL,
+                "dense_dimensions": embedding_dims,
+                "dense_vector_name": DENSE_VECTOR_NAME,
+                "sparse_vector_name": SPARSE_VECTOR_NAME,
+                "embedding_model": embedding_model,
+                "embedding_provider": embedding_provider,
+                "embedding_dimensions": embedding_dims,
+                "embedding_version": embedding_version,
+                "query_instruction_used": query_instruction_used,
                 "on_disk_vectors": spec.on_disk_vectors,
                 "on_disk_hnsw": spec.on_disk_hnsw,
                 "fusion_backend": spec.fusion_backend,
@@ -799,7 +994,15 @@ async def run_benchmark(
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--profile", required=True, choices=sorted(PROFILE_NAMES))
-    parser.add_argument("--collection", default=BENCHMARK_COLLECTION)
+    parser.add_argument(
+        "--collection",
+        default=None,
+        help=(
+            "Override the benchmark collection name. "
+            "If omitted, the profile's default collection is used. "
+            "Must start with 'quimera_benchmark_hybrid_118'."
+        ),
+    )
     parser.add_argument("--host", default="localhost")
     parser.add_argument("--port", type=int, default=6333)
     parser.add_argument("--output", type=Path, required=True)
@@ -815,9 +1018,22 @@ def _ensure_localhost(host: str) -> str:
     return clean
 
 
+def _resolve_collection(args_collection: str | None, profile_name: str) -> str:
+    """Return the validated collection name, using spec default if not overridden."""
+    spec = PROFILE_SPECS[profile_name]
+    raw = args_collection if args_collection is not None else spec.default_collection
+    return _validate_collection_name(raw)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
     host = _ensure_localhost(args.host)
+
+    try:
+        collection = _resolve_collection(args.collection, args.profile)
+    except ValueError as exc:
+        sys.stderr.write(f"invalid collection: {exc}\n")
+        return 2
 
     if args.execute and os.getenv(PROFILE_RUN_ENV) != PROFILE_RUN_REQUIRED:
         sys.stderr.write(
@@ -826,10 +1042,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
 
     if not args.execute:
+        spec = PROFILE_SPECS[args.profile]
         dry = {
             "dry_run": True,
             "profile": args.profile,
-            "collection": args.collection,
+            "collection": collection,
+            "embedding_model": spec.embedding_model,
+            "embedding_dimensions": spec.embedding_dimensions,
+            "embedding_provider": spec.embedding_provider,
+            "query_instruction_used": spec.query_instruction_used,
             "host": host,
             "port": args.port,
             "output": str(args.output),
@@ -844,7 +1065,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 profile_name=args.profile,
                 host=host,
                 port=args.port,
-                collection=args.collection,
+                collection=collection,
                 root=Path("."),
                 drop_and_recreate=args.drop_and_recreate,
             )

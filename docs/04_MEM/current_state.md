@@ -4,8 +4,29 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Last updated:** 2026-05-08
-**Updated by:** Codex — A0-PR05 OpenClaw ask CLI and readiness
+**Last updated:** 2026-05-27
+**Updated by:** Claude Code — boot completo do QUIMERA stack + diagnóstico + runbook
+
+---
+
+## Stack State — 2026-05-27
+
+Stack local completamente verificado e funcional. Ver `docs/04_MEM/QUIMERA_STACK_RUNBOOK.md`.
+
+| Serviço  | Status | Versão / Detalhe                              |
+|----------|--------|-----------------------------------------------|
+| Qdrant   | ✅ UP  | v1.18.1, 4 collections presentes              |
+| Ollama   | ✅ UP  | nomic-embed-text:latest (0.27GB) + qwen3:14b (9.28GB) |
+| LiteLLM  | ✅ UP  | 4 aliases chat saudáveis, embedding falso-positivo no health check (ver BUG 1) |
+
+**Fixes aplicados em `start_quimera.sh`:**
+1. `/health` → `/health/liveliness` em todas as verificações LiteLLM (3 ocorrências + modo `--status`)
+2. Adicionado export de `LITELLM_LOCAL_CHAT_MODEL` e `LITELLM_LOCAL_EMBED_MODEL` no fallback sem iTerm2
+3. iTerm2 path: variáveis derivadas incluídas no `LITELLM_TAB_CMD`
+
+**Problema residual conhecido (não-bloqueante):** LiteLLM reporta `unhealthy_count: 2` para `quimera_embed`/`local_embed` porque o health check interno usa `/api/generate` mas `nomic-embed-text` só aceita `/api/embed`. Os embeddings reais funcionam perfeitamente (768d verificado). Ver BUG 1 no runbook.
+
+---
 
 ---
 

@@ -9,7 +9,15 @@ fail() {
   exit "${2:-1}"
 }
 
-[ -n "${LITELLM_MASTER_KEY:-}" ] || fail "LITELLM_MASTER_KEY is required. Export a local dev key before starting LiteLLM."
+# Auto-source .env from repo root when called standalone (start_quimera.sh já faz isso)
+if [ -z "${LITELLM_MASTER_KEY:-}" ] && [ "${LITELLM_DISABLE_AUTO_ENV:-0}" != "1" ]; then
+    _ENV="${SCRIPT_DIR}/../../.env"
+    if [ -f "${_ENV}" ]; then
+        set -a && source "${_ENV}" && set +a
+    fi
+fi
+
+[ -n "${LITELLM_MASTER_KEY:-}" ] || fail "LITELLM_MASTER_KEY is required. Crie ~/.env ou rode via start_quimera.sh."
 
 export OLLAMA_API_BASE="${OLLAMA_API_BASE:-http://127.0.0.1:11434}"
 export QWEN_MODEL="${QWEN_MODEL:-qwen3:14b}"

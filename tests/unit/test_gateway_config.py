@@ -153,6 +153,16 @@ class TestGatewayConfigValidator(unittest.TestCase):
         config = GatewayConfig.model_validate({"model_list": _all_required_aliases()})
         self.assertTrue(config.litellm_settings.drop_params)
         self.assertFalse(config.litellm_settings.set_verbose)
+        self.assertEqual(config.litellm_settings.num_retries, 1)
+        self.assertEqual(config.litellm_settings.request_timeout, 35)
+
+    def test_litellm_settings_reject_retry_storm_values(self) -> None:
+        with self.assertRaises(ValidationError):
+            LiteLLMSettings(num_retries=99)
+
+    def test_litellm_settings_reject_invalid_request_timeout(self) -> None:
+        with self.assertRaises(ValidationError):
+            LiteLLMSettings(request_timeout=0)
 
     def test_remote_api_base_in_any_alias_rejected(self) -> None:
         aliases = _all_required_aliases()
@@ -328,6 +338,14 @@ class TestActualGatewayConfig(unittest.TestCase):
             self.config.litellm_settings.set_verbose,
             "set_verbose must be false to keep logs clean in production",
         )
+
+    def test_global_retry_and_timeout_budget_configured(self) -> None:
+        self.assertEqual(
+            self.config.litellm_settings.num_retries,
+            1,
+            "num_retries must stay low to avoid retry storms with local Ollama",
+        )
+        self.assertEqual(self.config.litellm_settings.request_timeout, 35)
 
     def test_no_alias_points_to_remote_provider(self) -> None:
         """Security contract: no remote provider may slip into the config."""

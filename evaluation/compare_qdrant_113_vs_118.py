@@ -35,7 +35,7 @@ DEFAULT_ROWS_CSV = "qdrant_118_benchmark_rows.csv"
 DEFAULT_REPORT_MD = "qdrant_118_benchmark_report.md"
 DEFAULT_CHARTS_SVG = "qdrant_118_benchmark_charts.svg"
 DEFAULT_DOC_REPORT = Path("docs") / "rag" / "qdrant_118_upgrade_results.md"
-DEFAULT_ADR = Path("docs") / "ADR" / "ADR-0XX-qdrant-118-upgrade.md"
+DEFAULT_ADR = Path("docs") / "ADR" / "ADR-018-qdrant-118-upgrade.md"
 POSTGRESQL_SCOPE = "out_of_scope_for_q18"
 PYTHON_RRF_DEFAULT_DECISION = "keep_python_rrf_default"
 TURBOQUANT_EXPERIMENTAL_DECISION = "accept_turboquant_experimental_only"
@@ -67,6 +67,13 @@ class ComparisonScenario(str, Enum):
     QDRANT_118_PYTHON_RRF_VS_NATIVE_RRF = "qdrant_118_python_rrf_vs_native_rrf"
     QDRANT_118_NO_QUANT_VS_TURBOQUANT = "qdrant_118_no_quant_vs_turboquant"
     QDRANT_118_DENSE_ONLY_VS_HYBRID = "qdrant_118_dense_only_vs_hybrid"
+    # Qwen3 embedding scenarios
+    QDRANT_113_VS_118_QWEN3_BASELINE = "qdrant_113_vs_118_qwen3_baseline"
+    QDRANT_118_QWEN3_BASELINE_VS_BALANCED = "qdrant_118_qwen3_baseline_vs_balanced"
+    QDRANT_118_QWEN3_PYTHON_RRF_VS_NATIVE_RRF = "qdrant_118_qwen3_python_rrf_vs_native_rrf"
+    QDRANT_118_QWEN3_NO_QUANT_VS_TURBOQUANT = "qdrant_118_qwen3_no_quant_vs_turboquant"
+    QDRANT_118_QWEN3_DENSE_ONLY_VS_HYBRID = "qdrant_118_qwen3_dense_only_vs_hybrid"
+    QDRANT_118_NOMIC_VS_QWEN3_EMBEDDING = "qdrant_118_nomic_vs_qwen3_embedding"
 
 
 class BenchmarkDecision(str, Enum):
@@ -79,6 +86,13 @@ class BenchmarkDecision(str, Enum):
     PROMOTE_QDRANT_NATIVE_RRF = "promote_qdrant_native_rrf"
     DEFER_DUE_TO_REGRESSION = "defer_due_to_regression"
     INCONCLUSIVE_MISSING_EVIDENCE = "inconclusive_missing_evidence"
+    # Qwen3-specific decisions
+    ACCEPT_QWEN3_AS_EMBEDDING_DEFAULT = "accept_qwen3_as_embedding_default"
+    KEEP_NOMIC_TEMPORARILY = "keep_nomic_temporarily"
+    QWEN3_INCONCLUSIVE_MISSING_BASELINE = "qwen3_inconclusive_missing_baseline"
+    DEFER_QWEN3_DUE_TO_REGRESSION = "defer_qwen3_due_to_regression"
+    ACCEPT_QDRANT_118_WITH_QWEN3 = "accept_qdrant_118_with_qwen3"
+    DEFER_QDRANT_118_WITH_QWEN3 = "defer_qdrant_118_with_qwen3"
 
 
 FusionBackend = Literal["python_rrf", "qdrant_rrf", "qdrant_weighted_rrf", "none"]
@@ -151,6 +165,58 @@ COMPARISONS: tuple[ComparisonSpec, ...] = (
         purpose="retrieval_mode",
         required_artifacts=("qdrant_118_dense_only", "qdrant_118_hybrid"),
         decision_question="Does hybrid retrieval remain preferable over dense-only on Qdrant 1.18?",
+    ),
+    # ── Qwen3 scenarios ───────────────────────────────────────────────────────
+    ComparisonSpec(
+        scenario=ComparisonScenario.QDRANT_113_VS_118_QWEN3_BASELINE,
+        profile_a="qdrant_113_qwen3_historical_baseline",
+        profile_b="qdrant_118_qwen3_baseline_ram",
+        purpose="version_upgrade_qwen3",
+        required_artifacts=("qdrant_113_qwen3_baseline", "qdrant_118_qwen3_baseline_ram"),
+        decision_question="Does Qdrant 1.18 preserve quality and latency versus 1.13.x when using Qwen3 embedding?",
+    ),
+    ComparisonSpec(
+        scenario=ComparisonScenario.QDRANT_118_QWEN3_BASELINE_VS_BALANCED,
+        profile_a="qdrant_118_qwen3_baseline_ram",
+        profile_b="qdrant_118_qwen3_balanced_local",
+        purpose="profile_default_qwen3",
+        required_artifacts=("qdrant_118_qwen3_baseline_ram", "qdrant_118_qwen3_balanced_local"),
+        decision_question="Should qwen3_balanced_local become the default Qwen3 benchmark profile?",
+    ),
+    ComparisonSpec(
+        scenario=ComparisonScenario.QDRANT_118_QWEN3_PYTHON_RRF_VS_NATIVE_RRF,
+        profile_a="qdrant_118_qwen3_python_rrf",
+        profile_b="qdrant_118_qwen3_native_rrf",
+        purpose="fusion_backend_qwen3",
+        required_artifacts=("qdrant_118_qwen3_python_rrf", "qdrant_118_qwen3_native_rrf"),
+        decision_question="Can native RRF replace Python RRF without regressions when using Qwen3 embedding?",
+    ),
+    ComparisonSpec(
+        scenario=ComparisonScenario.QDRANT_118_QWEN3_NO_QUANT_VS_TURBOQUANT,
+        profile_a="qdrant_118_qwen3_no_quantization",
+        profile_b="qdrant_118_qwen3_turboquant_experimental",
+        purpose="quantization_qwen3",
+        required_artifacts=("qdrant_118_qwen3_no_quantization", "qdrant_118_qwen3_turboquant_experimental"),
+        decision_question="Does TurboQuant preserve Qwen3 recall and NDCG while reducing storage?",
+    ),
+    ComparisonSpec(
+        scenario=ComparisonScenario.QDRANT_118_QWEN3_DENSE_ONLY_VS_HYBRID,
+        profile_a="qdrant_118_qwen3_dense_only",
+        profile_b="qdrant_118_qwen3_hybrid",
+        purpose="retrieval_mode_qwen3",
+        required_artifacts=("qdrant_118_qwen3_dense_only", "qdrant_118_qwen3_hybrid"),
+        decision_question="Does hybrid retrieval remain preferable over dense-only when using Qwen3 embedding?",
+    ),
+    ComparisonSpec(
+        scenario=ComparisonScenario.QDRANT_118_NOMIC_VS_QWEN3_EMBEDDING,
+        profile_a="qdrant_118_python_rrf",
+        profile_b="qdrant_118_qwen3_python_rrf",
+        purpose="embedding_model_comparison",
+        required_artifacts=("qdrant_118_python_rrf", "qdrant_118_qwen3_python_rrf"),
+        decision_question=(
+            "Does Qwen3-Embedding-0.6B (1024d) outperform nomic-embed-text (768d) "
+            "in NDCG@5, Recall@10, and P95 latency on Qdrant 1.18?"
+        ),
     ),
 )
 
@@ -577,23 +643,74 @@ def make_scenario_result(
     )
 
 
+_NOMIC_BASELINE_SCENARIOS = frozenset(
+    {
+        ComparisonScenario.QDRANT_113_VS_118_BASELINE.value,
+        ComparisonScenario.QDRANT_118_BASELINE_VS_BALANCED.value,
+        ComparisonScenario.QDRANT_118_PYTHON_RRF_VS_NATIVE_RRF.value,
+        ComparisonScenario.QDRANT_118_NO_QUANT_VS_TURBOQUANT.value,
+        ComparisonScenario.QDRANT_118_DENSE_ONLY_VS_HYBRID.value,
+    }
+)
+
+_QWEN3_SCENARIOS = frozenset(
+    {
+        ComparisonScenario.QDRANT_113_VS_118_QWEN3_BASELINE.value,
+        ComparisonScenario.QDRANT_118_QWEN3_BASELINE_VS_BALANCED.value,
+        ComparisonScenario.QDRANT_118_QWEN3_PYTHON_RRF_VS_NATIVE_RRF.value,
+        ComparisonScenario.QDRANT_118_QWEN3_NO_QUANT_VS_TURBOQUANT.value,
+        ComparisonScenario.QDRANT_118_QWEN3_DENSE_ONLY_VS_HYBRID.value,
+        ComparisonScenario.QDRANT_118_NOMIC_VS_QWEN3_EMBEDDING.value,
+    }
+)
+
+
 def decide_qdrant_118_upgrade(
     scenarios: Sequence[BenchmarkScenarioResult],
     *,
     baseline_113_present: bool,
 ) -> str:
-    """Return the final Q18-07 decision from scenario evidence."""
+    """Return the final Q18-07 decision from scenario evidence.
 
-    if not scenarios or not all(result.evidence_complete for result in scenarios):
+    Only the original Nomic 768d baseline scenarios drive the Qdrant upgrade
+    decision.  Qwen3 embedding scenarios are evaluated separately via
+    ``decide_qwen3_embedding`` so that missing Qwen3 evidence does not push
+    the Qdrant upgrade into INCONCLUSIVE.
+    """
+    # Filter to the Nomic baseline scenarios only
+    nomic_scenarios = [s for s in scenarios if s.scenario in _NOMIC_BASELINE_SCENARIOS]
+    if not nomic_scenarios or not all(result.evidence_complete for result in nomic_scenarios):
         return BenchmarkDecision.INCONCLUSIVE_MISSING_EVIDENCE.value
     if not baseline_113_present:
         return BenchmarkDecision.INCONCLUSIVE_MISSING_EVIDENCE.value
-    if any(result.decision_hint == BenchmarkDecision.DEFER_DUE_TO_REGRESSION.value for result in scenarios):
+    if any(result.decision_hint == BenchmarkDecision.DEFER_DUE_TO_REGRESSION.value for result in nomic_scenarios):
         return BenchmarkDecision.DEFER_DUE_TO_REGRESSION.value
-    balanced = _scenario_by_id(scenarios, ComparisonScenario.QDRANT_118_BASELINE_VS_BALANCED)
+    balanced = _scenario_by_id(nomic_scenarios, ComparisonScenario.QDRANT_118_BASELINE_VS_BALANCED)
     if balanced is not None and balanced.decision_hint == BenchmarkDecision.ACCEPT_QDRANT_118_BALANCED_PROFILE.value:
         return BenchmarkDecision.ACCEPT_QDRANT_118_BALANCED_PROFILE.value
     return BenchmarkDecision.ACCEPT_QDRANT_118_BASELINE.value
+
+
+def decide_qwen3_embedding(
+    scenarios: Sequence[BenchmarkScenarioResult],
+    *,
+    qwen3_available: bool,
+) -> str:
+    """Return the Qwen3 embedding decision from available Qwen3 scenario evidence."""
+    if not qwen3_available:
+        return BenchmarkDecision.QWEN3_INCONCLUSIVE_MISSING_BASELINE.value
+    qwen3_scenarios = [s for s in scenarios if s.scenario in _QWEN3_SCENARIOS]
+    if not qwen3_scenarios or not all(result.evidence_complete for result in qwen3_scenarios):
+        return BenchmarkDecision.QWEN3_INCONCLUSIVE_MISSING_BASELINE.value
+    if any(result.decision_hint == BenchmarkDecision.DEFER_DUE_TO_REGRESSION.value for result in qwen3_scenarios):
+        return BenchmarkDecision.DEFER_QWEN3_DUE_TO_REGRESSION.value
+    nomic_vs_qwen3 = _scenario_by_id(qwen3_scenarios, ComparisonScenario.QDRANT_118_NOMIC_VS_QWEN3_EMBEDDING)
+    if nomic_vs_qwen3 is None or not nomic_vs_qwen3.evidence_complete:
+        return BenchmarkDecision.QWEN3_INCONCLUSIVE_MISSING_BASELINE.value
+    # If Qwen3 shows regression vs Nomic, keep Nomic temporarily
+    if nomic_vs_qwen3.decision_hint == BenchmarkDecision.DEFER_DUE_TO_REGRESSION.value:
+        return BenchmarkDecision.KEEP_NOMIC_TEMPORARILY.value
+    return BenchmarkDecision.ACCEPT_QWEN3_AS_EMBEDDING_DEFAULT.value
 
 
 def decision_sentence(summary: Qdrant118BenchmarkSummary) -> str:
@@ -1429,15 +1546,27 @@ def _assert_safe_mapping(value: Mapping[str, object]) -> dict[str, object]:
 
 
 def _assert_safe_text(text: str) -> None:
+    """Reject any output that contains forbidden bare data keys.
+
+    Keys are matched as quoted JSON tokens so that safe metadata fields that
+    share a prefix (e.g. ``dense_vector_name``, ``sparse_vector_name``) are
+    not caught as false positives.  Each entry in *forbidden* is a complete
+    quoted string as it would appear in JSON output.
+    """
     lower = text.lower()
     forbidden = {
         '"query_text"',
+        '"query"',
         '"chunk_text"',
-        "dense_vector",
-        "sparse_vector",
+        '"document_text"',
+        '"raw_text"',
+        '"dense_vector"',
+        '"sparse_vector"',
         '"payload"',
         '"embedding"',
+        '"embeddings"',
         '"vector"',
+        '"vectors"',
         '"prompt"',
         '"answer"',
     }

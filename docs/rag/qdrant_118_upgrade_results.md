@@ -60,6 +60,27 @@ Python RRFFusion default: `true`.
 Native RRF decision: `keep_python_rrf_default`.
 TurboQuant decision: `accept_turboquant_experimental_only`.
 
+## D2P Update: Qdrant Server 1.18.1
+
+The benchmark matrix above was produced for Qdrant Server `1.18.0`; those
+numbers must not be rewritten as `1.18.1` evidence.
+
+ADR-D2P-018 now targets Qdrant Server `1.18.1` for local-first runtime
+evaluation because it is a reversible patch-level bugfix release. The Python
+client remains pinned to `qdrant-client==1.18.0` because `1.18.1` is not
+available on PyPI at this decision point.
+
+Qwen3 benchmarks should be repeated against server version `1.18.1`, and new
+artifacts should record `qdrant_server_version=1.18.1`. Python RRFFusion remains
+the default, TurboQuant remains experimental, and PostgreSQL/GraphRAG remain
+outside this cycle.
+
+If older run JSONs show `qdrant_server_version="1.18.0"`, treat that as a
+client-version annotation unless a live readiness or metrics snapshot proves the
+remote server version. New Q18/Qwen3 benchmarks should use
+`scripts/collect_qdrant_metrics_snapshot.py` before and after runs so
+`peak_ram_mb`/resident memory evidence is not left as `null`.
+
 ## Why PostgreSQL / GraphRAG Are Out Of Scope
 
 Q18 decides Qdrant engine, tuning and fusion behavior. PostgreSQL, pgvector and
@@ -79,6 +100,8 @@ this cycle.
 - Historical 1.13 baseline artifacts may be absent.
 - Local measurements do not represent production concurrency.
 - Deep memory reporting may be unavailable in some artifacts.
+- Previous runs had `peak_ram_mb=null`; storage decisions need metrics snapshots
+  before promotion.
 - TurboQuant requires a broader corpus before adoption.
 - Native RRF may diverge in tie-break behavior even with high overlap.
 
