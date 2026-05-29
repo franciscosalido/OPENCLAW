@@ -119,6 +119,11 @@ The bakeoff should not be used for a final default decision until the query set
 is expanded beyond the small Q18 synthetic corpus. Target at least 150 documents
 and 50 queries before treating +/-0.01 NDCG deltas as meaningful.
 
+The current Q18 corpus produced equal dense and hybrid NDCG for both Nomic and
+Qwen3-Embedding-4B. That is not a retrieval bug; it means the sparse/BM25 leg
+does not yet separate the scenarios on this 56-document corpus. Promotion needs
+the expanded corpus above before the hybrid-vs-dense signal can be trusted.
+
 ## Non-goals
 
 - No MCP live.

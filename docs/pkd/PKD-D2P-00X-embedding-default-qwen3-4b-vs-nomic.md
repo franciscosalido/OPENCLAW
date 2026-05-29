@@ -36,12 +36,19 @@ Qwen3-Embedding-4B may become default only if:
 - Output dimension is measured and matches the selected dimension.
 - NDCG@5 is at least Nomic + 0.01, or ties within +/-0.005 with stronger
   semantic/human-language query performance.
+- The implementation applies a `1e-9` floating-point tolerance around the
+  `+0.01` NDCG promotion boundary to avoid IEEE 754 false negatives.
 - Recall@10 does not regress against Nomic.
 - p95 total latency is at most 2.0x Nomic.
 - Cold-start cost is mitigable with `keep_alive`.
 - Artifacts do not leak query text, document text, payloads, vectors,
   embeddings, prompts or answers.
 - Python Weighted RRF remains ground truth.
+
+Current Q18 evidence is intentionally insufficient for promotion because dense
+and hybrid NDCG are equal for both models on the small synthetic corpus. This
+suggests the sparse leg is not adding measurable quality yet; the next decision
+requires the larger corpus target documented in the Ollama local upgrade spec.
 
 ## Rollback
 

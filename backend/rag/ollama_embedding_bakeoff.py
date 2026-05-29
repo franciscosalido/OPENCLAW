@@ -26,6 +26,7 @@ EMBEDDING_BAKEOFF_COLLECTION_SCHEMA_VERSION = "qdrant-hybrid-118-embedding-bakeo
 OLLAMA_VERSION_CONTRACT_LAST_VERIFIED = "2026-05-28"
 OLLAMA_LATEST_STABLE_KNOWN = "0.24.0"
 OLLAMA_KNOWN_PRERELEASES: frozenset[str] = frozenset({"0.30.0"})
+NDCG_PROMOTION_EPSILON = 1e-9
 OLLAMA_DEFAULT_BASE_URL = "http://localhost:11434"
 OLLAMA_EMBED_PATH = "/api/embed"
 OLLAMA_LEGACY_EMBEDDINGS_PATH = "/api/embeddings"
@@ -761,7 +762,7 @@ def decide_embedding_candidate(
         return EmbeddingCandidateDecision.DEFER_DUE_TO_LATENCY_OR_MEMORY
     ndcg_gain = qwen3_ndcg_at_5 - nomic_ndcg_at_5
     recall_not_worse = qwen3_recall_at_10 >= nomic_recall_at_10
-    if recall_not_worse and ndcg_gain >= 0.01:
+    if recall_not_worse and ndcg_gain >= 0.01 - NDCG_PROMOTION_EPSILON:
         return EmbeddingCandidateDecision.PROMOTE_QWEN3_4B_DEFAULT
     if recall_not_worse and ndcg_gain >= -0.005:
         return EmbeddingCandidateDecision.QWEN3_4B_EXPERIMENTAL_ONLY

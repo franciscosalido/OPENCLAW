@@ -18,6 +18,7 @@ from backend.rag.ollama_embedding_bakeoff import (
     NOMIC_BENCHMARK_COLLECTION,
     NOMIC_DEFAULT_DIMENSIONS,
     NOMIC_MODEL_ID,
+    NDCG_PROMOTION_EPSILON,
     QWEN3_4B_ALLOWED_DIMENSIONS,
     QWEN3_4B_BENCHMARK_COLLECTION,
     QWEN3_4B_DEFAULT_DIMENSIONS,
@@ -31,6 +32,7 @@ from backend.rag.ollama_embedding_bakeoff import (
     default_bakeoff_collection_spec,
     expected_dimension_for_model,
     format_qwen3_query,
+    decide_embedding_candidate,
     nomic_contract,
     qwen3_4b_contract,
 )
@@ -76,8 +78,6 @@ def test_qwen3_dimension_probe_detects_mismatch() -> None:
 
 
 def test_qwen3_unavailable_does_not_promote() -> None:
-    from backend.rag.ollama_embedding_bakeoff import decide_embedding_candidate
-
     decision = decide_embedding_candidate(
         qwen3_available=False,
         qwen3_ndcg_at_5=None,
@@ -89,6 +89,21 @@ def test_qwen3_unavailable_does_not_promote() -> None:
         memory_ok=None,
     )
     assert decision.value == "inconclusive_qwen3_4b_unavailable"
+
+
+def test_qwen3_promotion_threshold_tolerates_float_boundary() -> None:
+    assert NDCG_PROMOTION_EPSILON == 1e-9
+    decision = decide_embedding_candidate(
+        qwen3_available=True,
+        qwen3_ndcg_at_5=0.8966,
+        nomic_ndcg_at_5=0.8866,
+        qwen3_recall_at_10=0.9,
+        nomic_recall_at_10=0.9,
+        qwen3_total_p95_ms=19.9,
+        nomic_total_p95_ms=10.0,
+        memory_ok=True,
+    )
+    assert decision.value == "promote_qwen3_4b_default"
 
 
 def test_nomic_contract_dimensions_768() -> None:
