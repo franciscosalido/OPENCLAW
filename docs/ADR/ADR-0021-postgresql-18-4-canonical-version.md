@@ -62,3 +62,32 @@ Este ADR nao cria teste.
 
 Este ADR nao altera runtime, exceto referencias obvias em docs e configuracao
 local alinhadas ao PR documental.
+
+## Addendum - TimescaleDB e memoria temporal unificada
+
+PostgreSQL 18.4 e a base canonica da memoria relacional-temporal do QUIMERA.
+
+TimescaleDB e adotada como extensao temporal oficial sobre PostgreSQL, nao como
+banco separado. A versao de TimescaleDB usada pela infraestrutura deve ser
+compativel com PostgreSQL 18. TimescaleDB 2.23 introduziu compatibilidade
+completa com PostgreSQL 18.
+
+A partir deste ADR:
+
+- PostgreSQL 18.4 + TimescaleDB compoem uma unica unidade logica de memoria
+  temporal.
+- Qlib nao e fonte de verdade.
+- Diretorios Qlib, arquivos `.bin`, CSV ou Parquet sao artefatos derivados e
+  descartaveis.
+- Kronos nao tera memoria persistente separada.
+- Entradas Kronos e datasets Qlib devem ser projecoes da memoria canonica
+  PostgreSQL/TimescaleDB.
+- Saidas Kronos devem retornar para PostgreSQL/TimescaleDB em tabelas
+  versionadas de forecast/model run.
+- Nenhum agente acessa Qlib, arquivo `.bin`, PostgreSQL ou Qdrant diretamente;
+  agentes acessam a memoria por repository/API/MCP em PRs futuros.
+
+ADR-0022 detalha a memoria temporal unica para TimescaleDB, Qlib e Kronos.
+
+Referencia TimescaleDB 2.23.0:
+<https://github.com/timescale/timescaledb/releases/tag/2.23.0>

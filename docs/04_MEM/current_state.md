@@ -5,7 +5,7 @@
 > meaningful sessions.
 
 **Last updated:** 2026-06-04
-**Updated by:** Codex — RAG-01B PR-01 RC-02 PostgreSQL 18.4 canonical ADR + MCP memory fabric PKD
+**Updated by:** Codex — RAG-01B PR-01 RC-03 TimescaleDB/Qlib/Kronos temporal memory addendum
 
 ---
 
@@ -29,6 +29,23 @@ Local-only review state:
 
 No benchmark, migration, SQL schema change or version-selection test was added
 for this decision.
+
+## RAG-01B PR-01 RC-03 — Janus Temporal Memory Fabric
+
+Current branch: `rag-01b/pr-01-postgres-session-schema`
+
+Local-only review state:
+
+- ADR-0021 now includes a TimescaleDB addendum.
+- ADR-0022 accepts PostgreSQL 18.4 + TimescaleDB as the single temporal memory
+  source of truth for agentic memory, financial time series, Qlib projections
+  and Kronos forecasts.
+- Qlib is a derived compatibility projection, not canonical storage.
+- Kronos has no separate persistent memory.
+- Blueprint V3.0 now includes the QUIMERA Janus Temporal Memory Fabric section.
+
+No TimescaleDB runtime, Docker image change, SQL extension, hypertable, schema,
+Qlib adapter, Kronos adapter or MCP tool was implemented in RC-03.
 
 ---
 

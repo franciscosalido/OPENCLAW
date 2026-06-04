@@ -90,5 +90,6 @@ useful for prompt/context construction while keeping the SQL limit efficient.
 ## Out Of Scope
 
 This PR does not implement entity nodes, entity edges, GraphRAG, Qdrant cache,
-TimescaleDB, pgvector, MCP, REST, gRPC, OpenTelemetry spans, Ollama changes,
-LiteLLM changes or HybridRAG pipeline changes.
+TimescaleDB extension enablement, hypertables, financial schemas, Qlib
+projections, Kronos adapters, pgvector, MCP, REST, gRPC, OpenTelemetry spans,
+Ollama changes, LiteLLM changes or HybridRAG pipeline changes.

@@ -18,6 +18,41 @@ the default path for model calls, retrieval, and deterministic computation.
 - LiteLLM becomes the single model gateway for model calls.
 - GitHub remains the source of truth for issues, branches, and pull requests.
 
+## QUIMERA Janus Temporal Memory Fabric
+
+O QUIMERA usa uma memoria temporal unica baseada em PostgreSQL 18.4 +
+TimescaleDB.
+
+Essa memoria possui duas familias de dados:
+
+1. Memoria agentic/humana:
+   - `sessions`;
+   - `turns`;
+   - `agent_states`;
+   - `entity_mentions`;
+   - future `memory_events`;
+   - future entity graph.
+
+2. Memoria financeira/Kronos:
+   - `market_instruments`;
+   - `market_calendars`;
+   - `market_bars`;
+   - `market_features`;
+   - `model_runs`;
+   - `kronos_forecasts`;
+   - `qlib_projection_manifests`.
+
+Qlib nao e armazenamento canonico. Qlib e uma projecao compativel gerada a
+partir do PostgreSQL/TimescaleDB para consumo por workflows quantitativos e
+Kronos.
+
+Kronos nao possui memoria propria. Kronos consome K-line frames derivados de
+`market_bars`/`market_features` e persiste outputs em
+`kronos_forecasts`/`model_runs`.
+
+Nenhum agente acessa Qlib, arquivos `.bin`, PostgreSQL ou Qdrant diretamente.
+Agentes acessam memoria por repository/API/MCP em PRs futuros.
+
 ## Operational Source Of Truth
 
 GitHub is the final integration surface for OpenClaw work. Local branches are

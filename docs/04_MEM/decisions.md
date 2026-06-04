@@ -311,3 +311,18 @@ PostgreSQL 16 references are prohibited unless explicitly marked historical.
 `/var/lib/postgresql`, internal `PGDATA` is `/var/lib/postgresql/18/docker`,
 local auth uses `POSTGRES_PASSWORD_FILE`, `asyncpg` remains the Python driver,
 and heavyweight ORM usage remains prohibited.
+
+---
+
+## ADR-022 - TimescaleDB, Qlib and Kronos Unified Temporal Memory
+
+**Date:** 2026-06-04 | **Status:** Accepted | **File:** `docs/ADR/ADR-0022-temporal-memory-timescaledb-qlib-kronos.md`
+
+**Decision:** PostgreSQL 18.4 + TimescaleDB is the single source of truth for
+long-term temporal memory, including agentic memory, temporal events, financial
+series, K-lines, quantitative features, model runs and Kronos forecasts.
+
+**Operational consequence:** Qlib is a derived compatibility projection, not a
+canonical datastore. Kronos has no separate persistent memory and must read
+derived K-line frames from PostgreSQL/TimescaleDB projections and write
+forecasts/model run metadata back into PostgreSQL/TimescaleDB.
