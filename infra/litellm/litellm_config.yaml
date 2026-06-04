@@ -12,7 +12,7 @@ model_list:
   - model_name: local_chat
     litellm_params:
       model: os.environ/LITELLM_LOCAL_CHAT_MODEL
-      api_base: os.environ/OLLAMA_API_BASE
+      api_base: os.environ/OLLAMA_BASE_URL
       timeout: 120
       stream_timeout: 45
       max_retries: 1
@@ -28,7 +28,7 @@ model_list:
   - model_name: local_think
     litellm_params:
       model: os.environ/LITELLM_LOCAL_CHAT_MODEL
-      api_base: os.environ/OLLAMA_API_BASE
+      api_base: os.environ/OLLAMA_BASE_URL
       timeout: 120
       stream_timeout: 45
       max_retries: 1
@@ -42,7 +42,7 @@ model_list:
   - model_name: local_rag
     litellm_params:
       model: os.environ/LITELLM_LOCAL_CHAT_MODEL
-      api_base: os.environ/OLLAMA_API_BASE
+      api_base: os.environ/OLLAMA_BASE_URL
       timeout: 120
       stream_timeout: 45
       max_retries: 1
@@ -58,7 +58,7 @@ model_list:
   - model_name: local_json
     litellm_params:
       model: os.environ/LITELLM_LOCAL_CHAT_MODEL
-      api_base: os.environ/OLLAMA_API_BASE
+      api_base: os.environ/OLLAMA_BASE_URL
       timeout: 60
       stream_timeout: 45
       max_retries: 1
@@ -72,12 +72,64 @@ model_list:
       response_contract: json
       thinking_mode: false
 
+  - model_name: qwen3-local
+    litellm_params:
+      model: os.environ/LITELLM_LOCAL_CHAT_MODEL
+      api_base: os.environ/OLLAMA_BASE_URL
+      timeout: 120
+      stream_timeout: 45
+      max_retries: 1
+      keep_alive: -1
+      temperature: 0.2
+      extra_body:
+        think: false
+    model_info:
+      provider: ollama
+      purpose: canonical Qwen3 local chat alias
+      mode: chat
+      owned_by: quimera-local
+      thinking_mode: false
+
+  - model_name: qwen3:14b
+    litellm_params:
+      model: os.environ/LITELLM_LOCAL_CHAT_MODEL
+      api_base: os.environ/OLLAMA_BASE_URL
+      timeout: 120
+      stream_timeout: 45
+      max_retries: 1
+      keep_alive: -1
+      temperature: 0.2
+      extra_body:
+        think: false
+    model_info:
+      provider: ollama
+      purpose: compatibility alias for canonical Qwen3 model name
+      mode: chat
+      owned_by: quimera-local
+      alias_of: qwen3-local
+      thinking_mode: false
+
+  - model_name: nomic-embed-text
+    litellm_params:
+      model: os.environ/LITELLM_LOCAL_EMBED_MODEL
+      api_base: os.environ/OLLAMA_BASE_URL
+      timeout: 5
+      stream_timeout: 5
+      max_retries: 1
+      keep_alive: -1
+    model_info:
+      provider: ollama
+      purpose: canonical local embedding model alias
+      mode: embedding
+      owned_by: quimera-local
+      output_dimensions: 768
+
   - model_name: quimera_embed
     litellm_params:
       model: os.environ/LITELLM_LOCAL_EMBED_MODEL
-      api_base: os.environ/OLLAMA_API_BASE
-      timeout: 20
-      stream_timeout: 10
+      api_base: os.environ/OLLAMA_BASE_URL
+      timeout: 5
+      stream_timeout: 5
       max_retries: 1
       keep_alive: -1
     model_info:
@@ -90,9 +142,9 @@ model_list:
   - model_name: local_embed
     litellm_params:
       model: os.environ/LITELLM_LOCAL_EMBED_MODEL
-      api_base: os.environ/OLLAMA_API_BASE
-      timeout: 20
-      stream_timeout: 10
+      api_base: os.environ/OLLAMA_BASE_URL
+      timeout: 5
+      stream_timeout: 5
       max_retries: 1
       keep_alive: -1
     model_info:
@@ -108,7 +160,9 @@ litellm_settings:
     type: qdrant-semantic
     qdrant_api_base: os.environ/QDRANT_API_BASE
     qdrant_collection_name: quimera_llm_cache
-    qdrant_semantic_cache_embedding_model: quimera_embed
+    # EXPERIMENTAL: qdrant-semantic can fall back to local via render_config.py.
+    # Tracked upstream: BerriAI issue 23441.
+    qdrant_semantic_cache_embedding_model: nomic-embed-text
     qdrant_semantic_cache_vector_size: 768
     similarity_threshold: 0.92
   drop_params: true

@@ -2,6 +2,10 @@
 
 Status: Draft
 
+Superseded operational hardening: see
+`docs/specs/rag-01b/pr-05b-litellm-host-audit.md` for audit reports, version
+fingerprint, opt-in overhead benchmark and RC-01..RC-24 host boundary checks.
+
 ## Decisao
 
 LiteLLM e um processo Python local do host. Docker Compose nao gerencia LiteLLM no QUIMERA. O Compose gerencia apenas Postgres e Qdrant. O start_quimera.sh reaproveita um LiteLLM ja rodando ou inicia exatamente um processo host controlado por PID.

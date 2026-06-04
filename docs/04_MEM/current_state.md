@@ -5,7 +5,63 @@
 > meaningful sessions.
 
 **Last updated:** 2026-06-04
-**Updated by:** Codex — RAG-01B PR-05 LiteLLM host correction
+**Updated by:** Codex — RAG-01B PR-05B LiteLLM host audit
+
+---
+
+## RAG-01B PR-05B — LiteLLM Host Audit and Hardening
+
+Current branch: `rag-01b/pr-05b-litellm-host-audit`
+Issue: <https://github.com/franciscosalido/OPENCLAW/issues/110>
+
+Implemented:
+
+- LiteLLM source config normalized to `os.environ/OLLAMA_BASE_URL`.
+- Added canonical aliases `qwen3-local`, `qwen3:14b` and `nomic-embed-text`
+  while preserving legacy Gateway/Agentic aliases.
+- Embedding aliases now use timeout/stream timeout `5/5`; chat remains
+  `120/45`; global request timeout remains `165`.
+- Added `infra/litellm/audit.py` for safe JSON/Markdown audit reports.
+- Added `infra/litellm/version_fingerprint.py` for best-effort local version
+  collection with sanitized DSNs and structured warnings.
+- Added `infra/litellm/overhead_benchmark.py`; live benchmark is opt-in via
+  `QUIMERA_LITELLM_BENCHMARK=1`.
+- Reworked `infra/litellm/start_litellm.sh` to start one host process,
+  reuse readiness, write `.runtime/litellm.pid`, use `--num_workers 1`, and
+  wait on `/health/readiness`.
+- Added `scripts/start_quimera.sh` subcommands: `litellm-audit`,
+  `litellm-fingerprint`, `litellm-benchmark`.
+- Added PR-05B SDD at
+  `docs/specs/rag-01b/pr-05b-litellm-host-audit.md`.
+
+Scope explicitly not changed:
+
+- No LiteLLM Docker service.
+- No MCP server, FastAPI or gRPC.
+- No HybridRAG mutation.
+- No PostgreSQL/Timescale migrations or schema changes.
+- No Qdrant collection deletion/recreate.
+- No remote providers or model downloads.
+
+Validation so far:
+
+- PR-05B focused unit block: 58 passed.
+- LiteLLM/Gateway/Agentic focused block: 160 passed / 95 subtests passed.
+- All `tests/unit/test_litellm*.py` + start script tests: 78 passed /
+  8 subtests passed.
+- Full unit suite: 1669 passed / 256 subtests passed.
+- Full regression: 1685 passed / 51 skipped / 259 subtests passed.
+- `uv run mypy --strict` on `infra/litellm/*` PR-05B modules: success.
+- `uv run pyright` on `infra/litellm/*` PR-05B modules: 0 errors.
+- `bash -n` on `scripts/start_quimera.sh` and
+  `infra/litellm/start_litellm.sh`: clean.
+- `uv run python -m infra.litellm.config_validator`: success with one expected
+  qdrant-semantic policy warning.
+- `uv run python -m infra.litellm.render_config`: success, fallback local.
+- `uv run python -m infra.litellm.audit`: generated JSON/Markdown, status
+  `warn` due expected local-service/experimental warnings.
+- `uv run python -m infra.litellm.overhead_benchmark`: `SKIPPED_VALID` without
+  opt-in.
 
 ---
 

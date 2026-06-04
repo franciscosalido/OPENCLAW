@@ -21,11 +21,12 @@ def test_local_think_timeout_is_120() -> None:
     assert _aliases()["local_think"]["litellm_params"]["timeout"] == 120
 
 
-def test_embedding_timeouts_are_20_seconds() -> None:
+def test_embedding_timeouts_are_5_seconds() -> None:
     aliases = _aliases()
 
-    assert aliases["quimera_embed"]["litellm_params"]["timeout"] == 20
-    assert aliases["local_embed"]["litellm_params"]["timeout"] == 20
+    assert aliases["nomic-embed-text"]["litellm_params"]["timeout"] == 5
+    assert aliases["quimera_embed"]["litellm_params"]["timeout"] == 5
+    assert aliases["local_embed"]["litellm_params"]["timeout"] == 5
 
 
 def test_all_models_have_stream_timeout_and_one_retry() -> None:
@@ -46,8 +47,9 @@ def test_chat_models_have_slow_start_stream_timeout_budget() -> None:
 def test_embedding_models_keep_short_stream_timeout() -> None:
     aliases = _aliases()
 
-    assert aliases["quimera_embed"]["litellm_params"]["stream_timeout"] == 10
-    assert aliases["local_embed"]["litellm_params"]["stream_timeout"] == 10
+    assert aliases["nomic-embed-text"]["litellm_params"]["stream_timeout"] == 5
+    assert aliases["quimera_embed"]["litellm_params"]["stream_timeout"] == 5
+    assert aliases["local_embed"]["litellm_params"]["stream_timeout"] == 5
 
 
 def test_global_request_timeout_covers_longest_model_timeout() -> None:

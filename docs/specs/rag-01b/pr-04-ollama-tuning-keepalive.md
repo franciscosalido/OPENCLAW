@@ -39,11 +39,14 @@ requests de warmup/release.
 
 - `postgres-memory` -> `quimera-postgres-memory`
 - `qdrant` -> `quimera-qdrant`
-- `litellm` -> `quimera-litellm`
+
+Nota: a referencia anterior a um servico LiteLLM no Compose foi superseded por
+PR-05/PR-05B. LiteLLM agora e processo Python no host; Compose gerencia apenas
+Postgres e Qdrant.
 
 ## Healthchecks
 
-Postgres usa `pg_isready`; Qdrant usa `/healthz`; LiteLLM usa
+Postgres usa `pg_isready`; Qdrant usa `/healthz`; LiteLLM host usa
 `/health/readiness`; Ollama usa `/api/version`.
 
 ## Commands

@@ -5,6 +5,7 @@ from pathlib import Path
 
 COMPOSE = Path("infra/docker/compose.quimera.local.yml")
 SCRIPT = Path("scripts/start_quimera.sh")
+START_LITELLM = Path("infra/litellm/start_litellm.sh")
 GENERATED = Path("infra/litellm/generated")
 GITIGNORE = Path(".gitignore")
 
@@ -28,10 +29,11 @@ def test_compose_only_manages_postgres_and_qdrant() -> None:
 
 def test_start_script_runs_litellm_as_host_process() -> None:
     text = SCRIPT.read_text(encoding="utf-8")
+    start_text = START_LITELLM.read_text(encoding="utf-8")
 
-    assert "--host" in text
-    assert "127.0.0.1" in text
-    assert "--port" in text
-    assert "4000" in text
+    assert "--host" in start_text
+    assert "127.0.0.1" in start_text
+    assert "--port" in start_text
+    assert "4000" in start_text
     assert "docker compose" in text
     assert "compose exec -T litellm" not in text

@@ -8,7 +8,7 @@ OLLAMA_ENV_FILE="${REPO_ROOT}/infra/ollama/ollama_config.env"
 RUNTIME_DIR="${REPO_ROOT}/.runtime"
 OLLAMA_PID_FILE="${RUNTIME_DIR}/ollama.pid"
 LITELLM_PID_FILE="${RUNTIME_DIR}/litellm.pid"
-LITELLM_LOG_FILE="${RUNTIME_DIR}/litellm.log"
+LITELLM_LOG_FILE="${RUNTIME_DIR}/logs/litellm.log"
 LITELLM_CONFIG_FILE="${REPO_ROOT}/infra/litellm/litellm_config.yaml"
 LITELLM_RUNTIME_CONFIG_FILE="${REPO_ROOT}/infra/litellm/generated/litellm_config.runtime.yaml"
 QUIMERA_DEV_LITELLM_PLACEHOLDER_KEY="quimera-dev-key-change-me"
@@ -131,44 +131,27 @@ litellm_smoke() {
   uv run python -m infra.litellm.smoke_test
 }
 
+litellm_audit() {
+  load_env
+  uv run python -m infra.litellm.audit \
+    --json "${RUNTIME_DIR}/reports/litellm_audit.json" \
+    --markdown "${RUNTIME_DIR}/reports/litellm_audit.md"
+}
+
+litellm_fingerprint() {
+  load_env
+  uv run python -m infra.litellm.version_fingerprint
+}
+
+litellm_benchmark() {
+  load_env
+  uv run python -m infra.litellm.overhead_benchmark
+}
+
 litellm_start() {
   load_env
   ensure_runtime_dir
-  if [[ "${LITELLM_HOST}" != "127.0.0.1" ]]; then
-    echo "Refusing to bind LiteLLM to '${LITELLM_HOST}'" >&2
-    return 1
-  fi
-  if litellm_readiness_ok; then
-    echo "LiteLLM already running at ${LITELLM_BASE_URL}; reusing host process."
-    return 0
-  fi
-  if [[ -z "${LITELLM_MASTER_KEY:-}" ]]; then
-    echo "LITELLM_MASTER_KEY is required to start host LiteLLM" >&2
-    return 1
-  fi
-  if [[ "${LITELLM_MASTER_KEY}" == "${QUIMERA_DEV_LITELLM_PLACEHOLDER_KEY}" ]]; then
-    echo "WARNING: placeholder LITELLM_MASTER_KEY is in use; rotate it for any shared runtime." >&2
-  fi
-  litellm_render
-
-  local cmd=()
-  if [[ -n "${LITELLM_BIN:-}" ]]; then
-    cmd=("${LITELLM_BIN}")
-  elif command -v litellm >/dev/null 2>&1; then
-    cmd=(litellm)
-  elif [[ -x "${REPO_ROOT}/infra/litellm/.venv/bin/litellm" ]]; then
-    cmd=("${REPO_ROOT}/infra/litellm/.venv/bin/litellm")
-  else
-    echo "litellm command not found. Install infra/litellm requirements in the host venv." >&2
-    return 127
-  fi
-
-  "${cmd[@]}" \
-    --config "${QUIMERA_LITELLM_RUNTIME_CONFIG}" \
-    --host "${LITELLM_HOST}" \
-    --port "${LITELLM_PORT}" > "${LITELLM_LOG_FILE}" 2>&1 &
-  echo "$!" > "${LITELLM_PID_FILE}"
-  wait_http "${LITELLM_BASE_URL%/}/health/readiness" "LiteLLM" 30
+  bash "${REPO_ROOT}/infra/litellm/start_litellm.sh"
 }
 
 litellm_stop() {
@@ -309,7 +292,11 @@ run_tests() {
     tests/unit/test_litellm_config_yaml.py \
     tests/unit/test_litellm_cache_policy.py \
     tests/unit/test_litellm_timeout_policy.py \
-    tests/unit/test_litellm_host_runtime_policy.py
+    tests/unit/test_litellm_host_runtime_policy.py \
+    tests/unit/test_litellm_audit_contract.py \
+    tests/unit/test_litellm_version_fingerprint.py \
+    tests/unit/test_litellm_overhead_contract.py \
+    tests/unit/test_start_quimera_litellm_host.py
   if [[ "${RUN_INTEGRATION}" -eq 1 ]]; then
     uv run pytest -m integration \
       tests/integration/test_ollama_warmup.py \
@@ -333,7 +320,8 @@ Usage: scripts/start_quimera.sh <command> [flags]
 
 Commands: start, stop, restart, status, logs, doctor, test, warmup, release,
           litellm-validate, litellm-render, litellm-start, litellm-stop,
-          litellm-restart, litellm-smoke
+          litellm-restart, litellm-smoke, litellm-audit, litellm-fingerprint,
+          litellm-benchmark
 Flags: --build --warmup --doctor --integration --release-models --no-docker --no-ollama --logs --help
 HELP
 }
@@ -354,6 +342,9 @@ case "${COMMAND}" in
   litellm-stop) litellm_stop ;;
   litellm-restart) litellm_stop; litellm_start ;;
   litellm-smoke) litellm_smoke ;;
+  litellm-audit) litellm_audit ;;
+  litellm-fingerprint) litellm_fingerprint ;;
+  litellm-benchmark) litellm_benchmark ;;
   help|--help|-h) show_help ;;
   *) echo "Unknown command: ${COMMAND}" >&2; show_help; exit 2 ;;
 esac

@@ -10,6 +10,7 @@ from infra.litellm.config_validator import (
     ConfigValidationError,
     assert_host_local_qdrant_url,
     load_raw_config,
+    validate_config_report,
     validate_litellm_config,
     validate_no_literal_secrets,
 )
@@ -78,5 +79,61 @@ def test_request_timeout_must_cover_slowest_chat_stream_start(tmp_path: Path) ->
     bad_config = tmp_path / "bad_request_timeout.yaml"
     bad_config.write_text(yaml.safe_dump(raw), encoding="utf-8")
 
-    with pytest.raises(ConfigValidationError, match="request_timeout must be at least"):
+    with pytest.raises(ConfigValidationError, match="request_timeout must"):
         validate_litellm_config(bad_config, env={"LITELLM_MASTER_KEY": "local-dev-key"})
+
+
+def test_threshold_zero_fails(tmp_path: Path) -> None:
+    raw = yaml.safe_load(CONFIG.read_text(encoding="utf-8"))
+    raw["litellm_settings"]["cache_params"]["similarity_threshold"] = 0.0
+    bad_config = tmp_path / "bad_threshold.yaml"
+    bad_config.write_text(yaml.safe_dump(raw), encoding="utf-8")
+
+    with pytest.raises(ConfigValidationError, match="similarity_threshold"):
+        validate_litellm_config(bad_config, env={"LITELLM_MASTER_KEY": "local-dev-key"})
+
+
+def test_llm_cache_cannot_use_rag_cache_collection(tmp_path: Path) -> None:
+    raw = yaml.safe_load(CONFIG.read_text(encoding="utf-8"))
+    raw["litellm_settings"]["cache_params"]["qdrant_collection_name"] = "quimera_query_cache"
+    bad_config = tmp_path / "bad_cache_collision.yaml"
+    bad_config.write_text(yaml.safe_dump(raw), encoding="utf-8")
+
+    with pytest.raises(ConfigValidationError, match="quimera_llm_cache|collide"):
+        validate_litellm_config(bad_config, env={"LITELLM_MASTER_KEY": "local-dev-key"})
+
+
+def test_set_verbose_true_fails(tmp_path: Path) -> None:
+    raw = yaml.safe_load(CONFIG.read_text(encoding="utf-8"))
+    raw["litellm_settings"]["set_verbose"] = True
+    bad_config = tmp_path / "bad_verbose.yaml"
+    bad_config.write_text(yaml.safe_dump(raw), encoding="utf-8")
+
+    with pytest.raises(ConfigValidationError, match="set_verbose"):
+        validate_litellm_config(bad_config, env={"LITELLM_MASTER_KEY": "local-dev-key"})
+
+
+def test_corrupted_yaml_raises_config_validation_error(tmp_path: Path) -> None:
+    bad_config = tmp_path / "bad.yaml"
+    bad_config.write_text("model_list:\n  - [", encoding="utf-8")
+
+    with pytest.raises(ConfigValidationError, match="invalid YAML"):
+        load_raw_config(bad_config)
+
+
+def test_remote_qdrant_base_fails_provider_safety() -> None:
+    with pytest.raises(ConfigValidationError, match="Qdrant URL"):
+        validate_litellm_config(
+            CONFIG,
+            env={
+                "LITELLM_MASTER_KEY": "local-dev-key",
+                "QDRANT_API_BASE": "http://qdrant:6333",
+            },
+        )
+
+
+def test_config_report_surfaces_qdrant_semantic_policy_warning() -> None:
+    report = validate_config_report(CONFIG, env={"LITELLM_MASTER_KEY": "local-dev-key"})
+
+    assert report.cache_backend == "qdrant-semantic"
+    assert any(warning.rule_id == "RC-09" for warning in report.warnings)

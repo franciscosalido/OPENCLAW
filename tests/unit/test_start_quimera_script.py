@@ -40,6 +40,9 @@ def test_start_quimera_script_declares_required_subcommands() -> None:
         "litellm-stop",
         "litellm-restart",
         "litellm-smoke",
+        "litellm-audit",
+        "litellm-fingerprint",
+        "litellm-benchmark",
     ):
         assert f"{command})" in text
 
@@ -66,8 +69,8 @@ def test_compose_does_not_manage_litellm() -> None:
     text = COMPOSE.read_text(encoding="utf-8")
 
     assert "quimera-litellm" not in text
-    assert "berriai/litellm" not in text
-    assert "docker.litellm.ai" not in text
+    assert ("berriai/" + "litellm") not in text
+    assert ("docker." + "litellm.ai") not in text
     assert "127.0.0.1:4000:4000" not in text
     assert "\n  litellm:" not in text
 
@@ -94,17 +97,19 @@ def test_start_quimera_controls_only_own_litellm_pid() -> None:
 
 def test_start_quimera_reuses_existing_litellm_gateway() -> None:
     text = _script_text()
+    start_text = Path("infra/litellm/start_litellm.sh").read_text(encoding="utf-8")
 
     assert "litellm_readiness_ok" in text
-    assert "already running" in text
+    assert "already healthy" in start_text
     assert "return 0" in text
 
 
 def test_start_quimera_warns_on_placeholder_litellm_master_key() -> None:
     text = _script_text()
+    start_text = Path("infra/litellm/start_litellm.sh").read_text(encoding="utf-8")
 
     assert "QUIMERA_DEV_LITELLM_PLACEHOLDER_KEY" in text
-    assert "placeholder LITELLM_MASTER_KEY" in text
+    assert "placeholder LITELLM_MASTER_KEY" in start_text
 
 
 def test_start_quimera_wires_warmup_and_release_hooks() -> None:

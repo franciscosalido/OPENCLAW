@@ -80,7 +80,7 @@ class GatewayFinalBaselineTests(unittest.TestCase):
     def test_required_aliases_exist_in_both_litellm_configs(self) -> None:
         for path in (CONTRACT_LITELLM_CONFIG, OPERATIONAL_LITELLM_CONFIG):
             with self.subTest(path=path):
-                self.assertEqual(set(_aliases(path)), REQUIRED_ALIASES)
+                self.assertLessEqual(REQUIRED_ALIASES, set(_aliases(path)))
 
     def test_aliases_point_to_local_ollama_models(self) -> None:
         contract_aliases = _aliases(CONTRACT_LITELLM_CONFIG)
