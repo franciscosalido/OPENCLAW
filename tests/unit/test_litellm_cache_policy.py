@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+from infra.litellm.config_validator import ConfigValidationError
 from infra.litellm.render_config import render_runtime_config
 
 
@@ -50,7 +51,7 @@ def test_renderer_keeps_qdrant_semantic_when_flag_and_qdrant_ready(tmp_path: Pat
 
 
 def test_renderer_rejects_qdrant_without_ready_backend_when_no_fallback(tmp_path: Path) -> None:
-    with pytest.raises(RuntimeError, match="Qdrant semantic cache requested"):
+    with pytest.raises(ConfigValidationError, match="Qdrant semantic cache requested"):
         render_runtime_config(
             source_path=CONFIG,
             runtime_path=tmp_path / "runtime.yaml",

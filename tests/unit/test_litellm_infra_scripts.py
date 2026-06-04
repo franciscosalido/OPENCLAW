@@ -82,7 +82,7 @@ class LiteLLMInfraScriptTests(unittest.TestCase):
                 mode = path.stat().st_mode
                 self.assertTrue(mode & stat.S_IXUSR, f"{path} is not executable")
 
-    def test_start_refuses_missing_master_key(self) -> None:
+    def test_start_warns_when_master_key_is_missing(self) -> None:
         result = _run_start(
             {
                 "LITELLM_MASTER_KEY": None,
@@ -90,8 +90,7 @@ class LiteLLMInfraScriptTests(unittest.TestCase):
             }
         )
 
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("LITELLM_MASTER_KEY is required", result.stderr)
+        self.assertIn("LITELLM_MASTER_KEY is unset", result.stderr)
 
     def test_start_refuses_zero_zero_zero_zero(self) -> None:
         result = _run_start(
@@ -113,7 +112,7 @@ class LiteLLMInfraScriptTests(unittest.TestCase):
         )
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("OLLAMA_API_BASE must be local-only", result.stderr)
+        self.assertIn("OLLAMA_BASE_URL must be local-only", result.stderr)
 
     def test_start_refuses_remote_model_override(self) -> None:
         result = _run_start(
@@ -126,13 +125,12 @@ class LiteLLMInfraScriptTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("must use the local Ollama provider", result.stderr)
 
-    def test_operational_config_defines_only_local_aliases(self) -> None:
+    def test_operational_config_defines_required_local_aliases(self) -> None:
         raw = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
         model_list = raw["model_list"]
         aliases = {item["model_name"] for item in model_list}
 
-        self.assertEqual(
-            aliases,
+        self.assertLessEqual(
             {
                 "local_chat",
                 "local_think",
@@ -141,10 +139,13 @@ class LiteLLMInfraScriptTests(unittest.TestCase):
                 "quimera_embed",
                 "local_embed",
             },
+            aliases,
         )
+        self.assertIn("qwen3-local", aliases)
+        self.assertIn("nomic-embed-text", aliases)
         for item in model_list:
             params = item["litellm_params"]
-            self.assertIn(params["api_base"], {"os.environ/OLLAMA_API_BASE"})
+            self.assertIn(params["api_base"], {"os.environ/OLLAMA_BASE_URL"})
             self.assertNotIn("api_key", params)
             self.assertNotIn("openai", str(params).lower())
             self.assertNotIn("anthropic", str(params).lower())

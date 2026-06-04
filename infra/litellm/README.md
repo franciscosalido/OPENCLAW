@@ -42,9 +42,9 @@ Use shell exports. Do not copy real secrets into Git.
 
 ```bash
 export LITELLM_MASTER_KEY="dev-local-key-change-me"
-export OLLAMA_API_BASE="http://127.0.0.1:11434"
+export OLLAMA_BASE_URL="http://127.0.0.1:11434"
 export QWEN_MODEL="qwen3:14b"
-export EMBED_MODEL="nomic-embed-text"
+export EMBED_MODEL="nomic-embed-text:latest"
 export LITELLM_HOST="127.0.0.1"
 export LITELLM_PORT="4000"
 ```
@@ -63,6 +63,8 @@ Recommended through the stack controller:
 ./scripts/start_quimera.sh litellm-render
 ./scripts/start_quimera.sh litellm-start
 ./scripts/start_quimera.sh litellm-smoke
+./scripts/start_quimera.sh litellm-audit
+./scripts/start_quimera.sh litellm-benchmark
 ```
 
 `scripts/start_quimera.sh start` also starts or reuses host LiteLLM after
@@ -82,6 +84,12 @@ not versioned.
 The script refuses to bind to anything other than `127.0.0.1`.
 If the placeholder key from `.env.local.example` is still in use, the stack
 controller prints a warning. Rotate it for any shared runtime.
+
+`litellm-audit` writes safe local reports to `.runtime/reports/`. The audit
+includes config contracts, endpoint probes, cache policy and version
+fingerprints. `litellm-benchmark` is opt-in; without
+`QUIMERA_LITELLM_BENCHMARK=1`, it returns `status=SKIPPED_VALID` with
+`skipped=true` and does not call a model.
 
 ## Validate
 
@@ -126,17 +134,26 @@ collection `quimera_llm_cache`. The retrieval cache collection remains
 The renderer keeps Qdrant semantic cache only when
 `QUIMERA_LITELLM_QDRANT_SEMANTIC_EXPERIMENTAL=1` and Qdrant is reachable at
 `QDRANT_API_BASE`. Otherwise it writes a runtime config with local cache.
+The audit reports that fallback as a warning by design, not as a failed
+runtime.
+
+## Timeout Notes
+
+`local_json` uses `timeout=60` and `stream_timeout=45`. This is valid because
+LiteLLM treats `timeout` as the complete call budget and `stream_timeout` as
+the first streaming chunk budget. Keep JSON prompts concise; callers with
+unusually long JSON contexts should pass an explicit request timeout or use a
+future dedicated alias.
 
 ## Stop
 
-If LiteLLM runs in the foreground, stop it with `Ctrl-C`.
-
-If you started it in a background shell, find and stop that process manually:
-
 ```bash
-ps aux | grep '[l]itellm'
-kill <pid>
+./scripts/start_quimera.sh litellm-stop
 ```
+
+The stop path reads only `.runtime/litellm.pid`, sends SIGTERM to that PID, and
+uses SIGKILL only for the same PID after the grace loop. It does not use
+`pkill` or `killall`.
 
 ## MVP Boundary
 

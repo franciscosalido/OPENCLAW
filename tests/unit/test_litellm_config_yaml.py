@@ -42,12 +42,13 @@ def test_cache_collection_is_separated_from_retrieval_cache() -> None:
 
 def test_models_have_loopback_ollama_env_api_base() -> None:
     for model in _load_config()["model_list"]:
-        assert model["litellm_params"]["api_base"] == "os.environ/OLLAMA_API_BASE"
+        assert model["litellm_params"]["api_base"] == "os.environ/OLLAMA_BASE_URL"
 
 
 def test_embedding_alias_is_used_for_semantic_cache() -> None:
     cache_params = _load_config()["litellm_settings"]["cache_params"]
 
-    assert cache_params["qdrant_semantic_cache_embedding_model"] == "quimera_embed"
+    assert cache_params["qdrant_semantic_cache_embedding_model"] == "nomic-embed-text"
     assert cache_params["qdrant_semantic_cache_vector_size"] == 768
     assert "quimera_embed" in _aliases()
+    assert "nomic-embed-text" in _aliases()
