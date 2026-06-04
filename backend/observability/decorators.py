@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import re
 import time
 from collections.abc import Awaitable, Callable, Mapping
 from functools import wraps
@@ -10,11 +11,14 @@ from opentelemetry.trace import Status, StatusCode
 
 from backend.observability.attributes import (
     CACHE_HIT,
+    DB_COLLECTION_NAME,
+    DB_OPERATION_NAME,
+    DB_SYSTEM_NAME,
     ERROR_TYPE,
+    GEN_AI_OPERATION_NAME,
     GEN_AI_AGENT_ID,
     GEN_AI_AGENT_NAME,
     GEN_AI_DATA_SOURCE_ID,
-    GEN_AI_OPERATION_NAME,
     GEN_AI_PROVIDER_NAME,
     GEN_AI_REQUEST_MODEL,
     GEN_AI_TOOL_NAME,
@@ -34,6 +38,7 @@ from backend.observability.tracer import get_tracer
 P = ParamSpec("P")
 R = TypeVar("R")
 AsyncCallable = Callable[P, Awaitable[R]]
+_SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,128}$")
 
 
 def _ensure_async(fn: Callable[P, object]) -> AsyncCallable[P, R]:
@@ -69,6 +74,15 @@ def _cache_hit(result: object) -> bool | None:
             return raw
     raw_attr = getattr(result, "cache_hit", None)
     return raw_attr if isinstance(raw_attr, bool) else None
+
+
+def _validate_safe_name(value: str, field_name: str) -> str:
+    if not _SAFE_NAME_RE.fullmatch(value):
+        raise ValueError(f"{field_name} must be a safe low-cardinality identifier")
+    lowered = value.lower()
+    if any(token in lowered for token in ("prompt", "query", "answer", "response", "chunk", "vector", "embedding", "payload", "secret", "token", "password", "api_key")):
+        raise ValueError(f"{field_name} must not contain sensitive content markers")
+    return value
 
 
 def _trace_async(
@@ -171,11 +185,20 @@ def traced_rrf(*, backend: str = "python_rrf") -> Callable[[Callable[P, object]]
 
 
 def traced_pg(table: str, operation: str) -> Callable[[Callable[P, object]], AsyncCallable[P, R]]:
+    safe_table = _validate_safe_name(table, "table")
+    safe_operation = _validate_safe_name(operation.upper(), "operation")
+
     def decorator(fn: Callable[P, object]) -> AsyncCallable[P, R]:
         return _trace_async(
             fn,
-            span_name=f"pg {operation} {table}",
-            base_attrs={"quimera.pg_table": table, "quimera.pg_operation": operation},
+            span_name=f"pg {safe_operation} {safe_table}",
+            base_attrs={
+                DB_SYSTEM_NAME: "postgresql",
+                DB_OPERATION_NAME: safe_operation,
+                DB_COLLECTION_NAME: safe_table,
+                "quimera.pg_table": safe_table,
+                "quimera.pg_operation": safe_operation,
+            },
             latency_attr=LATENCY_PG_MS,
         )
 
@@ -202,11 +225,18 @@ def traced_mcp_tool(
     *,
     method_name: str = "tools/call",
 ) -> Callable[[Callable[P, object]], AsyncCallable[P, R]]:
+    safe_tool_name = _validate_safe_name(tool_name, "tool_name")
+    safe_method_name = _validate_safe_name(method_name.replace("/", ":"), "method_name").replace(":", "/")
+
     def decorator(fn: Callable[P, object]) -> AsyncCallable[P, R]:
         return _trace_async(
             fn,
-            span_name=f"mcp {tool_name}",
-            base_attrs={GEN_AI_TOOL_NAME: tool_name, MCP_METHOD_NAME: method_name},
+            span_name=f"mcp {safe_method_name}",
+            base_attrs={
+                GEN_AI_OPERATION_NAME: "execute_tool",
+                GEN_AI_TOOL_NAME: safe_tool_name,
+                MCP_METHOD_NAME: safe_method_name,
+            },
             latency_attr="latency.total_ms",
         )
 

@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import pytest
+
 from backend.observability.tracer import force_flush_tracing, setup_tracing, shutdown_tracing
+
+pytestmark = pytest.mark.integration
 
 
 def test_otel_console_exporter_smoke(monkeypatch) -> None:  # type: ignore[no-untyped-def]
@@ -12,4 +16,3 @@ def test_otel_console_exporter_smoke(monkeypatch) -> None:  # type: ignore[no-un
 
     assert force_flush_tracing(timeout_millis=1000) is True
     shutdown_tracing()
-

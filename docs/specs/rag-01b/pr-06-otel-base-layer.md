@@ -86,3 +86,23 @@ Ollama or any model endpoint.
 PR-07 should wire these decorators into selected RAG and gateway seams, define
 sampling policy for local development, and decide whether a collector/profile is
 worth adding as an optional operator path.
+
+## RC-01 Residual Risk Cleanup
+
+RC-01 addressed reviewer residual risks without widening PR-06 into runtime RAG
+instrumentation:
+
+- `traced_pg` now emits current OpenTelemetry database semantic convention
+  metadata for PostgreSQL:
+  - `db.system.name=postgresql`
+  - `db.operation.name`
+  - `db.collection.name`
+  Existing `quimera.pg_table`, `quimera.pg_operation` and `latency.pg_ms`
+  remain for the Quimera contract.
+- Metric instrument names are public constants:
+  - `GENAI_OPERATION_DURATION_METRIC_NAME`
+  - `RETRIEVAL_OPERATION_DURATION_METRIC_NAME`
+- OTel integration smoke tests are marked with `pytest.mark.integration`.
+- `traced_mcp_tool` validates `tool_name`/`method_name`, stores the tool name
+  only as `gen_ai.tool.name`, and uses the low-cardinality MCP method in the
+  span name.

@@ -106,6 +106,45 @@ async def test_decorator_records_exception_and_reraises(monkeypatch: pytest.Monk
     assert tracer.span.status is not None
 
 
+async def test_traced_pg_sets_postgresql_semconv_attributes(monkeypatch: pytest.MonkeyPatch) -> None:
+    tracer = FakeTracer()
+    monkeypatch.setattr(decorators, "get_tracer", lambda name: tracer)
+
+    @decorators.traced_pg(table="sessions", operation="select")
+    async def query() -> None:
+        return None
+
+    await query()
+
+    assert tracer.span.attributes["db.system.name"] == "postgresql"
+    assert tracer.span.attributes["db.operation.name"] == "SELECT"
+    assert tracer.span.attributes["db.collection.name"] == "sessions"
+    assert tracer.span.attributes["quimera.pg_table"] == "sessions"
+    assert tracer.span.attributes["quimera.pg_operation"] == "SELECT"
+
+
+async def test_traced_mcp_tool_uses_method_span_name_and_safe_tool_attribute(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tracer = FakeTracer()
+    monkeypatch.setattr(decorators, "get_tracer", lambda name: tracer)
+
+    @decorators.traced_mcp_tool(tool_name="safe_tool")
+    async def call_tool() -> None:
+        return None
+
+    await call_tool()
+
+    assert tracer.span_names == ["mcp tools/call"]
+    assert tracer.span.attributes["gen_ai.operation.name"] == "execute_tool"
+    assert tracer.span.attributes["gen_ai.tool.name"] == "safe_tool"
+
+
+def test_traced_mcp_tool_rejects_sensitive_or_free_text_tool_name() -> None:
+    with pytest.raises(ValueError):
+        decorators.traced_mcp_tool(tool_name="dump_prompt please")
+
+
 def test_decorator_rejects_sync_functions() -> None:
     with pytest.raises(TypeError, match="async functions only"):
 

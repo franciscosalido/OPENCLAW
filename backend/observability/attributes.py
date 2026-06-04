@@ -12,6 +12,11 @@ GEN_AI_EVALUATION_NAME = "gen_ai.evaluation.name"
 GEN_AI_EVALUATION_SCORE = "gen_ai.evaluation.score"
 ERROR_TYPE = "error.type"
 
+DB_SYSTEM_NAME = "db.system.name"
+DB_OPERATION_NAME = "db.operation.name"
+DB_COLLECTION_NAME = "db.collection.name"
+DB_NAMESPACE = "db.namespace"
+
 MCP_METHOD_NAME = "mcp.method.name"
 MCP_SESSION_ID = "mcp.session.id"
 MCP_PROTOCOL_VERSION = "mcp.protocol.version"
@@ -58,6 +63,15 @@ GENAI_ATTRS = frozenset(
         GEN_AI_EVALUATION_NAME,
         GEN_AI_EVALUATION_SCORE,
         ERROR_TYPE,
+    }
+)
+
+DB_ATTRS = frozenset(
+    {
+        DB_SYSTEM_NAME,
+        DB_OPERATION_NAME,
+        DB_COLLECTION_NAME,
+        DB_NAMESPACE,
     }
 )
 
@@ -114,6 +128,7 @@ SAFE_ATTRIBUTE_PREFIXES = frozenset(
         "cache.",
         "latency.",
         "error.",
+        "db.",
     }
 )
 
@@ -165,5 +180,4 @@ PII_FORBIDDEN_SUBSTRINGS = frozenset(
     }
 )
 
-SAFE_ATTRS = GENAI_ATTRS | MCP_ATTRS | QUIMERA_ATTRS
-
+SAFE_ATTRS = GENAI_ATTRS | DB_ATTRS | MCP_ATTRS | QUIMERA_ATTRS

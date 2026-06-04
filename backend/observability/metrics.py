@@ -12,6 +12,8 @@ from backend.observability.tracer import build_resource, is_otel_disabled
 _METRICS_INITIALIZED = False
 _GENAI_OPERATION_DURATION: Histogram | None = None
 _RETRIEVAL_OPERATION_DURATION: Histogram | None = None
+GENAI_OPERATION_DURATION_METRIC_NAME = "gen_ai.client.operation.duration"
+RETRIEVAL_OPERATION_DURATION_METRIC_NAME = "quimera.retrieval.operation.duration"
 
 
 def setup_metrics() -> None:
@@ -22,12 +24,12 @@ def setup_metrics() -> None:
     metrics.set_meter_provider(provider)
     meter = metrics.get_meter("quimera.observability")
     _GENAI_OPERATION_DURATION = meter.create_histogram(
-        "gen_ai.client.operation.duration",
+        GENAI_OPERATION_DURATION_METRIC_NAME,
         unit="s",
         description="Duration of local GenAI client operations.",
     )
     _RETRIEVAL_OPERATION_DURATION = meter.create_histogram(
-        "quimera.retrieval.operation.duration",
+        RETRIEVAL_OPERATION_DURATION_METRIC_NAME,
         unit="ms",
         description="Duration of Quimera retrieval operations.",
     )

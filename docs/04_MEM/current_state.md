@@ -13,6 +13,7 @@
 
 Current branch: `rag-01b/pr-06-otel-base-layer`
 Base branch: `rag-01b/pr-05b-litellm-host-audit` while PR-05B remains open.
+Draft PR: <https://github.com/franciscosalido/OPENCLAW/pull/113>
 
 Implemented:
 
@@ -59,6 +60,35 @@ Handoff to PR-07:
 - Decide optional collector/profile strategy.
 - Keep content capture disabled unless a future ADR explicitly changes the
   privacy boundary.
+
+---
+
+## RAG-01B PR-06 RC-01 — OTel SemConv and Test Marker Cleanup
+
+Current branch: `rag-01b/pr-06-otel-base-layer`
+Draft PR: <https://github.com/franciscosalido/OPENCLAW/pull/113>
+
+Implemented:
+
+- `traced_pg` now emits current OTel DB semconv attributes for PostgreSQL:
+  `db.system.name=postgresql`, `db.operation.name` and `db.collection.name`,
+  while preserving `quimera.pg_table`, `quimera.pg_operation` and
+  `latency.pg_ms`.
+- Added public metric name constants for the GenAI and retrieval histograms.
+- Added `pytest.mark.integration` to all PR-06 OTel integration tests, so
+  `pytest -m integration` includes them.
+- Hardened `traced_mcp_tool`: validates low-cardinality tool/method names,
+  stores tool name as `gen_ai.tool.name`, and keeps span name based on
+  `mcp.method.name` rather than raw tool name.
+
+Validation:
+
+- RC focused block: 17 passed.
+- `pytest -m integration` on OTel integration tests: 3 passed.
+- `uv run mypy --strict .`: success.
+- `uv run pyright`: 0 errors.
+- `uv run pytest`: 1730 passed / 51 skipped.
+- `git diff --check`: clean.
 
 ---
 

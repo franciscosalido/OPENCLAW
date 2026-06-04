@@ -13,6 +13,8 @@ def test_required_semantic_attributes_are_declared() -> None:
     assert "gen_ai.operation.name" in attrs.GENAI_ATTRS
     assert "gen_ai.provider.name" in attrs.GENAI_ATTRS
     assert "gen_ai.response.model" in attrs.GENAI_ATTRS
+    assert "db.system.name" in attrs.DB_ATTRS
+    assert "db.operation.name" in attrs.DB_ATTRS
     assert "mcp.method.name" in attrs.MCP_ATTRS
     assert "retrieval.cache_hit" in attrs.QUIMERA_ATTRS
     assert "latency.llm_ms" in attrs.QUIMERA_ATTRS
@@ -29,4 +31,3 @@ def test_attribute_names_are_lowercase_dotted_tokens() -> None:
         assert key == key.lower()
         assert " " not in key
         assert "." in key
-
