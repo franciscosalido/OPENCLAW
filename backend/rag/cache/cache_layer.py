@@ -23,7 +23,11 @@ from backend.rag.cache.cache_models import (
     sanitize_metadata,
 )
 from backend.rag.cache.errors import CachePayloadError, CacheVectorDimensionError
-from backend.rag.cache.types import CacheFilterValue
+from backend.rag.cache.types import (
+    CacheCollectionClient,
+    CacheFilterValue,
+    CacheLayerClient,
+)
 
 
 class CacheLayer:
@@ -31,14 +35,14 @@ class CacheLayer:
 
     def __init__(
         self,
-        client: Any,
+        client: AsyncQdrantClient | CacheLayerClient,
         settings: CacheSettings,
         collection_manager: CacheCollectionManager | None = None,
     ) -> None:
         self._client = client
         self._settings = settings
         self._collection_manager = collection_manager or CacheCollectionManager(
-            client,
+            cast(AsyncQdrantClient | CacheCollectionClient, client),
             settings,
         )
 

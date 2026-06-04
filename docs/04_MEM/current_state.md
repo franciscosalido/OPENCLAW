@@ -13,7 +13,7 @@
 
 Current branch: `rag-01b/pr-03-hybridrag-cache-qdrant`
 Draft PR: <https://github.com/franciscosalido/OPENCLAW/pull/106>
-Implementation commit: `d7014ffe0544c45aa1895c33150ed2586b8a532b`
+Implementation series: `414bf28..HEAD` on the draft PR branch.
 
 Local and remote branch are aligned (`HEAD...origin/rag-01b/pr-03-hybridrag-cache-qdrant`
 is `0 0`).
