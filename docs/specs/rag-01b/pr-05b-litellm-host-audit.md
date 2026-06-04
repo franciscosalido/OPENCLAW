@@ -78,11 +78,23 @@ Bug conhecido monitorado: `AttributeError: 'Cache' object has no attribute
 'cache'` em alguns caminhos de Qdrant semantic cache. O fallback existe para
 evitar derrubar o gateway por uma feature experimental.
 
+O audit reporta RC-09 como `warn` quando o YAML fonte declara
+`qdrant-semantic` mas a flag experimental nao esta ativa. Isso e
+observabilidade intencional: o runtime continua valido porque o renderer aplica
+fallback local.
+
 ## Timeout Policy
 
 - Chat/Qwen: `timeout=120`, `stream_timeout=45`.
 - Embeddings/Nomic: `timeout=5`, `stream_timeout=5`.
 - Global: `request_timeout=165`.
+
+`local_json` preserva `timeout=60` e `stream_timeout=45`. Pela documentacao do
+LiteLLM, `timeout` limita a chamada completa e `stream_timeout` limita a espera
+pelo primeiro chunk em streaming. O valor 45s e aceito por RC-17
+(`45 <= 60`) e protege slow-start local, mas operadores devem preferir payloads
+JSON concisos; contexto JSON longo pode exigir ajuste explicito de caller ou
+alias futuro.
 
 ## Health Policy
 
@@ -110,7 +122,8 @@ Authorization, API keys, DSN completo ou senhas.
 
 `python -m infra.litellm.version_fingerprint` coleta best-effort:
 
-- Python, platform, LiteLLM, Pydantic, HTTPX e qdrant-client;
+- Python direto do runtime (`python`, `python_version`, `python_executable`),
+  platform, LiteLLM, Pydantic, HTTPX e qdrant-client;
 - Ollama `/api/version`;
 - Qdrant `/readyz` e `/collections`;
 - Docker Compose version;
@@ -121,8 +134,8 @@ Falhas viram warnings estruturados.
 ## Proxy Overhead Benchmark
 
 `python -m infra.litellm.overhead_benchmark` so executa benchmark real quando
-`QUIMERA_LITELLM_BENCHMARK=1`. Sem opt-in retorna `SKIPPED_VALID`. O budget
-diagnostico e `p95_overhead_ms < 50`.
+`QUIMERA_LITELLM_BENCHMARK=1`. Sem opt-in retorna `status=SKIPPED_VALID` e
+`skipped=true`. O budget diagnostico e `p95_overhead_ms < 50`.
 
 ## Regression Matrix
 

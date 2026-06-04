@@ -131,6 +131,8 @@ def build_version_fingerprint(
 
     values: dict[str, Any] = {
         "python": sys.version.split()[0],
+        "python_version": platform.python_version(),
+        "python_executable": sys.executable,
         "platform": platform.platform(),
         "litellm": _package_version("litellm"),
         "pydantic": _package_version("pydantic"),

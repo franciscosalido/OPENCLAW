@@ -68,3 +68,13 @@ def test_embedding_dimension_uses_canonical_constant() -> None:
     for alias in ("quimera_embed", "local_embed"):
         model_info = _aliases()[alias]["model_info"]
         assert model_info["output_dimensions"] == CANONICAL_EMBED_DIM
+
+
+def test_pr05b_documents_local_json_stream_timeout_tradeoff() -> None:
+    text = Path("docs/specs/rag-01b/pr-05b-litellm-host-audit.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "local_json" in text
+    assert "stream_timeout=45" in text
+    assert "primeiro chunk" in text

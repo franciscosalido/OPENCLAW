@@ -7,6 +7,7 @@ def test_benchmark_is_opt_in() -> None:
     report = run_live_benchmark(env={})
 
     assert report["status"] == "SKIPPED_VALID"
+    assert report["skipped"] is True
     assert report["overhead_ms"] is None
 
 
@@ -15,6 +16,7 @@ def test_skipped_report_is_valid() -> None:
 
     assert report["schema_version"] == "quimera-litellm-overhead-v1"
     assert report["status"] == "SKIPPED_VALID"
+    assert report["skipped"] is True
 
 
 def test_calculates_percentiles_and_mean() -> None:

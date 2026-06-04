@@ -65,6 +65,7 @@ def skipped_report(reason: str = "QUIMERA_LITELLM_BENCHMARK is not 1") -> dict[s
     return {
         "schema_version": BENCHMARK_SCHEMA_VERSION,
         "status": "SKIPPED_VALID",
+        "skipped": True,
         "reason": reason,
         "overhead_ms": None,
     }
@@ -124,6 +125,7 @@ def run_live_benchmark(
         return {
             "schema_version": BENCHMARK_SCHEMA_VERSION,
             "status": "diagnostic_warning",
+            "skipped": False,
             "diagnostic_warning": exc.__class__.__name__,
             "overhead_ms": None,
         }
@@ -132,6 +134,7 @@ def run_live_benchmark(
     return {
         "schema_version": BENCHMARK_SCHEMA_VERSION,
         "status": "pass" if stats.p95_ms < OVERHEAD_P95_BUDGET_MS else "warn",
+        "skipped": False,
         "budget": {"p95_overhead_ms_lt": OVERHEAD_P95_BUDGET_MS},
         "overhead_ms": stats.to_dict(),
     }

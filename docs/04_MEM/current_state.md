@@ -65,6 +65,41 @@ Validation so far:
 
 ---
 
+## RAG-01B PR-05B RC-01 — Residual Risk Cleanup
+
+Current branch: `rag-01b/pr-05b-litellm-host-audit`
+PR: <https://github.com/franciscosalido/OPENCLAW/pull/111>
+
+Implemented RC-01 fixes:
+
+- RC-09 audit `warn` remains intentional when source YAML declares
+  `qdrant-semantic` and the experimental flag is not set; SDD/README now state
+  that fallback local is valid runtime behavior.
+- `local_json` keeps `timeout=60` and `stream_timeout=45`; SDD/README now
+  document the first-chunk tradeoff and recommend concise JSON contexts.
+- `version_fingerprint` now exposes `python_version` and `python_executable`
+  directly from the running interpreter, independent of command probe failures.
+- `overhead_benchmark` keeps `status=SKIPPED_VALID` and now also emits
+  `skipped=true` for compatibility with reviewer expectations.
+
+Validation:
+
+- RC-01 focused tests: 19 passed.
+- LiteLLM/start-script block: 80 passed / 8 subtests passed.
+- Gateway/Agentic focused block: 92 passed / 87 subtests passed.
+- PR-05B opt-in integrations without env flags: 5 skipped.
+- Full unit suite: 1671 passed / 256 subtests passed.
+- `uv run mypy --strict` on RC-01 touched LiteLLM modules: success.
+- `uv run pyright` on RC-01 touched LiteLLM modules: 0 errors.
+- `uv run python -m infra.litellm.version_fingerprint`: success; includes
+  `python_version` and `python_executable`.
+- `uv run python -m infra.litellm.overhead_benchmark`: `SKIPPED_VALID` with
+  `skipped=true`.
+- `uv run python -m infra.litellm.audit`: generated JSON/Markdown, status
+  `warn` by design.
+
+---
+
 ## RAG-01B PR-05 RC-01 — LiteLLM Host Hardening
 
 Current branch: `rag-01b/pr-05-litellm-host-cache-timeout`

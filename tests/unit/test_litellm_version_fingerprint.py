@@ -25,6 +25,8 @@ def test_fingerprint_tolerates_unavailable_services() -> None:
 
     assert fingerprint.schema_version == "quimera-litellm-version-fingerprint-v1"
     assert fingerprint.values["python"]
+    assert fingerprint.values["python_version"]
+    assert fingerprint.values["python_executable"]
     assert fingerprint.values["docker_compose"] is None
     assert any(warning["component"] == "ollama" for warning in fingerprint.warnings)
     assert any(warning["component"] == "qdrant_ready" for warning in fingerprint.warnings)
@@ -36,3 +38,17 @@ def test_fingerprint_contains_package_versions_when_installed() -> None:
     assert "pydantic" in fingerprint.values
     assert "httpx" in fingerprint.values
     assert "litellm" in fingerprint.values
+
+
+def test_python_version_does_not_depend_on_command_runner_failure() -> None:
+    def command_runner(_command: list[str], _timeout: float) -> tuple[int, str, str]:
+        return 127, "", "forced failure"
+
+    fingerprint = build_version_fingerprint(
+        env={"LITELLM_MASTER_KEY": "local-dev-key"},
+        command_runner=command_runner,
+        http_getter=lambda _url, _timeout: (None, "offline"),
+    )
+
+    assert isinstance(fingerprint.values["python_version"], str)
+    assert fingerprint.values["python_version"]
