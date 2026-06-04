@@ -14,7 +14,7 @@ model_list:
       model: os.environ/LITELLM_LOCAL_CHAT_MODEL
       api_base: os.environ/OLLAMA_API_BASE
       timeout: 120
-      stream_timeout: 15
+      stream_timeout: 45
       max_retries: 1
       keep_alive: -1
       temperature: 0.2
@@ -30,7 +30,7 @@ model_list:
       model: os.environ/LITELLM_LOCAL_CHAT_MODEL
       api_base: os.environ/OLLAMA_API_BASE
       timeout: 120
-      stream_timeout: 15
+      stream_timeout: 45
       max_retries: 1
       keep_alive: -1
       temperature: 0.2
@@ -44,7 +44,7 @@ model_list:
       model: os.environ/LITELLM_LOCAL_CHAT_MODEL
       api_base: os.environ/OLLAMA_API_BASE
       timeout: 120
-      stream_timeout: 15
+      stream_timeout: 45
       max_retries: 1
       keep_alive: -1
       temperature: 0.1
@@ -60,7 +60,7 @@ model_list:
       model: os.environ/LITELLM_LOCAL_CHAT_MODEL
       api_base: os.environ/OLLAMA_API_BASE
       timeout: 60
-      stream_timeout: 15
+      stream_timeout: 45
       max_retries: 1
       keep_alive: -1
       temperature: 0.0
@@ -117,7 +117,7 @@ litellm_settings:
   turn_off_message_logging: true
   redact_user_api_key_info: true
   num_retries: 1
-  request_timeout: 130
+  request_timeout: 165
 
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY

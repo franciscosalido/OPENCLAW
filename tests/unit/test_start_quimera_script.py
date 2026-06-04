@@ -88,6 +88,8 @@ def test_start_quimera_controls_only_own_litellm_pid() -> None:
     assert ".runtime/litellm.pid" in text
     assert "litellm_start()" in text
     assert "litellm_stop()" in text
+    assert 'kill -TERM "${pid}"' in text
+    assert 'kill -KILL "${pid}"' in text
 
 
 def test_start_quimera_reuses_existing_litellm_gateway() -> None:
@@ -96,6 +98,13 @@ def test_start_quimera_reuses_existing_litellm_gateway() -> None:
     assert "litellm_readiness_ok" in text
     assert "already running" in text
     assert "return 0" in text
+
+
+def test_start_quimera_warns_on_placeholder_litellm_master_key() -> None:
+    text = _script_text()
+
+    assert "QUIMERA_DEV_LITELLM_PLACEHOLDER_KEY" in text
+    assert "placeholder LITELLM_MASTER_KEY" in text
 
 
 def test_start_quimera_wires_warmup_and_release_hooks() -> None:

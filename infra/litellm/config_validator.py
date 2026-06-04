@@ -30,6 +30,8 @@ REMOTE_KEY_MARKERS = (
     "XAI_API_KEY",
     "AZURE_API_KEY",
 )
+CANONICAL_EMBED_DIM = 768
+MINIMUM_EMBED_DIM = 64
 ALLOWED_ENV_REFS = {
     "OLLAMA_API_BASE",
     "OLLAMA_BASE_URL",
@@ -80,6 +82,12 @@ class LiteLLMParams(BaseModel):
     timeout: int = Field(gt=0)
     stream_timeout: int = Field(gt=0)
     max_retries: int = Field(ge=0, le=3)
+
+    @model_validator(mode="after")
+    def stream_timeout_within_timeout(self) -> "LiteLLMParams":
+        if self.stream_timeout > self.timeout:
+            raise ValueError("stream_timeout must be <= timeout")
+        return self
 
     @field_validator("model")
     @classmethod
@@ -150,8 +158,16 @@ class CacheParams(BaseModel):
             raise ValueError("LLM cache collection must differ from retrieval cache")
         if self.qdrant_semantic_cache_embedding_model != "quimera_embed":
             raise ValueError("semantic cache embedding model must be quimera_embed")
-        if self.qdrant_semantic_cache_vector_size != 768:
-            raise ValueError("semantic cache vector size must be 768")
+        if self.qdrant_semantic_cache_vector_size is None:
+            raise ValueError("semantic cache vector size is required")
+        if self.qdrant_semantic_cache_vector_size < MINIMUM_EMBED_DIM:
+            raise ValueError(
+                f"semantic cache vector size must be >= {MINIMUM_EMBED_DIM}"
+            )
+        if self.qdrant_semantic_cache_vector_size != CANONICAL_EMBED_DIM:
+            raise ValueError(
+                f"semantic cache vector size must match CANONICAL_EMBED_DIM={CANONICAL_EMBED_DIM}"
+            )
         if self.similarity_threshold is None or not 0.0 < self.similarity_threshold <= 1.0:
             raise ValueError("similarity_threshold must be between 0 and 1")
         return self
@@ -212,6 +228,22 @@ class ConfigRoot(BaseModel):
         missing = sorted(required - names)
         if missing:
             raise ValueError(f"missing required LiteLLM aliases: {missing}")
+        return self
+
+    @model_validator(mode="after")
+    def request_timeout_covers_local_slow_start(self) -> "ConfigRoot":
+        if not self.model_list:
+            return self
+        max_budget = max(
+            alias.litellm_params.timeout + alias.litellm_params.stream_timeout
+            for alias in self.model_list
+            if alias.litellm_params.model != "os.environ/LITELLM_LOCAL_EMBED_MODEL"
+        )
+        if self.litellm_settings.request_timeout < max_budget:
+            raise ValueError(
+                f"request_timeout must be at least {max_budget} seconds "
+                "to cover local chat timeout plus stream slow-start budget"
+            )
         return self
 
 

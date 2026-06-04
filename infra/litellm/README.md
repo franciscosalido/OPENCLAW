@@ -80,6 +80,8 @@ not versioned.
 ```
 
 The script refuses to bind to anything other than `127.0.0.1`.
+If the placeholder key from `.env.local.example` is still in use, the stack
+controller prints a warning. Rotate it for any shared runtime.
 
 ## Validate
 

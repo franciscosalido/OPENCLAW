@@ -162,7 +162,7 @@ class LiteLLMInfraScriptTests(unittest.TestCase):
         settings = config["litellm_settings"]
 
         self.assertEqual(settings["num_retries"], 1)
-        self.assertEqual(settings["request_timeout"], 130)
+        self.assertEqual(settings["request_timeout"], 165)
 
 
 class HealthcheckConfigGuardTests(unittest.TestCase):

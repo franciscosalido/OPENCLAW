@@ -6,6 +6,7 @@ import pytest
 import yaml
 
 from infra.litellm.config_validator import (
+    CANONICAL_EMBED_DIM,
     ConfigValidationError,
     assert_host_local_qdrant_url,
     load_raw_config,
@@ -32,6 +33,10 @@ def test_validate_litellm_config_accepts_project_env_refs() -> None:
     assert cfg.litellm_settings.cache_params is not None
     assert cfg.litellm_settings.cache_params.qdrant_collection_name == "quimera_llm_cache"
     assert cfg.general_settings.master_key == "os.environ/LITELLM_MASTER_KEY"
+    assert (
+        cfg.litellm_settings.cache_params.qdrant_semantic_cache_vector_size
+        == CANONICAL_EMBED_DIM
+    )
 
 
 def test_validate_no_literal_secrets_rejects_plain_master_key() -> None:
@@ -54,4 +59,24 @@ def test_remote_provider_models_are_rejected(tmp_path: Path) -> None:
     bad_config.write_text(yaml.safe_dump(raw), encoding="utf-8")
 
     with pytest.raises(ConfigValidationError, match="remote provider"):
+        validate_litellm_config(bad_config, env={"LITELLM_MASTER_KEY": "local-dev-key"})
+
+
+def test_stream_timeout_cannot_exceed_model_timeout(tmp_path: Path) -> None:
+    raw = yaml.safe_load(CONFIG.read_text(encoding="utf-8"))
+    raw["model_list"][0]["litellm_params"]["stream_timeout"] = 999
+    bad_config = tmp_path / "bad_stream_timeout.yaml"
+    bad_config.write_text(yaml.safe_dump(raw), encoding="utf-8")
+
+    with pytest.raises(ConfigValidationError, match="stream_timeout must be <= timeout"):
+        validate_litellm_config(bad_config, env={"LITELLM_MASTER_KEY": "local-dev-key"})
+
+
+def test_request_timeout_must_cover_slowest_chat_stream_start(tmp_path: Path) -> None:
+    raw = yaml.safe_load(CONFIG.read_text(encoding="utf-8"))
+    raw["litellm_settings"]["request_timeout"] = 120
+    bad_config = tmp_path / "bad_request_timeout.yaml"
+    bad_config.write_text(yaml.safe_dump(raw), encoding="utf-8")
+
+    with pytest.raises(ConfigValidationError, match="request_timeout must be at least"):
         validate_litellm_config(bad_config, env={"LITELLM_MASTER_KEY": "local-dev-key"})

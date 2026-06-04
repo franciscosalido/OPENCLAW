@@ -61,7 +61,7 @@ def render_runtime_config(
 
     runtime_path.parent.mkdir(parents=True, exist_ok=True)
     runtime_path.write_text(
-        yaml.safe_dump(rendered, sort_keys=False, allow_unicode=False),
+        yaml.safe_dump(rendered, sort_keys=False, allow_unicode=True),
         encoding="utf-8",
     )
     return RenderResult(source_path=source_path, runtime_path=runtime_path, cache_backend=cache_backend)

@@ -11,6 +11,7 @@ LITELLM_PID_FILE="${RUNTIME_DIR}/litellm.pid"
 LITELLM_LOG_FILE="${RUNTIME_DIR}/litellm.log"
 LITELLM_CONFIG_FILE="${REPO_ROOT}/infra/litellm/litellm_config.yaml"
 LITELLM_RUNTIME_CONFIG_FILE="${REPO_ROOT}/infra/litellm/generated/litellm_config.runtime.yaml"
+QUIMERA_DEV_LITELLM_PLACEHOLDER_KEY="quimera-dev-key-change-me"
 # Own Ollama process marker: .runtime/ollama.pid
 # Own LiteLLM process marker: .runtime/litellm.pid
 
@@ -145,6 +146,9 @@ litellm_start() {
     echo "LITELLM_MASTER_KEY is required to start host LiteLLM" >&2
     return 1
   fi
+  if [[ "${LITELLM_MASTER_KEY}" == "${QUIMERA_DEV_LITELLM_PLACEHOLDER_KEY}" ]]; then
+    echo "WARNING: placeholder LITELLM_MASTER_KEY is in use; rotate it for any shared runtime." >&2
+  fi
   litellm_render
 
   local cmd=()
@@ -175,13 +179,17 @@ litellm_stop() {
   local pid
   pid="$(cat "${LITELLM_PID_FILE}")"
   if [[ -n "${pid}" ]] && kill -0 "${pid}" >/dev/null 2>&1; then
-    kill "${pid}" || true
+    kill -TERM "${pid}" || true
     for _ in $(seq 1 10); do
       if ! kill -0 "${pid}" >/dev/null 2>&1; then
         break
       fi
       sleep 1
     done
+    if kill -0 "${pid}" >/dev/null 2>&1; then
+      echo "LiteLLM PID ${pid} did not stop after SIGTERM; sending SIGKILL to owned PID." >&2
+      kill -KILL "${pid}" || true
+    fi
   fi
   rm -f "${LITELLM_PID_FILE}"
 }

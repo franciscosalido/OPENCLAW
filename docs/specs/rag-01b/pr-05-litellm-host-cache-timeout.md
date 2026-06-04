@@ -46,6 +46,8 @@ Quando iniciar um processo novo, deve gravar apenas `.runtime/litellm.pid`.
 
 `litellm-stop` deve encerrar somente o PID gravado pelo proprio script. Nao usar
 `pkill`, `killall` ou encerramento por nome de processo.
+Se o processo proprio nao encerrar apos SIGTERM, o script pode usar SIGKILL
+apenas no PID gravado em `.runtime/litellm.pid`.
 
 ## Cache
 
@@ -57,6 +59,9 @@ O arquivo fonte pode declarar:
 - `qdrant_semantic_cache_embedding_model: quimera_embed`
 - `qdrant_semantic_cache_vector_size: 768`
 - `similarity_threshold: 0.92`
+
+A dimensao canonica atual do embedding e 768 para `nomic-embed-text`, exposta
+no validador como `CANONICAL_EMBED_DIM`.
 
 O renderizador so mantem `qdrant-semantic` quando:
 
