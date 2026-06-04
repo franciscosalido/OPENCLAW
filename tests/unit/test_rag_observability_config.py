@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any
 
 from loguru import logger
@@ -26,9 +27,10 @@ class RagObservabilityConfigTests(unittest.TestCase):
             RagObservabilityConfig(log_level="TRACE").validated()
 
     def test_load_config_reads_rag_observability_yaml(self) -> None:
-        config_path = Path("tests/tmp_rag_observability_config.yaml")
-        config_path.write_text(
-            """
+        with TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "rag_observability_config.yaml"
+            config_path.write_text(
+                """
 rag:
   observability:
     enabled: true
@@ -38,12 +40,9 @@ rag:
     generation_events_enabled: true
     collection_guard_events_enabled: false
 """,
-            encoding="utf-8",
-        )
-        try:
+                encoding="utf-8",
+            )
             config = load_rag_observability_config(config_path)
-        finally:
-            config_path.unlink()
 
         self.assertTrue(config.enabled)
         self.assertEqual(config.log_level, "DEBUG")

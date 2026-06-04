@@ -5,7 +5,115 @@
 > meaningful sessions.
 
 **Last updated:** 2026-06-04
-**Updated by:** Codex — RAG-01B PR-01 RC-03 TimescaleDB/Qlib/Kronos temporal memory addendum
+**Updated by:** Codex — RAG-01B PR-03 RC-02 corrupted payload hardening
+
+---
+
+## RAG-01B PR-03 RC-02 — Corrupted Cache Payload Handling
+
+Current branch: `rag-01b/pr-03-hybridrag-cache-qdrant`
+PR: <https://github.com/franciscosalido/OPENCLAW/pull/106>
+
+Implemented RC-02 fixes:
+
+- `CacheLayer.lookup` now treats corrupted Qdrant cache payload as a safe cache
+  miss, logs `cache_lookup_bad_payload_skipped` at DEBUG, and returns `None`.
+- Added unit coverage proving corrupted cache payload does not raise
+  `CachePayloadError` to callers.
+- `hmac_query_hash` docstring now explicitly warns never to log `query_text`
+  alongside the returned hash.
+
+Validation:
+
+- `test_cache_layer.py`: 9 passed.
+- `test_cache_fingerprint.py`: 8 passed.
+- PR-03 + observability focused tests: 52 passed.
+- Full unit suite: 1590 passed / 253 subtests passed.
+- Live Qdrant integration with `TEST_QDRANT_URL=http://127.0.0.1:6333`: 3 passed.
+- `uv run mypy --strict .`: success.
+- `uv run pyright`: 0 errors.
+- `git diff --check`: clean.
+- Cache module scope scans: no forbidden imports or destructive collection calls.
+
+---
+
+## RAG-01B PR-03 Review Gate
+
+Current branch: `rag-01b/pr-03-hybridrag-cache-qdrant`
+PR: <https://github.com/franciscosalido/OPENCLAW/pull/106>
+Status: ready for review, not merged.
+
+Rito status:
+
+- Local branch pulled with `--ff-only`: already up to date.
+- Local Qdrant checked healthy at `http://127.0.0.1:6333`.
+- Live Qdrant integration now executed with
+  `TEST_QDRANT_URL=http://127.0.0.1:6333`: 3 passed.
+- PR was converted from draft to ready for review.
+- Merge/prune are blocked until COWORK/human approval.
+
+---
+
+## RAG-01B PR-03 RC-01 — Semantic Cache Hardening
+
+Current branch: `rag-01b/pr-03-hybridrag-cache-qdrant`
+Draft PR: <https://github.com/franciscosalido/OPENCLAW/pull/106>
+
+Implemented RC-01 fixes:
+
+- `CacheSettings` now rejects `collection_name == source_collection`.
+- `invalidate_by_schema_version` rejects empty/blank version values.
+- `invalidate_by_corpus_epoch` rejects empty/blank corpus epoch values.
+- `test_rag_observability_config` no longer writes to a fixed file under
+  `tests/`; it uses an isolated temporary directory, resolving the pre-existing
+  PermissionError/carry-over artifact risk.
+- `hmac_query_hash` is documented as a caller-side helper whose raw query input
+  must never be persisted; only the returned hash may be stored.
+- `record_hit` remains best-effort but now emits a safe DEBUG log on failure.
+
+Validation:
+
+- RC focused tests: 37 passed.
+- PR-03 + observability focused tests: 51 passed.
+- Full unit suite: 1589 passed / 253 subtests passed.
+- Optional Qdrant integration tests: 3 skipped cleanly when live integration env
+  is not set.
+- `uv run mypy --strict .`: success.
+- `uv run pyright`: 0 errors.
+- `git diff --check`: clean.
+
+---
+
+## RAG-01B PR-03 — HybridRAG Semantic Cache Layer (Qdrant)
+
+Current branch: `rag-01b/pr-03-hybridrag-cache-qdrant`
+Draft PR: <https://github.com/franciscosalido/OPENCLAW/pull/106>
+Implementation series: `414bf28..HEAD` on the draft PR branch.
+
+Local and remote branch are aligned (`HEAD...origin/rag-01b/pr-03-hybridrag-cache-qdrant`
+is `0 0`).
+
+Implemented:
+
+- SDD for PR-03 semantic retrieval cache.
+- `backend/rag/cache/*` settings, models, fingerprint helpers, Qdrant collection
+  manager, async `CacheLayer`, errors and shared types.
+- Unit tests with fake Qdrant clients.
+- Optional live Qdrant integration tests guarded by environment configuration.
+
+Validation:
+
+- PR-03 focused unit tests: 44 passed.
+- Optional Qdrant integration tests: 3 skipped cleanly when live integration env
+  is not set.
+- Full unit suite: 1587 passed / 253 subtests passed.
+- `uv run mypy --strict .`: success.
+- `uv run pyright`: 0 errors.
+- `git diff --check`: clean.
+
+Explicitly not implemented in PR-03: response cache, raw query/prompt/final
+answer/full chunk storage, LLM calls, embedding generation, MCP/API/gRPC,
+PostgreSQL/TimescaleDB changes, Qdrant knowledge collection mutation or ORM.
 
 ---
 
