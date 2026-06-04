@@ -74,6 +74,19 @@ def test_market_calendar_rejects_open_session_without_window() -> None:
         )
 
 
+def test_market_calendar_rejects_close_at_lte_open_at() -> None:
+    with pytest.raises(ValueError, match="close_at must be greater than open_at"):
+        MarketCalendar(
+            calendar_id=uuid4(),
+            exchange="NASDAQ",
+            session_date=date(2026, 6, 4),
+            is_open=True,
+            open_at=NOW,
+            close_at=NOW,
+            created_at=NOW,
+        )
+
+
 def _bar(**overrides: object) -> MarketBar:
     values: dict[str, object] = {
         "ts": NOW,

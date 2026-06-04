@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import os
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime, timedelta
@@ -10,6 +11,7 @@ import pytest
 from backend.memory.postgres.client import PostgresClient
 from backend.memory.postgres.migrations import run_migrations
 from backend.temporal.finance_models import MarketBar
+from backend.temporal.finance_models import MarketInstrument
 from backend.temporal.finance_repository import FinanceRepository
 from backend.temporal.timescale import is_timescale_available
 
@@ -22,7 +24,7 @@ def _test_dsn() -> str | None:
 
 
 @pytest.fixture
-async def repository() -> AsyncGenerator[FinanceRepository, None]:
+async def repo_client() -> AsyncGenerator[tuple[PostgresClient, FinanceRepository], None]:
     dsn = _test_dsn()
     if not dsn:
         pytest.skip("TEST_POSTGRES_DSN or QUIMERA_POSTGRES_DSN is required")
@@ -32,12 +34,46 @@ async def repository() -> AsyncGenerator[FinanceRepository, None]:
             pytest.skip("TimescaleDB extension is required for PR-02 integration tests")
     await run_migrations(client)
     try:
-        yield FinanceRepository(client)
+        yield client, FinanceRepository(client)
     finally:
         await client.close()
 
 
-async def test_market_bars_window_roundtrip_and_upsert(repository: FinanceRepository) -> None:
+@pytest.fixture
+def repository(
+    repo_client: tuple[PostgresClient, FinanceRepository],
+) -> FinanceRepository:
+    return repo_client[1]
+
+
+def _market_bar(
+    *,
+    instrument: MarketInstrument,
+    ts: datetime,
+    offset: int = 0,
+) -> MarketBar:
+    return MarketBar(
+        ts=ts,
+        instrument_id=instrument.instrument_id,
+        timeframe="1d",
+        open=10.0 + offset,
+        high=12.0 + offset,
+        low=9.0 + offset,
+        close=11.0 + offset,
+        volume=100.0 + offset,
+        amount=1000.0 + offset,
+        factor=1.0,
+        source_id="synthetic",
+        ingested_at=ts,
+        schema_version="market-bar-v1",
+        quality_flags={"invalid": False, "nested": {"i": offset}},
+        metadata={"bar": offset},
+    )
+
+
+async def test_market_bars_window_roundtrip_and_upsert(
+    repository: FinanceRepository,
+) -> None:
     instrument = await repository.create_market_instrument(
         symbol=f"AAPL-{uuid4().hex[:8]}",
         exchange="NASDAQ",
@@ -46,23 +82,7 @@ async def test_market_bars_window_roundtrip_and_upsert(repository: FinanceReposi
     )
     base_ts = datetime(2026, 6, 1, tzinfo=UTC)
     bars = [
-        MarketBar(
-            ts=base_ts + timedelta(days=i),
-            instrument_id=instrument.instrument_id,
-            timeframe="1d",
-            open=10.0 + i,
-            high=12.0 + i,
-            low=9.0 + i,
-            close=11.0 + i,
-            volume=100.0 + i,
-            amount=1000.0 + i,
-            factor=1.0,
-            source_id="synthetic",
-            ingested_at=base_ts,
-            schema_version="market-bar-v1",
-            quality_flags={"invalid": False, "nested": {"i": i}},
-            metadata={"bar": i},
-        )
+        _market_bar(instrument=instrument, ts=base_ts + timedelta(days=i), offset=i)
         for i in range(3)
     ]
     assert await repository.upsert_market_bars(bars) == 3
@@ -101,3 +121,27 @@ async def test_same_symbol_different_exchange_is_allowed(repository: FinanceRepo
     )
 
     assert first.instrument_id != second.instrument_id
+
+
+async def test_concurrent_market_bar_upsert_50(
+    repo_client: tuple[PostgresClient, FinanceRepository],
+) -> None:
+    client, repository = repo_client
+    instrument = await repository.create_market_instrument(
+        symbol=f"CONCURRENT-{uuid4().hex[:8]}",
+        exchange="NASDAQ",
+        asset_class="equity",
+    )
+    base_ts = datetime(2026, 7, 1, tzinfo=UTC)
+    bars = [
+        _market_bar(instrument=instrument, ts=base_ts + timedelta(minutes=i), offset=i)
+        for i in range(50)
+    ]
+
+    await asyncio.gather(*(repository.upsert_market_bar(bar) for bar in bars))
+    count = await client.pool.fetchval(
+        "SELECT count(*) FROM market_bars WHERE instrument_id = $1",
+        instrument.instrument_id,
+    )
+
+    assert count == 50

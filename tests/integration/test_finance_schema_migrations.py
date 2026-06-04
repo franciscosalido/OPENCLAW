@@ -35,10 +35,21 @@ async def _require_timescale(client: PostgresClient) -> None:
             pytest.skip("TimescaleDB extension is required for PR-02 integration tests")
 
 
+async def _require_uuidv7(client: PostgresClient) -> None:
+    try:
+        version = await client.pool.fetchval("SELECT uuid_extract_version(uuidv7())")
+    except Exception as exc:
+        raise AssertionError(
+            "PostgreSQL 18 uuidv7() is required for PR-02 finance migrations"
+        ) from exc
+    assert version == 7
+
+
 async def test_finance_migrations_apply_twice_and_register_checksums(
     postgres_client: PostgresClient,
 ) -> None:
     await _require_timescale(postgres_client)
+    await _require_uuidv7(postgres_client)
     first = await run_migrations(postgres_client)
     second = await run_migrations(postgres_client)
     rows = await postgres_client.pool.fetch(
@@ -53,6 +64,7 @@ async def test_finance_migrations_apply_twice_and_register_checksums(
 
 async def test_finance_hypertables_and_uuidv7_available(postgres_client: PostgresClient) -> None:
     await _require_timescale(postgres_client)
+    await _require_uuidv7(postgres_client)
     await run_migrations(postgres_client)
     async with postgres_client.pool.acquire() as conn:
         assert await is_hypertable(conn, "market_bars")
@@ -64,6 +76,7 @@ async def test_finance_hypertables_and_uuidv7_available(postgres_client: Postgre
 
 async def test_finance_constraints_are_enforced(postgres_client: PostgresClient) -> None:
     await _require_timescale(postgres_client)
+    await _require_uuidv7(postgres_client)
     await run_migrations(postgres_client)
     instrument_id = await postgres_client.pool.fetchval(
         """

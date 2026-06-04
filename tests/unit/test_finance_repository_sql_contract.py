@@ -31,7 +31,8 @@ def test_finance_repository_uses_parameterized_sql() -> None:
 
 def test_order_by_direction_is_branch_controlled() -> None:
     source = _source()
-    assert 'direction = "ASC" if ascending else "DESC"' in source
-    assert "ORDER BY ts {direction}" in source
-    assert '.replace("{direction}", direction)' in source
-    assert "ORDER BY ts " in source
+    assert "query = ascending_query if ascending else descending_query" in source
+    assert "ORDER BY ts ASC" in source
+    assert "ORDER BY ts DESC" in source
+    assert "{direction}" not in source
+    assert ".replace(" not in source

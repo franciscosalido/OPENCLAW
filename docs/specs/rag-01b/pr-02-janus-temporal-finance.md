@@ -64,6 +64,18 @@ by an internal boolean branch, not user-provided SQL.
 - PostgreSQL 18 `uuidv7()` is required by the new entity tables.
 - Real Qlib/Kronos adapters remain future work and must preserve the canonical
   memory boundary.
+- RC-01 corrected the `get_market_bars_window` ordering query to use explicit
+  ASC/DESC SQL branches instead of templated direction replacement.
+- Bulk writes currently loop through async repository methods one row at a
+  time. Before real ingestion, a performance PR should evaluate
+  `copy_records_to_table` or `executemany` for large market bar and forecast
+  batches.
+- `KronosForecastResult.predictions` remains intentionally shape-agnostic in
+  this contract PR. A future Kronos adapter PR should define a concrete
+  `TypeAlias` or `Protocol` for prediction payloads.
+- The pre-existing `test_rag_observability_config` temporary-file permission
+  issue is unrelated to PR-02 and should be handled in a separate maintenance
+  PR if it reproduces.
 
 ## Out Of Scope
 

@@ -80,3 +80,14 @@ def test_qlib_ohlcv_view_is_not_materialized() -> None:
     sql = _sql()
     assert "CREATE OR REPLACE VIEW qlib_ohlcv_v1" in sql
     assert "CREATE MATERIALIZED VIEW qlib_ohlcv_v1" not in sql
+
+
+def test_qlib_ohlcv_view_defaults_factor_and_excludes_invalid_bars() -> None:
+    sql = _sql()
+    start = sql.index("CREATE OR REPLACE VIEW qlib_ohlcv_v1")
+    view_sql = sql[start:]
+
+    assert "COALESCE(b.factor, 1.0) AS factor" in view_sql
+    assert "jsonb_typeof(b.quality_flags->'invalid') = 'boolean'" in view_sql
+    assert "THEN (b.quality_flags->>'invalid')::boolean" in view_sql
+    assert ") = FALSE" in view_sql

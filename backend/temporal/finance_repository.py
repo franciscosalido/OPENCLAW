@@ -197,17 +197,27 @@ class FinanceRepository:
             raise ValueError("timeframe cannot be empty")
         if limit is not None and limit <= 0:
             raise ValueError("limit must be > 0")
-        direction = "ASC" if ascending else "DESC"
-        query = """
+        ascending_query = """
             SELECT *
             FROM market_bars
             WHERE instrument_id = $1
               AND timeframe = $2
               AND ($3::timestamptz IS NULL OR ts >= $3)
               AND ($4::timestamptz IS NULL OR ts <= $4)
-            ORDER BY ts {direction}
+            ORDER BY ts ASC
             LIMIT $5
-            """.replace("{direction}", direction)
+            """
+        descending_query = """
+            SELECT *
+            FROM market_bars
+            WHERE instrument_id = $1
+              AND timeframe = $2
+              AND ($3::timestamptz IS NULL OR ts >= $3)
+              AND ($4::timestamptz IS NULL OR ts <= $4)
+            ORDER BY ts DESC
+            LIMIT $5
+            """
+        query = ascending_query if ascending else descending_query
         rows = await self._pool.fetch(
             query,
             instrument_id,
