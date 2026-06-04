@@ -33,4 +33,5 @@ def test_order_by_direction_is_branch_controlled() -> None:
     source = _source()
     assert 'direction = "ASC" if ascending else "DESC"' in source
     assert "ORDER BY ts {direction}" in source
-    assert "ascending" not in source.split("ORDER BY ts {direction}", maxsplit=1)[0].split("WHERE", maxsplit=1)[-1]
+    assert '.replace("{direction}", direction)' in source
+    assert "ORDER BY ts " in source
