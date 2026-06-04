@@ -4,8 +4,31 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Last updated:** 2026-05-27
-**Updated by:** Claude Code — boot completo do QUIMERA stack + diagnóstico + runbook
+**Last updated:** 2026-06-04
+**Updated by:** Codex — RAG-01B PR-01 RC-02 PostgreSQL 18.4 canonical ADR + MCP memory fabric PKD
+
+---
+
+## RAG-01B PR-01 RC-02 — PostgreSQL 18.4 Canonical Memory Base
+
+Current branch: `rag-01b/pr-01-postgres-session-schema`
+
+Local-only review state:
+
+- ADR-0021 accepts PostgreSQL 18.4 as the canonical relational-temporal memory
+  version.
+- Docker Compose pins `postgres:18.4-trixie`.
+- PostgreSQL local auth uses `POSTGRES_PASSWORD_FILE` with a non-versioned
+  password file under `infra/postgres/secrets/`.
+- PostgreSQL 18+ storage layout is explicit: volume mount
+  `/var/lib/postgresql`, internal `PGDATA=/var/lib/postgresql/18/docker`.
+- PKD-00X documents the QUIMERA MCP Memory Fabric over LiteLLM as the future
+  memory access architecture. No MCP runtime was implemented in RC-02.
+- PostgreSQL 16 was the previous blueprint reference and is superseded by
+  ADR-0021.
+
+No benchmark, migration, SQL schema change or version-selection test was added
+for this decision.
 
 ---
 

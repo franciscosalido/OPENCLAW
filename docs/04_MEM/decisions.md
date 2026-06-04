@@ -295,3 +295,19 @@ production RAG embeddings and does not reindex Qdrant.
 **Boundary:** No remote providers, FastAPI, MCP, quant tools, OpenTelemetry, profiling, dashboards, production ingestion, real portfolio data, or `openclaw_knowledge` mutation are included in Gateway-0.
 
 **Future rule:** remote providers, OpenTelemetry/profiling, and any production `openclaw_knowledge` ingestion require a new issue and explicit ADR/sprint.
+
+---
+
+## ADR-021 - PostgreSQL 18.4 Canonical Memory Version
+
+**Date:** 2026-06-04 | **Status:** Accepted | **File:** `docs/adr/ADR-0021-postgresql-18-4-canonical-version.md`
+
+**Decision:** PostgreSQL 18.4 is the canonical relational-temporal memory
+version for QUIMERA / OPENCLAW. The local Docker image is pinned to
+`postgres:18.4-trixie`; `postgres:latest`, unpinned `postgres:18`, and active
+PostgreSQL 16 references are prohibited unless explicitly marked historical.
+
+**Operational consequence:** The PostgreSQL volume mounts at
+`/var/lib/postgresql`, internal `PGDATA` is `/var/lib/postgresql/18/docker`,
+local auth uses `POSTGRES_PASSWORD_FILE`, `asyncpg` remains the Python driver,
+and heavyweight ORM usage remains prohibited.

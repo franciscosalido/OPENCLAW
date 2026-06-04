@@ -3,10 +3,12 @@
 ## Objective
 
 PR-01 adds the local PostgreSQL foundation for Quimera relational-temporal
-memory. PostgreSQL stores sessions, turns, agent state and entity mentions.
+memory. PostgreSQL 18.4 stores sessions, turns, agent state and entity mentions.
 Qdrant remains the vector memory layer and is not changed by this PR.
 Following project PKD planning, PostgreSQL runs locally in Docker like Qdrant so
 the memory stack can be mounted, stopped and remounted through containers.
+PostgreSQL 16 was the previous blueprint reference and is superseded by
+ADR-0021.
 
 ## Tables
 
@@ -30,10 +32,20 @@ the memory stack can be mounted, stopped and remounted through containers.
 
 PostgreSQL is defined in `docker/docker-compose.postgres.yml` with:
 
-- pinned `postgres:16` image;
+- pinned `postgres:18.4-trixie` image;
 - loopback-only port binding, `127.0.0.1:5432:5432`;
-- named volume `postgres_data`;
-- local trust auth for the development container, avoiding checked-in passwords.
+- named volume `postgres_data` mounted at `/var/lib/postgresql`;
+- `PGDATA=/var/lib/postgresql/18/docker`;
+- local password file via `POSTGRES_PASSWORD_FILE`, with the password file kept
+  out of version control.
+
+Create the local password file before starting PostgreSQL:
+
+```bash
+mkdir -p infra/postgres/secrets
+printf '%s\n' '<local-development-password>' > infra/postgres/secrets/postgres_password.txt
+chmod 600 infra/postgres/secrets/postgres_password.txt
+```
 
 Start it with:
 
@@ -44,7 +56,7 @@ docker compose -f docker/docker-compose.postgres.yml up -d
 Use this DSN for local integration tests:
 
 ```bash
-TEST_POSTGRES_DSN="postgresql://quimera@127.0.0.1:5432/quimera"
+TEST_POSTGRES_DSN="postgresql://quimera:<local-development-password>@127.0.0.1:5432/quimera"
 ```
 
 ## Indexes
