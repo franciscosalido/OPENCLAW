@@ -7,7 +7,12 @@ COMPOSE_FILE="${REPO_ROOT}/infra/docker/compose.quimera.local.yml"
 OLLAMA_ENV_FILE="${REPO_ROOT}/infra/ollama/ollama_config.env"
 RUNTIME_DIR="${REPO_ROOT}/.runtime"
 OLLAMA_PID_FILE="${RUNTIME_DIR}/ollama.pid"
+LITELLM_PID_FILE="${RUNTIME_DIR}/litellm.pid"
+LITELLM_LOG_FILE="${RUNTIME_DIR}/litellm.log"
+LITELLM_CONFIG_FILE="${REPO_ROOT}/infra/litellm/litellm_config.yaml"
+LITELLM_RUNTIME_CONFIG_FILE="${REPO_ROOT}/infra/litellm/generated/litellm_config.runtime.yaml"
 # Own Ollama process marker: .runtime/ollama.pid
+# Own LiteLLM process marker: .runtime/litellm.pid
 
 COMMAND="${1:-start}"
 if [[ "${COMMAND}" == --* ]]; then
@@ -60,16 +65,32 @@ load_env() {
     source "${OLLAMA_ENV_FILE}"
     set +a
   fi
-  export OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-http://127.0.0.1:11434}"
+  export OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-${OLLAMA_API_BASE:-http://127.0.0.1:11434}}"
+  export OLLAMA_API_BASE="${OLLAMA_API_BASE:-${OLLAMA_BASE_URL}}"
   export OLLAMA_KEEP_ALIVE="${OLLAMA_KEEP_ALIVE:--1}"
   export OLLAMA_NUM_PARALLEL="${OLLAMA_NUM_PARALLEL:-2}"
   export OLLAMA_MAX_LOADED_MODELS="${OLLAMA_MAX_LOADED_MODELS:-2}"
   export QUIMERA_OLLAMA_EMBED_MODEL="${QUIMERA_OLLAMA_EMBED_MODEL:-nomic-embed-text:latest}"
   export QUIMERA_OLLAMA_CHAT_MODEL="${QUIMERA_OLLAMA_CHAT_MODEL:-qwen3:14b}"
+  export QWEN_MODEL="${QWEN_MODEL:-${QUIMERA_OLLAMA_CHAT_MODEL}}"
+  export EMBED_MODEL="${EMBED_MODEL:-${QUIMERA_OLLAMA_EMBED_MODEL}}"
+  export LITELLM_HOST="${LITELLM_HOST:-127.0.0.1}"
+  export LITELLM_PORT="${LITELLM_PORT:-4000}"
+  export LITELLM_BASE_URL="${LITELLM_BASE_URL:-http://${LITELLM_HOST}:${LITELLM_PORT}}"
+  export LITELLM_LOCAL_CHAT_MODEL="${LITELLM_LOCAL_CHAT_MODEL:-ollama_chat/${QWEN_MODEL}}"
+  export LITELLM_LOCAL_EMBED_MODEL="${LITELLM_LOCAL_EMBED_MODEL:-ollama/${EMBED_MODEL}}"
+  export QDRANT_API_BASE="${QDRANT_API_BASE:-http://127.0.0.1:6333}"
+  export QUIMERA_LITELLM_CONFIG="${QUIMERA_LITELLM_CONFIG:-${LITELLM_CONFIG_FILE}}"
+  export QUIMERA_LITELLM_RUNTIME_CONFIG="${QUIMERA_LITELLM_RUNTIME_CONFIG:-${LITELLM_RUNTIME_CONFIG_FILE}}"
 }
 
 compose() {
-  docker compose -f "${COMPOSE_FILE}" "$@"
+  local env_file="${REPO_ROOT}/.env.local"
+  if [[ -f "${env_file}" ]]; then
+    docker compose --env-file="${env_file}" -f "${COMPOSE_FILE}" "$@"
+  else
+    docker compose -f "${COMPOSE_FILE}" "$@"
+  fi
 }
 
 wait_http() {
@@ -88,6 +109,81 @@ wait_http() {
 
 ensure_runtime_dir() {
   mkdir -p "${RUNTIME_DIR}"
+}
+
+litellm_readiness_ok() {
+  curl -fsS --max-time 2 "${LITELLM_BASE_URL%/}/health/readiness" >/dev/null 2>&1
+}
+
+litellm_validate() {
+  load_env
+  uv run python -m infra.litellm.config_validator "${QUIMERA_LITELLM_CONFIG}"
+}
+
+litellm_render() {
+  load_env
+  uv run python -m infra.litellm.render_config
+}
+
+litellm_smoke() {
+  load_env
+  uv run python -m infra.litellm.smoke_test
+}
+
+litellm_start() {
+  load_env
+  ensure_runtime_dir
+  if [[ "${LITELLM_HOST}" != "127.0.0.1" ]]; then
+    echo "Refusing to bind LiteLLM to '${LITELLM_HOST}'" >&2
+    return 1
+  fi
+  if litellm_readiness_ok; then
+    echo "LiteLLM already running at ${LITELLM_BASE_URL}; reusing host process."
+    return 0
+  fi
+  if [[ -z "${LITELLM_MASTER_KEY:-}" ]]; then
+    echo "LITELLM_MASTER_KEY is required to start host LiteLLM" >&2
+    return 1
+  fi
+  litellm_render
+
+  local cmd=()
+  if [[ -n "${LITELLM_BIN:-}" ]]; then
+    cmd=("${LITELLM_BIN}")
+  elif command -v litellm >/dev/null 2>&1; then
+    cmd=(litellm)
+  elif [[ -x "${REPO_ROOT}/infra/litellm/.venv/bin/litellm" ]]; then
+    cmd=("${REPO_ROOT}/infra/litellm/.venv/bin/litellm")
+  else
+    echo "litellm command not found. Install infra/litellm requirements in the host venv." >&2
+    return 127
+  fi
+
+  "${cmd[@]}" \
+    --config "${QUIMERA_LITELLM_RUNTIME_CONFIG}" \
+    --host "${LITELLM_HOST}" \
+    --port "${LITELLM_PORT}" > "${LITELLM_LOG_FILE}" 2>&1 &
+  echo "$!" > "${LITELLM_PID_FILE}"
+  wait_http "${LITELLM_BASE_URL%/}/health/readiness" "LiteLLM" 30
+}
+
+litellm_stop() {
+  load_env
+  if [[ ! -f "${LITELLM_PID_FILE}" ]]; then
+    return 0
+  fi
+  local pid
+  pid="$(cat "${LITELLM_PID_FILE}")"
+  if [[ -n "${pid}" ]] && kill -0 "${pid}" >/dev/null 2>&1; then
+    kill "${pid}" || true
+    for _ in $(seq 1 10); do
+      if ! kill -0 "${pid}" >/dev/null 2>&1; then
+        break
+      fi
+      sleep 1
+    done
+  fi
+  rm -f "${LITELLM_PID_FILE}"
 }
 
 ensure_ollama() {
@@ -123,6 +219,7 @@ start_stack() {
     compose "${args[@]}"
     wait_http "http://127.0.0.1:6333/healthz" "Qdrant" 30
   fi
+  litellm_start
   if [[ "${RUN_WARMUP}" -eq 1 ]]; then
     warmup_models
   fi
@@ -139,6 +236,7 @@ stop_stack() {
   if [[ "${RELEASE_MODELS}" -eq 1 ]]; then
     release_models || true
   fi
+  litellm_stop
   if [[ "${NO_DOCKER}" -eq 0 ]]; then
     compose down
   fi
@@ -162,8 +260,8 @@ status_stack() {
     echo "Docker unavailable" >&2
     rc=1
   fi
-  curl -fsS --max-time 3 "http://127.0.0.1:6333/healthz" >/dev/null || rc=1
-  curl -fsS --max-time 3 "http://127.0.0.1:4000/health/readiness" >/dev/null || rc=1
+  curl -fsS --max-time 3 "${QDRANT_API_BASE%/}/healthz" >/dev/null || rc=1
+  litellm_readiness_ok || rc=1
   curl -fsS --max-time 3 "${OLLAMA_BASE_URL}/api/version" >/dev/null || rc=1
   return "${rc}"
 }
@@ -177,9 +275,15 @@ doctor() {
   local rc=0
   command -v docker >/dev/null 2>&1 || { echo "Docker missing" >&2; rc=1; }
   [[ -f "${COMPOSE_FILE}" ]] || { echo "Compose file missing" >&2; rc=1; }
+  if command -v docker >/dev/null 2>&1 && [[ -f "${COMPOSE_FILE}" ]]; then
+    if compose config --services | grep -qx "litellm"; then
+      echo "Compose must not manage LiteLLM" >&2
+      rc=1
+    fi
+  fi
   curl -fsS --max-time 3 "${OLLAMA_BASE_URL}/api/version" >/dev/null || { echo "Ollama unavailable" >&2; rc=1; }
-  curl -fsS --max-time 3 "http://127.0.0.1:6333/healthz" >/dev/null || { echo "Qdrant unavailable" >&2; rc=1; }
-  curl -fsS --max-time 3 "http://127.0.0.1:4000/health/readiness" >/dev/null || { echo "LiteLLM unavailable" >&2; rc=1; }
+  curl -fsS --max-time 3 "${QDRANT_API_BASE%/}/healthz" >/dev/null || { echo "Qdrant unavailable" >&2; rc=1; }
+  litellm_readiness_ok || { echo "LiteLLM unavailable" >&2; rc=1; }
   return "${rc}"
 }
 
@@ -192,7 +296,12 @@ run_tests() {
   uv run pytest \
     tests/unit/test_ollama_tuning.py \
     tests/unit/test_ollama_warmup_contract.py \
-    tests/unit/test_start_quimera_script.py
+    tests/unit/test_start_quimera_script.py \
+    tests/unit/test_litellm_config_validator.py \
+    tests/unit/test_litellm_config_yaml.py \
+    tests/unit/test_litellm_cache_policy.py \
+    tests/unit/test_litellm_timeout_policy.py \
+    tests/unit/test_litellm_host_runtime_policy.py
   if [[ "${RUN_INTEGRATION}" -eq 1 ]]; then
     uv run pytest -m integration \
       tests/integration/test_ollama_warmup.py \
@@ -214,7 +323,9 @@ show_help() {
   cat <<'HELP'
 Usage: scripts/start_quimera.sh <command> [flags]
 
-Commands: start, stop, restart, status, logs, doctor, test, warmup, release
+Commands: start, stop, restart, status, logs, doctor, test, warmup, release,
+          litellm-validate, litellm-render, litellm-start, litellm-stop,
+          litellm-restart, litellm-smoke
 Flags: --build --warmup --doctor --integration --release-models --no-docker --no-ollama --logs --help
 HELP
 }
@@ -229,6 +340,12 @@ case "${COMMAND}" in
   test) run_tests ;;
   warmup) warmup_models ;;
   release) release_models ;;
+  litellm-validate) litellm_validate ;;
+  litellm-render) litellm_render ;;
+  litellm-start) litellm_start ;;
+  litellm-stop) litellm_stop ;;
+  litellm-restart) litellm_stop; litellm_start ;;
+  litellm-smoke) litellm_smoke ;;
   help|--help|-h) show_help ;;
   *) echo "Unknown command: ${COMMAND}" >&2; show_help; exit 2 ;;
 esac

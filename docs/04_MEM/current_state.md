@@ -5,7 +5,46 @@
 > meaningful sessions.
 
 **Last updated:** 2026-06-04
-**Updated by:** Codex — RAG-01B PR-04 RC-01 compose env and volume docs
+**Updated by:** Codex — RAG-01B PR-05 LiteLLM host correction
+
+---
+
+## RAG-01B PR-05 — LiteLLM Host Cache + Timeout Hardening
+
+Current branch: `rag-01b/pr-05-litellm-host-cache-timeout`
+
+Architectural correction:
+
+- LiteLLM is a host Python process, not a Docker Compose service.
+- Docker Compose manages only Postgres and Qdrant.
+- `scripts/start_quimera.sh` reuses a ready host LiteLLM at
+  `http://127.0.0.1:4000` or starts exactly one host process tracked by
+  `.runtime/litellm.pid`.
+- The PR-04 memory line saying Compose managed `quimera-litellm` is superseded
+  by this PR-05 correction.
+
+Implemented:
+
+- Removed `litellm`/`quimera-litellm` from
+  `infra/docker/compose.quimera.local.yml`.
+- Added host LiteLLM commands to `scripts/start_quimera.sh`:
+  `litellm-validate`, `litellm-render`, `litellm-start`, `litellm-stop`,
+  `litellm-restart`, `litellm-smoke`.
+- Added `infra/litellm/config_validator.py`,
+  `infra/litellm/render_config.py` and `infra/litellm/smoke_test.py`.
+- Added Qdrant semantic-cache source config with safe local fallback in the
+  generated runtime config.
+- Added tests guarding against LiteLLM returning to Compose.
+
+Validation:
+
+- Focused PR-05/Gateway block: 103 passed / 3 skipped / 65 subtests passed.
+- Full unit suite: 1642 passed / 253 subtests passed.
+- Full regression: 1659 passed / 47 skipped / 256 subtests passed.
+- `docker compose -f infra/docker/compose.quimera.local.yml config --services`:
+  `postgres-memory`, `qdrant`.
+- `bash -n` on changed shell scripts: clean.
+- `git diff --check`: clean.
 
 ---
 

@@ -7,7 +7,8 @@ from pathlib import Path
 SCRIPT = Path("scripts/start_quimera.sh")
 STAR_WRAPPER = Path("scripts/star_quimera.sh")
 COMPOSE = Path("infra/docker/compose.quimera.local.yml")
-SDD = Path("docs/specs/rag-01b/pr-04-ollama-tuning-keepalive.md")
+PR04_SDD = Path("docs/specs/rag-01b/pr-04-ollama-tuning-keepalive.md")
+PR05_SDD = Path("docs/specs/rag-01b/pr-05-litellm-host-cache-timeout.md")
 ENV_EXAMPLE = Path(".env.local.example")
 
 
@@ -33,6 +34,12 @@ def test_start_quimera_script_declares_required_subcommands() -> None:
         "test",
         "warmup",
         "release",
+        "litellm-validate",
+        "litellm-render",
+        "litellm-start",
+        "litellm-stop",
+        "litellm-restart",
+        "litellm-smoke",
     ):
         assert f"{command})" in text
 
@@ -55,12 +62,40 @@ def test_start_quimera_uses_compose_without_destructive_prune() -> None:
     assert "docker system prune" not in text
 
 
+def test_compose_does_not_manage_litellm() -> None:
+    text = COMPOSE.read_text(encoding="utf-8")
+
+    assert "quimera-litellm" not in text
+    assert "berriai/litellm" not in text
+    assert "docker.litellm.ai" not in text
+    assert "127.0.0.1:4000:4000" not in text
+    assert "\n  litellm:" not in text
+
+
 def test_start_quimera_does_not_kill_external_ollama() -> None:
     text = _script_text()
 
     assert "killall ollama" not in text
     assert "pkill ollama" not in text
     assert ".runtime/ollama.pid" in text
+
+
+def test_start_quimera_controls_only_own_litellm_pid() -> None:
+    text = _script_text()
+
+    assert "pkill litellm" not in text
+    assert "killall litellm" not in text
+    assert ".runtime/litellm.pid" in text
+    assert "litellm_start()" in text
+    assert "litellm_stop()" in text
+
+
+def test_start_quimera_reuses_existing_litellm_gateway() -> None:
+    text = _script_text()
+
+    assert "litellm_readiness_ok" in text
+    assert "already running" in text
+    assert "return 0" in text
 
 
 def test_start_quimera_wires_warmup_and_release_hooks() -> None:
@@ -79,10 +114,10 @@ def test_star_quimera_wrapper_execs_start_script() -> None:
     assert 'exec "$(dirname "$0")/start_quimera.sh" "$@"' in text
 
 
-def test_compose_requires_litellm_master_key_fail_fast() -> None:
+def test_compose_does_not_require_litellm_master_key() -> None:
     text = COMPOSE.read_text(encoding="utf-8")
 
-    assert "LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:?" in text
+    assert "LITELLM_MASTER_KEY" not in text
 
 
 def test_local_env_example_documents_litellm_master_key() -> None:
@@ -93,8 +128,16 @@ def test_local_env_example_documents_litellm_master_key() -> None:
 
 
 def test_sdd_documents_manual_volume_reset_policy() -> None:
-    text = SDD.read_text(encoding="utf-8").lower()
+    text = PR04_SDD.read_text(encoding="utf-8").lower()
 
     assert "reset de volume" in text
     assert "manual" in text
     assert "docker volume rm" in text
+
+
+def test_pr05_sdd_documents_litellm_host_policy() -> None:
+    text = PR05_SDD.read_text(encoding="utf-8")
+
+    assert "LiteLLM e um processo Python local do host" in text
+    assert "Docker Compose nao gerencia LiteLLM" in text
+    assert "Compose gerencia apenas Postgres e Qdrant" in text

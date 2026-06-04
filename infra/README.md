@@ -11,9 +11,12 @@ Copy the example file before starting the stack:
 cp .env.local.example .env.local
 ```
 
-`LITELLM_MASTER_KEY` is required. The compose file uses Docker Compose required
-variable interpolation and fails fast when the value is missing instead of
-starting LiteLLM with an empty key.
+Docker Compose manages only Postgres and Qdrant. LiteLLM is a local host
+Python process controlled by `scripts/start_quimera.sh` or
+`infra/litellm/start_litellm.sh`.
+
+`LITELLM_MASTER_KEY` is required by the host LiteLLM process. The Compose file
+must not interpolate it because Compose does not start LiteLLM in Quimera.
 
 The example value is a local placeholder only:
 

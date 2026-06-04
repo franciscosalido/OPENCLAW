@@ -63,6 +63,7 @@ Thumbs.db
 logs/
 logs/*.jsonl
 *.log
+.runtime/
 tests/golden/reports/
 reports/golden/
 reports/gateway2/
@@ -98,3 +99,8 @@ secrets/
 *.key
 *.pem
 *.p12
+
+# Generated local LiteLLM runtime config
+infra/litellm/generated/*
+!infra/litellm/generated/
+!infra/litellm/generated/.gitkeep

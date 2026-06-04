@@ -38,13 +38,12 @@ def test_quimera_status_reports_when_stack_is_online() -> None:
             "running",
             "postgres-memory",
             "qdrant",
-            "litellm",
         ],
         check=False,
         capture_output=True,
         text=True,
     )
-    if not all(name in compose_ps.stdout for name in ("postgres-memory", "qdrant", "litellm")):
+    if not all(name in compose_ps.stdout for name in ("postgres-memory", "qdrant")):
         pytest.skip("quimera local compose stack is not fully online")
     try:
         qdrant = httpx.get("http://127.0.0.1:6333/healthz", timeout=2.0)
