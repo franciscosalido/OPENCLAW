@@ -1,0 +1,36 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+
+REPOSITORY = Path("backend/temporal/finance_repository.py")
+
+
+def _source() -> str:
+    return REPOSITORY.read_text(encoding="utf-8")
+
+
+def test_finance_repository_uses_asyncpg_and_no_heavy_orm() -> None:
+    source = _source().lower()
+    assert "asyncpg" in source
+    for forbidden in ("sqlalchemy", "django", "peewee", "tortoise", "pony"):
+        assert forbidden not in source
+
+
+def test_finance_repository_uses_parameterized_sql() -> None:
+    source = _source()
+    for token in ("$1", "$2"):
+        assert token in source
+    assert "DROP TABLE" not in source
+    assert 'f"SELECT' not in source
+    assert "f'SELECT" not in source
+    assert 'f"INSERT' not in source
+    assert "f'INSERT" not in source
+    assert ".format(" not in source
+
+
+def test_order_by_direction_is_branch_controlled() -> None:
+    source = _source()
+    assert 'direction = "ASC" if ascending else "DESC"' in source
+    assert "ORDER BY ts {direction}" in source
+    assert "ascending" not in source.split("ORDER BY ts {direction}", maxsplit=1)[0].split("WHERE", maxsplit=1)[-1]
