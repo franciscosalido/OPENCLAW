@@ -5,7 +5,90 @@
 > meaningful sessions.
 
 **Last updated:** 2026-06-04
-**Updated by:** Codex — RAG-01B PR-05B LiteLLM host audit
+**Updated by:** Codex — RAG-01B PR-06 OpenTelemetry base layer
+
+---
+
+## RAG-01B PR-06 — OpenTelemetry Base Layer
+
+Current branch: `rag-01b/pr-06-otel-base-layer`
+Base branch: `rag-01b/pr-05b-litellm-host-audit` while PR-05B remains open.
+Draft PR: <https://github.com/franciscosalido/OPENCLAW/pull/113>
+
+Implemented:
+
+- Added `backend/observability/` base package with OTel tracing setup,
+  idempotent asyncpg instrumentation, safe attributes, PII/content guards,
+  contextvars, events, metrics and async-only decorators.
+- Added LiteLLM OTel callback guard and source YAML callback settings:
+  `litellm_settings.callbacks: ["otel"]` plus
+  `callback_settings.otel.message_logging: false`.
+- Added `scripts/start_quimera.sh otel-doctor` and `otel-doctor --json`.
+- Added `.env.observability.example` and PR-06 SDD.
+- Added OTel dependencies:
+  `opentelemetry-api`, `opentelemetry-sdk`,
+  `opentelemetry-exporter-otlp-proto-http`,
+  `opentelemetry-instrumentation-asyncpg`.
+
+Scope explicitly not changed:
+
+- No full RAG runtime instrumentation.
+- No dashboard, collector, Grafana, Tempo, Jaeger or Prometheus service.
+- No MCP server, FastAPI, REST API or gRPC.
+- No PostgreSQL/Timescale schema change.
+- No Qdrant collection change.
+- No LiteLLM Docker service.
+
+Validation:
+
+- PR-06 focused OTel tests: 39 passed.
+- LiteLLM/start-script compatibility block: 58 passed.
+- Full unit suite: 1707 passed.
+- Full regression: 1726 passed / 51 skipped.
+- Focused post-typing block: 52 passed / 2 skipped.
+- `uv run mypy --strict .`: success.
+- `uv run pyright`: 0 errors.
+- `bash -n scripts/start_quimera.sh`: clean.
+- `uv run python -m infra.litellm.config_validator`: success with one expected
+  qdrant-semantic policy warning.
+- `./scripts/start_quimera.sh otel-doctor --json`: status `ok`.
+- `git diff --check`: clean.
+
+Handoff to PR-07:
+
+- Wire decorators into selected RAG/Gateway execution paths.
+- Decide optional collector/profile strategy.
+- Keep content capture disabled unless a future ADR explicitly changes the
+  privacy boundary.
+
+---
+
+## RAG-01B PR-06 RC-01 — OTel SemConv and Test Marker Cleanup
+
+Current branch: `rag-01b/pr-06-otel-base-layer`
+Draft PR: <https://github.com/franciscosalido/OPENCLAW/pull/113>
+
+Implemented:
+
+- `traced_pg` now emits current OTel DB semconv attributes for PostgreSQL:
+  `db.system.name=postgresql`, `db.operation.name` and `db.collection.name`,
+  while preserving `quimera.pg_table`, `quimera.pg_operation` and
+  `latency.pg_ms`.
+- Added public metric name constants for the GenAI and retrieval histograms.
+- Added `pytest.mark.integration` to all PR-06 OTel integration tests, so
+  `pytest -m integration` includes them.
+- Hardened `traced_mcp_tool`: validates low-cardinality tool/method names,
+  stores tool name as `gen_ai.tool.name`, and keeps span name based on
+  `mcp.method.name` rather than raw tool name.
+
+Validation:
+
+- RC focused block: 17 passed.
+- `pytest -m integration` on OTel integration tests: 3 passed.
+- `uv run mypy --strict .`: success.
+- `uv run pyright`: 0 errors.
+- `uv run pytest`: 1730 passed / 51 skipped.
+- `git diff --check`: clean.
 
 ---
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -8,13 +9,13 @@ import yaml
 CONFIG = Path("infra/litellm/litellm_config.yaml")
 
 
-def _load_config() -> dict:
+def _load_config() -> dict[str, Any]:
     raw = yaml.safe_load(CONFIG.read_text(encoding="utf-8"))
     assert isinstance(raw, dict)
     return raw
 
 
-def _aliases() -> dict[str, dict]:
+def _aliases() -> dict[str, dict[str, Any]]:
     return {item["model_name"]: item for item in _load_config()["model_list"]}
 
 

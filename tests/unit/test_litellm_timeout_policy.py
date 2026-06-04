@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -11,7 +12,7 @@ CONFIG = Path("infra/litellm/litellm_config.yaml")
 CHAT_ALIASES = {"local_chat", "local_think", "local_rag", "local_json"}
 
 
-def _aliases() -> dict[str, dict]:
+def _aliases() -> dict[str, dict[str, Any]]:
     raw = yaml.safe_load(CONFIG.read_text(encoding="utf-8"))
     assert isinstance(raw, dict)
     return {item["model_name"]: item for item in raw["model_list"]}

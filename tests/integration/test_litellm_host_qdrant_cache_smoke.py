@@ -28,7 +28,7 @@ def test_litellm_qdrant_cache_backend_is_reachable() -> None:
     assert collections.status_code < 400
 
 
-def test_litellm_qdrant_semantic_cache_runtime_policy(tmp_path) -> None:
+def test_litellm_qdrant_semantic_cache_runtime_policy(tmp_path: Path) -> None:
     if os.environ.get("RUN_LITELLM_QDRANT_CACHE_SMOKE") != "1":
         pytest.skip("RUN_LITELLM_QDRANT_CACHE_SMOKE=1 is required")
 
