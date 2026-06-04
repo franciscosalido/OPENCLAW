@@ -5,7 +5,40 @@
 > meaningful sessions.
 
 **Last updated:** 2026-06-04
-**Updated by:** Codex — RAG-01B PR-01 RC-03 TimescaleDB/Qlib/Kronos temporal memory addendum
+**Updated by:** Codex — RAG-01B PR-03 HybridRAG semantic cache draft PR
+
+---
+
+## RAG-01B PR-03 — HybridRAG Semantic Cache Layer (Qdrant)
+
+Current branch: `rag-01b/pr-03-hybridrag-cache-qdrant`
+Draft PR: <https://github.com/franciscosalido/OPENCLAW/pull/106>
+HEAD: `d7014ffe0544c45aa1895c33150ed2586b8a532b`
+
+Local and remote branch are aligned (`HEAD...origin/rag-01b/pr-03-hybridrag-cache-qdrant`
+is `0 0`).
+
+Implemented:
+
+- SDD for PR-03 semantic retrieval cache.
+- `backend/rag/cache/*` settings, models, fingerprint helpers, Qdrant collection
+  manager, async `CacheLayer`, errors and shared types.
+- Unit tests with fake Qdrant clients.
+- Optional live Qdrant integration tests guarded by environment configuration.
+
+Validation:
+
+- PR-03 focused unit tests: 44 passed.
+- Optional Qdrant integration tests: 3 skipped cleanly when live integration env
+  is not set.
+- Full unit suite: 1587 passed / 253 subtests passed.
+- `uv run mypy --strict .`: success.
+- `uv run pyright`: 0 errors.
+- `git diff --check`: clean.
+
+Explicitly not implemented in PR-03: response cache, raw query/prompt/final
+answer/full chunk storage, LLM calls, embedding generation, MCP/API/gRPC,
+PostgreSQL/TimescaleDB changes, Qdrant knowledge collection mutation or ORM.
 
 ---
 
