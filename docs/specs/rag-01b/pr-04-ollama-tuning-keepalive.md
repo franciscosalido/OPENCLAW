@@ -64,6 +64,12 @@ Postgres usa `pg_isready`; Qdrant usa `/healthz`; LiteLLM usa
 recomendado apos merge e `restart --warmup --doctor`. `down -v` e proibido no
 script padrao.
 
+Reset de volume e uma operacao manual e explicita. `restart` preserva volumes
+porque chama `docker compose down` sem `-v`; isso evita perda acidental de
+memoria local. Se um operador suspeitar de dados corrompidos em volume local,
+deve parar a stack e remover manualmente somente o volume pretendido com
+`docker volume rm`, conforme `infra/README.md`.
+
 ## Tests
 
 Unitarios cobrem config, contratos HTTP de warmup/release e leitura estatica do
@@ -73,6 +79,10 @@ script. Integracoes sao opt-in/skip-clean para Ollama e Docker indisponiveis.
 
 Sem API externa, sem secrets hardcoded e sem download automatico obrigatorio de
 modelos grandes. O script nao mata processos Ollama externos.
+
+`LITELLM_MASTER_KEY` e obrigatorio. O compose usa interpolacao requerida de
+Docker Compose para falhar cedo se a variavel nao estiver definida. Um exemplo
+local nao secreto existe em `.env.local.example`.
 
 ## Escopo Negativo
 

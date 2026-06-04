@@ -65,7 +65,7 @@ services:
     volumes:
       - ../litellm/litellm_config.yaml:/app/config.yaml:ro
     environment:
-      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:?Set LITELLM_MASTER_KEY in .env.local}
       - OLLAMA_API_BASE=http://host.docker.internal:11434
       - LITELLM_LOCAL_CHAT_MODEL=ollama_chat/${QUIMERA_OLLAMA_CHAT_MODEL:-qwen3:14b}
       - LITELLM_LOCAL_EMBED_MODEL=ollama/${QUIMERA_OLLAMA_EMBED_MODEL:-nomic-embed-text:latest}

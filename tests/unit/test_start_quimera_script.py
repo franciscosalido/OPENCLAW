@@ -6,6 +6,9 @@ from pathlib import Path
 
 SCRIPT = Path("scripts/start_quimera.sh")
 STAR_WRAPPER = Path("scripts/star_quimera.sh")
+COMPOSE = Path("infra/docker/compose.quimera.local.yml")
+SDD = Path("docs/specs/rag-01b/pr-04-ollama-tuning-keepalive.md")
+ENV_EXAMPLE = Path(".env.local.example")
 
 
 def _script_text() -> str:
@@ -74,3 +77,24 @@ def test_star_quimera_wrapper_execs_start_script() -> None:
     text = STAR_WRAPPER.read_text(encoding="utf-8")
 
     assert 'exec "$(dirname "$0")/start_quimera.sh" "$@"' in text
+
+
+def test_compose_requires_litellm_master_key_fail_fast() -> None:
+    text = COMPOSE.read_text(encoding="utf-8")
+
+    assert "LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:?" in text
+
+
+def test_local_env_example_documents_litellm_master_key() -> None:
+    text = ENV_EXAMPLE.read_text(encoding="utf-8")
+
+    assert "LITELLM_MASTER_KEY=quimera-dev-key" in text
+    assert "QUIMERA_LLM_API_KEY=${LITELLM_MASTER_KEY}" in text
+
+
+def test_sdd_documents_manual_volume_reset_policy() -> None:
+    text = SDD.read_text(encoding="utf-8").lower()
+
+    assert "reset de volume" in text
+    assert "manual" in text
+    assert "docker volume rm" in text

@@ -5,7 +5,36 @@
 > meaningful sessions.
 
 **Last updated:** 2026-06-04
-**Updated by:** Codex — RAG-01B PR-04 local runtime implementation
+**Updated by:** Codex — RAG-01B PR-04 RC-01 compose env and volume docs
+
+---
+
+## RAG-01B PR-04 RC-01 — Compose Env Guard + Volume Reset Docs
+
+Current branch: `rag-01b/pr-04-ollama-tuning`
+Draft PR: <https://github.com/franciscosalido/OPENCLAW/pull/108>
+
+Implemented RC-01 fixes:
+
+- `infra/docker/compose.quimera.local.yml` now requires `LITELLM_MASTER_KEY`
+  through Docker Compose required interpolation and fails fast when missing.
+- Added `.env.local.example` with a local placeholder key and Ollama defaults.
+- Added `infra/README.md` documenting the local env contract and manual volume
+  reset procedure.
+- SDD now states that `restart` preserves volumes and corrupted-volume reset is
+  manual/operator-owned via `docker volume rm`.
+
+Validation:
+
+- PR-04 unit tests: 28 passed.
+- Compose config with placeholder key: success.
+- Compose config without `LITELLM_MASTER_KEY`: fails as expected with an
+  actionable message.
+- Full unit suite: 1618 passed / 253 subtests passed.
+- PR-04 optional integration: 1 passed / 2 skipped cleanly.
+- `uv run mypy --strict .`: success.
+- `uv run pyright`: 0 errors.
+- `git diff --check`: clean.
 
 ---
 
