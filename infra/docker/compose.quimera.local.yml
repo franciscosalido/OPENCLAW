@@ -1,0 +1,93 @@
+name: quimera-local
+
+services:
+  postgres-memory:
+    container_name: quimera-postgres-memory
+    image: postgres:18.4-trixie
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - ../postgres/initdb:/docker-entrypoint-initdb.d:ro
+      - ../postgres/secrets/postgres_password.txt:/run/secrets/quimera_postgres_password:ro
+    environment:
+      - POSTGRES_DB=quimera
+      - POSTGRES_USER=quimera
+      - POSTGRES_PASSWORD_FILE=/run/secrets/quimera_postgres_password
+      - PGDATA=/var/lib/postgresql/18/docker
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U quimera -d quimera -h 127.0.0.1
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  qdrant:
+    container_name: quimera-qdrant
+    image: qdrant/qdrant:v1.18.1
+    ports:
+      - "127.0.0.1:6333:6333"
+      - "127.0.0.1:6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+      - ../qdrant/config.yaml:/qdrant/config/production.yaml:ro
+    environment:
+      - QDRANT__SERVICE__HTTP_PORT=6333
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          bash -lc 'exec 3<>/dev/tcp/127.0.0.1/6333 &&
+          printf "GET /healthz HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n" >&3 &&
+          grep -q "200" <&3'
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  litellm:
+    container_name: quimera-litellm
+    image: ghcr.io/berriai/litellm:v1.83.7-stable
+    command:
+      - --config
+      - /app/config.yaml
+      - --host
+      - 0.0.0.0
+      - --port
+      - "4000"
+    ports:
+      - "127.0.0.1:4000:4000"
+    volumes:
+      - ../litellm/litellm_config.yaml:/app/config.yaml:ro
+    environment:
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:?Set LITELLM_MASTER_KEY in .env.local}
+      - OLLAMA_API_BASE=http://host.docker.internal:11434
+      - LITELLM_LOCAL_CHAT_MODEL=ollama_chat/${QUIMERA_OLLAMA_CHAT_MODEL:-qwen3:14b}
+      - LITELLM_LOCAL_EMBED_MODEL=ollama/${QUIMERA_OLLAMA_EMBED_MODEL:-nomic-embed-text:latest}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres-memory:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          python -c "import urllib.request;
+          urllib.request.urlopen('http://127.0.0.1:4000/health/readiness', timeout=3).read()"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+volumes:
+  postgres_data:
+  qdrant_data:
