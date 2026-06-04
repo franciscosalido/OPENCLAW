@@ -5,7 +5,24 @@
 > meaningful sessions.
 
 **Last updated:** 2026-06-04
-**Updated by:** Codex — RAG-01B PR-03 RC-01 cache hardening
+**Updated by:** Codex — RAG-01B PR-03 ready for COWORK review
+
+---
+
+## RAG-01B PR-03 Review Gate
+
+Current branch: `rag-01b/pr-03-hybridrag-cache-qdrant`
+PR: <https://github.com/franciscosalido/OPENCLAW/pull/106>
+Status: ready for review, not merged.
+
+Rito status:
+
+- Local branch pulled with `--ff-only`: already up to date.
+- Local Qdrant checked healthy at `http://127.0.0.1:6333`.
+- Live Qdrant integration now executed with
+  `TEST_QDRANT_URL=http://127.0.0.1:6333`: 3 passed.
+- PR was converted from draft to ready for review.
+- Merge/prune are blocked until COWORK/human approval.
 
 ---
 
