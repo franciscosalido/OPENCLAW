@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from types import TracebackType
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -147,7 +147,7 @@ def test_traced_mcp_tool_rejects_sensitive_or_free_text_tool_name() -> None:
 
 def test_decorator_rejects_sync_functions() -> None:
     with pytest.raises(TypeError, match="async functions only"):
-
-        @decorators.traced_embed(model="nomic-embed-text")
         def sync_fn() -> None:
             return None
+
+        decorators.traced_embed(model="nomic-embed-text")(cast(Callable[[], Awaitable[None]], sync_fn))

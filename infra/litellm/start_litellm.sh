@@ -31,6 +31,13 @@ wait_readiness() {
   return 1
 }
 
+litellm_docker_container_running() {
+  if ! command -v docker >/dev/null 2>&1; then
+    return 1
+  fi
+  docker ps --filter 'name=^/quimera-litellm$' --format '{{.Names}}' 2>/dev/null | grep -qx 'quimera-litellm'
+}
+
 find_litellm_bin() {
   if [[ -n "${LITELLM_BIN:-}" ]]; then
     printf '%s\n' "${LITELLM_BIN}"
@@ -102,6 +109,10 @@ elif [[ "${LITELLM_MASTER_KEY}" == "${PLACEHOLDER_KEY}" || "${LITELLM_MASTER_KEY
 fi
 
 mkdir -p "${RUNTIME_DIR}" "${LOG_DIR}"
+
+if litellm_docker_container_running; then
+  fail "Refusing to reuse quimera-litellm Docker container. LiteLLM must run as a host process."
+fi
 
 if curl -fsS --max-time 1 "${LITELLM_BASE_URL%/}/health/readiness" >/dev/null 2>&1; then
   printf 'LiteLLM already healthy at %s; reusing existing host process.\n' "${LITELLM_BASE_URL}"

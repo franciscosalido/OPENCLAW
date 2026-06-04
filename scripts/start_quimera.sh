@@ -37,6 +37,7 @@ NO_DOCKER=0
 NO_OLLAMA=0
 FOLLOW_LOGS=0
 OTEL_JSON=0
+STATUS_JSON=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -48,7 +49,7 @@ while [[ $# -gt 0 ]]; do
     --no-docker) NO_DOCKER=1 ;;
     --no-ollama) NO_OLLAMA=1 ;;
     --logs) FOLLOW_LOGS=1 ;;
-    --json) OTEL_JSON=1 ;;
+    --json) OTEL_JSON=1; STATUS_JSON=1 ;;
     --help|-h) COMMAND="help" ;;
     *) echo "Unknown flag: $1" >&2; exit 2 ;;
   esac
@@ -254,6 +255,10 @@ stop_stack() {
 
 status_stack() {
   load_env
+  if [[ "${STATUS_JSON}" -eq 1 ]]; then
+    uv run python "${REPO_ROOT}/scripts/quimera_status.py" status --json
+    return $?
+  fi
   local rc=0
   if command -v docker >/dev/null 2>&1; then
     compose ps || rc=1
@@ -266,6 +271,15 @@ status_stack() {
   litellm_readiness_ok || rc=1
   curl -fsS --max-time 3 "${OLLAMA_BASE_URL}/api/version" >/dev/null || rc=1
   return "${rc}"
+}
+
+rag01b_acceptance() {
+  load_env
+  if [[ "${STATUS_JSON}" -eq 1 ]]; then
+    uv run python "${REPO_ROOT}/scripts/quimera_status.py" rag01b-acceptance --json
+  else
+    uv run python "${REPO_ROOT}/scripts/quimera_status.py" rag01b-acceptance
+  fi
 }
 
 logs() {
@@ -332,7 +346,7 @@ Usage: scripts/start_quimera.sh <command> [flags]
 Commands: start, stop, restart, status, logs, doctor, test, warmup, release,
           litellm-validate, litellm-render, litellm-start, litellm-stop,
           litellm-restart, litellm-smoke, litellm-audit, litellm-fingerprint,
-          litellm-benchmark, otel-doctor
+          litellm-benchmark, otel-doctor, rag01b-acceptance
 Flags: --build --warmup --doctor --integration --release-models --no-docker --no-ollama --logs --json --help
 HELP
 }
@@ -342,6 +356,7 @@ case "${COMMAND}" in
   stop) stop_stack ;;
   restart) RELEASE_MODELS=1; stop_stack; BUILD=1; RUN_WARMUP=1; RUN_DOCTOR=1; start_stack ;;
   status) status_stack ;;
+  rag01b-acceptance) rag01b_acceptance ;;
   logs) logs ;;
   doctor) doctor ;;
   test) run_tests ;;

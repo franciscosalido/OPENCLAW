@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Final, Protocol, runtime_checkable
 
+from backend.observability.decorators import traced_retrieval, traced_rrf
 from backend.rag.fusion import (
     FusedResult,
     RRFFusion,
@@ -264,6 +265,7 @@ class AsyncHybridRetriever:
     clock: ClockProtocol = field(default_factory=lambda: _DEFAULT_CLOCK)
     retrieval_logger: RetrievalLoggerProtocol = field(default_factory=NullRetrievalLogger)
 
+    @traced_retrieval(source="qdrant")
     async def retrieve(
         self,
         query: str,
@@ -351,10 +353,9 @@ class AsyncHybridRetriever:
 
         # -- RRF Fusion (synchronous) --
         t_fuse = self.clock.perf_counter()
-        all_fused = self.fusion.fuse(
+        all_fused = await self._fuse_ranked(
             dense_results=dense_ranked,
             sparse_results=sparse_ranked,
-            limit=None,
         )
         fusion_ms = _elapsed_ms(t_fuse, self.clock.perf_counter())
 
@@ -378,6 +379,19 @@ class AsyncHybridRetriever:
         result = HybridRetrievalResult(results=final, trace=trace)
         self._log_retrieval_event(query=query, cfg=cfg, result=result)
         return result
+
+    @traced_rrf(backend="python_rrf")
+    async def _fuse_ranked(
+        self,
+        *,
+        dense_results: Sequence[RankedResult],
+        sparse_results: Sequence[RankedResult],
+    ) -> list[FusedResult]:
+        return self.fusion.fuse(
+            dense_results=dense_results,
+            sparse_results=sparse_results,
+            limit=None,
+        )
 
     def _log_retrieval_event(
         self,

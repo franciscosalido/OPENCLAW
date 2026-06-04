@@ -10,6 +10,7 @@ from typing import Any, Protocol, TypeVar, cast
 
 from loguru import logger
 
+from backend.observability.decorators import traced_retrieval
 from backend.rag._validation import validate_question
 from backend.rag.context_packer import ContextBudgetResult, ContextPacker, RetrievedChunk
 
@@ -89,6 +90,7 @@ class Retriever:
         _validate_top_k(self.top_k)
         _validate_score_threshold(self.score_threshold)
 
+    @traced_retrieval(source="qdrant")
     async def retrieve(
         self,
         question: str,

@@ -26,6 +26,7 @@ from backend.rag.observability import (
     load_rag_observability_config,
     utc_now_iso,
 )
+from backend.observability.decorators import traced_embed
 
 
 DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434"
@@ -109,6 +110,7 @@ class OllamaEmbedder:
         if self._owns_client and self.client is not None:
             await self.client.aclose()
 
+    @traced_embed(model="nomic-embed-text")
     async def embed(self, text: str) -> list[float]:
         """Embed one text string via Ollama /api/embed.
 
