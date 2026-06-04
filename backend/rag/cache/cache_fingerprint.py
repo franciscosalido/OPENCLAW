@@ -55,7 +55,10 @@ def build_retrieval_fingerprint(
 
 
 def hmac_query_hash(query_text: str, secret: str) -> str:
-    """Return HMAC of query text; callers must persist only the returned hash."""
+    """Return HMAC of query text; persist only the returned hash.
+
+    Never log query_text alongside the returned hash.
+    """
 
     if not query_text:
         raise ValueError("query_text cannot be empty")

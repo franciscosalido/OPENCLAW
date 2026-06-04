@@ -5,7 +5,35 @@
 > meaningful sessions.
 
 **Last updated:** 2026-06-04
-**Updated by:** Codex — RAG-01B PR-03 ready for COWORK review
+**Updated by:** Codex — RAG-01B PR-03 RC-02 corrupted payload hardening
+
+---
+
+## RAG-01B PR-03 RC-02 — Corrupted Cache Payload Handling
+
+Current branch: `rag-01b/pr-03-hybridrag-cache-qdrant`
+PR: <https://github.com/franciscosalido/OPENCLAW/pull/106>
+
+Implemented RC-02 fixes:
+
+- `CacheLayer.lookup` now treats corrupted Qdrant cache payload as a safe cache
+  miss, logs `cache_lookup_bad_payload_skipped` at DEBUG, and returns `None`.
+- Added unit coverage proving corrupted cache payload does not raise
+  `CachePayloadError` to callers.
+- `hmac_query_hash` docstring now explicitly warns never to log `query_text`
+  alongside the returned hash.
+
+Validation:
+
+- `test_cache_layer.py`: 9 passed.
+- `test_cache_fingerprint.py`: 8 passed.
+- PR-03 + observability focused tests: 52 passed.
+- Full unit suite: 1590 passed / 253 subtests passed.
+- Live Qdrant integration with `TEST_QDRANT_URL=http://127.0.0.1:6333`: 3 passed.
+- `uv run mypy --strict .`: success.
+- `uv run pyright`: 0 errors.
+- `git diff --check`: clean.
+- Cache module scope scans: no forbidden imports or destructive collection calls.
 
 ---
 

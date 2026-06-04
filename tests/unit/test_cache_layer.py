@@ -142,14 +142,23 @@ async def test_lookup_hit_uses_filter_and_no_vectors() -> None:
 
 
 @pytest.mark.asyncio
-async def test_lookup_rejects_bad_payload_and_expired_payload() -> None:
+async def test_lookup_corrupted_payload_returns_none_not_raises() -> None:
     client = FakeQdrantClient()
     client.points[str(uuid4())] = {"schema_version": "wrong", "_score": 0.95}
     layer = CacheLayer(client, _settings())
-    with pytest.raises(CachePayloadError):
-        await layer.lookup(query_vector=(0.1, 0.2, 0.3, 0.4), fingerprint=_fingerprint())
 
+    assert (
+        await layer.lookup(query_vector=(0.1, 0.2, 0.3, 0.4), fingerprint=_fingerprint())
+        is None
+    )
+
+
+@pytest.mark.asyncio
+async def test_lookup_expired_payload_returns_none() -> None:
+    client = FakeQdrantClient()
+    layer = CacheLayer(client, _settings())
     client.points = {str(uuid4()): _payload(expires_at=(NOW - timedelta(seconds=1)).isoformat(), _score=0.95)}
+
     assert await layer.lookup(query_vector=(0.1, 0.2, 0.3, 0.4), fingerprint=_fingerprint()) is None
 
 

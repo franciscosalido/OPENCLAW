@@ -85,7 +85,11 @@ class CacheLayer:
         score = float(getattr(point, "score", 0.0))
         if score < self._settings.threshold:
             return None
-        hit = _cache_hit_from_point(point, score=score)
+        try:
+            hit = _cache_hit_from_point(point, score=score)
+        except CachePayloadError as exc:
+            logger.opt(exception=exc).debug("cache_lookup_bad_payload_skipped")
+            return None
         if _is_hit_expired(hit):
             return None
         await self.record_hit(cache_id=hit.cache_id, current_hit_count=hit.hit_count)
