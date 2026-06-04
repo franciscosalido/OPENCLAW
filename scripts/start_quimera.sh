@@ -36,6 +36,7 @@ RELEASE_MODELS=0
 NO_DOCKER=0
 NO_OLLAMA=0
 FOLLOW_LOGS=0
+OTEL_JSON=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -47,6 +48,7 @@ while [[ $# -gt 0 ]]; do
     --no-docker) NO_DOCKER=1 ;;
     --no-ollama) NO_OLLAMA=1 ;;
     --logs) FOLLOW_LOGS=1 ;;
+    --json) OTEL_JSON=1 ;;
     --help|-h) COMMAND="help" ;;
     *) echo "Unknown flag: $1" >&2; exit 2 ;;
   esac
@@ -146,6 +148,15 @@ litellm_fingerprint() {
 litellm_benchmark() {
   load_env
   uv run python -m infra.litellm.overhead_benchmark
+}
+
+otel_doctor() {
+  load_env
+  if [[ "${OTEL_JSON}" -eq 1 ]]; then
+    uv run python -m backend.observability.tracer --doctor --json --config "${QUIMERA_LITELLM_CONFIG}"
+  else
+    uv run python -m backend.observability.tracer --doctor --config "${QUIMERA_LITELLM_CONFIG}"
+  fi
 }
 
 litellm_start() {
@@ -321,8 +332,8 @@ Usage: scripts/start_quimera.sh <command> [flags]
 Commands: start, stop, restart, status, logs, doctor, test, warmup, release,
           litellm-validate, litellm-render, litellm-start, litellm-stop,
           litellm-restart, litellm-smoke, litellm-audit, litellm-fingerprint,
-          litellm-benchmark
-Flags: --build --warmup --doctor --integration --release-models --no-docker --no-ollama --logs --help
+          litellm-benchmark, otel-doctor
+Flags: --build --warmup --doctor --integration --release-models --no-docker --no-ollama --logs --json --help
 HELP
 }
 
@@ -345,6 +356,7 @@ case "${COMMAND}" in
   litellm-audit) litellm_audit ;;
   litellm-fingerprint) litellm_fingerprint ;;
   litellm-benchmark) litellm_benchmark ;;
+  otel-doctor) otel_doctor ;;
   help|--help|-h) show_help ;;
   *) echo "Unknown command: ${COMMAND}" >&2; show_help; exit 2 ;;
 esac
