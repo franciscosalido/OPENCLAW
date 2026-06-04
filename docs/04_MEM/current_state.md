@@ -5,7 +5,59 @@
 > meaningful sessions.
 
 **Last updated:** 2026-06-04
-**Updated by:** Codex — RAG-01B PR-06 OpenTelemetry base layer
+**Updated by:** Codex — RAG-01B PR-07 Benchmark, ADR and MCP memory gate
+
+---
+
+## RAG-01B PR-07 — Benchmark + ADR + MCP Memory Gate
+
+Current branch: `rag-01b/pr-07-benchmark-adr-mcp-memory`
+
+Implemented:
+
+- Added deterministic benchmark harness and artifacts:
+  `evaluation/results/rag_01b_session_benchmark_summary.json` and
+  `evaluation/results/rag_01b_session_benchmark_rows.csv`.
+- Added accepted backend decision ADR:
+  `docs/ADR/ADR-003-memory-backend-decision.md`.
+- Added PR-07 SDD and benchmark result documentation.
+- Added FastMCP-based local memory servers:
+  `backend/mcp/postgres_memory_server.py` and
+  `backend/mcp/qdrant_memory_server.py`, with loopback-only ports 8811/8812
+  and guarded tool inputs.
+- Registered MCP servers in host LiteLLM config and hardened the config
+  validator for loopback URL, port and transport policy.
+- Wired OTel decorators into embedding, retrieval, RRF, cache and selected
+  Postgres repository paths, and added benchmark probes for embed, retrieval,
+  RRF, rerank, cache, pg_read and pg_write spans.
+- Added `scripts/quimera_status.py` plus `start_quimera.sh status --json` and
+  `rag01b-acceptance --json`.
+- Hardened LiteLLM host-only policy: `start_litellm.sh` refuses to reuse a
+  running `quimera-litellm` Docker container, and status JSON reports that
+  violation explicitly.
+- Closed PR-01/PR-02 reviewer gaps with opt-in integration tests for
+  concurrent agent-state/turn writes, market-bar concurrency, and real
+  pg_indexes checks.
+- Added `fastmcp` dependency for the local MCP memory layer.
+
+Validation:
+
+- PR-07 focused unit block: 35 passed.
+- PR-07 focused integration block: 5 passed / 7 skipped.
+- Full unit suite: 1739 passed.
+- Full regression: 1763 passed / 58 skipped.
+- `uv run mypy --strict .`: success.
+- `uv run pyright`: 0 errors.
+- `uv run python -m infra.litellm.config_validator`: success with one expected
+  qdrant-semantic policy warning.
+- `./scripts/start_quimera.sh rag01b-acceptance --json`: `overall=ok`.
+- `git diff --check`: clean.
+
+Operational note:
+
+- Local status currently reports `overall=fail` because Postgres and Qdrant are
+  not running and a legacy `quimera-litellm` Docker container is active. This is
+  now detected as a host-only violation instead of being silently reused.
 
 ---
 

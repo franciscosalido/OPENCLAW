@@ -39,6 +39,8 @@ def test_litellm_stop_uses_only_owned_pid_with_sigkill_fallback() -> None:
 def test_start_litellm_host_contract() -> None:
     text = START_LITELLM.read_text(encoding="utf-8")
 
+    assert "litellm_docker_container_running" in text
+    assert "Refusing to reuse quimera-litellm Docker container" in text
     assert "LITELLM_MODE=PRODUCTION" in text
     assert "LITELLM_LOG=ERROR" in text
     assert "--host \"${LITELLM_HOST}\"" in text

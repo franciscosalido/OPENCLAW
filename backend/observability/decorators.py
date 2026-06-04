@@ -3,7 +3,7 @@ from __future__ import annotations
 import inspect
 import re
 import time
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Coroutine, Mapping
 from functools import wraps
 from typing import Any, ParamSpec, TypeVar, cast
 
@@ -11,6 +11,8 @@ from opentelemetry.trace import Status, StatusCode
 
 from backend.observability.attributes import (
     CACHE_HIT,
+    CACHE_BACKEND,
+    CACHE_COLLECTION,
     DB_COLLECTION_NAME,
     DB_OPERATION_NAME,
     DB_SYSTEM_NAME,
@@ -26,10 +28,12 @@ from backend.observability.attributes import (
     LATENCY_EMBED_MS,
     LATENCY_LLM_MS,
     LATENCY_PG_MS,
+    LATENCY_RERANK_MS,
     LATENCY_RETRIEVAL_MS,
     LATENCY_RRF_MS,
     MCP_METHOD_NAME,
     RETRIEVAL_RESULT_COUNT,
+    RETRIEVAL_RERANK_ENABLED,
 )
 from backend.observability.context import get_quimera_context_attributes
 from backend.observability.safety import sanitize_error_message, validate_attributes
@@ -37,11 +41,11 @@ from backend.observability.tracer import get_tracer
 
 P = ParamSpec("P")
 R = TypeVar("R")
-AsyncCallable = Callable[P, Awaitable[R]]
+AsyncCallable = Callable[P, Coroutine[Any, Any, R]]
 _SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,128}$")
 
 
-def _ensure_async(fn: Callable[P, object]) -> AsyncCallable[P, R]:
+def _ensure_async(fn: Callable[P, Awaitable[R]]) -> AsyncCallable[P, R]:
     if not inspect.iscoroutinefunction(fn):
         raise TypeError("OpenTelemetry Quimera decorators support async functions only")
     return cast(AsyncCallable[P, R], fn)
@@ -86,7 +90,7 @@ def _validate_safe_name(value: str, field_name: str) -> str:
 
 
 def _trace_async(
-    fn: Callable[P, object],
+    fn: Callable[P, Awaitable[R]],
     *,
     span_name: str,
     base_attrs: Mapping[str, object],
@@ -116,8 +120,8 @@ def _trace_async(
     return wrapper
 
 
-def traced_embed(model: str | None = None) -> Callable[[Callable[P, object]], AsyncCallable[P, R]]:
-    def decorator(fn: Callable[P, object]) -> AsyncCallable[P, R]:
+def traced_embed(model: str | None = None) -> Callable[[Callable[P, Awaitable[R]]], AsyncCallable[P, R]]:
+    def decorator(fn: Callable[P, Awaitable[R]]) -> AsyncCallable[P, R]:
         attrs: dict[str, object] = {
             GEN_AI_OPERATION_NAME: "embeddings",
             GEN_AI_PROVIDER_NAME: "ollama",
@@ -133,8 +137,8 @@ def traced_llm(
     model: str | None = None,
     *,
     operation: str = "chat",
-) -> Callable[[Callable[P, object]], AsyncCallable[P, R]]:
-    def decorator(fn: Callable[P, object]) -> AsyncCallable[P, R]:
+) -> Callable[[Callable[P, Awaitable[R]]], AsyncCallable[P, R]]:
+    def decorator(fn: Callable[P, Awaitable[R]]) -> AsyncCallable[P, R]:
         attrs: dict[str, object] = {
             GEN_AI_OPERATION_NAME: operation,
             GEN_AI_PROVIDER_NAME: "ollama",
@@ -146,7 +150,7 @@ def traced_llm(
     return decorator
 
 
-def traced_retrieval(source: str | None = None) -> Callable[[Callable[P, object]], AsyncCallable[P, R]]:
+def traced_retrieval(source: str | None = None) -> Callable[[Callable[P, Awaitable[R]]], AsyncCallable[P, R]]:
     def enrich(result: object) -> Mapping[str, object]:
         attrs: dict[str, object] = {}
         count = _result_count(result)
@@ -157,7 +161,7 @@ def traced_retrieval(source: str | None = None) -> Callable[[Callable[P, object]
             attrs[CACHE_HIT] = hit
         return attrs
 
-    def decorator(fn: Callable[P, object]) -> AsyncCallable[P, R]:
+    def decorator(fn: Callable[P, Awaitable[R]]) -> AsyncCallable[P, R]:
         attrs = {GEN_AI_OPERATION_NAME: "retrieval"}
         if source:
             attrs[GEN_AI_DATA_SOURCE_ID] = source
@@ -172,8 +176,8 @@ def traced_retrieval(source: str | None = None) -> Callable[[Callable[P, object]
     return decorator
 
 
-def traced_rrf(*, backend: str = "python_rrf") -> Callable[[Callable[P, object]], AsyncCallable[P, R]]:
-    def decorator(fn: Callable[P, object]) -> AsyncCallable[P, R]:
+def traced_rrf(*, backend: str = "python_rrf") -> Callable[[Callable[P, Awaitable[R]]], AsyncCallable[P, R]]:
+    def decorator(fn: Callable[P, Awaitable[R]]) -> AsyncCallable[P, R]:
         return _trace_async(
             fn,
             span_name="retrieval rrf",
@@ -184,11 +188,45 @@ def traced_rrf(*, backend: str = "python_rrf") -> Callable[[Callable[P, object]]
     return decorator
 
 
-def traced_pg(table: str, operation: str) -> Callable[[Callable[P, object]], AsyncCallable[P, R]]:
+def traced_rerank(*, enabled: bool = True) -> Callable[[Callable[P, Awaitable[R]]], AsyncCallable[P, R]]:
+    def decorator(fn: Callable[P, Awaitable[R]]) -> AsyncCallable[P, R]:
+        return _trace_async(
+            fn,
+            span_name="retrieval rerank",
+            base_attrs={RETRIEVAL_RERANK_ENABLED: enabled},
+            latency_attr=LATENCY_RERANK_MS,
+        )
+
+    return decorator
+
+
+def traced_cache(
+    *,
+    operation: str,
+    backend: str = "qdrant",
+    collection: str = "quimera_query_cache",
+) -> Callable[[Callable[P, Awaitable[R]]], AsyncCallable[P, R]]:
+    def enrich(result: object) -> Mapping[str, object]:
+        hit = result is not None if operation == "lookup" else False
+        return {CACHE_HIT: hit, "retrieval.cache_hit": hit}
+
+    def decorator(fn: Callable[P, Awaitable[R]]) -> AsyncCallable[P, R]:
+        return _trace_async(
+            fn,
+            span_name=f"cache {operation}",
+            base_attrs={CACHE_BACKEND: backend, CACHE_COLLECTION: collection},
+            latency_attr="latency.retrieval_ms",
+            enrich_result=enrich,
+        )
+
+    return decorator
+
+
+def traced_pg(table: str, operation: str) -> Callable[[Callable[P, Awaitable[R]]], AsyncCallable[P, R]]:
     safe_table = _validate_safe_name(table, "table")
     safe_operation = _validate_safe_name(operation.upper(), "operation")
 
-    def decorator(fn: Callable[P, object]) -> AsyncCallable[P, R]:
+    def decorator(fn: Callable[P, Awaitable[R]]) -> AsyncCallable[P, R]:
         return _trace_async(
             fn,
             span_name=f"pg {safe_operation} {safe_table}",
@@ -208,8 +246,8 @@ def traced_pg(table: str, operation: str) -> Callable[[Callable[P, object]], Asy
 def traced_agent(
     agent_name: str,
     agent_id: str | None = None,
-) -> Callable[[Callable[P, object]], AsyncCallable[P, R]]:
-    def decorator(fn: Callable[P, object]) -> AsyncCallable[P, R]:
+) -> Callable[[Callable[P, Awaitable[R]]], AsyncCallable[P, R]]:
+    def decorator(fn: Callable[P, Awaitable[R]]) -> AsyncCallable[P, R]:
         attrs: dict[str, object] = {
             GEN_AI_AGENT_NAME: agent_name,
         }
@@ -224,11 +262,11 @@ def traced_mcp_tool(
     tool_name: str,
     *,
     method_name: str = "tools/call",
-) -> Callable[[Callable[P, object]], AsyncCallable[P, R]]:
+) -> Callable[[Callable[P, Awaitable[R]]], AsyncCallable[P, R]]:
     safe_tool_name = _validate_safe_name(tool_name, "tool_name")
     safe_method_name = _validate_safe_name(method_name.replace("/", ":"), "method_name").replace(":", "/")
 
-    def decorator(fn: Callable[P, object]) -> AsyncCallable[P, R]:
+    def decorator(fn: Callable[P, Awaitable[R]]) -> AsyncCallable[P, R]:
         return _trace_async(
             fn,
             span_name=f"mcp {safe_method_name}",

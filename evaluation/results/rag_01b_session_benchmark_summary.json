@@ -1,0 +1,120 @@
+{
+  "decisions": {
+    "agent_states": "postgres",
+    "entity_mentions": "postgres",
+    "kronos_forecasts": "postgres_timescale",
+    "llm_response_cache": "qdrant_or_litellm_cache",
+    "qlib_projection": "postgres_timescale_manifest",
+    "semantic_cache": "qdrant",
+    "sessions": "postgres",
+    "turns": "postgres",
+    "vectors": "qdrant"
+  },
+  "environment": {
+    "litellm_host_only": true,
+    "otel_enabled": true,
+    "postgresql": "18.4",
+    "python": "3.12.13",
+    "qdrant": "1.18.x"
+  },
+  "generated_at": "2026-06-04T23:35:51.497662+00:00",
+  "git_commit": "991e63af7615b5e1f8aeaef0cab9fc4e4364bff0",
+  "guards": {
+    "QUIMERA_CACHE_ENABLED": "0",
+    "litellm_cache_bypass": true,
+    "real_mode": false
+  },
+  "otel_attributes": {
+    "forbidden_attributes_seen": [],
+    "observed_safe_attributes": {
+      "cache.backend": "qdrant",
+      "db.system.name": "postgresql",
+      "gen_ai.operation.name": "retrieval",
+      "latency.rrf_ms": 0.0
+    },
+    "observed_span_names": [
+      "embeddings",
+      "retrieval qdrant",
+      "retrieval rrf",
+      "cache lookup",
+      "pg READ turns",
+      "pg WRITE turns"
+    ]
+  },
+  "scenarios": [
+    {
+      "postgres": {
+        "errors": 0,
+        "p50_ms": 1.2,
+        "p95_ms": 2.0,
+        "p99_ms": 2.7
+      },
+      "qdrant": {
+        "errors": 0,
+        "p50_ms": 3.4,
+        "p95_ms": 5.8,
+        "p99_ms": 7.1
+      },
+      "reason": "ordered temporal turns are relational/session-local data",
+      "samples": 100,
+      "scenario": "recent_turns_context",
+      "winner": "postgres"
+    },
+    {
+      "postgres": {
+        "errors": 0,
+        "p50_ms": 0.8,
+        "p95_ms": 1.5,
+        "p99_ms": 2.1
+      },
+      "qdrant": {
+        "errors": 0,
+        "p50_ms": 4.0,
+        "p95_ms": 6.2,
+        "p99_ms": 8.4
+      },
+      "reason": "agent state is keyed JSONB with uniqueness constraints",
+      "samples": 100,
+      "scenario": "session_state_lookup",
+      "winner": "postgres"
+    },
+    {
+      "postgres": {
+        "errors": 0,
+        "p50_ms": 0.0,
+        "p95_ms": 0.0,
+        "p99_ms": 0.0
+      },
+      "qdrant": {
+        "errors": 0,
+        "p50_ms": 2.2,
+        "p95_ms": 3.9,
+        "p99_ms": 5.0
+      },
+      "reason": "semantic vector retrieval is a Qdrant capability",
+      "samples": 100,
+      "scenario": "semantic_context_retrieval",
+      "winner": "qdrant"
+    },
+    {
+      "postgres": {
+        "errors": 0,
+        "p50_ms": 1.0,
+        "p95_ms": 1.8,
+        "p99_ms": 2.5
+      },
+      "qdrant": {
+        "errors": 0,
+        "p50_ms": 3.0,
+        "p95_ms": 5.0,
+        "p99_ms": 6.5
+      },
+      "reason": "entity mentions are normalized temporal facts",
+      "samples": 100,
+      "scenario": "light_entity_context",
+      "winner": "postgres"
+    }
+  ],
+  "schema_version": "rag-01b-session-benchmark-v1",
+  "warnings": []
+}

@@ -4,6 +4,7 @@ import json
 import os
 import sys
 import ast
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -12,13 +13,21 @@ from loguru import logger
 from opentelemetry import metrics, trace
 from opentelemetry.metrics import Meter
 from opentelemetry.sdk.resources import DEPLOYMENT_ENVIRONMENT, SERVICE_NAME, Resource
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
+from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter, SpanExportResult
 from opentelemetry.trace import Tracer
 
 _TRACING_INITIALIZED = False
 _ACTIVE_PROVIDER: TracerProvider | None = None
 _ASYNC_PG_INSTRUMENTED = False
+
+
+class _SafeConsoleSpanExporter(ConsoleSpanExporter):
+    def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
+        try:
+            return super().export(spans)
+        except ValueError:
+            return SpanExportResult.FAILURE
 
 
 @dataclass(frozen=True)
@@ -83,7 +92,7 @@ def _otlp_endpoint() -> str | None:
 def _build_span_exporter() -> Any:
     endpoint = _otlp_endpoint()
     if endpoint is None:
-        return ConsoleSpanExporter()
+        return _SafeConsoleSpanExporter()
     from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 
     return OTLPSpanExporter(endpoint=endpoint)

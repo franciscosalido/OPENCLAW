@@ -33,6 +33,7 @@ from backend.rag.observability import (
     load_rag_observability_config,
     utc_now_iso,
 )
+from backend.observability.decorators import traced_embed
 
 
 ENV_LLM_EMBED_MODEL = "QUIMERA_LLM_EMBED_MODEL"
@@ -102,6 +103,7 @@ class GatewayEmbedClient:
         if self._owns_client and self.client is not None:
             await self.client.aclose()
 
+    @traced_embed(model="nomic-embed-text")
     async def embed(self, text: str) -> list[float]:
         """Embed one synthetic/local text through LiteLLM ``/embeddings``."""
         clean_text = _validate_text(text)

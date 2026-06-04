@@ -7,6 +7,7 @@ from uuid import UUID
 
 import asyncpg  # type: ignore[import-untyped]
 
+from backend.observability.decorators import traced_pg
 from backend.memory.postgres.models import (
     AgentState,
     EntityMention,
@@ -48,6 +49,7 @@ class PostgresMemoryRepository:
         )
         return None if row is None else _session_from_record(row)
 
+    @traced_pg(table="turns", operation="write")
     async def append_turn(
         self,
         session_id: object,
@@ -72,6 +74,7 @@ class PostgresMemoryRepository:
         )
         return _turn_from_record(_require_row(row))
 
+    @traced_pg(table="turns", operation="read")
     async def get_recent_turns(self, session_id: object, limit: int = 20) -> list[Turn]:
         if limit <= 0:
             raise ValueError("limit must be > 0")
@@ -92,6 +95,7 @@ class PostgresMemoryRepository:
         )
         return [_turn_from_record(row) for row in rows]
 
+    @traced_pg(table="agent_states", operation="write")
     async def upsert_agent_state(
         self,
         agent_id: str,

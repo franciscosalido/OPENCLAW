@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -39,6 +40,8 @@ CANONICAL_OLLAMA_BASE_URL = "http://127.0.0.1:11434"
 CANONICAL_QDRANT_BASE_URL = "http://127.0.0.1:6333"
 CANONICAL_LLM_CACHE_COLLECTION = "quimera_llm_cache"
 CANONICAL_RAG_CACHE_COLLECTION = "quimera_query_cache"
+MCP_ALLOWED_PORTS = {8811, 8812}
+MCP_NAME_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 CHAT_TIMEOUT_SECONDS = 120
 CHAT_STREAM_TIMEOUT_SECONDS = 45
 EMBED_TIMEOUT_SECONDS = 5
@@ -268,12 +271,48 @@ class GeneralSettings(BaseModel):
         return self
 
 
+class McpServerEntry(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    url: str
+    transport: str
+    available_on_public_internet: bool = False
+
+    @field_validator("url")
+    @classmethod
+    def url_must_be_loopback_mcp(cls, value: str) -> str:
+        parsed = urlparse(value)
+        if parsed.scheme != "http":
+            raise ValueError("MCP server URL must use http")
+        if parsed.hostname not in {"127.0.0.1", "localhost"}:
+            raise ValueError("MCP server URL must be loopback")
+        if parsed.port not in MCP_ALLOWED_PORTS:
+            raise ValueError("MCP server URL must use approved PR-07 ports")
+        if parsed.path != "/mcp":
+            raise ValueError("MCP server path must be /mcp")
+        return value
+
+    @field_validator("transport")
+    @classmethod
+    def transport_must_be_streamable_http(cls, value: str) -> str:
+        if value not in {"streamable_http", "streamable-http"}:
+            raise ValueError("MCP transport must be streamable_http")
+        return value
+
+    @model_validator(mode="after")
+    def mcp_must_not_be_public(self) -> "McpServerEntry":
+        if self.available_on_public_internet:
+            raise ValueError("MCP server must not be public internet")
+        return self
+
+
 class ConfigRoot(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     model_list: list[ModelEntry]
     litellm_settings: LiteLLMSettings
     general_settings: GeneralSettings
+    mcp_servers: dict[str, McpServerEntry] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def required_aliases_present(self) -> "ConfigRoot":
@@ -289,6 +328,13 @@ class ConfigRoot(BaseModel):
         missing = sorted(required - names)
         if missing:
             raise ValueError(f"missing required LiteLLM aliases: {missing}")
+        return self
+
+    @model_validator(mode="after")
+    def mcp_servers_are_local_first(self) -> "ConfigRoot":
+        for name in self.mcp_servers:
+            if not MCP_NAME_RE.fullmatch(name):
+                raise ValueError("MCP server names must be lowercase SEP-986-safe hyphenated identifiers")
         return self
 
     @model_validator(mode="after")

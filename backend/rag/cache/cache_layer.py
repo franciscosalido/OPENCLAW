@@ -12,6 +12,7 @@ from loguru import logger
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.http import models
 
+from backend.observability.decorators import traced_cache
 from backend.rag.cache.cache_collection import CacheCollectionManager
 from backend.rag.cache.cache_config import CacheSettings
 from backend.rag.cache.cache_models import (
@@ -59,6 +60,7 @@ class CacheLayer:
             return
         await self._collection_manager.ensure_collection()
 
+    @traced_cache(operation="lookup")
     async def lookup(
         self,
         *,
@@ -95,6 +97,7 @@ class CacheLayer:
         await self.record_hit(cache_id=hit.cache_id, current_hit_count=hit.hit_count)
         return hit
 
+    @traced_cache(operation="store")
     async def store(
         self,
         *,
@@ -229,6 +232,7 @@ class CacheLayer:
         active = [hit for hit in hits if not _is_hit_expired(hit)]
         return sorted(active, key=lambda hit: hit.hit_count, reverse=True)[:top_n]
 
+    @traced_cache(operation="record_hit")
     async def record_hit(
         self,
         *,

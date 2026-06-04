@@ -1,0 +1,9 @@
+scenario,backend,sample_index,latency_ms,error,cache_enabled,cache_bypass,git_commit,timestamp
+recent_turns_context,postgres,0,1.2,,0,True,991e63af7615b5e1f8aeaef0cab9fc4e4364bff0,2026-06-04T23:35:51.497662+00:00
+recent_turns_context,qdrant,0,3.4,,0,True,991e63af7615b5e1f8aeaef0cab9fc4e4364bff0,2026-06-04T23:35:51.497662+00:00
+session_state_lookup,postgres,0,0.8,,0,True,991e63af7615b5e1f8aeaef0cab9fc4e4364bff0,2026-06-04T23:35:51.497662+00:00
+session_state_lookup,qdrant,0,4.0,,0,True,991e63af7615b5e1f8aeaef0cab9fc4e4364bff0,2026-06-04T23:35:51.497662+00:00
+semantic_context_retrieval,postgres,0,0.0,,0,True,991e63af7615b5e1f8aeaef0cab9fc4e4364bff0,2026-06-04T23:35:51.497662+00:00
+semantic_context_retrieval,qdrant,0,2.2,,0,True,991e63af7615b5e1f8aeaef0cab9fc4e4364bff0,2026-06-04T23:35:51.497662+00:00
+light_entity_context,postgres,0,1.0,,0,True,991e63af7615b5e1f8aeaef0cab9fc4e4364bff0,2026-06-04T23:35:51.497662+00:00
+light_entity_context,qdrant,0,3.0,,0,True,991e63af7615b5e1f8aeaef0cab9fc4e4364bff0,2026-06-04T23:35:51.497662+00:00

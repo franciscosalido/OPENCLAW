@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Mapping, Sequence
+from collections.abc import Awaitable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
@@ -29,11 +29,11 @@ ALLOWED_EMBEDDING_BACKENDS = frozenset(
 class RagEmbedder(Protocol):
     """Minimal async embedding interface required by RAG ingestion/retrieval."""
 
-    async def embed(self, text: str) -> list[float]:
+    def embed(self, text: str) -> Awaitable[list[float]]:
         """Embed one text string."""
         ...
 
-    async def embed_batch(self, texts: Sequence[str]) -> list[list[float]]:
+    def embed_batch(self, texts: Sequence[str]) -> Awaitable[list[list[float]]]:
         """Embed a batch of text strings."""
         ...
 
