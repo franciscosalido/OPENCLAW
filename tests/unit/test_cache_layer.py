@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
@@ -44,12 +45,14 @@ class FakeQdrantClient:
         points = [
             FakePoint(
                 point_id=point_id,
-                score=float(payload.get("_score", 0.99)),
+                score=_float_payload_value(payload.get("_score", 0.99)),
                 payload={key: value for key, value in payload.items() if key != "_score"},
             )
             for point_id, payload in self.points.items()
         ]
-        return FakeQueryResult(points[: int(kwargs["limit"])])
+        limit = kwargs["limit"]
+        assert isinstance(limit, int)
+        return FakeQueryResult(points[:limit])
 
     async def upsert(self, **kwargs: object) -> None:
         self.upserts.append(kwargs["points"])
@@ -83,8 +86,8 @@ def _fingerprint() -> CacheFingerprint:
     )
 
 
-def _result(**overrides: object) -> RetrievalResult:
-    values = {
+def _result(**overrides: Any) -> RetrievalResult:
+    values: dict[str, Any] = {
         "doc_ids": ("doc-1", "doc-2"),
         "scores": (0.9, 0.8),
         "fusion_backend": "python_rrf",
@@ -93,11 +96,11 @@ def _result(**overrides: object) -> RetrievalResult:
         "metadata": {"safe": True},
     }
     values.update(overrides)
-    return RetrievalResult(**values)  # type: ignore[arg-type]
+    return RetrievalResult(**values)
 
 
-def _settings(**overrides: object) -> CacheSettings:
-    values = {"vector_size": 4, "threshold": 0.9}
+def _settings(**overrides: Any) -> CacheSettings:
+    values: dict[str, Any] = {"vector_size": 4, "threshold": 0.9}
     values.update(overrides)
     return CacheSettings(**values)
 
@@ -223,3 +226,8 @@ def _payload(**overrides: object) -> dict[str, object]:
     }
     payload.update(overrides)
     return payload
+
+
+def _float_payload_value(value: object) -> float:
+    assert isinstance(value, (int, float, str))
+    return float(value)

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any, cast
+
 import pytest
 
 from backend.rag.cache.cache_config import CacheSettings
@@ -58,7 +60,7 @@ def test_cache_settings_ignores_unprefixed_enabled(monkeypatch: pytest.MonkeyPat
 )
 def test_cache_settings_validation(field: str, value: object) -> None:
     with pytest.raises(ValueError):
-        CacheSettings(**{field: value})
+        CacheSettings(**cast(Any, {field: value}))
 
 
 def test_cache_settings_does_not_use_field_aliases() -> None:

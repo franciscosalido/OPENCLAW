@@ -23,6 +23,7 @@ from backend.rag.cache.cache_models import (
     sanitize_metadata,
 )
 from backend.rag.cache.errors import CachePayloadError, CacheVectorDimensionError
+from backend.rag.cache.types import CacheFilterValue
 
 
 class CacheLayer:
@@ -30,7 +31,7 @@ class CacheLayer:
 
     def __init__(
         self,
-        client: AsyncQdrantClient,
+        client: Any,
         settings: CacheSettings,
         collection_manager: CacheCollectionManager | None = None,
     ) -> None:
@@ -322,7 +323,7 @@ def _filter_for_fingerprint(fingerprint: CacheFingerprint) -> models.Filter:
     return _filter_from_mapping(fingerprint.to_payload_filter_conditions())
 
 
-def _filter_from_mapping(values: Mapping[str, object]) -> models.Filter:
+def _filter_from_mapping(values: Mapping[str, CacheFilterValue]) -> models.Filter:
     return models.Filter(
         must=[
             models.FieldCondition(
@@ -352,7 +353,9 @@ def _cache_hit_from_point(point: object, *, score: float) -> CacheHit:
             schema_version=str(payload["schema_version"]),
         )
         doc_ids = tuple(str(item) for item in _sequence_payload(payload, "result_doc_ids"))
-        scores = tuple(float(item) for item in _sequence_payload(payload, "result_scores"))
+        scores = tuple(
+            _payload_float(item) for item in _sequence_payload(payload, "result_scores")
+        )
         created_at = _parse_datetime(payload["created_at"], "created_at")
         expires_at_raw = payload.get("expires_at")
         expires_at = (
@@ -382,6 +385,15 @@ def _sequence_payload(payload: Mapping[str, object], key: str) -> Sequence[objec
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
         raise CachePayloadError("cache payload sequence field is malformed")
     return value
+
+
+def _payload_float(value: object) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+        raise CachePayloadError("cache payload score is malformed")
+    parsed = float(value)
+    if not math.isfinite(parsed):
+        raise CachePayloadError("cache payload score is malformed")
+    return parsed
 
 
 def _parse_datetime(value: object, field_name: str) -> datetime:

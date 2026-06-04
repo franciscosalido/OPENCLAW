@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any, cast
 
-from qdrant_client import AsyncQdrantClient
 from qdrant_client.http import models
 
 from backend.rag.cache.cache_config import CacheDistance, CacheSettings
@@ -28,7 +27,7 @@ CACHE_PAYLOAD_INDEXES: Mapping[str, models.PayloadSchemaType] = {
 class CacheCollectionManager:
     """Create and validate the dedicated Qdrant cache collection."""
 
-    def __init__(self, client: AsyncQdrantClient, settings: CacheSettings) -> None:
+    def __init__(self, client: Any, settings: CacheSettings) -> None:
         self._client = client
         self._settings = settings
 

@@ -9,6 +9,8 @@ from datetime import UTC, datetime
 from typing import Any, Literal
 from uuid import UUID
 
+from backend.rag.cache.types import CacheFilterValue
+
 
 SCHEMA_VERSION_QUERY_CACHE_V1 = "query-cache-v1"
 FusionBackend = Literal["python_rrf", "qdrant_rrf"]
@@ -58,7 +60,7 @@ class CacheFingerprint:
         if self.schema_version != SCHEMA_VERSION_QUERY_CACHE_V1:
             raise ValueError("schema_version must be query-cache-v1")
 
-    def to_payload_filter_conditions(self) -> dict[str, object]:
+    def to_payload_filter_conditions(self) -> dict[str, CacheFilterValue]:
         """Return payload fields that must match this fingerprint."""
 
         return {

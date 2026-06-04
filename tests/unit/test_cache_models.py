@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 from dataclasses import FrozenInstanceError, is_dataclass
 from datetime import UTC, datetime, timedelta
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -30,8 +31,8 @@ def _fingerprint() -> CacheFingerprint:
     )
 
 
-def _result(**overrides: object) -> RetrievalResult:
-    values = {
+def _result(**overrides: Any) -> RetrievalResult:
+    values: dict[str, Any] = {
         "doc_ids": ("doc-1", "doc-2"),
         "scores": (0.9, 0.8),
         "fusion_backend": "python_rrf",
@@ -40,11 +41,11 @@ def _result(**overrides: object) -> RetrievalResult:
         "metadata": {"safe": True},
     }
     values.update(overrides)
-    return RetrievalResult(**values)  # type: ignore[arg-type]
+    return RetrievalResult(**values)
 
 
-def _entry(**overrides: object) -> CacheEntry:
-    values = {
+def _entry(**overrides: Any) -> CacheEntry:
+    values: dict[str, Any] = {
         "cache_id": uuid4(),
         "query_vector": (0.1, 0.2),
         "result_doc_ids": ("doc-1",),
@@ -54,7 +55,7 @@ def _entry(**overrides: object) -> CacheEntry:
         "created_at": NOW,
     }
     values.update(overrides)
-    return CacheEntry(**values)  # type: ignore[arg-type]
+    return CacheEntry(**values)
 
 
 def test_cache_dataclasses_are_frozen_and_slots() -> None:
