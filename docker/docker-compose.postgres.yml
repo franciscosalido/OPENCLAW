@@ -1,0 +1,25 @@
+# PostgreSQL relational memory
+# Version is PINNED - never change postgres:16 to latest
+services:
+  postgres:
+    image: postgres:16
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=quimera
+      - POSTGRES_USER=quimera
+      - POSTGRES_HOST_AUTH_METHOD=trust
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U quimera -d quimera -h 127.0.0.1
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  postgres_data:

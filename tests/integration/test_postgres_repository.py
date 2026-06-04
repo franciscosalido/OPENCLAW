@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import asyncio
 from collections.abc import AsyncGenerator
 from uuid import uuid4
 
@@ -38,6 +39,17 @@ def repository(repo_client: PostgresClient) -> PostgresMemoryRepository:
 
 async def test_healthcheck_select_1(repo_client: PostgresClient) -> None:
     assert await repo_client.healthcheck() is True
+
+
+async def test_healthcheck_after_close_fails_controlled() -> None:
+    dsn = _test_dsn()
+    if not dsn:
+        pytest.skip("TEST_POSTGRES_DSN or QUIMERA_POSTGRES_DSN is required")
+    client = await PostgresClient.create(dsn=dsn)
+    await client.close()
+
+    with pytest.raises(Exception):
+        await client.healthcheck()
 
 
 async def test_create_and_get_session_roundtrip(
@@ -164,17 +176,35 @@ async def test_delete_turn_cascades_entity_mentions(
 async def test_concurrent_agent_state_upsert_same_key_is_safe(
     repository: PostgresMemoryRepository,
 ) -> None:
-    import asyncio
-
     agent_id = f"test-agent-{uuid4().hex}"
     session = await repository.create_session(agent_id=agent_id)
 
-    results = await asyncio.gather(
-        repository.upsert_agent_state(agent_id, session.session_id, "plan", {"v": 1}),
-        repository.upsert_agent_state(agent_id, session.session_id, "plan", {"v": 2}),
+    tasks = [
+        repository.upsert_agent_state(agent_id, session.session_id, "plan", {"v": i})
+        for i in range(10)
+    ]
+    results = await asyncio.gather(*tasks)
+
+    assert len({result.state_id for result in results}) == 1
+
+
+async def test_concurrent_turn_append_50(
+    repo_client: PostgresClient,
+    repository: PostgresMemoryRepository,
+) -> None:
+    session = await repository.create_session(agent_id=f"test-agent-{uuid4().hex}")
+    tasks = [
+        repository.append_turn(session.session_id, "user", f"msg {i}")
+        for i in range(50)
+    ]
+    turns = await asyncio.gather(*tasks)
+    count = await repo_client.pool.fetchval(
+        "SELECT count(*) FROM turns WHERE session_id = $1",
+        session.session_id,
     )
 
-    assert results[0].state_id == results[1].state_id
+    assert len({turn.turn_id for turn in turns}) == 50
+    assert count == 50
 
 
 async def test_unicode_content_roundtrip(repository: PostgresMemoryRepository) -> None:
@@ -194,6 +224,35 @@ async def test_jsonb_metadata_roundtrip(repository: PostgresMemoryRepository) ->
 
     assert fetched is not None
     assert fetched.metadata == {"nested": {"value": 1}, "items": ["a", "b"]}
+
+
+async def test_jsonb_agent_state_roundtrip_native_types(
+    repository: PostgresMemoryRepository,
+) -> None:
+    agent_id = f"test-agent-{uuid4().hex}"
+    session = await repository.create_session(agent_id=agent_id)
+    value = {
+        "enabled": True,
+        "disabled": False,
+        "missing": None,
+        "items": [1, "two", None],
+        "nested": {"ok": True},
+    }
+    state = await repository.upsert_agent_state(
+        agent_id,
+        session.session_id,
+        "working_memory",
+        value,
+    )
+    fetched = await repository.get_agent_state(
+        agent_id,
+        session.session_id,
+        "working_memory",
+    )
+
+    assert state.state_value == value
+    assert fetched is not None
+    assert fetched.state_value == value
 
 
 async def test_sql_injection_payload_is_stored_not_executed(

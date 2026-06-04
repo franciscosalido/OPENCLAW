@@ -24,6 +24,14 @@ class Agent0ReadinessTests(unittest.TestCase):
         assert_readiness_report_sanitized(report)
         self.assertNotIn("prompt", report)
         self.assertNotIn("payload", report)
+        self.assertIn(
+            {
+                "name": "golden_questions",
+                "passed": True,
+                "reason_code": "loaded",
+            },
+            report["checks"],
+        )
 
     def test_readiness_report_sanitizer_rejects_forbidden_keys(self) -> None:
         with self.assertRaises(ValueError):

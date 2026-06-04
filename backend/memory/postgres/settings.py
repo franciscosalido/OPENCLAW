@@ -8,7 +8,7 @@ from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-DEFAULT_POSTGRES_DSN = "postgresql://postgres@127.0.0.1:5432/quimera"
+DEFAULT_POSTGRES_DSN = "postgresql://quimera@127.0.0.1:5432/quimera"
 
 
 class PostgresSettings(BaseSettings):

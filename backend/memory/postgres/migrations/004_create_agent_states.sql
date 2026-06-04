@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS agent_states (
     state_key       TEXT NOT NULL CHECK (length(trim(state_key)) > 0),
     state_value     JSONB NOT NULL,
     schema_version  TEXT NOT NULL DEFAULT 'agent-state-v1',
+    -- Updated explicitly by repository upsert so writes remain visible in code.
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE(agent_id, session_id, state_key)
 );

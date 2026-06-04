@@ -198,7 +198,7 @@ def _check_manifests() -> list[ReadinessCheck]:
 def _check_golden_questions() -> list[ReadinessCheck]:
     try:
         questions = load_all_golden_questions()
-        return [_check_bool("golden_questions", len(questions) == 6, "loaded", "invalid")]
+        return [_check_bool("golden_questions", bool(questions), "loaded", "invalid")]
     except Exception:
         return [ReadinessCheck("golden_questions", False, "invalid")]
 

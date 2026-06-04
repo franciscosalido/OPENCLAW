@@ -39,7 +39,7 @@ def test_no_migration_file_is_empty() -> None:
 def test_migrations_use_if_not_exists_where_applicable() -> None:
     for migration in list_migration_files(MIGRATIONS_DIR):
         sql = migration.sql.upper()
-        assert "IF NOT EXISTS" in sql or migration.version.startswith("005_")
+        assert "IF NOT EXISTS" in sql
 
 
 def test_schema_migrations_migration_exists() -> None:

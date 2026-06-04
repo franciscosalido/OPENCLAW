@@ -5,6 +5,8 @@
 PR-01 adds the local PostgreSQL foundation for Quimera relational-temporal
 memory. PostgreSQL stores sessions, turns, agent state and entity mentions.
 Qdrant remains the vector memory layer and is not changed by this PR.
+Following project PKD planning, PostgreSQL runs locally in Docker like Qdrant so
+the memory stack can be mounted, stopped and remounted through containers.
 
 ## Tables
 
@@ -23,6 +25,27 @@ Qdrant remains the vector memory layer and is not changed by this PR.
 - All user values are passed as asyncpg parameters, never string-interpolated SQL.
 - Settings are loaded with `pydantic-settings`; DSNs are sanitized before display.
 - Integration tests skip unless `TEST_POSTGRES_DSN` or `QUIMERA_POSTGRES_DSN` is set.
+
+## Local Docker
+
+PostgreSQL is defined in `docker/docker-compose.postgres.yml` with:
+
+- pinned `postgres:16` image;
+- loopback-only port binding, `127.0.0.1:5432:5432`;
+- named volume `postgres_data`;
+- local trust auth for the development container, avoiding checked-in passwords.
+
+Start it with:
+
+```bash
+docker compose -f docker/docker-compose.postgres.yml up -d
+```
+
+Use this DSN for local integration tests:
+
+```bash
+TEST_POSTGRES_DSN="postgresql://quimera@127.0.0.1:5432/quimera"
+```
 
 ## Indexes
 
