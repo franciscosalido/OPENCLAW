@@ -5,7 +5,47 @@
 > meaningful sessions.
 
 **Last updated:** 2026-06-04
-**Updated by:** Codex — RAG-01B PR-03 RC-02 corrupted payload hardening
+**Updated by:** Codex — RAG-01B PR-04 local runtime implementation
+
+---
+
+## RAG-01B PR-04 — Ollama Tuning + Keep-Alive Hardening
+
+Current branch: `rag-01b/pr-04-ollama-tuning`
+Base: `main` after PR-03 merge.
+
+PR-03 was merged through GitHub:
+
+- PR: <https://github.com/franciscosalido/OPENCLAW/pull/106>
+- Merge commit: `3fe71d53460e00f68fbeb1df9821f4b8599a9ad6`
+- `main...origin/main`: `0 0` after pull/prune.
+- Local Git inconsistency fixed: `branch.main.rebase=false` and
+  `pull.rebase=false` so `git pull --ff-only` no longer attempts rebase.
+
+PR-04 implemented locally:
+
+- `scripts/start_quimera.sh` controller with start/stop/restart/status/logs/
+  doctor/test/warmup/release.
+- Root `start_quimera.sh` and `scripts/star_quimera.sh` compatibility wrappers.
+- `infra/ollama` config, warmup and shutdown/release hooks.
+- `infra/docker/compose.quimera.local.yml` for `quimera-postgres-memory`,
+  `quimera-qdrant` and `quimera-litellm`.
+- `docs/specs/rag-01b/pr-04-ollama-tuning-keepalive.md`.
+
+Validation:
+
+- PR-04 unit tests: 25 passed.
+- Controller self-test: 25 passed.
+- Full unit suite: 1615 passed / 253 subtests passed.
+- PR-04 optional integration: 1 passed / 2 skipped cleanly.
+- `uv run mypy --strict .`: success.
+- `uv run pyright`: 0 errors.
+- `bash -n` on shell wrappers: clean.
+- YAML parse check: clean.
+- `git diff --check`: clean.
+
+Explicitly not implemented: schema SQL, HybridRAG changes, MCP/API/gRPC,
+Kronos, Qlib, pgvector logic, model auto-pull or performance tests.
 
 ---
 
