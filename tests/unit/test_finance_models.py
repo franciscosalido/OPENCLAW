@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import FrozenInstanceError, is_dataclass
 from datetime import UTC, date, datetime, timedelta
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -157,48 +158,56 @@ def test_model_run_rejects_inverted_input_window() -> None:
 
 
 def test_kronos_forecast_validates_horizon_sample_and_prediction_shape() -> None:
-    base = dict(
-        forecast_ts=NOW,
-        run_id=uuid4(),
-        instrument_id=uuid4(),
-        timeframe="1d",
-        horizon_step=0,
-        high_pred=12.0,
-        low_pred=10.0,
-        sample_count=1,
-        quantiles={},
-        ingested_at=NOW,
-        schema_version="kronos-forecast-v1",
-        metadata={},
-        created_at=NOW,
-    )
+    def forecast(**overrides: Any) -> KronosForecast:
+        values: dict[str, Any] = {
+            "forecast_ts": NOW,
+            "run_id": uuid4(),
+            "instrument_id": uuid4(),
+            "timeframe": "1d",
+            "horizon_step": 0,
+            "high_pred": 12.0,
+            "low_pred": 10.0,
+            "sample_count": 1,
+            "quantiles": {},
+            "ingested_at": NOW,
+            "schema_version": "kronos-forecast-v1",
+            "metadata": {},
+            "created_at": NOW,
+        }
+        values.update(overrides)
+        return KronosForecast(**values)
+
     with pytest.raises(ValueError, match="horizon_step"):
-        KronosForecast(**{**base, "horizon_step": -1})
+        forecast(horizon_step=-1)
     with pytest.raises(ValueError, match="sample_count"):
-        KronosForecast(**{**base, "sample_count": 0})
+        forecast(sample_count=0)
     with pytest.raises(ValueError, match="high_pred"):
-        KronosForecast(**{**base, "high_pred": 9.0})
+        forecast(high_pred=9.0)
 
 
 def test_qlib_projection_manifest_validation() -> None:
-    base = dict(
-        projection_id=uuid4(),
-        projection_name="daily-bars",
-        projection_version="projection-v1",
-        format="qlib_bin",
-        source_query_hash="query",
-        transform_hash="transform",
-        row_count=1,
-        start_ts=NOW,
-        end_ts=NOW + timedelta(days=1),
-        ingested_at=NOW,
-        schema_version="qlib-projection-manifest-v1",
-        metadata={},
-        created_at=NOW,
-    )
+    def manifest(**overrides: Any) -> QlibProjectionManifest:
+        values: dict[str, Any] = {
+            "projection_id": uuid4(),
+            "projection_name": "daily-bars",
+            "projection_version": "projection-v1",
+            "format": "qlib_bin",
+            "source_query_hash": "query",
+            "transform_hash": "transform",
+            "row_count": 1,
+            "start_ts": NOW,
+            "end_ts": NOW + timedelta(days=1),
+            "ingested_at": NOW,
+            "schema_version": "qlib-projection-manifest-v1",
+            "metadata": {},
+            "created_at": NOW,
+        }
+        values.update(overrides)
+        return QlibProjectionManifest(**values)
+
     with pytest.raises(ValueError, match="format"):
-        QlibProjectionManifest(**{**base, "format": "duckdb"})
+        manifest(format="duckdb")
     with pytest.raises(ValueError, match="row_count"):
-        QlibProjectionManifest(**{**base, "row_count": -1})
+        manifest(row_count=-1)
     with pytest.raises(ValueError, match="end_ts"):
-        QlibProjectionManifest(**{**base, "end_ts": NOW - timedelta(days=1)})
+        manifest(end_ts=NOW - timedelta(days=1))

@@ -1,6 +1,6 @@
 """Qlib projection manifest contract.
 
-This module intentionally does not import pyqlib and does not write projection
+This module intentionally does not import the Qlib package and does not write projection
 files. It reexports the canonical temporal manifest dataclass.
 """
 

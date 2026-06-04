@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import Any
 
 import asyncpg  # type: ignore[import-untyped]
 
 
-async def is_timescale_available(conn: asyncpg.Connection) -> bool:
+async def is_timescale_available(conn: Any) -> bool:
     """Return whether the TimescaleDB extension is available to this database."""
 
     value = await conn.fetchval(
@@ -17,7 +18,7 @@ async def is_timescale_available(conn: asyncpg.Connection) -> bool:
     return bool(value)
 
 
-async def is_hypertable(conn: asyncpg.Connection, table_name: str) -> bool:
+async def is_hypertable(conn: Any, table_name: str) -> bool:
     """Return whether a table is registered as a TimescaleDB hypertable."""
 
     if not table_name.strip():
