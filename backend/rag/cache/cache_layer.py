@@ -8,6 +8,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 from uuid import UUID, uuid4
 
+from loguru import logger
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.http import models
 
@@ -149,8 +150,9 @@ class CacheLayer:
         *,
         dry_run: bool = False,
     ) -> CacheInvalidationResult:
+        clean_version = _require_non_empty_text(version, "version")
         return await self._invalidate(
-            _filter_from_mapping({"schema_version": version}),
+            _filter_from_mapping({"schema_version": clean_version}),
             selector_kind="schema_version",
             dry_run=dry_run,
         )
@@ -173,8 +175,9 @@ class CacheLayer:
         *,
         dry_run: bool = False,
     ) -> CacheInvalidationResult:
+        clean_corpus_epoch = _require_non_empty_text(corpus_epoch, "corpus_epoch")
         return await self._invalidate(
-            _filter_from_mapping({"corpus_epoch": corpus_epoch}),
+            _filter_from_mapping({"corpus_epoch": clean_corpus_epoch}),
             selector_kind="corpus_epoch",
             dry_run=dry_run,
         )
@@ -239,7 +242,8 @@ class CacheLayer:
                 points=[str(cache_id)],
                 wait=True,
             )
-        except Exception:
+        except Exception as exc:
+            logger.opt(exception=exc).debug("cache_record_hit_failed")
             return
 
     async def _invalidate(
@@ -337,6 +341,13 @@ def _filter_from_mapping(values: Mapping[str, CacheFilterValue]) -> models.Filte
             for key, value in values.items()
         ]
     )
+
+
+def _require_non_empty_text(value: str, field_name: str) -> str:
+    clean = value.strip()
+    if not clean:
+        raise ValueError(f"{field_name} cannot be empty")
+    return clean
 
 
 def _cache_hit_from_point(point: object, *, score: float) -> CacheHit:

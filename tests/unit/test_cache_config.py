@@ -63,6 +63,17 @@ def test_cache_settings_validation(field: str, value: object) -> None:
         CacheSettings(**cast(Any, {field: value}))
 
 
+def test_cache_settings_rejects_cache_collection_as_source_collection() -> None:
+    with pytest.raises(
+        ValueError,
+        match="collection_name and source_collection must differ",
+    ):
+        CacheSettings(
+            collection_name="quimera_query_cache",
+            source_collection="quimera_query_cache",
+        )
+
+
 def test_cache_settings_does_not_use_field_aliases() -> None:
     fields = CacheSettings.model_fields
 

@@ -55,13 +55,17 @@ def build_retrieval_fingerprint(
 
 
 def hmac_query_hash(query_text: str, secret: str) -> str:
-    """Return HMAC of query text without storing the text itself."""
+    """Return HMAC of query text; callers must persist only the returned hash."""
 
     if not query_text:
         raise ValueError("query_text cannot be empty")
     if not secret:
         raise ValueError("secret cannot be empty")
-    return hmac.new(secret.encode("utf-8"), query_text.encode("utf-8"), hashlib.sha256).hexdigest()
+    return hmac.new(
+        secret.encode("utf-8"),
+        query_text.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
 
 
 def _reject_sensitive_keys(value: Mapping[str, Any]) -> None:

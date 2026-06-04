@@ -36,6 +36,9 @@ Coleção de conhecimento e coleção de cache devem permanecer separadas. A
 camada nunca usa `recreate_collection`, nunca apaga coleção inteira e nunca
 recria coleção incompatível automaticamente.
 
+`CacheSettings` rejeita configuração em que `collection_name` e
+`source_collection` apontem para a mesma collection.
+
 ## Cache fingerprint
 
 O fingerprint amarra cache a:
@@ -47,6 +50,10 @@ O fingerprint amarra cache a:
 - corpus epoch;
 - retrieval fingerprint;
 - schema version.
+
+Se callers futuros usarem HMAC para derivar identidade semântica a partir de
+texto de query, somente o hash resultante pode ser armazenado. O texto original
+da query nunca deve entrar em payload, logs ou metadados persistidos.
 
 ## Payload permitido
 

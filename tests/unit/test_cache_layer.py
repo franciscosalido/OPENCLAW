@@ -207,6 +207,16 @@ async def test_invalidation_hot_entries_and_record_hit() -> None:
     assert client.deletes
 
 
+@pytest.mark.asyncio
+async def test_invalidate_rejects_empty_version_and_corpus_epoch() -> None:
+    layer = CacheLayer(FakeQdrantClient(), _settings())
+
+    with pytest.raises(ValueError, match="version cannot be empty"):
+        await layer.invalidate_by_schema_version(" ")
+    with pytest.raises(ValueError, match="corpus_epoch cannot be empty"):
+        await layer.invalidate_by_corpus_epoch("")
+
+
 def _payload(**overrides: object) -> dict[str, object]:
     payload: dict[str, object] = {
         "result_doc_ids": ["doc-1", "doc-2"],

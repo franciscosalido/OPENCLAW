@@ -5,7 +5,37 @@
 > meaningful sessions.
 
 **Last updated:** 2026-06-04
-**Updated by:** Codex — RAG-01B PR-03 HybridRAG semantic cache draft PR
+**Updated by:** Codex — RAG-01B PR-03 RC-01 cache hardening
+
+---
+
+## RAG-01B PR-03 RC-01 — Semantic Cache Hardening
+
+Current branch: `rag-01b/pr-03-hybridrag-cache-qdrant`
+Draft PR: <https://github.com/franciscosalido/OPENCLAW/pull/106>
+
+Implemented RC-01 fixes:
+
+- `CacheSettings` now rejects `collection_name == source_collection`.
+- `invalidate_by_schema_version` rejects empty/blank version values.
+- `invalidate_by_corpus_epoch` rejects empty/blank corpus epoch values.
+- `test_rag_observability_config` no longer writes to a fixed file under
+  `tests/`; it uses an isolated temporary directory, resolving the pre-existing
+  PermissionError/carry-over artifact risk.
+- `hmac_query_hash` is documented as a caller-side helper whose raw query input
+  must never be persisted; only the returned hash may be stored.
+- `record_hit` remains best-effort but now emits a safe DEBUG log on failure.
+
+Validation:
+
+- RC focused tests: 37 passed.
+- PR-03 + observability focused tests: 51 passed.
+- Full unit suite: 1589 passed / 253 subtests passed.
+- Optional Qdrant integration tests: 3 skipped cleanly when live integration env
+  is not set.
+- `uv run mypy --strict .`: success.
+- `uv run pyright`: 0 errors.
+- `git diff --check`: clean.
 
 ---
 

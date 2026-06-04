@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -48,6 +48,14 @@ class CacheSettings(BaseSettings):
         if not clean:
             raise ValueError("cache setting cannot be empty")
         return clean
+
+    @model_validator(mode="after")
+    def validate_collection_boundaries(self) -> Self:
+        """Keep the cache collection separate from the source collection."""
+
+        if self.collection_name == self.source_collection:
+            raise ValueError("collection_name and source_collection must differ")
+        return self
 
     @property
     def similarity_threshold(self) -> float:
