@@ -28,6 +28,13 @@ def test_migration_files_exist_and_are_ordered() -> None:
         "003_create_turns",
         "004_create_agent_states",
         "005_create_entity_mentions",
+        "010_create_market_instruments",
+        "011_create_market_calendars",
+        "012_create_market_bars",
+        "013_create_market_features",
+        "014_create_model_runs",
+        "015_create_kronos_forecasts",
+        "016_create_qlib_projection_manifests",
     ]
 
 
