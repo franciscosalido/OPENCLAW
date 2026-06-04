@@ -12,6 +12,7 @@ dependencies = [
     "pydantic-settings>=2.7.0",
     "pyyaml>=6.0.2",
     "loguru>=0.7.3",
+    "asyncpg>=0.30.0",
 ]
 
 [dependency-groups]
@@ -35,7 +36,7 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 markers = [
     "smoke: end-to-end tests requiring Ollama + Qdrant",
-    "integration: tests requiring Qdrant running",
+    "integration: tests requiring local services such as Qdrant or PostgreSQL",
 ]
 
 [tool.mypy]
