@@ -61,6 +61,36 @@ Operational note:
 
 ---
 
+## RAG-01B PR-07 RC-01 — Review Sandbox and Decision Hardening
+
+Current branch: `rag-01b/pr-07-benchmark-adr-mcp-memory`
+
+Implemented:
+
+- Refactored `test_start_quimera_status_json.py` subprocess checks to invoke
+  `scripts/quimera_status.py` with `sys.executable` and explicit `PYTHONPATH`,
+  avoiding `uv run` in sandbox-mounted review environments.
+- Added `degraded` to MCP `ToolResponse`; Postgres MCP read tools now mark
+  responses as degraded when no DSN/backend is configured, and write-enabled
+  calls fail explicitly with `postgres backend unavailable`.
+- Added `sprint: RAG-01B` to benchmark summary JSON and regenerated benchmark
+  JSON/CSV artifacts.
+- Clarified `llm_response_cache` decision as `qdrant` in benchmark decisions,
+  ADR-003 and benchmark docs. LiteLLM remains gateway/manager, not the
+  canonical storage backend.
+- Updated PR-07 SDD OTel notes to reflect real retrieval/RRF instrumentation.
+
+Validation:
+
+- RC focused tests: 15 passed.
+- Full unit suite: 1740 passed.
+- Full regression: 1764 passed / 58 skipped.
+- `uv run mypy --strict .`: success.
+- `uv run pyright`: 0 errors.
+- `./scripts/start_quimera.sh rag01b-acceptance --json`: `overall=ok`.
+
+---
+
 ## RAG-01B PR-06 — OpenTelemetry Base Layer
 
 Current branch: `rag-01b/pr-06-otel-base-layer`

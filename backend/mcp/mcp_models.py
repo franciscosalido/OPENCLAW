@@ -10,6 +10,7 @@ class ToolResponse(BaseModel):
 
     schema_version: str = "quimera-mcp-response-v1"
     ok: bool
+    degraded: bool = False
     data: dict[str, Any] = Field(default_factory=dict)
     error: str | None = None
 
@@ -31,4 +32,3 @@ class McpServerConfig(BaseModel):
     port: int
     path: str = "/mcp"
     transport: str = "streamable-http"
-

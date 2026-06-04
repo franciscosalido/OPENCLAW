@@ -20,7 +20,9 @@ The default benchmark mode is local, deterministic and cache-safe:
 ## Results
 
 The benchmark summary chooses Postgres for temporal/session facts and Qdrant for
-semantic vector retrieval.
+semantic vector retrieval. It also makes `llm_response_cache` explicit:
+Qdrant is the canonical storage backend for the LLM response semantic cache,
+while LiteLLM remains the gateway/manager.
 
 ## Decision
 

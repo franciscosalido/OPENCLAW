@@ -134,6 +134,7 @@ def build_summary(samples: int, *, real_mode: bool = False) -> dict[str, object]
     scenarios = build_fake_scenarios(samples)
     return {
         "schema_version": "rag-01b-session-benchmark-v1",
+        "sprint": "RAG-01B",
         "generated_at": generated_at,
         "git_commit": git_commit,
         "environment": {

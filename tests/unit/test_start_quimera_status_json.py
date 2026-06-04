@@ -1,20 +1,32 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
+import sys
+from pathlib import Path
 
 import pytest
 
 from scripts import quimera_status
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
-def test_start_quimera_status_json_is_parseable() -> None:
-    result = subprocess.run(
-        ["bash", "scripts/start_quimera.sh", "status", "--json"],
+
+def _run_status_helper(command: str) -> subprocess.CompletedProcess[str]:
+    env = {**os.environ, "PYTHONPATH": str(REPO_ROOT)}
+    return subprocess.run(
+        [sys.executable, str(REPO_ROOT / "scripts/quimera_status.py"), command, "--json"],
         text=True,
         capture_output=True,
         check=False,
+        cwd=REPO_ROOT,
+        env=env,
     )
+
+
+def test_start_quimera_status_json_is_parseable() -> None:
+    result = _run_status_helper("status")
 
     data = json.loads(result.stdout)
     assert data["schema_version"] == "quimera-status-v1"
@@ -25,12 +37,7 @@ def test_start_quimera_status_json_is_parseable() -> None:
 
 
 def test_rag01b_acceptance_json_is_parseable() -> None:
-    result = subprocess.run(
-        ["bash", "scripts/start_quimera.sh", "rag01b-acceptance", "--json"],
-        text=True,
-        capture_output=True,
-        check=False,
-    )
+    result = _run_status_helper("rag01b-acceptance")
 
     data = json.loads(result.stdout)
     assert data["schema_version"] == "rag01b-acceptance-v1"

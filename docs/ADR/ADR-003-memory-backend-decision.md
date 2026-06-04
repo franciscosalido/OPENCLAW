@@ -34,7 +34,8 @@ Qdrant is the canonical vector backend for:
 - knowledge vectors;
 - dense, sparse and hybrid retrieval;
 - semantic query cache;
-- optional LiteLLM semantic cache when the LiteLLM backend is stable.
+- LLM response semantic cache, with LiteLLM acting as gateway/manager and
+  `quimera_llm_cache` as the Qdrant-backed storage boundary.
 
 Python Weighted RRF remains the ground truth for fusion. Native Qdrant RRF
 remains experimental.
@@ -52,7 +53,7 @@ source of truth.
 - entity_mentions: postgres
 - vectors: qdrant
 - semantic_cache: qdrant
-- llm_response_cache: qdrant_or_litellm_cache
+- llm_response_cache: qdrant
 - qlib_projection: postgres_timescale_manifest
 - kronos_forecasts: postgres_timescale
 
@@ -63,4 +64,3 @@ source of truth.
 - Agents access memory through repository/API/MCP layers, not direct storage
   coupling.
 - Benchmark artifacts must be updated before reopening this decision.
-

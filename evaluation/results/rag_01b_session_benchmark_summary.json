@@ -3,7 +3,7 @@
     "agent_states": "postgres",
     "entity_mentions": "postgres",
     "kronos_forecasts": "postgres_timescale",
-    "llm_response_cache": "qdrant_or_litellm_cache",
+    "llm_response_cache": "qdrant",
     "qlib_projection": "postgres_timescale_manifest",
     "semantic_cache": "qdrant",
     "sessions": "postgres",
@@ -17,8 +17,8 @@
     "python": "3.12.13",
     "qdrant": "1.18.x"
   },
-  "generated_at": "2026-06-04T23:35:51.497662+00:00",
-  "git_commit": "991e63af7615b5e1f8aeaef0cab9fc4e4364bff0",
+  "generated_at": "2026-06-04T23:47:20.947081+00:00",
+  "git_commit": "53cf6163d5c51957de0704ec8fbe769ab9f54937",
   "guards": {
     "QUIMERA_CACHE_ENABLED": "0",
     "litellm_cache_bypass": true,
@@ -116,5 +116,6 @@
     }
   ],
   "schema_version": "rag-01b-session-benchmark-v1",
+  "sprint": "RAG-01B",
   "warnings": []
 }

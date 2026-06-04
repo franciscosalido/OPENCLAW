@@ -44,7 +44,7 @@ DECISIONS: dict[str, str] = {
     "entity_mentions": "postgres",
     "vectors": "qdrant",
     "semantic_cache": "qdrant",
-    "llm_response_cache": "qdrant_or_litellm_cache",
+    "llm_response_cache": "qdrant",
     "qlib_projection": "postgres_timescale_manifest",
     "kronos_forecasts": "postgres_timescale",
 }
@@ -59,4 +59,3 @@ def to_jsonable_scenario(scenario: BenchmarkScenario) -> dict[str, object]:
         "winner": scenario.winner,
         "reason": scenario.reason,
     }
-

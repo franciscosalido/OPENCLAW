@@ -31,5 +31,7 @@ def test_adr_documents_backend_boundaries() -> None:
     assert "Qdrant" in text
     assert "Qlib and Kronos use derived projections" in text
     assert "MCP is an agent interface" in text
+    assert "llm_response_cache: qdrant" in text
+    assert "qdrant_or_litellm_cache" not in text
     assert "PostgreSQL 17" not in text
     assert "Qdrant 1.13" not in text

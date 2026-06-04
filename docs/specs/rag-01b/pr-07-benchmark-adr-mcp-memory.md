@@ -68,10 +68,9 @@ loopback URLs only.
 PR-07 wires existing PR-06 decorators to minimal real async paths:
 
 - embed;
+- retrieval;
+- Python Weighted RRF through the hybrid retriever fusion boundary;
+- rerank benchmark probe;
 - cache lookup/store/record_hit;
 - Postgres turns read/write;
 - Postgres agent state write.
-
-RRF and rerank spans are emitted through benchmark probes because the core RRF
-implementation is synchronous and PR-06 decorators intentionally reject sync
-functions.

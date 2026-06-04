@@ -16,11 +16,13 @@ def test_benchmark_summary_schema_and_decisions() -> None:
     data = json.loads(SUMMARY.read_text(encoding="utf-8"))
 
     assert data["schema_version"] == "rag-01b-session-benchmark-v1"
+    assert data["sprint"] == "RAG-01B"
     assert data["environment"]["postgresql"] == "18.4"
     assert data["environment"]["qdrant"] == "1.18.x"
     assert data["guards"]["QUIMERA_CACHE_ENABLED"] == "0"
     assert data["decisions"]["sessions"] == "postgres"
     assert data["decisions"]["vectors"] == "qdrant"
+    assert data["decisions"]["llm_response_cache"] == "qdrant"
     assert data["otel_attributes"]["forbidden_attributes_seen"] == []
 
 
@@ -51,3 +53,4 @@ def test_build_summary_is_deterministic_shape() -> None:
 
     assert len(scenarios) == 4
     assert decisions["semantic_cache"] == "qdrant"
+    assert decisions["llm_response_cache"] == "qdrant"
