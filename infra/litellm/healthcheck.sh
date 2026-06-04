@@ -15,7 +15,8 @@ command -v curl >/dev/null 2>&1 || fail "curl is required." 127
 
 LITELLM_HOST="${LITELLM_HOST:-127.0.0.1}"
 LITELLM_PORT="${LITELLM_PORT:-4000}"
-OLLAMA_API_BASE="${OLLAMA_API_BASE:-http://127.0.0.1:11434}"
+OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-${OLLAMA_API_BASE:-http://127.0.0.1:11434}}"
+OLLAMA_API_BASE="${OLLAMA_API_BASE:-${OLLAMA_BASE_URL}}"
 
 [ "${LITELLM_HOST}" = "127.0.0.1" ] || fail "Refusing non-local LiteLLM host '${LITELLM_HOST}'."
 

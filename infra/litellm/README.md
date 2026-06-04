@@ -56,11 +56,32 @@ derives `LITELLM_LOCAL_CHAT_MODEL` and `LITELLM_LOCAL_EMBED_MODEL` from
 
 ## Start
 
+Recommended through the stack controller:
+
+```bash
+./scripts/start_quimera.sh litellm-validate
+./scripts/start_quimera.sh litellm-render
+./scripts/start_quimera.sh litellm-start
+./scripts/start_quimera.sh litellm-smoke
+```
+
+`scripts/start_quimera.sh start` also starts or reuses host LiteLLM after
+Postgres and Qdrant are ready.
+
+Docker Compose does not manage LiteLLM in Quimera. Compose owns Postgres and
+Qdrant only; LiteLLM remains a host Python process on `127.0.0.1:4000`.
+
+The source config is `infra/litellm/litellm_config.yaml`. The generated runtime
+config is `infra/litellm/generated/litellm_config.runtime.yaml`; it is local and
+not versioned.
+
 ```bash
 ./start_litellm.sh
 ```
 
 The script refuses to bind to anything other than `127.0.0.1`.
+If the placeholder key from `.env.local.example` is still in use, the stack
+controller prints a warning. Rotate it for any shared runtime.
 
 ## Validate
 
@@ -87,10 +108,24 @@ source .venv/bin/activate
 Expected checks:
 
 - `/v1/models` responds.
+- `/health/readiness` and `/health/liveliness` respond.
 - All five local aliases are visible.
 - `local_chat` returns a compact answer through LiteLLM.
 - Ollama is reachable.
 - No active remote provider appears in the LiteLLM config.
+
+Avoid using `/health` as the default probe because LiteLLM uses it for model
+health checks.
+
+## Semantic Cache
+
+The source config declares Qdrant semantic cache for the LLM gateway with
+collection `quimera_llm_cache`. The retrieval cache collection remains
+`quimera_query_cache`; these collections must never be merged.
+
+The renderer keeps Qdrant semantic cache only when
+`QUIMERA_LITELLM_QDRANT_SEMANTIC_EXPERIMENTAL=1` and Qdrant is reachable at
+`QDRANT_API_BASE`. Otherwise it writes a runtime config with local cache.
 
 ## Stop
 
