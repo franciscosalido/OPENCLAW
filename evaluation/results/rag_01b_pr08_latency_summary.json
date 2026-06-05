@@ -1,0 +1,11 @@
+{
+  "embed_ms": 0.0,
+  "llm_ms": 0.0,
+  "mcp_ms": 0.0,
+  "p50_ms": null,
+  "p95_ms": null,
+  "pg_ms": 0.0,
+  "retrieval_ms": 0.0,
+  "schema_version": "rag-01b-pr08-latency-v1",
+  "total_ms": 78.98195800953545
+}

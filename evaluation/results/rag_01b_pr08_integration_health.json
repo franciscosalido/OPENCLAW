@@ -1,0 +1,47 @@
+{
+  "generated_at": "2026-06-05T00:13:51.083927+00:00",
+  "mcp_servers": {
+    "quimera-postgres-memory": {
+      "allowed_tools_validated_static": true,
+      "expected_tools": [
+        "postgres_memory_health",
+        "postgres_recent_turns_get",
+        "postgres_agent_state_get"
+      ],
+      "gateway_introspection_skipped": true,
+      "registered_in_litellm_config": true,
+      "status": "ok"
+    },
+    "quimera-qdrant-memory": {
+      "allowed_tools_validated_static": true,
+      "expected_tools": [
+        "qdrant_memory_health",
+        "qdrant_collection_list",
+        "qdrant_scroll_safe"
+      ],
+      "gateway_introspection_skipped": true,
+      "registered_in_litellm_config": true,
+      "status": "ok"
+    }
+  },
+  "models": {
+    "aliases": [],
+    "required_aliases_present": false,
+    "status": "fail"
+  },
+  "otel": {
+    "otel_sdk_disabled": false,
+    "service_name": "quimera"
+  },
+  "overall": "fail",
+  "schema_version": "quimera-pr08-integration-health-v1",
+  "services": {
+    "litellm": "fail",
+    "ollama": "ok",
+    "postgres": "fail",
+    "qdrant": "fail"
+  },
+  "warnings": [
+    "litellm model introspection unavailable"
+  ]
+}

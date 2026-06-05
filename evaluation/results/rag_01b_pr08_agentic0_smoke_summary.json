@@ -1,0 +1,65 @@
+{
+  "correlation_id": "42a0e1eee36f4e23a689bcc02fff3945",
+  "gateway": {
+    "host_only": true,
+    "litellm_base_url": "http://127.0.0.1:4000"
+  },
+  "generated_at": "2026-06-05T00:17:37.936277+00:00",
+  "hybridrag": {
+    "collection": "quimera_pr08_hybrid_smoke_pr08-c096621c20774e8bb5be360dc93c56d3",
+    "dense_ok": true,
+    "dense_recall_at_5": 1.0,
+    "hybrid_ok": true,
+    "hybrid_recall_at_5": 1.0,
+    "result_count": 3,
+    "sparse_ok": true
+  },
+  "latency": {
+    "embed_ms": 0.0,
+    "llm_ms": 0.0,
+    "mcp_ms": 0.0,
+    "p50_ms": null,
+    "p95_ms": null,
+    "pg_ms": 0.0,
+    "retrieval_ms": 0.0,
+    "total_ms": 78.98195800953545
+  },
+  "llm": {
+    "autonomous_tool_use_attempted": false,
+    "autonomous_tool_use_ok": null,
+    "completion_ok": false,
+    "model": "qwen3-local"
+  },
+  "mcp": {
+    "allowed_tools_enforced": true,
+    "postgres_tool_ok": true,
+    "qdrant_tool_ok": true,
+    "virtual_key_checked": false
+  },
+  "postgres_memory": {
+    "agent_state_roundtrip_ok": false,
+    "session_persistence_ok": false
+  },
+  "run_id": "pr08-c096621c20774e8bb5be360dc93c56d3",
+  "safety": {
+    "forbidden_fields_seen": [],
+    "raw_chunks_seen": false,
+    "secrets_seen": false,
+    "vectors_seen": false
+  },
+  "schema_version": "rag-01b-pr08-agentic0-smoke-v1",
+  "services": {
+    "litellm": "fail",
+    "ollama": "ok",
+    "postgres": "fail",
+    "qdrant": "fail"
+  },
+  "status": "skipped",
+  "trace_ids": [
+    "42a0e1eee36f4e23a689bcc02fff3945"
+  ],
+  "warnings": [
+    "litellm model introspection unavailable",
+    "litellm unavailable; LLM synthesis skipped"
+  ]
+}

@@ -42,6 +42,16 @@ CANONICAL_LLM_CACHE_COLLECTION = "quimera_llm_cache"
 CANONICAL_RAG_CACHE_COLLECTION = "quimera_query_cache"
 MCP_ALLOWED_PORTS = {8811, 8812}
 MCP_NAME_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+AGENTIC0_ALLOWED_TOOLS = {
+    "postgres_memory_health",
+    "postgres_recent_turns_get",
+    "postgres_agent_state_get",
+    "qdrant_memory_health",
+    "qdrant_collection_list",
+    "qdrant_scroll_safe",
+}
+AGENTIC0_OPTIONAL_WRITE_TOOLS = {"postgres_agent_state_upsert"}
+DESTRUCTIVE_TOOL_PARTS = ("delete", "recreate", "drop", "truncate", "admin", "store")
 CHAT_TIMEOUT_SECONDS = 120
 CHAT_STREAM_TIMEOUT_SECONDS = 45
 EMBED_TIMEOUT_SECONDS = 5
@@ -306,6 +316,31 @@ class McpServerEntry(BaseModel):
         return self
 
 
+class Agentic0ToolPolicy(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    virtual_key_name: str = "agentic0-smoke"
+    allowed_tools: tuple[str, ...]
+    optional_write_tools: tuple[str, ...] = ()
+    destructive_tools_allowed: bool = False
+
+    @model_validator(mode="after")
+    def validate_agentic0_tools(self) -> "Agentic0ToolPolicy":
+        tools = set(self.allowed_tools)
+        if "*" in tools:
+            raise ValueError("Agentic0 allowed_tools cannot contain wildcard")
+        if any(any(part in tool for part in DESTRUCTIVE_TOOL_PARTS) for tool in tools):
+            raise ValueError("Agentic0 allowed_tools cannot contain destructive tools")
+        if not AGENTIC0_ALLOWED_TOOLS.issubset(tools):
+            missing = sorted(AGENTIC0_ALLOWED_TOOLS - tools)
+            raise ValueError(f"Agentic0 allowed_tools missing required tools: {missing}")
+        if any(tool not in AGENTIC0_OPTIONAL_WRITE_TOOLS for tool in self.optional_write_tools):
+            raise ValueError("Agentic0 optional write tools must be explicitly approved")
+        if self.destructive_tools_allowed:
+            raise ValueError("Agentic0 destructive tools must remain disabled")
+        return self
+
+
 class ConfigRoot(BaseModel):
     model_config = ConfigDict(extra="allow")
 
@@ -313,6 +348,7 @@ class ConfigRoot(BaseModel):
     litellm_settings: LiteLLMSettings
     general_settings: GeneralSettings
     mcp_servers: dict[str, McpServerEntry] = Field(default_factory=dict)
+    agentic0_tool_policy: Agentic0ToolPolicy | None = None
 
     @model_validator(mode="after")
     def required_aliases_present(self) -> "ConfigRoot":

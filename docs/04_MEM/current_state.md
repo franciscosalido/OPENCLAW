@@ -4,8 +4,69 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Last updated:** 2026-06-04
-**Updated by:** Codex — RAG-01B PR-07 Benchmark, ADR and MCP memory gate
+**Last updated:** 2026-06-05
+**Updated by:** Codex — RAG-01B PR-08 Agentic0 integration smoke
+
+---
+
+## RAG-01B PR-08 — Agentic0 End-to-End System Integration Smoke
+
+Current branch: `rag-01b/pr-08-integration-smoke`
+
+Implemented:
+
+- Added deterministic PR-08 integration package under `integration/` with:
+  Agentic0 smoke contracts, LiteLLM-only Agentic0 client, integration health
+  report, synthetic HybridRAG fixture, safe report writer and CLI smoke runner.
+- Added PR-08 documentation:
+  `docs/specs/rag-01b/pr-08-agentic0-integration-smoke.md`,
+  `docs/rag/rag_01b_pr08_integration_report.md`, and
+  `docs/references/llm_harness_original_papers.md`.
+- Updated `docs/04_MEM/AGENT_CONTEXT.md` with final RAG-01B integration state,
+  service responsibility map, Level 0/local-only policy and PR-08 commands.
+- Added Agentic0 virtual-key/tool policy to host LiteLLM config and validator.
+  Allowed tools are explicit; wildcard and destructive tools are rejected.
+- Extended `scripts/start_quimera.sh` with:
+  `integration-health`, `mcp-status`, `agentic0-smoke`, `pr08-report`, and
+  `rag01b-final-gate`.
+- Added PR-08 unit and integration tests for Agentic0 contracts, health,
+  HybridRAG, MCP registration, no direct backend shortcuts, safe artifacts,
+  OTel trace safety, degraded-service behavior, latency reporting and final
+  closeout docs.
+- Generated PR-08 artifacts:
+  `evaluation/results/rag_01b_pr08_agentic0_smoke_summary.json`,
+  `evaluation/results/rag_01b_pr08_integration_health.json`, and
+  `evaluation/results/rag_01b_pr08_latency_summary.json`.
+
+Scope explicitly not changed:
+
+- No LiteLLM Docker service.
+- No remote provider fallback.
+- No Agentic0 direct Qdrant/Postgres/Ollama access.
+- No destructive Qdrant/Postgres operations outside guarded test-prefix
+  cleanup helpers.
+- No raw prompt, answer, chunk, document text, vector, embedding, secret or DSN
+  stored in PR-08 artifacts.
+
+Validation:
+
+- `bash -n scripts/start_quimera.sh`: clean.
+- `uv run python -m infra.litellm.config_validator`: success with one expected
+  qdrant-semantic policy warning.
+- PR-08 focused block: 23 passed / 1 skipped.
+- Full regression: 1787 passed / 59 skipped.
+- `uv run mypy --strict` on PR-08 modules/tests and LiteLLM validator:
+  success.
+- `uv run pyright` on PR-08 modules/tests and LiteLLM validator: 0 errors.
+- `uv run python -m integration.run_agentic0_smoke_test --json --allow-degraded`:
+  generated safe artifacts with status `skipped` because the local stack had
+  LiteLLM/Qdrant/Postgres down while Ollama was OK.
+
+Operational note:
+
+- Live end-to-end Agentic0 synthesis should be rerun after starting the full
+  local stack with LiteLLM host gateway, Qdrant and Postgres. The degraded
+  result is intentional and safe; it verifies no shortcut path bypasses LiteLLM.
 
 ---
 

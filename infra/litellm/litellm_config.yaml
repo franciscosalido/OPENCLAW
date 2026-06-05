@@ -189,6 +189,19 @@ mcp_servers:
     transport: streamable_http
     available_on_public_internet: false
 
+agentic0_tool_policy:
+  virtual_key_name: agentic0-smoke
+  allowed_tools:
+    - postgres_memory_health
+    - postgres_recent_turns_get
+    - postgres_agent_state_get
+    - qdrant_memory_health
+    - qdrant_collection_list
+    - qdrant_scroll_safe
+  optional_write_tools:
+    - postgres_agent_state_upsert
+  destructive_tools_allowed: false
+
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
   disable_spend_logs: true

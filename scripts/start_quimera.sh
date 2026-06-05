@@ -282,6 +282,60 @@ rag01b_acceptance() {
   fi
 }
 
+integration_health() {
+  load_env
+  if [[ "${STATUS_JSON}" -eq 1 ]]; then
+    uv run python -m integration.check_integration_health --json --write-artifact
+  else
+    uv run python -m integration.check_integration_health --write-artifact
+  fi
+}
+
+mcp_status() {
+  load_env
+  uv run python -m integration.check_integration_health --json --write-artifact
+}
+
+agentic0_smoke() {
+  load_env
+  if [[ "${STATUS_JSON}" -eq 1 ]]; then
+    uv run python -m integration.run_agentic0_smoke_test --json
+  else
+    uv run python -m integration.run_agentic0_smoke_test
+  fi
+}
+
+pr08_report() {
+  load_env
+  uv run python -m integration.run_agentic0_smoke_test --allow-degraded >/dev/null
+  printf 'PR-08 report: %s\n' "${REPO_ROOT}/docs/rag/rag_01b_pr08_integration_report.md"
+}
+
+rag01b_final_gate() {
+  load_env
+  local status_json
+  local health_json
+  local smoke_json
+  status_json="$(uv run python "${REPO_ROOT}/scripts/quimera_status.py" status --json || true)"
+  health_json="$(uv run python -m integration.check_integration_health --json --write-artifact || true)"
+  smoke_json="$(uv run python -m integration.run_agentic0_smoke_test --json --allow-degraded || true)"
+  if [[ "${STATUS_JSON}" -eq 1 ]]; then
+    uv run python - <<PY
+import json
+report = {
+    "schema_version": "rag01b-final-gate-v1",
+    "status": json.loads('''${status_json}''') if '''${status_json}'''.strip() else {},
+    "integration_health": json.loads('''${health_json}''') if '''${health_json}'''.strip() else {},
+    "agentic0_smoke": json.loads('''${smoke_json}''') if '''${smoke_json}'''.strip() else {},
+}
+report["overall"] = "ok" if report["integration_health"].get("overall") in {"ok", "degraded"} else "degraded"
+print(json.dumps(report, sort_keys=True))
+PY
+  else
+    printf 'rag01b-final-gate completed\n'
+  fi
+}
+
 logs() {
   compose logs -f --tail=200
 }
@@ -346,7 +400,8 @@ Usage: scripts/start_quimera.sh <command> [flags]
 Commands: start, stop, restart, status, logs, doctor, test, warmup, release,
           litellm-validate, litellm-render, litellm-start, litellm-stop,
           litellm-restart, litellm-smoke, litellm-audit, litellm-fingerprint,
-          litellm-benchmark, otel-doctor, rag01b-acceptance
+          litellm-benchmark, otel-doctor, rag01b-acceptance, mcp-status,
+          integration-health, agentic0-smoke, pr08-report, rag01b-final-gate
 Flags: --build --warmup --doctor --integration --release-models --no-docker --no-ollama --logs --json --help
 HELP
 }
@@ -357,6 +412,11 @@ case "${COMMAND}" in
   restart) RELEASE_MODELS=1; stop_stack; BUILD=1; RUN_WARMUP=1; RUN_DOCTOR=1; start_stack ;;
   status) status_stack ;;
   rag01b-acceptance) rag01b_acceptance ;;
+  integration-health) integration_health ;;
+  mcp-status) mcp_status ;;
+  agentic0-smoke) agentic0_smoke ;;
+  pr08-report) pr08_report ;;
+  rag01b-final-gate) rag01b_final_gate ;;
   logs) logs ;;
   doctor) doctor ;;
   test) run_tests ;;
