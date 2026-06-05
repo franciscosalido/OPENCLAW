@@ -29,6 +29,7 @@ def build_integration_health_report() -> dict[str, Any]:
     litellm_models = _litellm_models()
     config_mcp = _mcp_servers_from_config(Path("infra/litellm/litellm_config.yaml"))
     services = _service_statuses(base_status)
+    service_latencies_ms = _service_latencies(base_status)
     mcp_servers = {
         name: {
             "status": "ok" if name in config_mcp else "fail",
@@ -54,6 +55,7 @@ def build_integration_health_report() -> dict[str, Any]:
         "generated_at": datetime.now(UTC).isoformat(),
         "overall": overall,
         "services": services,
+        "service_latencies_ms": service_latencies_ms,
         "mcp_servers": mcp_servers,
         "models": litellm_models,
         "otel": {
@@ -73,6 +75,21 @@ def _service_statuses(base_status: dict[str, Any]) -> dict[str, ServiceStatus]:
             raw_status = raw.get("status") if isinstance(raw, dict) else "unknown"
             status = raw_status if isinstance(raw_status, str) else "unknown"
             result[name] = cast(ServiceStatus, status) if status in {"ok", "fail", "skipped", "unknown"} else "unknown"
+    return result
+
+
+def _service_latencies(base_status: dict[str, Any]) -> dict[str, float]:
+    raw_services = base_status.get("services", {})
+    result: dict[str, float] = {}
+    if not isinstance(raw_services, dict):
+        return result
+    for name in ("ollama", "litellm", "qdrant", "postgres"):
+        raw = raw_services.get(name, {})
+        if not isinstance(raw, dict):
+            continue
+        latency = raw.get("latency_ms")
+        if isinstance(latency, int | float) and latency >= 0:
+            result[name] = float(latency)
     return result
 
 

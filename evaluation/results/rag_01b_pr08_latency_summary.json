@@ -1,11 +1,14 @@
 {
   "embed_ms": 0.0,
-  "llm_ms": 0.0,
-  "mcp_ms": 0.0,
+  "llm_ms": 8.631,
+  "mcp_ms": 22.864,
+  "measurement_mode": "degraded_no_live_stack",
   "p50_ms": null,
   "p95_ms": null,
-  "pg_ms": 0.0,
-  "retrieval_ms": 0.0,
+  "p95_warning": "not_measured_stack_unavailable",
+  "pg_ms": 19.238,
+  "retrieval_ms": 3.626,
+  "sample_count": 0,
   "schema_version": "rag-01b-pr08-latency-v1",
-  "total_ms": 78.98195800953545
+  "total_ms": 86.25145799305756
 }

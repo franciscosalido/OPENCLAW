@@ -24,3 +24,13 @@ def test_agent_context_contains_rag01b_final_closeout() -> None:
         "Known gaps for the next sprint",
     ):
         assert token in text
+
+
+def test_start_quimera_final_gate_reads_json_from_temp_files() -> None:
+    script = Path("scripts/start_quimera.sh").read_text(encoding="utf-8")
+
+    assert "mktemp -d" in script
+    assert "load_json(sys.argv[1])" in script
+    assert "json.loads('''${status_json}''')" not in script
+    assert "json.loads('''${health_json}''')" not in script
+    assert "json.loads('''${smoke_json}''')" not in script

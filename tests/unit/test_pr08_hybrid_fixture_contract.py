@@ -26,6 +26,12 @@ def test_hybrid_fixture_contract_is_safe_and_deterministic() -> None:
     assert summary["sparse_ok"] is True
     assert summary["hybrid_ok"] is True
     assert summary["result_count"] > 0
+    assert summary["quality_mode"] == "offline_synthetic_fixture"
+    assert summary["quality_evidence"] == "deterministic_rrf_fixture"
+    assert summary["retrieval_backend"] == "qdrant_query_api_rrf_contract"
+    assert summary["live_quality_checked"] is False
+    assert summary["live_quality_required"] is True
+    assert summary["quality_warning"] == "live_nomic_hybrid_validation_required"
 
 
 def test_cleanup_rejects_real_collections() -> None:

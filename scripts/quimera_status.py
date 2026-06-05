@@ -76,9 +76,9 @@ def build_status_report() -> dict[str, object]:
     qdrant_ok, qdrant_ms, _ = _http_check("http://127.0.0.1:6333/readyz")
     if not qdrant_ok:
         qdrant_ok, qdrant_ms, _ = _http_check("http://127.0.0.1:6333/healthz")
-    litellm_ok, _, _ = _http_check("http://127.0.0.1:4000/health/readiness")
+    litellm_ok, litellm_ms, _ = _http_check("http://127.0.0.1:4000/health/readiness")
     litellm_docker_running = _litellm_docker_container_running()
-    ollama_ok, _, ollama_data = _http_check("http://127.0.0.1:11434/api/version")
+    ollama_ok, ollama_ms, ollama_data = _http_check("http://127.0.0.1:11434/api/version")
     postgres = _postgres_status()
     qdrant: ServiceReport = {
         "status": "ok" if qdrant_ok else "fail",
@@ -92,11 +92,13 @@ def build_status_report() -> dict[str, object]:
         "readiness": "ok" if litellm_ok else "fail",
         "host_only": not litellm_docker_running,
         "docker_container_running": litellm_docker_running,
+        "latency_ms": litellm_ms,
     }
     ollama: ServiceReport = {
         "status": "ok" if ollama_ok else "fail",
         "url": "http://127.0.0.1:11434",
         "version": str((ollama_data or {}).get("version", "unknown")),
+        "latency_ms": ollama_ms,
     }
     services: dict[str, ServiceReport] = {
         "postgres": postgres,

@@ -28,6 +28,12 @@ class HybridSearchResult:
 
 class HybridContractSummary(TypedDict):
     collection: str
+    quality_mode: str
+    quality_evidence: str
+    retrieval_backend: str
+    live_quality_checked: bool
+    live_quality_required: bool
+    quality_warning: str | None
     dense_ok: bool
     sparse_ok: bool
     hybrid_ok: bool
@@ -96,6 +102,12 @@ def hybrid_contract_summary(run_id: str = "unit") -> HybridContractSummary:
     expected = {"doc-memory", "doc-qdrant", "doc-agentic0"}
     return {
         "collection": collection_name(run_id),
+        "quality_mode": "offline_synthetic_fixture",
+        "quality_evidence": "deterministic_rrf_fixture",
+        "retrieval_backend": "qdrant_query_api_rrf_contract",
+        "live_quality_checked": False,
+        "live_quality_required": True,
+        "quality_warning": "live_nomic_hybrid_validation_required",
         "dense_ok": bool(dense),
         "sparse_ok": bool(sparse),
         "hybrid_ok": bool(hybrid),

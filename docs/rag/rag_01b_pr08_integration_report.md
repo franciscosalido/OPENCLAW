@@ -1,7 +1,7 @@
 # RAG-01B PR-08 Integration Report
 
 Status: `skipped`
-Correlation ID: `42a0e1eee36f4e23a689bcc02fff3945`
+Correlation ID: `eb12379051ee493baf9ca588399a8ccf`
 
 ## Services
 
@@ -12,9 +12,20 @@ Correlation ID: `42a0e1eee36f4e23a689bcc02fff3945`
 
 ## HybridRAG
 
+- quality_mode: `offline_synthetic_fixture`
+- quality_evidence: `deterministic_rrf_fixture`
+- live_quality_checked: `False`
+- quality_warning: `live_nomic_hybrid_validation_required`
 - dense_ok: `True`
 - sparse_ok: `True`
 - hybrid_ok: `True`
+
+## Latency
+
+- measurement_mode: `degraded_no_live_stack`
+- sample_count: `0`
+- p95_ms: `None`
+- p95_warning: `not_measured_stack_unavailable`
 
 ## Agentic0
 

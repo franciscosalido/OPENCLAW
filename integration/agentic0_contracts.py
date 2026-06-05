@@ -72,6 +72,12 @@ class ToolCallSummary:
 @dataclass(frozen=True, slots=True)
 class RetrievalSummary:
     collection: str
+    quality_mode: str
+    quality_evidence: str
+    retrieval_backend: str
+    live_quality_checked: bool
+    live_quality_required: bool
+    quality_warning: str | None
     dense_ok: bool
     sparse_ok: bool
     hybrid_ok: bool
@@ -97,6 +103,9 @@ class LLMCallSummary:
 @dataclass(frozen=True, slots=True)
 class LatencySummary:
     total_ms: float
+    measurement_mode: str = "live_probe"
+    sample_count: int = 1
+    p95_warning: str | None = None
     embed_ms: float = 0.0
     retrieval_ms: float = 0.0
     pg_ms: float = 0.0
@@ -158,11 +167,25 @@ def skipped_result(config: Agentic0SmokeConfig, *, reason: str) -> Agentic0Smoke
         correlation_id=uuid4().hex,
         services={},
         tool_calls=[],
-        retrieval=RetrievalSummary(config.qdrant_collection, False, False, False, 0.0, 0.0, 0),
+        retrieval=RetrievalSummary(
+            config.qdrant_collection,
+            "not_checked",
+            "skipped_before_retrieval",
+            "none",
+            False,
+            True,
+            "live_nomic_hybrid_validation_required",
+            False,
+            False,
+            False,
+            0.0,
+            0.0,
+            0,
+        ),
         postgres_memory=PostgresMemorySummary(False, False),
         llm=LLMCallSummary(config.litellm_model, False),
         final_answer_ok=False,
-        latency=LatencySummary(0.0),
+        latency=LatencySummary(0.0, measurement_mode="not_measured", sample_count=0, p95_warning="not_measured_stack_unavailable"),
         safety=SafetySummary(),
         trace_ids=[],
         warnings=[reason],

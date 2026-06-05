@@ -44,6 +44,12 @@ O deterministic smoke é obrigatório e seguro. Autonomous tool-use é opt-in vi
 A fixture PR-08 usa coleção sintética `quimera_pr08_hybrid_smoke_<run_id>`,
 vetores `text-dense` e `text-sparse`, e RRF determinístico.
 
+O Recall@5 reportado pela fixture é evidência determinística offline, não
+qualidade live do modelo `nomic-embed-text`. O artefato deve marcar
+`quality_mode=offline_synthetic_fixture`, `live_quality_checked=false` e
+`live_quality_required=true` até a stack completa validar Qdrant HybridRAG com
+o encoder local vivo.
+
 ## Postgres Memory Context
 
 O smoke valida o contrato de sessão e estado via MCP/health. Writes reais são
@@ -83,8 +89,11 @@ determinístico não faz retry infinito e não usa bypass direto.
 
 ## Latency Budget End-to-End
 
-O relatório mede `total_ms`, `mcp_ms` e `llm_ms`. Orçamentos p95 são
-documentais no PR-08 e não hard gate por padrão.
+O relatório mede `total_ms`, `mcp_ms` e `llm_ms`. O p95 só é preenchido quando
+a stack essencial está online. Sem stack live, o artefato deve marcar
+`measurement_mode=degraded_no_live_stack`, `sample_count=0` e
+`p95_warning=not_measured_stack_unavailable`. Quando a stack está online,
+qualquer `p95_ms > 500` deve gerar `p95_warning=p95_exceeds_500ms`.
 
 ## LLM Harness Methodology
 

@@ -5,7 +5,7 @@
 > meaningful sessions.
 
 **Last updated:** 2026-06-05
-**Updated by:** Codex — RAG-01B PR-08 Agentic0 integration smoke
+**Updated by:** Codex — RAG-01B PR-08 RC-01 risk closure
 
 ---
 
@@ -67,6 +67,35 @@ Operational note:
 - Live end-to-end Agentic0 synthesis should be rerun after starting the full
   local stack with LiteLLM host gateway, Qdrant and Postgres. The degraded
   result is intentional and safe; it verifies no shortcut path bypasses LiteLLM.
+
+### RAG-01B PR-08 RC-01 — Reviewer Risk Closure
+
+Implemented:
+
+- HybridRAG artifacts now explicitly mark Recall@5 as
+  `offline_synthetic_fixture`, require live local validation, and distinguish
+  deterministic RRF fixture evidence from real `nomic-embed-text` quality.
+- `json_has_no_forbidden_fields` now delegates to the AST-aware field scanner,
+  so audit flags such as `secrets_seen` do not trigger false positives while
+  unsafe field names remain blocked.
+- `rag01b-final-gate` no longer interpolates JSON into a Python heredoc. It
+  writes status, integration-health and smoke JSON to temporary files and loads
+  them by path.
+- Latency artifacts now include `measurement_mode`, `sample_count` and
+  `p95_warning`. Offline/degraded runs set `p95_ms=null` with
+  `not_measured_stack_unavailable`; live p95 over 500ms emits
+  `p95_exceeds_500ms`.
+- `scripts/quimera_status.py` now captures LiteLLM and Ollama healthcheck
+  latency, and integration health includes safe per-service latency metadata.
+
+Validation:
+
+- PR-08 focused RC block: 27 passed / 1 skipped.
+- Full regression: 1791 passed / 59 skipped.
+- `uv run mypy --strict` on PR-08 modules/tests and status script: success.
+- `uv run pyright` on PR-08 modules/tests and status script: 0 errors.
+- `bash -n scripts/start_quimera.sh`: clean.
+- `git diff --check`: clean.
 
 ---
 

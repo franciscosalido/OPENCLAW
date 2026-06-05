@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-05T00:13:51.083927+00:00",
+  "generated_at": "2026-06-05T00:33:13.775832+00:00",
   "mcp_servers": {
     "quimera-postgres-memory": {
       "allowed_tools_validated_static": true,
@@ -35,6 +35,12 @@
   },
   "overall": "fail",
   "schema_version": "quimera-pr08-integration-health-v1",
+  "service_latencies_ms": {
+    "litellm": 8.631,
+    "ollama": 4.891,
+    "postgres": 19.238,
+    "qdrant": 3.626
+  },
   "services": {
     "litellm": "fail",
     "ollama": "ok",

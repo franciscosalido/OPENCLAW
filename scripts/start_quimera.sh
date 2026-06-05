@@ -313,20 +313,41 @@ pr08_report() {
 
 rag01b_final_gate() {
   load_env
-  local status_json
-  local health_json
-  local smoke_json
-  status_json="$(uv run python "${REPO_ROOT}/scripts/quimera_status.py" status --json || true)"
-  health_json="$(uv run python -m integration.check_integration_health --json --write-artifact || true)"
-  smoke_json="$(uv run python -m integration.run_agentic0_smoke_test --json --allow-degraded || true)"
+  local tmp_dir
+  local status_file
+  local health_file
+  local smoke_file
+  tmp_dir="$(mktemp -d)"
+  trap 'rm -rf "${tmp_dir}"' RETURN
+  status_file="${tmp_dir}/status.json"
+  health_file="${tmp_dir}/integration_health.json"
+  smoke_file="${tmp_dir}/agentic0_smoke.json"
+  uv run python "${REPO_ROOT}/scripts/quimera_status.py" status --json >"${status_file}" || true
+  uv run python -m integration.check_integration_health --json --write-artifact >"${health_file}" || true
+  uv run python -m integration.run_agentic0_smoke_test --json --allow-degraded >"${smoke_file}" || true
   if [[ "${STATUS_JSON}" -eq 1 ]]; then
-    uv run python - <<PY
+    uv run python - "${status_file}" "${health_file}" "${smoke_file}" <<'PY'
 import json
+import sys
+
+def load_json(path: str) -> dict:
+    try:
+        content = open(path, encoding="utf-8").read().strip()
+    except OSError:
+        return {}
+    if not content:
+        return {}
+    try:
+        parsed = json.loads(content)
+    except ValueError:
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
 report = {
     "schema_version": "rag01b-final-gate-v1",
-    "status": json.loads('''${status_json}''') if '''${status_json}'''.strip() else {},
-    "integration_health": json.loads('''${health_json}''') if '''${health_json}'''.strip() else {},
-    "agentic0_smoke": json.loads('''${smoke_json}''') if '''${smoke_json}'''.strip() else {},
+    "status": load_json(sys.argv[1]),
+    "integration_health": load_json(sys.argv[2]),
+    "agentic0_smoke": load_json(sys.argv[3]),
 }
 report["overall"] = "ok" if report["integration_health"].get("overall") in {"ok", "degraded"} else "degraded"
 print(json.dumps(report, sort_keys=True))

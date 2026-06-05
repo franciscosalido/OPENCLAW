@@ -47,9 +47,14 @@ def is_safe_trace_id(value: str) -> bool:
 
 
 def json_has_no_forbidden_fields(value: Mapping[str, Any]) -> bool:
-    encoded = json.dumps(value, sort_keys=True)
-    lowered = encoded.lower()
-    return not any(part in lowered for part in FORBIDDEN_FIELD_PARTS)
+    """Return whether a JSON-like object has forbidden field names.
+
+    This mirrors the AST-aware scanner used by production artifact writers.
+    It intentionally checks keys, not serialized values, so audit flags such
+    as ``secrets_seen`` remain allowed while real unsafe fields are rejected.
+    """
+    json.dumps(value, sort_keys=True)
+    return not find_forbidden_fields(value)
 
 
 def _walk(value: object, found: set[str]) -> None:
