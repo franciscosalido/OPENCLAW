@@ -1,0 +1,8 @@
+{
+  "agentic0_p95_ms": 5000.0,
+  "litellm_p95_ms": 500.0,
+  "postgres_p95_ms": 50.0,
+  "qdrant_p95_ms": 100.0,
+  "regression_multiplier": 2.0,
+  "schema_version": "quimera-latency-baseline-v1"
+}

@@ -1,0 +1,48 @@
+{
+  "agentic0": {
+    "latency_ms": 0.0,
+    "status": "skipped",
+    "tool_calls": 0
+  },
+  "baseline_comparison": {
+    "baseline_file": "baseline/rag01b_latency_baseline.json",
+    "exit_code": 0,
+    "regressions": []
+  },
+  "generated_at": "2026-06-05T01:01:28.472109+00:00",
+  "latency": {
+    "agentic0_p95_ms": 0.0,
+    "litellm_p95_ms": 9.975,
+    "postgres_p95_ms": 87.742,
+    "qdrant_p95_ms": 28.751
+  },
+  "mode": "quick",
+  "overall": "degraded",
+  "postgres": {
+    "backup": {
+      "created": false,
+      "manifest_path": null,
+      "restore_verified": null
+    },
+    "pg_stat_statements": {
+      "enabled": false,
+      "top_query_count": 0
+    }
+  },
+  "schema_version": "quimera-pr09-smoke-summary-v1",
+  "services": {
+    "litellm": "fail",
+    "mcp_postgres": {
+      "status": "ok"
+    },
+    "mcp_qdrant": {
+      "status": "ok"
+    },
+    "ollama": "ok",
+    "postgres": "ok",
+    "qdrant": "ok"
+  },
+  "warnings": [
+    "litellm model introspection unavailable"
+  ]
+}

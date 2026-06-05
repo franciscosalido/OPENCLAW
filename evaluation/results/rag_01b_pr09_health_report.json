@@ -1,0 +1,50 @@
+{
+  "active_sessions_24h": null,
+  "backup": {
+    "latest_manifest": null,
+    "restore_verified": null
+  },
+  "baseline_comparison": {
+    "baseline_file": "baseline/rag01b_latency_baseline.json",
+    "exit_code": 0,
+    "regressions": [
+      {
+        "limit": 100.0,
+        "metric": "postgres_p95_ms",
+        "value": 127.128
+      }
+    ]
+  },
+  "generated_at": "2026-06-05T01:01:27.477764+00:00",
+  "latency": {
+    "agentic0_p95_ms": 0.0,
+    "litellm_p95_ms": 5.44,
+    "postgres_p95_ms": 127.128,
+    "qdrant_p95_ms": 26.002
+  },
+  "pg_stat_statements": {
+    "available": false,
+    "installed": false,
+    "max": 0,
+    "track": "unknown",
+    "track_io_timing": "unknown"
+  },
+  "schema_version": "quimera-health-report-v1",
+  "services": {
+    "litellm": "fail",
+    "ollama": "ok",
+    "postgres": "ok",
+    "qdrant": "ok"
+  },
+  "table_sizes": {},
+  "top_queries": [],
+  "versions": {
+    "postgres": "18.4",
+    "python": "3.12",
+    "qdrant": "1.18.x"
+  },
+  "warnings": [
+    "litellm model introspection unavailable",
+    "postgres DSN not configured"
+  ]
+}
