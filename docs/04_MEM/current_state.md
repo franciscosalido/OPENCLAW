@@ -4,8 +4,101 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Last updated:** 2026-06-05
-**Updated by:** Codex — RAG-01B PR-08 RC-01 risk closure
+**Last updated:** 2026-06-06
+**Updated by:** Codex — RAG-01B PR-09 RC-01 operational smoke hardening
+
+---
+
+## RAG-01B PR-09 — Operational Hardening + Smoke CLI
+
+Current branch: `rag-01b/pr-09-operational-hardening-smoke`
+Base branch: `rag-01b/pr-08-integration-smoke`
+
+Implemented:
+
+- Added accepted working memory checkpoint ADR:
+  `docs/ADR/ADR-004-working-memory-checkpoint-contract.md`.
+- Added `docs/04_MEM/WORKING_MEMORY_CONTRACT.md`, explicitly deferring the
+  fast working memory backend and accepting pgvector only as durable checkpoint.
+- Added PR-09 SDD, recovery runbooks, PostgreSQL backup/restore runbook and
+  15-minute agent onboarding doc.
+- Added local PostgreSQL backup helpers:
+  `infra/postgres/backup.sh`, `restore_verify.sh`, `backup_manifest.py` and
+  `backup_config.env.example`.
+- Added pg_stat_statements operational config and diagnostics:
+  Postgres compose command settings, initdb extension bootstrap,
+  `infra/postgres/sql/010_pg_stat_statements_diagnostics.sql` and
+  `infra/postgres/pg_stat_report.py`.
+- Added working memory checkpoint SQL contract:
+  `infra/postgres/sql/011_working_memory_checkpoint_contract.sql`.
+- Added PR-09 smoke CLI:
+  `./run_smoke.sh` plus `scripts/start_quimera.sh smoke`.
+- Added PR-09 smoke summary and manual health report:
+  `integration/smoke_summary.py` and `integration/health_report.py`.
+- Added conservative latency baseline:
+  `baseline/rag01b_latency_baseline.json`.
+- Generated PR-09 artifacts:
+  `evaluation/results/rag_01b_pr09_smoke_summary.json`,
+  `evaluation/results/rag_01b_pr09_health_report.json` and
+  `evaluation/results/rag_01b_pr09_pg_stat_report.json`.
+
+Scope explicitly not changed:
+
+- No final fast working memory backend selected.
+- No Redis implementation.
+- No Qdrant in-memory implementation.
+- No Python vector memory implementation.
+- No cloud/offsite backup, PITR, replication or dashboard.
+- No provider remoto.
+- No `down -v`, `docker system prune` or volume deletion.
+- No destructive schema migration.
+
+Validation:
+
+- PR-09 unit block: 21 passed.
+- PR-09 integration block: 3 passed / 2 skipped.
+- PR-08 + PR-09 focused block: 51 passed / 3 skipped.
+- Full regression: 1816 passed / 60 skipped.
+- `uv run mypy --strict .`: success.
+- `uv run pyright`: 0 errors.
+- `bash -n run_smoke.sh infra/postgres/backup.sh infra/postgres/restore_verify.sh scripts/start_quimera.sh`: clean.
+- `./run_smoke.sh --quick --json --no-build --timeout 5 --allow-degraded`:
+  generated PR-09 smoke summary with `overall=degraded` because LiteLLM was
+  unavailable while local Postgres/Qdrant/Ollama healthchecks were OK.
+
+Operational note:
+
+- Live backup/restore and live pg_stat integration tests skipped because no
+  Postgres DSN was exported in the shell. The static contract, scripts,
+  manifest logic and degraded reports are covered locally.
+
+### RAG-01B PR-09 RC-01 — Integration + Diagnostic Final Closure
+
+Implemented:
+
+- Hardened `integration/smoke_summary.py::render_summary_table` so service
+  values can be either strings (`"ok"`, `"fail"`) or dictionaries with
+  `status`.
+- Added `status` as a compatibility alias for the canonical smoke-summary
+  `overall` field, and documented that contract in the PR-09 SDD.
+- Refactored PR-09 live subprocess tests to invoke modules with
+  `sys.executable` and explicit `PYTHONPATH`, avoiding `uv run` inside
+  mounted review sandboxes.
+- Added a PR-09 GitHub Actions workflow that runs the required unit contracts
+  on Python 3.12 inside `.venv`.
+- Added an explicit irreversible-data-loss warning around manual
+  `docker volume rm` reset instructions in `infra/README.md`.
+- Regenerated PR-09 health and smoke summary artifacts with the new
+  `status == overall` contract.
+
+Validation:
+
+- PR-09 focused block: 28 passed / 2 skipped.
+- Full regression: 1819 passed / 61 skipped.
+- `uv run mypy --strict .`: success.
+- `uv run pyright`: 0 errors.
+- `bash -n run_smoke.sh infra/postgres/backup.sh infra/postgres/restore_verify.sh scripts/start_quimera.sh`: clean.
+- `git diff --check`: clean.
 
 ---
 

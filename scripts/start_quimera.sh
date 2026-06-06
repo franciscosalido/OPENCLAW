@@ -357,6 +357,14 @@ PY
   fi
 }
 
+pr09_smoke() {
+  local args=(--quick)
+  if [[ "${STATUS_JSON}" -eq 1 ]]; then
+    args+=(--json)
+  fi
+  "${REPO_ROOT}/run_smoke.sh" "${args[@]}"
+}
+
 logs() {
   compose logs -f --tail=200
 }
@@ -421,7 +429,7 @@ Usage: scripts/start_quimera.sh <command> [flags]
 Commands: start, stop, restart, status, logs, doctor, test, warmup, release,
           litellm-validate, litellm-render, litellm-start, litellm-stop,
           litellm-restart, litellm-smoke, litellm-audit, litellm-fingerprint,
-          litellm-benchmark, otel-doctor, rag01b-acceptance, mcp-status,
+          litellm-benchmark, otel-doctor, rag01b-acceptance, smoke, mcp-status,
           integration-health, agentic0-smoke, pr08-report, rag01b-final-gate
 Flags: --build --warmup --doctor --integration --release-models --no-docker --no-ollama --logs --json --help
 HELP
@@ -432,6 +440,7 @@ case "${COMMAND}" in
   stop) stop_stack ;;
   restart) RELEASE_MODELS=1; stop_stack; BUILD=1; RUN_WARMUP=1; RUN_DOCTOR=1; start_stack ;;
   status) status_stack ;;
+  smoke) pr09_smoke ;;
   rag01b-acceptance) rag01b_acceptance ;;
   integration-health) integration_health ;;
   mcp-status) mcp_status ;;

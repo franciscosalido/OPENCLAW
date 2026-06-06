@@ -1,0 +1,15 @@
+{
+  "generated_at": "2026-06-05T01:00:07.109142+00:00",
+  "pg_stat_statements": {
+    "available": false,
+    "installed": false,
+    "max": 0,
+    "track": "unknown",
+    "track_io_timing": "unknown"
+  },
+  "schema_version": "quimera-pg-stat-report-v1",
+  "top_queries": [],
+  "warnings": [
+    "postgres DSN not configured"
+  ]
+}
