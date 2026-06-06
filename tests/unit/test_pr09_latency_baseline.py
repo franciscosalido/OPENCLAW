@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from integration.smoke_summary import compare_latency_baseline
+import pytest
+
+from integration.smoke_summary import build_smoke_summary, compare_latency_baseline
 
 
 BASELINE = Path("baseline/rag01b_latency_baseline.json")
@@ -28,3 +30,20 @@ def test_latency_regression_detection_modes() -> None:
     assert quick["regressions"]
     assert quick["exit_code"] == 0
     assert full["exit_code"] == 5
+
+
+def test_smoke_summary_exposes_status_alias_for_overall(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "integration.smoke_summary.build_integration_health_report",
+        lambda: {
+            "overall": "ok",
+            "services": {"postgres": "ok", "qdrant": "ok", "litellm": "ok", "ollama": "ok"},
+            "mcp_servers": {},
+            "service_latencies_ms": {},
+            "warnings": [],
+        },
+    )
+    summary = build_smoke_summary(mode="quick")
+
+    assert summary["overall"] == "ok"
+    assert summary["status"] == summary["overall"]

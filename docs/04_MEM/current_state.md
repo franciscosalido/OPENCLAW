@@ -4,8 +4,8 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Last updated:** 2026-06-05
-**Updated by:** Codex — RAG-01B PR-09 operational hardening smoke
+**Last updated:** 2026-06-06
+**Updated by:** Codex — RAG-01B PR-09 RC-01 operational smoke hardening
 
 ---
 
@@ -71,6 +71,34 @@ Operational note:
 - Live backup/restore and live pg_stat integration tests skipped because no
   Postgres DSN was exported in the shell. The static contract, scripts,
   manifest logic and degraded reports are covered locally.
+
+### RAG-01B PR-09 RC-01 — Integration + Diagnostic Final Closure
+
+Implemented:
+
+- Hardened `integration/smoke_summary.py::render_summary_table` so service
+  values can be either strings (`"ok"`, `"fail"`) or dictionaries with
+  `status`.
+- Added `status` as a compatibility alias for the canonical smoke-summary
+  `overall` field, and documented that contract in the PR-09 SDD.
+- Refactored PR-09 live subprocess tests to invoke modules with
+  `sys.executable` and explicit `PYTHONPATH`, avoiding `uv run` inside
+  mounted review sandboxes.
+- Added a PR-09 GitHub Actions workflow that runs the required unit contracts
+  on Python 3.12 inside `.venv`.
+- Added an explicit irreversible-data-loss warning around manual
+  `docker volume rm` reset instructions in `infra/README.md`.
+- Regenerated PR-09 health and smoke summary artifacts with the new
+  `status == overall` contract.
+
+Validation:
+
+- PR-09 focused block: 28 passed / 2 skipped.
+- Full regression: 1819 passed / 61 skipped.
+- `uv run mypy --strict .`: success.
+- `uv run pyright`: 0 errors.
+- `bash -n run_smoke.sh infra/postgres/backup.sh infra/postgres/restore_verify.sh scripts/start_quimera.sh`: clean.
+- `git diff --check`: clean.
 
 ---
 

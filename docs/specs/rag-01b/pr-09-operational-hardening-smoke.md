@@ -62,6 +62,9 @@ Modes:
 The script does not use `down -v`, `docker system prune`, collection deletion
 or database recreation of the primary database.
 
+The smoke summary keeps `overall` as the canonical gate result and also emits
+`status` as an identical compatibility alias for external consumers.
+
 ## Health Report
 
 `python -m integration.health_report` creates JSON and Markdown reports with

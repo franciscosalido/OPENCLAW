@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -12,8 +14,11 @@ pytestmark = pytest.mark.integration
 def test_pr09_health_report_live_outputs_files(tmp_path: Path) -> None:
     json_path = tmp_path / "health.json"
     md_path = tmp_path / "health.md"
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(Path.cwd())
     result = subprocess.run(
-        ["uv", "run", "python", "-m", "integration.health_report", "--json", str(json_path), "--markdown", str(md_path)],
+        [sys.executable, "-m", "integration.health_report", "--json", str(json_path), "--markdown", str(md_path)],
+        env=env,
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,

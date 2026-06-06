@@ -50,6 +50,7 @@ def build_smoke_summary(*, mode: Mode, agentic0: dict[str, Any] | None = None, p
         "generated_at": datetime.now(UTC).isoformat(),
         "mode": mode,
         "overall": overall,
+        "status": overall,
         "services": {
             **health.get("services", {}),
             "mcp_postgres": {"status": health.get("mcp_servers", {}).get("quimera-postgres-memory", {}).get("status", "unknown")},
@@ -91,17 +92,25 @@ def render_summary_table(summary: dict[str, Any]) -> str:
     services = summary.get("services", {})
     for component, key in (("Postgres", "postgres"), ("Qdrant", "qdrant"), ("LiteLLM", "litellm"), ("MCP", "mcp_postgres"), ("Agentic0", "agentic0")):
         if component == "Agentic0":
-            status = summary.get("agentic0", {}).get("status", "unknown")
+            status = _status_from_value(summary.get("agentic0", {}))
             p95 = latency.get("agentic0_p95_ms", 0.0)
         elif component == "MCP":
-            status = services.get("mcp_postgres", {}).get("status", "unknown")
+            status = _status_from_value(services.get("mcp_postgres", {}))
             p95 = 0.0
         else:
-            service = services.get(key, {})
-            status = service.get("status", service if isinstance(service, str) else "unknown")
+            status = _status_from_value(services.get(key, {}))
             p95 = latency.get(f"{key}_p95_ms", 0.0)
         rows.append(f"| {component} | {status} | 0.0 | {p95} | local-first |")
     return "\n".join(rows)
+
+
+def _status_from_value(value: object) -> str:
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        status = value.get("status", "unknown")
+        return status if isinstance(status, str) else "unknown"
+    return "unknown"
 
 
 def _latencies_from_health(health: dict[str, Any]) -> dict[str, float]:

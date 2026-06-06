@@ -15,3 +15,12 @@ def test_quimera_recovery_runbook_contains_operational_steps() -> None:
 
     for token in ("./run_smoke.sh --quick", "pg_stat_report", "Agentic0", "working memory", "restore"):
         assert token in text
+
+
+def test_infra_readme_warns_volume_rm_is_irreversible() -> None:
+    text = Path("infra/README.md").read_text(encoding="utf-8")
+
+    assert "docker volume rm" in text
+    assert "permanently deletes" in text
+    assert "irreversible" in text
+    assert "backup/restore verification" in text

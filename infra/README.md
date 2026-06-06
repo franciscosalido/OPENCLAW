@@ -35,6 +35,11 @@ named volumes are preserved. This is intentional for local memory durability.
 Full reset of corrupted local volumes is manual and operator-owned. Stop the
 stack first, then remove only the intended named volume, for example:
 
+WARNING: `docker volume rm` permanently deletes the selected local data volume.
+This is irreversible without a separate backup. Run it only after a successful
+backup/restore verification or when the human operator explicitly accepts data
+loss for that local dev volume.
+
 ```bash
 ./scripts/start_quimera.sh stop --release-models
 docker volume rm quimera-local_postgres_data

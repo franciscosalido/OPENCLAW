@@ -7,14 +7,20 @@
   "baseline_comparison": {
     "baseline_file": "baseline/rag01b_latency_baseline.json",
     "exit_code": 0,
-    "regressions": []
+    "regressions": [
+      {
+        "limit": 100.0,
+        "metric": "postgres_p95_ms",
+        "value": 125.599
+      }
+    ]
   },
-  "generated_at": "2026-06-05T01:01:28.472109+00:00",
+  "generated_at": "2026-06-06T22:55:24.768364+00:00",
   "latency": {
     "agentic0_p95_ms": 0.0,
-    "litellm_p95_ms": 9.975,
-    "postgres_p95_ms": 87.742,
-    "qdrant_p95_ms": 28.751
+    "litellm_p95_ms": 3.253,
+    "postgres_p95_ms": 125.599,
+    "qdrant_p95_ms": 30.301
   },
   "mode": "quick",
   "overall": "degraded",
@@ -42,6 +48,7 @@
     "postgres": "ok",
     "qdrant": "ok"
   },
+  "status": "degraded",
   "warnings": [
     "litellm model introspection unavailable"
   ]
