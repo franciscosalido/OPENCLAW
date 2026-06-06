@@ -14,7 +14,7 @@ def test_pr09_ci_runs_required_suites_on_python312_venv() -> None:
 
     assert workflow["jobs"]["pr09-python312"]["runs-on"] == "ubuntu-latest"
     assert 'python-version: "3.12"' in text
-    assert "astral-sh/setup-uv@v8" in text
+    assert "astral-sh/setup-uv@v7" in text
     assert "uv venv --python 3.12 .venv" in text
     assert "uv sync --python .venv/bin/python --frozen" in text
     assert ".venv/bin/python -m pytest" in text

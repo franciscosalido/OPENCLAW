@@ -11,16 +11,16 @@
       {
         "limit": 100.0,
         "metric": "postgres_p95_ms",
-        "value": 125.599
+        "value": 123.226
       }
     ]
   },
-  "generated_at": "2026-06-06T22:55:24.768364+00:00",
+  "generated_at": "2026-06-06T23:24:24.363234+00:00",
   "latency": {
     "agentic0_p95_ms": 0.0,
-    "litellm_p95_ms": 3.253,
-    "postgres_p95_ms": 125.599,
-    "qdrant_p95_ms": 30.301
+    "litellm_p95_ms": 3.189,
+    "postgres_p95_ms": 123.226,
+    "qdrant_p95_ms": 27.61
   },
   "mode": "quick",
   "overall": "degraded",
