@@ -326,3 +326,22 @@ series, K-lines, quantitative features, model runs and Kronos forecasts.
 canonical datastore. Kronos has no separate persistent memory and must read
 derived K-line frames from PostgreSQL/TimescaleDB projections and write
 forecasts/model run metadata back into PostgreSQL/TimescaleDB.
+
+---
+
+## ADR-005 - Qdrant Working Memory with pgvector Checkpoints
+
+**Date:** 2026-06-06 | **Status:** Accepted | **File:** `docs/adr/ADR-005-qdrant-working-memory-pgvector-checkpoints.md`
+
+**Decision:** Qdrant is the initial hot backend for QUIMERA Working Memory.
+The default collection is `quimera_working_memory`, named vector is
+`work-dense`, vector size is `768`, distance is `Cosine`, and Qdrant vector
+storage is `on_disk=false`.
+
+**Checkpoint rule:** Postgres/pgvector stores durable checkpoints in
+`working_memory_snapshots` and `working_memory_snapshot_points`. pgvector is a
+restore/checkpoint layer, not the hot path.
+
+**Boundary:** This does not decide Redis, Dragonfly or Python/RAM backends
+forever. HybridRAG, semantic cache and Postgres/Timescale canonical memory keep
+their existing responsibilities.

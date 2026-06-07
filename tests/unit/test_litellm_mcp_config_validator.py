@@ -17,12 +17,13 @@ def test_litellm_accepts_loopback_mcp_servers() -> None:
     assert "quimera-postgres-memory" in cfg.mcp_servers
     assert cfg.mcp_servers["quimera-postgres-memory"].url == "http://127.0.0.1:8811/mcp"
     assert cfg.mcp_servers["quimera-qdrant-memory"].available_on_public_internet is False
+    assert cfg.mcp_servers["quimera-working-memory"].url == "http://127.0.0.1:8813/mcp"
 
 
 def test_litellm_rejects_public_mcp_server_url() -> None:
     raw = deepcopy(load_raw_config(CONFIG))
     raw["mcp_servers"]["bad-public"] = {
-        "url": "http://0.0.0.0:8811/mcp",
+        "url": "http://0.0.0.0:8813/mcp",
         "transport": "streamable_http",
         "available_on_public_internet": False,
     }
@@ -34,7 +35,7 @@ def test_litellm_rejects_public_mcp_server_url() -> None:
 def test_litellm_rejects_sse_and_public_internet() -> None:
     raw = deepcopy(load_raw_config(CONFIG))
     raw["mcp_servers"]["bad-sse"] = {
-        "url": "http://127.0.0.1:8811/mcp",
+        "url": "http://127.0.0.1:8813/mcp",
         "transport": "sse",
         "available_on_public_internet": True,
     }

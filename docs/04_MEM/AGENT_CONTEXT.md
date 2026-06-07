@@ -124,6 +124,40 @@ RAG-0 is **local only**. No remote AI fallback in this sprint.
 - Remote AI: disabled. Sanitized fallback only after explicit sprint approval.
 - GitHub is the source of truth for issues, branches, PRs, and merge state.
 
+### RAG-01B Final Integration State
+
+RAG-01B closes with PostgreSQL 18.4, TimescaleDB, Qdrant 1.18.x, LiteLLM host,
+Ollama/Qwen3, MCP Streamable HTTP and OTel as the canonical local stack.
+
+Responsibility map:
+
+- Postgres/Timescale: sessions, turns, agent_states, temporal memory and
+  financial temporal truth.
+- Qdrant: dense, sparse and hybrid vector retrieval plus semantic cache
+  storage.
+- LiteLLM: host-only gateway for model calls and MCP registration; it is not a
+  vector database.
+- MCP: agent interface over memory backends, not a source of truth.
+- OTel: safe metadata, correlation ids and latency signals only.
+
+Minimum RAG-01B final commands:
+
+```bash
+./scripts/start_quimera.sh status --json
+./scripts/start_quimera.sh integration-health --json
+./scripts/start_quimera.sh agentic0-smoke --json
+```
+
+Agentic0 memory access policy: runtime Agentic0 accesses memory only through
+LiteLLM/MCP. It must not call Postgres, Qdrant or Ollama directly.
+
+Secrecy policy: Level 0 data never leaves the machine. Do not store prompt,
+response, chunk, vector, raw payload, DSN or secrets in logs, spans or
+artifacts.
+
+Known gaps for the next sprint: multi-agent permission policy, KRONOS,
+autonomous tool-use hardening, full evaluation harness and shadow mode.
+
 Runtime env vars (must be set locally before running OpenClaw):
 
 | Var | Default | Notes |

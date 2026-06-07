@@ -282,6 +282,89 @@ rag01b_acceptance() {
   fi
 }
 
+integration_health() {
+  load_env
+  if [[ "${STATUS_JSON}" -eq 1 ]]; then
+    uv run python -m integration.check_integration_health --json --write-artifact
+  else
+    uv run python -m integration.check_integration_health --write-artifact
+  fi
+}
+
+mcp_status() {
+  load_env
+  uv run python -m integration.check_integration_health --json --write-artifact
+}
+
+agentic0_smoke() {
+  load_env
+  if [[ "${STATUS_JSON}" -eq 1 ]]; then
+    uv run python -m integration.run_agentic0_smoke_test --json
+  else
+    uv run python -m integration.run_agentic0_smoke_test
+  fi
+}
+
+pr08_report() {
+  load_env
+  uv run python -m integration.run_agentic0_smoke_test --allow-degraded >/dev/null
+  printf 'PR-08 report: %s\n' "${REPO_ROOT}/docs/rag/rag_01b_pr08_integration_report.md"
+}
+
+rag01b_final_gate() {
+  load_env
+  local tmp_dir
+  local status_file
+  local health_file
+  local smoke_file
+  tmp_dir="$(mktemp -d)"
+  trap 'rm -rf "${tmp_dir}"' RETURN
+  status_file="${tmp_dir}/status.json"
+  health_file="${tmp_dir}/integration_health.json"
+  smoke_file="${tmp_dir}/agentic0_smoke.json"
+  uv run python "${REPO_ROOT}/scripts/quimera_status.py" status --json >"${status_file}" || true
+  uv run python -m integration.check_integration_health --json --write-artifact >"${health_file}" || true
+  uv run python -m integration.run_agentic0_smoke_test --json --allow-degraded >"${smoke_file}" || true
+  if [[ "${STATUS_JSON}" -eq 1 ]]; then
+    uv run python - "${status_file}" "${health_file}" "${smoke_file}" <<'PY'
+import json
+import sys
+
+def load_json(path: str) -> dict:
+    try:
+        content = open(path, encoding="utf-8").read().strip()
+    except OSError:
+        return {}
+    if not content:
+        return {}
+    try:
+        parsed = json.loads(content)
+    except ValueError:
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+report = {
+    "schema_version": "rag01b-final-gate-v1",
+    "status": load_json(sys.argv[1]),
+    "integration_health": load_json(sys.argv[2]),
+    "agentic0_smoke": load_json(sys.argv[3]),
+}
+report["overall"] = "ok" if report["integration_health"].get("overall") in {"ok", "degraded"} else "degraded"
+print(json.dumps(report, sort_keys=True))
+PY
+  else
+    printf 'rag01b-final-gate completed\n'
+  fi
+}
+
+pr09_smoke() {
+  local args=(--quick)
+  if [[ "${STATUS_JSON}" -eq 1 ]]; then
+    args+=(--json)
+  fi
+  "${REPO_ROOT}/run_smoke.sh" "${args[@]}"
+}
+
 logs() {
   compose logs -f --tail=200
 }
@@ -346,7 +429,8 @@ Usage: scripts/start_quimera.sh <command> [flags]
 Commands: start, stop, restart, status, logs, doctor, test, warmup, release,
           litellm-validate, litellm-render, litellm-start, litellm-stop,
           litellm-restart, litellm-smoke, litellm-audit, litellm-fingerprint,
-          litellm-benchmark, otel-doctor, rag01b-acceptance
+          litellm-benchmark, otel-doctor, rag01b-acceptance, smoke, mcp-status,
+          integration-health, agentic0-smoke, pr08-report, rag01b-final-gate
 Flags: --build --warmup --doctor --integration --release-models --no-docker --no-ollama --logs --json --help
 HELP
 }
@@ -356,7 +440,13 @@ case "${COMMAND}" in
   stop) stop_stack ;;
   restart) RELEASE_MODELS=1; stop_stack; BUILD=1; RUN_WARMUP=1; RUN_DOCTOR=1; start_stack ;;
   status) status_stack ;;
+  smoke) pr09_smoke ;;
   rag01b-acceptance) rag01b_acceptance ;;
+  integration-health) integration_health ;;
+  mcp-status) mcp_status ;;
+  agentic0-smoke) agentic0_smoke ;;
+  pr08-report) pr08_report ;;
+  rag01b-final-gate) rag01b_final_gate ;;
   logs) logs ;;
   doctor) doctor ;;
   test) run_tests ;;

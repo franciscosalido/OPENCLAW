@@ -18,5 +18,7 @@ def test_pr07_stack_is_local_first_static_contract() -> None:
     assert "quimera-litellm" not in compose
     assert "http://127.0.0.1:8811/mcp" in litellm
     assert "http://127.0.0.1:8812/mcp" in litellm
+    assert "http://127.0.0.1:8813/mcp" in litellm
     assert "0.0.0.0:8811" not in litellm
     assert "0.0.0.0:8812" not in litellm
+    assert "0.0.0.0:8813" not in litellm

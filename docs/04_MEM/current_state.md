@@ -4,8 +4,277 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Last updated:** 2026-06-04
-**Updated by:** Codex — RAG-01B PR-07 Benchmark, ADR and MCP memory gate
+**Last updated:** 2026-06-06
+**Updated by:** Codex — RAG-01B PR-10 working memory Qdrant + pgvector
+
+---
+
+## RAG-01B PR-10 — Working Memory Qdrant + pgvector Checkpoints
+
+Current branch: `rag-01b/pr-10-working-memory-qdrant-pgvector`
+Base branch: `rag-01b/pr-08-integration-smoke` after PR-09 merge commit
+`a0870b14d441de9731c84cb3e027ae76fdbb787c`.
+
+Implemented:
+
+- Added accepted ADR-005 in both ADR trees:
+  `docs/adr/ADR-005-qdrant-working-memory-pgvector-checkpoints.md` and
+  `docs/ADR/ADR-005-qdrant-working-memory-pgvector-checkpoints.md`.
+- Added PR-10 SDD and memory handoff:
+  `docs/specs/rag-01b/pr-10-working-memory-qdrant-pgvector.md` and
+  `docs/04_MEM/WORKING_MEMORY_QDRANT.md`.
+- Added `backend/working_memory/` with settings, immutable models, safety
+  gates, Qdrant hot store, pgvector checkpoint repository, snapshot service,
+  restore service, cleanup and safe metric names.
+- Added pgvector checkpoint SQL:
+  `infra/postgres/sql/020_working_memory_checkpoints.sql`.
+- Added working-memory MCP tools/server on loopback Streamable HTTP
+  `127.0.0.1:8813/mcp`.
+- Registered `quimera-working-memory` in host LiteLLM config and allowed only
+  safe Agentic0 health/query tools by default. Upsert/snapshot are optional
+  write tools; restore/cleanup remain disabled by default.
+- Added degraded-safe working-memory smoke report:
+  `integration/working_memory_smoke.py` and
+  `evaluation/results/rag_01b_pr10_working_memory_smoke.json`.
+
+Scope explicitly not changed:
+
+- No Redis, Dragonfly or Python/RAM backend decision.
+- No HybridRAG collection mutation.
+- No `quimera_query_cache` or `quimera_llm_cache` mutation.
+- No pgvector ANN index as hot path.
+- No daemon/scheduler/dashboard/provider remoto/real data.
+- No `delete_collection` flow for working memory.
+
+Validation:
+
+- PR-10 unit/integration block: 67 passed / 4 skipped.
+- PR-10 + LiteLLM/MCP registration block: 75 passed / 4 skipped.
+- `uv run mypy --strict` on PR-10 working-memory, MCP, LiteLLM config and
+  tests: success.
+- `uv run pyright` on the same scope: 0 errors.
+- `uv run python -m infra.litellm.config_validator`: success with one expected
+  qdrant-semantic fallback warning.
+- `uv run python -m integration.working_memory_smoke`: generated skipped safe
+  smoke artifact because live stack was not requested.
+- `git diff --check`: clean.
+
+Operational note:
+
+- Live Qdrant/Postgres restore tests are opt-in and skip cleanly unless the
+  human operator exports the explicit `QUIMERA_TEST_WM_*` variables and a
+  test DSN.
+
+### RAG-01B PR-10 RC-01 — Restore Integrity and Host Python 3.12 Gate
+
+Implemented:
+
+- Added `abort_on_checksum_fail` to `RestoreService`. Default remains
+  availability-first warn-and-restore; strict operators can now abort restore
+  before any point is written when checksum validation fails.
+- Replaced module-level `count(1)` snapshot epochs in the real snapshot flow
+  with PostgreSQL `MAX(snapshot_epoch) + 1` allocation under an advisory lock
+  scoped to `(agent_id, session_id)`, avoiding restart-to-1 behavior and
+  cross-process epoch races.
+- Documented that `integration/hybrid_fixture.py` uses `delete_collection` only
+  for synthetic HybridRAG fixture teardown and not in working-memory runtime.
+
+Validation:
+
+- `.venv/bin/python --version`: Python 3.12.13.
+- Required host Python 3.12 unit block:
+  68 passed.
+- PR-10 focused unit/integration block:
+  70 passed / 4 skipped.
+- Full host Python 3.12 regression with `.venv/bin/python -m pytest`:
+  1891 passed / 65 skipped.
+- `uv run mypy --strict` on PR-10 working-memory/MCP/tests:
+  success.
+- `uv run pyright` on PR-10 working-memory/MCP/tests:
+  0 errors / 0 warnings.
+
+---
+
+## RAG-01B PR-09 — Operational Hardening + Smoke CLI
+
+Current branch: `rag-01b/pr-09-operational-hardening-smoke`
+Base branch: `rag-01b/pr-08-integration-smoke`
+
+Implemented:
+
+- Added accepted working memory checkpoint ADR:
+  `docs/ADR/ADR-004-working-memory-checkpoint-contract.md`.
+- Added `docs/04_MEM/WORKING_MEMORY_CONTRACT.md`, explicitly deferring the
+  fast working memory backend and accepting pgvector only as durable checkpoint.
+- Added PR-09 SDD, recovery runbooks, PostgreSQL backup/restore runbook and
+  15-minute agent onboarding doc.
+- Added local PostgreSQL backup helpers:
+  `infra/postgres/backup.sh`, `restore_verify.sh`, `backup_manifest.py` and
+  `backup_config.env.example`.
+- Added pg_stat_statements operational config and diagnostics:
+  Postgres compose command settings, initdb extension bootstrap,
+  `infra/postgres/sql/010_pg_stat_statements_diagnostics.sql` and
+  `infra/postgres/pg_stat_report.py`.
+- Added working memory checkpoint SQL contract:
+  `infra/postgres/sql/011_working_memory_checkpoint_contract.sql`.
+- Added PR-09 smoke CLI:
+  `./run_smoke.sh` plus `scripts/start_quimera.sh smoke`.
+- Added PR-09 smoke summary and manual health report:
+  `integration/smoke_summary.py` and `integration/health_report.py`.
+- Added conservative latency baseline:
+  `baseline/rag01b_latency_baseline.json`.
+- Generated PR-09 artifacts:
+  `evaluation/results/rag_01b_pr09_smoke_summary.json`,
+  `evaluation/results/rag_01b_pr09_health_report.json` and
+  `evaluation/results/rag_01b_pr09_pg_stat_report.json`.
+
+Scope explicitly not changed:
+
+- No final fast working memory backend selected.
+- No Redis implementation.
+- No Qdrant in-memory implementation.
+- No Python vector memory implementation.
+- No cloud/offsite backup, PITR, replication or dashboard.
+- No provider remoto.
+- No `down -v`, `docker system prune` or volume deletion.
+- No destructive schema migration.
+
+Validation:
+
+- PR-09 unit block: 21 passed.
+- PR-09 integration block: 3 passed / 2 skipped.
+- PR-08 + PR-09 focused block: 51 passed / 3 skipped.
+- Full regression: 1816 passed / 60 skipped.
+- `uv run mypy --strict .`: success.
+- `uv run pyright`: 0 errors.
+- `bash -n run_smoke.sh infra/postgres/backup.sh infra/postgres/restore_verify.sh scripts/start_quimera.sh`: clean.
+- `./run_smoke.sh --quick --json --no-build --timeout 5 --allow-degraded`:
+  generated PR-09 smoke summary with `overall=degraded` because LiteLLM was
+  unavailable while local Postgres/Qdrant/Ollama healthchecks were OK.
+
+Operational note:
+
+- Live backup/restore and live pg_stat integration tests skipped because no
+  Postgres DSN was exported in the shell. The static contract, scripts,
+  manifest logic and degraded reports are covered locally.
+
+### RAG-01B PR-09 RC-01 — Integration + Diagnostic Final Closure
+
+Implemented:
+
+- Hardened `integration/smoke_summary.py::render_summary_table` so service
+  values can be either strings (`"ok"`, `"fail"`) or dictionaries with
+  `status`.
+- Added `status` as a compatibility alias for the canonical smoke-summary
+  `overall` field, and documented that contract in the PR-09 SDD.
+- Refactored PR-09 live subprocess tests to invoke modules with
+  `sys.executable` and explicit `PYTHONPATH`, avoiding `uv run` inside
+  mounted review sandboxes.
+- Added a PR-09 GitHub Actions workflow that runs the required unit contracts
+  on Python 3.12 inside `.venv`.
+- Added an explicit irreversible-data-loss warning around manual
+  `docker volume rm` reset instructions in `infra/README.md`.
+- Regenerated PR-09 health and smoke summary artifacts with the new
+  `status == overall` contract.
+
+Validation:
+
+- PR-09 focused block: 28 passed / 2 skipped.
+- Full regression: 1819 passed / 61 skipped.
+- `uv run mypy --strict .`: success.
+- `uv run pyright`: 0 errors.
+- `bash -n run_smoke.sh infra/postgres/backup.sh infra/postgres/restore_verify.sh scripts/start_quimera.sh`: clean.
+- `git diff --check`: clean.
+
+---
+
+## RAG-01B PR-08 — Agentic0 End-to-End System Integration Smoke
+
+Current branch: `rag-01b/pr-08-integration-smoke`
+
+Implemented:
+
+- Added deterministic PR-08 integration package under `integration/` with:
+  Agentic0 smoke contracts, LiteLLM-only Agentic0 client, integration health
+  report, synthetic HybridRAG fixture, safe report writer and CLI smoke runner.
+- Added PR-08 documentation:
+  `docs/specs/rag-01b/pr-08-agentic0-integration-smoke.md`,
+  `docs/rag/rag_01b_pr08_integration_report.md`, and
+  `docs/references/llm_harness_original_papers.md`.
+- Updated `docs/04_MEM/AGENT_CONTEXT.md` with final RAG-01B integration state,
+  service responsibility map, Level 0/local-only policy and PR-08 commands.
+- Added Agentic0 virtual-key/tool policy to host LiteLLM config and validator.
+  Allowed tools are explicit; wildcard and destructive tools are rejected.
+- Extended `scripts/start_quimera.sh` with:
+  `integration-health`, `mcp-status`, `agentic0-smoke`, `pr08-report`, and
+  `rag01b-final-gate`.
+- Added PR-08 unit and integration tests for Agentic0 contracts, health,
+  HybridRAG, MCP registration, no direct backend shortcuts, safe artifacts,
+  OTel trace safety, degraded-service behavior, latency reporting and final
+  closeout docs.
+- Generated PR-08 artifacts:
+  `evaluation/results/rag_01b_pr08_agentic0_smoke_summary.json`,
+  `evaluation/results/rag_01b_pr08_integration_health.json`, and
+  `evaluation/results/rag_01b_pr08_latency_summary.json`.
+
+Scope explicitly not changed:
+
+- No LiteLLM Docker service.
+- No remote provider fallback.
+- No Agentic0 direct Qdrant/Postgres/Ollama access.
+- No destructive Qdrant/Postgres operations outside guarded test-prefix
+  cleanup helpers.
+- No raw prompt, answer, chunk, document text, vector, embedding, secret or DSN
+  stored in PR-08 artifacts.
+
+Validation:
+
+- `bash -n scripts/start_quimera.sh`: clean.
+- `uv run python -m infra.litellm.config_validator`: success with one expected
+  qdrant-semantic policy warning.
+- PR-08 focused block: 23 passed / 1 skipped.
+- Full regression: 1787 passed / 59 skipped.
+- `uv run mypy --strict` on PR-08 modules/tests and LiteLLM validator:
+  success.
+- `uv run pyright` on PR-08 modules/tests and LiteLLM validator: 0 errors.
+- `uv run python -m integration.run_agentic0_smoke_test --json --allow-degraded`:
+  generated safe artifacts with status `skipped` because the local stack had
+  LiteLLM/Qdrant/Postgres down while Ollama was OK.
+
+Operational note:
+
+- Live end-to-end Agentic0 synthesis should be rerun after starting the full
+  local stack with LiteLLM host gateway, Qdrant and Postgres. The degraded
+  result is intentional and safe; it verifies no shortcut path bypasses LiteLLM.
+
+### RAG-01B PR-08 RC-01 — Reviewer Risk Closure
+
+Implemented:
+
+- HybridRAG artifacts now explicitly mark Recall@5 as
+  `offline_synthetic_fixture`, require live local validation, and distinguish
+  deterministic RRF fixture evidence from real `nomic-embed-text` quality.
+- `json_has_no_forbidden_fields` now delegates to the AST-aware field scanner,
+  so audit flags such as `secrets_seen` do not trigger false positives while
+  unsafe field names remain blocked.
+- `rag01b-final-gate` no longer interpolates JSON into a Python heredoc. It
+  writes status, integration-health and smoke JSON to temporary files and loads
+  them by path.
+- Latency artifacts now include `measurement_mode`, `sample_count` and
+  `p95_warning`. Offline/degraded runs set `p95_ms=null` with
+  `not_measured_stack_unavailable`; live p95 over 500ms emits
+  `p95_exceeds_500ms`.
+- `scripts/quimera_status.py` now captures LiteLLM and Ollama healthcheck
+  latency, and integration health includes safe per-service latency metadata.
+
+Validation:
+
+- PR-08 focused RC block: 27 passed / 1 skipped.
+- Full regression: 1791 passed / 59 skipped.
+- `uv run mypy --strict` on PR-08 modules/tests and status script: success.
+- `uv run pyright` on PR-08 modules/tests and status script: 0 errors.
+- `bash -n scripts/start_quimera.sh`: clean.
+- `git diff --check`: clean.
 
 ---
 

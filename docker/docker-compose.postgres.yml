@@ -13,6 +13,18 @@ services:
       - POSTGRES_USER=quimera
       - POSTGRES_PASSWORD_FILE=/run/secrets/quimera_postgres_password
       - PGDATA=/var/lib/postgresql/18/docker
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+      - -c
+      - compute_query_id=auto
+      - -c
+      - pg_stat_statements.max=10000
+      - -c
+      - pg_stat_statements.track=all
+      - -c
+      - track_io_timing=on
     restart: unless-stopped
     healthcheck:
       test:

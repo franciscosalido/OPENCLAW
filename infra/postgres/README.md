@@ -21,6 +21,37 @@ Start the container:
 docker compose -f docker/docker-compose.postgres.yml up -d
 ```
 
+PR-09 operational hardening enables `pg_stat_statements` in the local compose
+command line:
+
+- `shared_preload_libraries=pg_stat_statements`
+- `compute_query_id=auto`
+- `pg_stat_statements.max=10000`
+- `pg_stat_statements.track=all`
+- `track_io_timing=on`
+
+Create a local custom-format backup:
+
+```bash
+./infra/postgres/backup.sh
+```
+
+Verify a restore in a temporary database:
+
+```bash
+./infra/postgres/restore_verify.sh .runtime/backups/postgres/<dump-file>
+```
+
+Generate safe pg_stat diagnostics without query text:
+
+```bash
+python -m infra.postgres.pg_stat_report --json
+```
+
+Backups are local-only, default to `.runtime/backups/postgres`, use
+`pg_dump -Fc`, and write a JSON manifest with SHA-256, size, version and restore
+status. The scripts never print the full DSN.
+
 For integration tests, build the DSN locally with the same password:
 
 ```bash

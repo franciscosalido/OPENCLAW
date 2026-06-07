@@ -1,0 +1,74 @@
+{
+  "correlation_id": "eb12379051ee493baf9ca588399a8ccf",
+  "gateway": {
+    "host_only": true,
+    "litellm_base_url": "http://127.0.0.1:4000"
+  },
+  "generated_at": "2026-06-05T00:33:13.776184+00:00",
+  "hybridrag": {
+    "collection": "quimera_pr08_hybrid_smoke_pr08-3db640f936d446c6962768781a1a07fd",
+    "dense_ok": true,
+    "dense_recall_at_5": 1.0,
+    "hybrid_ok": true,
+    "hybrid_recall_at_5": 1.0,
+    "live_quality_checked": false,
+    "live_quality_required": true,
+    "quality_evidence": "deterministic_rrf_fixture",
+    "quality_mode": "offline_synthetic_fixture",
+    "quality_warning": "live_nomic_hybrid_validation_required",
+    "result_count": 3,
+    "retrieval_backend": "qdrant_query_api_rrf_contract",
+    "sparse_ok": true
+  },
+  "latency": {
+    "embed_ms": 0.0,
+    "llm_ms": 8.631,
+    "mcp_ms": 22.864,
+    "measurement_mode": "degraded_no_live_stack",
+    "p50_ms": null,
+    "p95_ms": null,
+    "p95_warning": "not_measured_stack_unavailable",
+    "pg_ms": 19.238,
+    "retrieval_ms": 3.626,
+    "sample_count": 0,
+    "total_ms": 86.25145799305756
+  },
+  "llm": {
+    "autonomous_tool_use_attempted": false,
+    "autonomous_tool_use_ok": null,
+    "completion_ok": false,
+    "model": "qwen3-local"
+  },
+  "mcp": {
+    "allowed_tools_enforced": true,
+    "postgres_tool_ok": true,
+    "qdrant_tool_ok": true,
+    "virtual_key_checked": false
+  },
+  "postgres_memory": {
+    "agent_state_roundtrip_ok": false,
+    "session_persistence_ok": false
+  },
+  "run_id": "pr08-3db640f936d446c6962768781a1a07fd",
+  "safety": {
+    "forbidden_fields_seen": [],
+    "raw_chunks_seen": false,
+    "secrets_seen": false,
+    "vectors_seen": false
+  },
+  "schema_version": "rag-01b-pr08-agentic0-smoke-v1",
+  "services": {
+    "litellm": "fail",
+    "ollama": "ok",
+    "postgres": "fail",
+    "qdrant": "fail"
+  },
+  "status": "skipped",
+  "trace_ids": [
+    "eb12379051ee493baf9ca588399a8ccf"
+  ],
+  "warnings": [
+    "litellm model introspection unavailable",
+    "litellm unavailable; LLM synthesis skipped"
+  ]
+}
