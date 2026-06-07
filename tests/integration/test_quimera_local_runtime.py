@@ -55,7 +55,7 @@ def test_quimera_status_reports_when_stack_is_online() -> None:
         pytest.skip("local runtime is not fully online")
 
     result = subprocess.run(
-        ["./scripts/start_quimera.sh", "status"],
+        ["./start_quimera.sh", "--status"],
         check=False,
         capture_output=True,
         text=True,
@@ -64,12 +64,12 @@ def test_quimera_status_reports_when_stack_is_online() -> None:
     assert result.returncode == 0
 
 
-def test_quimera_runtime_control_is_opt_in() -> None:
+def test_quimera_runtime_status_command_is_opt_in() -> None:
     if os.environ.get("QUIMERA_TEST_CAN_CONTROL_RUNTIME") != "1":
         pytest.skip("QUIMERA_TEST_CAN_CONTROL_RUNTIME=1 is required")
 
     result = subprocess.run(
-        ["./scripts/start_quimera.sh", "doctor"],
+        ["./start_quimera.sh", "--status"],
         check=False,
         capture_output=True,
         text=True,

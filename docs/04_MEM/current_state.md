@@ -5,7 +5,58 @@
 > meaningful sessions.
 
 **Last updated:** 2026-06-07
-**Updated by:** Codex — Testes-01 Qdrant client dependency contract
+**Updated by:** Codex — RC Vibe integration roundtrip/status hardening
+
+---
+
+## codex/rc-vibe-integration-roundtrip-status — Vibe Integration Residual RC
+
+Current branch: `codex/rc-vibe-integration-roundtrip-status`
+Base branch: local `main` at `df37f51`.
+
+Implemented:
+
+- Made `test_finance_repository_full_roundtrip` use a per-test isolated
+  PostgreSQL database via the existing `isolated_postgres_client` helper.
+  This preserves insert-only repository semantics while eliminating residual
+  `qlib_projection_manifests` unique-key collisions between live test runs.
+- Updated the PR-07 live JSON status integration test to call
+  `scripts/quimera_status.py status --json` through `sys.executable` with an
+  explicit `PYTHONPATH`, instead of invoking the removed
+  `scripts/start_quimera.sh status --json` contract.
+- Updated the local runtime integration checks to use the canonical wrapper
+  contract: `./start_quimera.sh --status`.
+
+Research notes:
+
+- PostgreSQL 18 `INSERT ... ON CONFLICT` could handle duplicate unique keys,
+  but was intentionally not used here because the failure is test-state
+  leakage and the repository method models create/insert semantics.
+- Python 3.12 documents `sys.executable` as the recommended way to relaunch
+  the current Python interpreter, which is more portable than shelling through
+  a wrapper that has no JSON mode.
+
+Validation:
+
+- `uv run mypy --strict tests/integration/test_finance_repository_roundtrip.py
+  tests/integration/test_pr07_start_quimera_status_json_live.py
+  tests/integration/test_quimera_local_runtime.py`: success.
+- `uv run pyright tests/integration/test_finance_repository_roundtrip.py
+  tests/integration/test_pr07_start_quimera_status_json_live.py
+  tests/integration/test_quimera_local_runtime.py`: 0 errors.
+- Live targeted integration block with temporary superuser test role:
+  `tests/integration/test_finance_repository_roundtrip.py
+  tests/integration/test_pr07_start_quimera_status_json_live.py
+  tests/integration/test_quimera_local_runtime.py`: 3 passed / 1 skipped.
+- `uv run pytest tests/unit/test_start_quimera_status_json.py`: 3 passed.
+- `git diff --check`: clean.
+
+Scope intentionally not changed:
+
+- No repository method was converted from insert/create to upsert.
+- No Docker, Postgres, Qdrant, LiteLLM or Ollama runtime configuration was
+  changed.
+- No generated PR-08/PR-09 artifacts were staged.
 
 ---
 
