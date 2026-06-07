@@ -15,16 +15,18 @@ default profile.
 Qdrant Server 1.18.1 is a patch release with fixes that matter for local-first
 benchmarking: async update safety, empty vector handling, TurboQuant memory
 reporting, payload index/filter correctness, worker/optimizer behavior and
-snapshot/resharding stability. The Python package index currently exposes
-`qdrant-client==1.18.0` as the latest Python client, so this ADR intentionally
-accepts a documented server/client patch mismatch.
+snapshot/resharding stability. The lockfile currently resolves
+`qdrant-client==1.18.0`, so this ADR intentionally accepts a documented
+server/client patch mismatch while the project dependency requires
+`qdrant-client>=1.18` to prevent rollback to legacy 1.13.x clients.
 
 ## Decision
 
 Target Qdrant Server `qdrant/qdrant:v1.18.1` for local-first runtime
 evaluation.
 
-Keep Python client dependency `qdrant-client==1.18.0`.
+Keep Python client dependency `qdrant-client>=1.18`; the current lockfile
+resolution remains `1.18.0`.
 
 Python Weighted RRF remains the ground truth. Native Qdrant RRF remains
 experimental. TurboQuant remains experimental and is not a default. PostgreSQL/GraphRAG remain outside Q18.
@@ -39,7 +41,8 @@ development/benchmark runtime:
 - Benchmark collections can be recreated from source corpus.
 - `quimera_knowledge` and `quimera_knowledge_v2` remain protected by existing
   governance.
-- The Python client pin remains stable at `1.18.0`.
+- The Python client contract remains in the `1.18` family or newer, with the
+  current lockfile resolved at `1.18.0`.
 
 ## Evidence
 
@@ -56,13 +59,13 @@ results regress.
 - Server target: `1.18.1`.
 - Docker image: `qdrant/qdrant:v1.18.1`.
 - Client target: `1.18.0`.
-- Client dependency: `qdrant-client==1.18.0`.
+- Client dependency: `qdrant-client>=1.18`.
 - Version family: `1.18`.
 
-Readiness requires exact server target, exact client target and same `1.18`
-family. Exact server/client patch parity is recorded as diagnostic
-`version_exact_parity_ok=false`, but it does not block readiness while
-`qdrant-client==1.18.1` is unavailable on PyPI.
+Readiness requires exact server target, current lockfile client target and same
+`1.18` family. Exact server/client patch parity is recorded as diagnostic
+`version_exact_parity_ok=false`, but it does not block readiness while the
+lockfile resolves `qdrant-client==1.18.0`.
 
 ## YAML Configuration Policy
 
@@ -80,7 +83,7 @@ family. Exact server/client patch parity is recorded as diagnostic
 ## Alternatives Considered
 
 1. Keep Qdrant Server 1.18.0.
-2. Target Qdrant Server 1.18.1 with `qdrant-client==1.18.0`.
+2. Target Qdrant Server 1.18.1 with `qdrant-client>=1.18`.
 3. Revert to Qdrant 1.13.2 immediately.
 4. Promote TurboQuant or native RRF as part of the patch upgrade.
 5. Move PostgreSQL/GraphRAG into this cycle.
@@ -144,7 +147,8 @@ Rollback targets:
   "reversible": true,
   "server_target_version": "1.18.1",
   "client_target_version": "1.18.0",
-  "client_patch_version_note": "qdrant-client 1.18.1 not available on PyPI at decision time",
+  "client_dependency": "qdrant-client>=1.18",
+  "client_patch_version_note": "uv.lock currently resolves qdrant-client 1.18.0",
   "docker_image": "qdrant/qdrant:v1.18.1",
   "python_rrf_default": true,
   "native_rrf_default": false,

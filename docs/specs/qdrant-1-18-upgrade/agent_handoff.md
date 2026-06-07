@@ -44,7 +44,8 @@ Before touching Docker or dependencies:
 
 ## Q18-02 Result
 
-- Client pin target: `qdrant-client==1.18.0`.
+- Client dependency target: `qdrant-client>=1.18`; `uv.lock` currently
+  resolves `1.18.0`.
 - Server image target: `qdrant/qdrant:v1.18.0`.
 - Version contract path: `infra/qdrant/version_contract.yaml`.
 - Local config path: `infra/qdrant/config.yaml`.

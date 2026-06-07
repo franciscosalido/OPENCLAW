@@ -71,25 +71,28 @@ def test_version_contract_targets_server_1181_client_1180() -> None:
     assert contract["server_target_version"] == "1.18.1"
     assert contract["server_image"] == "qdrant/qdrant:v1.18.1"
     assert contract["client_target_version"] == "1.18.0"
-    assert contract["client_dependency"] == "qdrant-client==1.18.0"
+    assert contract["client_dependency"] == "qdrant-client>=1.18"
     assert contract["version_family"] == "1.18"
     assert contract["rest_port"] == 6333
     assert contract["grpc_port"] == 6334
     assert contract["config_schema_version"] == "qdrant-local-config-v2"
 
 
-def test_pyproject_pins_qdrant_client_1180() -> None:
-    assert "qdrant-client==1.18.0" in _pyproject_dependencies()
+def test_pyproject_requires_qdrant_client_118_or_newer() -> None:
+    deps = _pyproject_dependencies()
+
+    assert "qdrant-client>=1.18" in deps
+    assert "qdrant-client==1.13.2" not in deps
 
 
-def test_requirements_rag_pins_qdrant_client_1180_if_present() -> None:
+def test_requirements_rag_requires_qdrant_client_118_or_newer_if_present() -> None:
     requirements_path = ROOT / "requirements-rag.txt"
     if not requirements_path.exists():
         return
     text = requirements_path.read_text(encoding="utf-8")
     if "qdrant-client" in text:
-        assert "qdrant-client==1.18.0" in text
-        assert "qdrant-client==1.18.1" not in text
+        assert "qdrant-client>=1.18" in text
+        assert "qdrant-client==1.13.2" not in text
 
 
 def test_docker_compose_pins_qdrant_1181() -> None:
@@ -122,7 +125,7 @@ def test_server_and_client_versions_match_contract() -> None:
 
     assert contract["client_dependency"] in _pyproject_dependencies()
     assert image == contract["server_image"]
-    assert str(contract["client_target_version"]) in str(contract["client_dependency"])
+    assert str(contract["client_dependency"]).startswith("qdrant-client>=1.18")
     assert str(contract["server_target_version"]) in str(contract["server_image"])
     assert str(contract["server_target_version"]).startswith(str(contract["version_family"]))
     assert str(contract["client_target_version"]).startswith(str(contract["version_family"]))

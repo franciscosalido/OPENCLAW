@@ -4,8 +4,42 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Last updated:** 2026-06-06
-**Updated by:** Codex — RAG-01B PR-10 working memory Qdrant + pgvector
+**Last updated:** 2026-06-07
+**Updated by:** Codex — Testes-01 Qdrant client dependency contract
+
+---
+
+## Testes-01 — Qdrant Client Dependency Contract
+
+Current branch: `Testes-01`
+Base branch: `main` at `68f5716d37f6f1c421f73db08d7708f8d4709aa7`.
+
+Implemented:
+
+- Relaxed project dependency from `qdrant-client==1.18.0` to
+  `qdrant-client>=1.18`.
+- Reconciled `uv.lock` metadata offline; the locked package version remains
+  `qdrant-client 1.18.0`.
+- Updated Qdrant 1.18 version contract, ADR-018 and active Qdrant handoff docs
+  to distinguish dependency floor (`>=1.18`) from current lockfile resolution
+  (`1.18.0`).
+- Updated Qdrant 1.18 unit contracts to reject legacy `qdrant-client==1.13.2`
+  while accepting the new `>=1.18` dependency floor.
+
+Validation:
+
+- `.venv/bin/python -m pytest tests/unit/test_qdrant_118_config.py`:
+  43 passed.
+- `uv lock --check`: success.
+- Host import/version check: installed `qdrant-client` is `1.18.0` and
+  satisfies `>=1.18`.
+- `git diff --check`: clean.
+
+Scope intentionally not changed:
+
+- No Qdrant server image change.
+- No dependency installation.
+- No generated PR-09 smoke artifact staged.
 
 ---
 
