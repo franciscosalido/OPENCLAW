@@ -200,6 +200,46 @@ Validation:
 - `git diff --check`:
   clean.
 
+### main RC — Vibe sandbox contract and pg_dump 18.4 verification
+
+Implemented:
+
+- Updated stale tests that still expected removed `scripts/start_quimera.sh`
+  subcommands. The canonical wrapper contract is now exactly
+  `./start_quimera.sh --start`, `./start_quimera.sh --status` and
+  `./start_quimera.sh --stop`.
+- Updated `docs/04_MEM/AGENT_CONTEXT.md` to advertise the new wrapper commands
+  instead of obsolete JSON subcommands.
+- Hardened unit tests that execute gateway/LiteLLM scripts so sandbox
+  integration env such as `host.docker.internal` cannot leak into local-only
+  unit contracts.
+- Updated `infra/litellm/audit.py` so RC-21/RC-23 audit the actual host
+  modules (`infra/litellm/audit.py` and `overhead_benchmark.py`) instead of
+  requiring removed `start_quimera.sh` subcommands.
+- Rebuilt `Dockerfile.openclaw-sandbox` locally as
+  `openclaw-sandbox-pg18-check` and verified the sandbox image has
+  `pg_dump (PostgreSQL) 18.4 (Debian 18.4-1.pgdg13+1)` and matching
+  `psql 18.4`.
+
+Validation:
+
+- `uv run pytest tests/unit`:
+  1866 passed.
+- Vibe-reported Postgres integration block:
+  9 passed.
+- `docker build -f Dockerfile.openclaw-sandbox -t openclaw-sandbox-pg18-check .`:
+  success.
+- `docker run --rm openclaw-sandbox-pg18-check pg_dump --version`:
+  PostgreSQL 18.4.
+- `docker run --rm openclaw-sandbox-pg18-check psql --version`:
+  PostgreSQL 18.4.
+- `bash -n` on touched shell scripts:
+  success.
+- `uv run mypy --strict` on touched Python files:
+  success.
+- `uv run pyright` on touched Python files:
+  0 errors.
+
 ---
 
 ## RAG-01B PR-10 — Working Memory Qdrant + pgvector Checkpoints

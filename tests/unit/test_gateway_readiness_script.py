@@ -14,6 +14,14 @@ SCRIPT = REPO_ROOT / "scripts" / "check_gateway_readiness.sh"
 
 def _run_script(env_updates: dict[str, str | None] | None = None) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
+    for key in (
+        "QUIMERA_LLM_BASE_URL",
+        "OLLAMA_API_BASE",
+        "QDRANT_URL",
+        "LITELLM_MASTER_KEY",
+        "QUIMERA_LLM_API_KEY",
+    ):
+        env.pop(key, None)
     for key, value in (env_updates or {}).items():
         if value is None:
             env.pop(key, None)

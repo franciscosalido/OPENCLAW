@@ -13,6 +13,21 @@ from backend.rag.generator import LocalGenerator
 
 
 class LocalGeneratorTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self) -> None:
+        self._env_patch = patch.dict(
+            os.environ,
+            {
+                "QUIMERA_LLM_BASE_URL": DEFAULT_LLM_BASE_URL,
+                "QUIMERA_LLM_API_KEY": "dev-key",
+                "QUIMERA_LLM_MODEL": "local_chat",
+            },
+            clear=False,
+        )
+        self._env_patch.start()
+
+    def tearDown(self) -> None:
+        self._env_patch.stop()
+
     async def test_chat_posts_to_litellm_chat_completions_endpoint(self) -> None:
         seen_payloads: list[dict[str, object]] = []
 

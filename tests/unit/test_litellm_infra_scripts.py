@@ -51,6 +51,17 @@ def _has_remote_marker(active_text: str) -> bool:
 
 def _run_start(env_updates: dict[str, str | None]) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
+    for key in (
+        "LITELLM_HOST",
+        "LITELLM_BASE_URL",
+        "OLLAMA_BASE_URL",
+        "OLLAMA_API_BASE",
+        "QDRANT_API_BASE",
+        "LITELLM_LOCAL_CHAT_MODEL",
+        "LITELLM_LOCAL_EMBED_MODEL",
+        "LITELLM_MASTER_KEY",
+    ):
+        env.pop(key, None)
     for key, value in env_updates.items():
         if value is None:
             env.pop(key, None)

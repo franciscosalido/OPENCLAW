@@ -6,17 +6,18 @@ from pathlib import Path
 START = Path("scripts/start_quimera.sh")
 
 
-def test_start_quimera_declares_otel_doctor_command() -> None:
+def test_start_quimera_does_not_reintroduce_otel_doctor_subcommand() -> None:
     text = START.read_text(encoding="utf-8")
 
-    assert "otel-doctor" in text
-    assert "otel_doctor()" in text
-    assert "backend.observability.tracer --doctor" in text
+    assert "otel-doctor" not in text
+    assert "otel_doctor()" not in text
+    assert "backend.observability.tracer --doctor" not in text
 
 
-def test_start_quimera_supports_otel_doctor_json_flag() -> None:
+def test_start_quimera_accepts_only_start_stop_status_flags() -> None:
     text = START.read_text(encoding="utf-8")
 
-    assert "--json) OTEL_JSON=1" in text
-    assert "--doctor --json" in text
-
+    assert "--start) _start ;;" in text
+    assert "--stop) _stop ;;" in text
+    assert "--status) _status ;;" in text
+    assert "--json) OTEL_JSON=1" not in text

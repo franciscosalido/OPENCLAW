@@ -45,8 +45,9 @@ def test_audit_writes_json_and_markdown(tmp_path: Path) -> None:
     assert "LiteLLM Host Audit" in markdown_path.read_text(encoding="utf-8")
 
 
-def test_start_quimera_declares_litellm_audit_command() -> None:
+def test_litellm_audit_is_not_a_start_quimera_subcommand() -> None:
     text = Path("scripts/start_quimera.sh").read_text(encoding="utf-8")
 
-    assert "litellm-audit)" in text
-    assert "python -m infra.litellm.audit" in text
+    assert "litellm-audit)" not in text
+    assert "python -m infra.litellm.audit" not in text
+    assert "Accepted commands: --start, --stop, --status" in text or "--status) _status ;;" in text

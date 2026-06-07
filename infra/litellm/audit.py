@@ -208,9 +208,10 @@ def build_litellm_audit(
             contracts["RC-19"] = _contract("fail", f"start_litellm missing {token}")
     if "pkill" in quimera_script or "killall" in quimera_script:
         contracts["RC-20"] = _contract("fail", "stop lifecycle must not use pkill or killall")
-    for token in ("litellm-audit", "litellm-benchmark"):
-        if token not in quimera_script:
-            contracts["RC-21" if token == "litellm-audit" else "RC-23"] = _contract("fail", f"{token} command missing")
+    if not (repo_root / "infra/litellm/audit.py").exists():
+        contracts["RC-21"] = _contract("fail", "litellm audit module missing")
+    if any(token in quimera_script for token in ("litellm-audit)", "litellm-benchmark)")):
+        contracts["RC-21"] = _contract("fail", "start_quimera must not expose LiteLLM audit subcommands")
 
     fingerprint = build_version_fingerprint(env=env_map, config_path=config_path, runtime_config_path=runtime_config_path)
     warnings.extend(fingerprint.warnings)

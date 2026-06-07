@@ -143,9 +143,9 @@ Responsibility map:
 Minimum RAG-01B final commands:
 
 ```bash
-./scripts/start_quimera.sh status --json
-./scripts/start_quimera.sh integration-health --json
-./scripts/start_quimera.sh agentic0-smoke --json
+./start_quimera.sh --start
+./start_quimera.sh --status
+./start_quimera.sh --stop
 ```
 
 Agentic0 memory access policy: runtime Agentic0 accesses memory only through

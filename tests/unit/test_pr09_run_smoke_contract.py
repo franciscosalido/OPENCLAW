@@ -25,11 +25,12 @@ def test_run_smoke_script_contract() -> None:
     assert "delete_collection" not in text
 
 
-def test_start_quimera_exposes_smoke_command() -> None:
+def test_start_quimera_does_not_reintroduce_smoke_subcommand() -> None:
     text = START.read_text(encoding="utf-8")
 
-    assert "smoke)" in text
-    assert "run_smoke.sh" in text
+    assert "smoke)" not in text
+    assert "run_smoke.sh" not in text
+    assert "--start) _start ;;" in text
 
 
 def test_run_smoke_exit_codes_documented() -> None:

@@ -166,7 +166,10 @@ class TestCheckLiteLLMGateway(unittest.TestCase):
         with (
             patch.dict(
                 "os.environ",
-                {"QUIMERA_LLM_API_KEY": "dev-key"},
+                {
+                    "QUIMERA_LLM_API_KEY": "dev-key",
+                    "QUIMERA_LLM_BASE_URL": "http://127.0.0.1:4000/v1",
+                },
                 clear=False,
             ),
             patch(
@@ -177,7 +180,14 @@ class TestCheckLiteLLMGateway(unittest.TestCase):
             check_litellm_gateway()
 
     def test_litellm_gateway_exits_when_api_key_missing(self) -> None:
-        with patch.dict("os.environ", {"QUIMERA_LLM_API_KEY": ""}, clear=False):
+        with patch.dict(
+            "os.environ",
+            {
+                "QUIMERA_LLM_API_KEY": "",
+                "QUIMERA_LLM_BASE_URL": "http://127.0.0.1:4000/v1",
+            },
+            clear=False,
+        ):
             with self.assertRaises(SystemExit) as ctx:
                 check_litellm_gateway()
             self.assertEqual(ctx.exception.code, 1)
@@ -187,7 +197,10 @@ class TestCheckLiteLLMGateway(unittest.TestCase):
         with (
             patch.dict(
                 "os.environ",
-                {"QUIMERA_LLM_API_KEY": "dev-key"},
+                {
+                    "QUIMERA_LLM_API_KEY": "dev-key",
+                    "QUIMERA_LLM_BASE_URL": "http://127.0.0.1:4000/v1",
+                },
                 clear=False,
             ),
             patch(
@@ -207,7 +220,10 @@ class TestCheckLiteLLMGateway(unittest.TestCase):
         with (
             patch.dict(
                 "os.environ",
-                {"QUIMERA_LLM_API_KEY": "dev-key"},
+                {
+                    "QUIMERA_LLM_API_KEY": "dev-key",
+                    "QUIMERA_LLM_BASE_URL": "http://127.0.0.1:4000/v1",
+                },
                 clear=False,
             ),
             patch("backend.gateway.health.httpx.get", return_value=response),
