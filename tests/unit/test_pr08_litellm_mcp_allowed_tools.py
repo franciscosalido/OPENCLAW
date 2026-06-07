@@ -28,9 +28,9 @@ def test_mcp_servers_remain_loopback_and_not_public() -> None:
     cfg = validate_litellm_config(Path("infra/litellm/litellm_config.yaml"))
 
     assert set(cfg.mcp_servers) == {
-        "quimera-postgres-memory",
-        "quimera-qdrant-memory",
-        "quimera-working-memory",
+        "quimera_postgres_memory",
+        "quimera_qdrant_memory",
+        "quimera_working_memory",
     }
     for server in cfg.mcp_servers.values():
         assert server.url.startswith("http://127.0.0.1:")

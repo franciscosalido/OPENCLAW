@@ -23,7 +23,9 @@ def validate_litellm_otel_callback_config(path: Path) -> dict[str, bool]:
     callbacks = settings.get("callbacks")
     callbacks_present = isinstance(callbacks, list) and "otel" in callbacks
     callback_settings = cfg.get("callback_settings")
-    otel_settings = callback_settings.get("otel") if isinstance(callback_settings, dict) else None
+    otel_settings = (
+        callback_settings.get("otel") if isinstance(callback_settings, dict) else None
+    )
     message_logging_disabled = (
         isinstance(otel_settings, dict)
         and otel_settings.get("message_logging") is False
@@ -60,7 +62,9 @@ def _main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--validate", action="store_true")
     parser.add_argument("--json", action="store_true")
-    parser.add_argument("--config", type=Path, default=Path("infra/litellm/litellm_config.yaml"))
+    parser.add_argument(
+        "--config", type=Path, default=Path("infra/litellm/litellm_config.yaml")
+    )
     args = parser.parse_args()
     result = validate_litellm_otel_callback_config(args.config)
     if args.json:
@@ -72,4 +76,3 @@ def _main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(_main())
-

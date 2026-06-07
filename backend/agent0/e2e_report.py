@@ -121,5 +121,7 @@ def _percentile(values: Sequence[float], percentile: int) -> float:
     if not values:
         return 0.0
     ordered = sorted(values)
-    index = min(len(ordered) - 1, max(0, round((percentile / 100) * (len(ordered) - 1))))
+    index = min(
+        len(ordered) - 1, max(0, round((percentile / 100) * (len(ordered) - 1)))
+    )
     return round(ordered[index], 3)

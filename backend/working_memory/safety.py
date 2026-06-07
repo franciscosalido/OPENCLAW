@@ -81,7 +81,9 @@ def sanitize_metadata(mapping: Mapping[str, Any] | None) -> dict[str, Any]:
 
     if mapping is None:
         return {}
-    return {str(key): _sanitize_value(str(key), value) for key, value in mapping.items()}
+    return {
+        str(key): _sanitize_value(str(key), value) for key, value in mapping.items()
+    }
 
 
 def validate_safe_summary(text: str | None) -> str | None:
@@ -101,7 +103,9 @@ def compute_payload_checksum(mapping: Mapping[str, Any]) -> str:
     """Return deterministic SHA-256 checksum for safe payload metadata."""
 
     safe = validate_safe_payload(sanitize_metadata(mapping))
-    encoded = json.dumps(safe, sort_keys=True, separators=(",", ":"), default=str).encode()
+    encoded = json.dumps(
+        safe, sort_keys=True, separators=(",", ":"), default=str
+    ).encode()
     return hashlib.sha256(encoded).hexdigest()
 
 
@@ -120,7 +124,9 @@ def _reject_sensitive_keys(mapping: Mapping[str, Any]) -> None:
     for key, value in mapping.items():
         lowered = str(key).casefold()
         if _is_sensitive_key(lowered):
-            raise WorkingMemorySafetyError(f"sensitive working-memory key is forbidden: {key}")
+            raise WorkingMemorySafetyError(
+                f"sensitive working-memory key is forbidden: {key}"
+            )
         if isinstance(value, Mapping):
             _reject_sensitive_keys(value)
 
@@ -130,7 +136,10 @@ def _sanitize_value(key: str, value: Any) -> Any:
     if _is_sensitive_key(lowered):
         return "[REDACTED]"
     if isinstance(value, Mapping):
-        return {str(child_key): _sanitize_value(str(child_key), child_value) for child_key, child_value in value.items()}
+        return {
+            str(child_key): _sanitize_value(str(child_key), child_value)
+            for child_key, child_value in value.items()
+        }
     if isinstance(value, list):
         return [_sanitize_value(key, item) for item in value]
     if isinstance(value, str) and _SECRET_PATTERN.search(value):
@@ -143,4 +152,7 @@ def _is_sensitive_key(lowered_key: str) -> bool:
         return False
     if lowered_key in FORBIDDEN_WORKING_MEMORY_KEYS:
         return True
-    return any(token in lowered_key for token in FORBIDDEN_WORKING_MEMORY_KEYS - {"vector", "embedding", "payload"})
+    return any(
+        token in lowered_key
+        for token in FORBIDDEN_WORKING_MEMORY_KEYS - {"vector", "embedding", "payload"}
+    )

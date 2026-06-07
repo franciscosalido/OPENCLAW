@@ -326,9 +326,7 @@ class RoutingDecisionLogger:
         stem_path = self.base_path.with_suffix("")
         if self.rotate_daily:
             date = datetime.now(UTC).date().isoformat()
-            return stem_path.with_name(f"{stem_path.name}_{date}").with_suffix(
-                ".jsonl"
-            )
+            return stem_path.with_name(f"{stem_path.name}_{date}").with_suffix(".jsonl")
         return stem_path.with_suffix(".jsonl")
 
 

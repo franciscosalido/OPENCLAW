@@ -31,8 +31,8 @@ RAG local-first construido no RAG-1A:
 - Collections antigas locais podem ser apagadas em PR futuro, mas nao neste PR.
 - PostgreSQL/pgvector e alternativa futura, nao alvo deste mini-sprint.
 
-O repositorio atual fixa `qdrant-client==1.13.2` em `pyproject.toml`. Este PR
-nao altera esse pin.
+Historicamente, este repositorio fixava `qdrant-client==1.13.2` em
+`pyproject.toml`. O contrato ativo agora exige `qdrant-client>=1.18`.
 
 ## Hipotese
 

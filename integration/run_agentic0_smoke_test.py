@@ -46,8 +46,8 @@ async def run_smoke(*, allow_degraded: bool = False) -> Agentic0SmokeResult:
         return result
     hybrid = hybrid_contract_summary(run_id)
     tool_calls = [
-        ToolCallSummary("quimera-postgres-memory", "postgres_agent_state_get", "degraded" if health["services"].get("postgres") != "ok" else "ok", 0.0, ("schema_version", "ok", "degraded", "data")),
-        ToolCallSummary("quimera-qdrant-memory", "qdrant_scroll_safe", "ok" if hybrid["hybrid_ok"] else "fail", 0.0, ("schema_version", "ok", "data")),
+        ToolCallSummary("quimera_postgres_memory", "postgres_agent_state_get", "degraded" if health["services"].get("postgres") != "ok" else "ok", 0.0, ("schema_version", "ok", "degraded", "data")),
+        ToolCallSummary("quimera_qdrant_memory", "qdrant_scroll_safe", "ok" if hybrid["hybrid_ok"] else "fail", 0.0, ("schema_version", "ok", "data")),
     ]
     llm_ok = False
     warnings = list(health.get("warnings", []))

@@ -21,9 +21,7 @@ DEFAULT_RAG_CONFIG_PATH = REPO_ROOT / "config" / "rag_config.yaml"
 ENV_RAG_EMBEDDING_BACKEND = "QUIMERA_RAG_EMBEDDING_BACKEND"
 BACKEND_GATEWAY_LITELLM = "gateway_litellm"
 BACKEND_DIRECT_OLLAMA = "direct_ollama"
-ALLOWED_EMBEDDING_BACKENDS = frozenset(
-    {BACKEND_GATEWAY_LITELLM, BACKEND_DIRECT_OLLAMA}
-)
+ALLOWED_EMBEDDING_BACKENDS = frozenset({BACKEND_GATEWAY_LITELLM, BACKEND_DIRECT_OLLAMA})
 
 
 class RagEmbedder(Protocol):
@@ -64,7 +62,9 @@ class RagEmbeddingConfig:
         if not self.embedding_alias.strip():
             raise ValueError("rag.embedding.embedding_alias cannot be empty")
         if self.legacy_embedding_backend.strip() != BACKEND_DIRECT_OLLAMA:
-            raise ValueError("rag.embedding.legacy_embedding_backend must be direct_ollama")
+            raise ValueError(
+                "rag.embedding.legacy_embedding_backend must be direct_ollama"
+            )
         if not self.embedding_model.strip():
             raise ValueError("rag.embedding.embedding_model cannot be empty")
         if not self.endpoint.strip():
@@ -78,7 +78,9 @@ class RagEmbeddingConfig:
         if self.max_concurrency <= 0:
             raise ValueError("rag.embedding.max_concurrency must be greater than zero")
         if self.expected_dimensions <= 0:
-            raise ValueError("rag.embedding.expected_dimensions must be greater than zero")
+            raise ValueError(
+                "rag.embedding.expected_dimensions must be greater than zero"
+            )
 
         return RagEmbeddingConfig(
             active_backend=active_backend,

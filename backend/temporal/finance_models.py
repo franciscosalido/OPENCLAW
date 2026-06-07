@@ -247,7 +247,11 @@ class KronosForecast:
             raise ValueError("horizon_step must be >= 0")
         if self.sample_count is not None and self.sample_count < 1:
             raise ValueError("sample_count must be >= 1")
-        if self.high_pred is not None and self.low_pred is not None and self.high_pred < self.low_pred:
+        if (
+            self.high_pred is not None
+            and self.low_pred is not None
+            and self.high_pred < self.low_pred
+        ):
             raise ValueError("high_pred must be >= low_pred")
         _validate_envelope_fields(
             ingested_at=self.ingested_at,
@@ -301,7 +305,11 @@ class QlibProjectionManifest:
             _require_tzaware(self.start_ts, "start_ts")
         if self.end_ts is not None:
             _require_tzaware(self.end_ts, "end_ts")
-        if self.start_ts is not None and self.end_ts is not None and self.end_ts < self.start_ts:
+        if (
+            self.start_ts is not None
+            and self.end_ts is not None
+            and self.end_ts < self.start_ts
+        ):
             raise ValueError("end_ts must be >= start_ts")
         if self.expires_at is not None:
             _require_tzaware(self.expires_at, "expires_at")
@@ -364,7 +372,9 @@ def _require_mapping(value: Mapping[str, Any], field_name: str) -> None:
         raise TypeError(f"{field_name} must be a mapping")
 
 
-def _freeze_mapping(instance: object, field_name: str, value: Mapping[str, Any]) -> None:
+def _freeze_mapping(
+    instance: object, field_name: str, value: Mapping[str, Any]
+) -> None:
     _require_mapping(value, field_name)
     object.__setattr__(instance, field_name, dict(value))
 

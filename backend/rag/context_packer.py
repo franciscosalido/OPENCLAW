@@ -57,7 +57,9 @@ class ContextBudgetConfig:
                 )
         if self.mode != CONTEXT_BUDGET_MODE:
             raise ValueError('rag.context_budget.mode must be "whole_chunks"')
-        aliases = tuple(_validate_budget_alias(alias) for alias in self.apply_to_aliases)
+        aliases = tuple(
+            _validate_budget_alias(alias) for alias in self.apply_to_aliases
+        )
         if not aliases:
             raise ValueError("rag.context_budget.apply_to_aliases cannot be empty")
         return ContextBudgetConfig(
@@ -151,12 +153,12 @@ class ContextPacker:
         if self.max_context_tokens <= 0:
             raise ValueError("max_context_tokens must be greater than zero")
         if not 0.0 <= self.dedup_similarity_threshold <= 1.0:
-            raise ValueError(
-                "dedup_similarity_threshold must be between 0.0 and 1.0"
-            )
+            raise ValueError("dedup_similarity_threshold must be between 0.0 and 1.0")
         budget = self.context_budget.validated()
         object.__setattr__(self, "context_budget", budget)
-        object.__setattr__(self, "active_alias", _validate_budget_alias(self.active_alias))
+        object.__setattr__(
+            self, "active_alias", _validate_budget_alias(self.active_alias)
+        )
         object.__setattr__(
             self,
             "last_budget_result",

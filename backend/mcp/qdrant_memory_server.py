@@ -15,26 +15,40 @@ def create_qdrant_memory_server(config: QdrantMcpConfig | None = None) -> FastMC
 
     @server.tool
     async def qdrant_memory_health() -> dict[str, object]:
-        return HealthResponse(status="skipped", backend="qdrant", details={"url": resolved.url}).model_dump()
+        return HealthResponse(
+            status="skipped", backend="qdrant", details={"url": resolved.url}
+        ).model_dump()
 
     @server.tool
     async def qdrant_query_cache_health() -> dict[str, object]:
-        return ToolResponse(ok=True, data={"collection": "quimera_query_cache", "vectors_exposed": False}).model_dump()
+        return ToolResponse(
+            ok=True,
+            data={"collection": "quimera_query_cache", "vectors_exposed": False},
+        ).model_dump()
 
     @server.tool
     async def qdrant_collection_list() -> dict[str, object]:
-        return ToolResponse(ok=True, data={"collections": [], "vectors_exposed": False}).model_dump()
+        return ToolResponse(
+            ok=True, data={"collections": [], "vectors_exposed": False}
+        ).model_dump()
 
     @server.tool
     async def qdrant_collection_info(collection_name: str) -> dict[str, object]:
         clean = validate_collection_name(collection_name)
-        return ToolResponse(ok=True, data={"collection_name": clean, "vectors_exposed": False}).model_dump()
+        return ToolResponse(
+            ok=True, data={"collection_name": clean, "vectors_exposed": False}
+        ).model_dump()
 
     @server.tool
-    async def qdrant_scroll_safe(collection_name: str, limit: int = 10) -> dict[str, object]:
+    async def qdrant_scroll_safe(
+        collection_name: str, limit: int = 10
+    ) -> dict[str, object]:
         clean = validate_collection_name(collection_name)
         validate_limit(limit)
-        return ToolResponse(ok=True, data={"collection_name": clean, "points": [], "vectors_exposed": False}).model_dump()
+        return ToolResponse(
+            ok=True,
+            data={"collection_name": clean, "points": [], "vectors_exposed": False},
+        ).model_dump()
 
     return server
 

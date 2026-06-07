@@ -29,8 +29,8 @@ provider remoto.
 
 ## MCP Postgres e MCP Qdrant via LiteLLM
 
-`quimera-postgres-memory` e `quimera-qdrant-memory` são registrados em
-`infra/litellm/litellm_config.yaml` com Streamable HTTP e loopback. Se a versão
+`quimera_postgres_memory` e `quimera_qdrant_memory` são registrados em
+`infra/litellm/litellm_config.yaml` com transporte `http` e loopback. Se a versão
 local do LiteLLM não expuser introspection MCP, o healthcheck marca
 `gateway_introspection_skipped=true` e mantém validação estática.
 

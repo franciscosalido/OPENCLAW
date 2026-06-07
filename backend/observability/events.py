@@ -14,7 +14,9 @@ from backend.observability.safety import validate_attribute_key, validate_attrib
 
 
 class EventSpan(Protocol):
-    def add_event(self, name: str, attributes: Mapping[str, object] | None = None) -> None: ...
+    def add_event(
+        self, name: str, attributes: Mapping[str, object] | None = None
+    ) -> None: ...
 
 
 def add_safe_event(
@@ -57,4 +59,3 @@ def add_cache_decision_event(
     if reason is not None:
         attrs["quimera.cache_reason"] = reason
     add_safe_event(span, "quimera.cache.decision", attrs)
-

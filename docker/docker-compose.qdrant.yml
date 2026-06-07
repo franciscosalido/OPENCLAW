@@ -1,9 +1,9 @@
 # Qdrant vector database
-# Version is PINNED - never change :v1.18.1 to :latest
+# Version is PINNED - never change :v1.18.2 to :latest
 services:
   qdrant:
     # Server follows infra/qdrant/version_contract.yaml
-    image: qdrant/qdrant:v1.18.1
+    image: qdrant/qdrant:v1.18.2
     ports:
       - "6333:6333"  # REST + Dashboard -> http://localhost:6333/dashboard
       - "6334:6334"  # gRPC

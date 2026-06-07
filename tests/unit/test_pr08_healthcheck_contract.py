@@ -30,4 +30,4 @@ def test_integration_health_json_schema(monkeypatch: pytest.MonkeyPatch) -> None
     assert {"ollama", "litellm", "qdrant", "postgres"}.issubset(report["services"])
     assert "dsn" not in encoded.lower()
     assert "secret" not in encoded.lower()
-    assert report["mcp_servers"]["quimera-postgres-memory"]["gateway_introspection_skipped"] is True
+    assert report["mcp_servers"]["quimera_postgres_memory"]["gateway_introspection_skipped"] is True

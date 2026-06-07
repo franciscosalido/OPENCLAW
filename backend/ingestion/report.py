@@ -91,8 +91,12 @@ def build_report(
         for report in enabled_reports
         if report.rejection_reason not in {"curation_status_not_approved"}
     ]
-    latencies = [report.latency_ms for report in document_reports if report.status == "chunked"]
-    chunked_documents = sum(1 for report in document_reports if report.status == "chunked")
+    latencies = [
+        report.latency_ms for report in document_reports if report.status == "chunked"
+    ]
+    chunked_documents = sum(
+        1 for report in document_reports if report.status == "chunked"
+    )
     total_approved = len(approved_documents)
     coverage = round(chunked_documents / total_approved, 6) if total_approved else 0.0
 
@@ -108,7 +112,9 @@ def build_report(
         "rejected_documents": sum(
             1 for result in document_reports if result.status == "rejected"
         ),
-        "skipped_documents": sum(1 for result in document_reports if result.status == "skipped"),
+        "skipped_documents": sum(
+            1 for result in document_reports if result.status == "skipped"
+        ),
         "duplicate_documents": sum(
             1 for result in document_reports if result.status == "duplicate"
         ),
@@ -138,7 +144,9 @@ def write_report(path: Path, report: dict[str, Any]) -> None:
     """Write sanitized report JSON."""
 
     assert_report_is_sanitized(report)
-    path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
 
 
 def _find_forbidden_keys(value: Any) -> set[str]:

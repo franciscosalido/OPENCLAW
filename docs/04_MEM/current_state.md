@@ -4,8 +4,95 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Last updated:** 2026-06-06
-**Updated by:** Codex — RAG-01B PR-10 working memory Qdrant + pgvector
+**Last updated:** 2026-06-07
+**Updated by:** Codex — Testes-01 Qdrant client dependency contract
+
+---
+
+## Testes-01 — Qdrant Client Dependency Contract
+
+Current branch: `Testes-01`
+Base branch: `main` at `68f5716d37f6f1c421f73db08d7708f8d4709aa7`.
+
+Implemented:
+
+- Relaxed project dependency from `qdrant-client==1.18.0` to
+  `qdrant-client>=1.18`.
+- Reconciled `uv.lock` metadata offline; the locked package version remains
+  `qdrant-client 1.18.0`.
+- Updated Qdrant 1.18 version contract, ADR-018 and active Qdrant handoff docs
+  to distinguish dependency floor (`>=1.18`) from current lockfile resolution
+  (`1.18.0`).
+- Updated Qdrant 1.18 unit contracts to reject legacy `qdrant-client==1.13.2`
+  while accepting the new `>=1.18` dependency floor.
+- Applied Ruff cleanup to `backend/`: `uvx ruff format backend/` reformatted
+  65 files and `uvx ruff check --fix backend/` removed 13 unused imports.
+- Updated LiteLLM MCP server identifiers from hyphenated names to
+  LiteLLM-safe `snake_case` names:
+  `quimera_postgres_memory`, `quimera_qdrant_memory` and
+  `quimera_working_memory`.
+- Updated the LiteLLM MCP transport contract from `streamable_http` to `http`,
+  matching the currently installed LiteLLM gateway runtime.
+- Started LiteLLM as a host-only local LaunchAgent
+  `com.quimera.litellm.local`, bound to `127.0.0.1:4000`, using the rendered
+  runtime config from `infra/litellm/generated/litellm_config.runtime.yaml`
+  and explicit development placeholder keys. No `.env` or `.env.*` file was
+  read.
+
+Validation:
+
+- `.venv/bin/python -m pytest tests/unit/test_qdrant_118_config.py`:
+  43 passed.
+- `uv lock --check`: success.
+- Host import/version check: installed `qdrant-client` is `1.18.0` and
+  satisfies `>=1.18`.
+- `uvx ruff check backend/`: success.
+- `uvx ruff format --check backend/`: success.
+- `uv run mypy --strict backend`: success.
+- `uv run pyright backend`: 0 errors / 0 warnings.
+- Full host Python 3.12 regression with `.venv/bin/python -m pytest`:
+  1891 passed / 65 skipped.
+- `git diff --check`: clean.
+- `python -m infra.litellm.config_validator infra/litellm/litellm_config.yaml`:
+  success; one expected qdrant-semantic fallback warning.
+- `.venv/bin/python -m pytest tests/unit/test_litellm_mcp_config_validator.py
+  tests/integration/test_pr07_litellm_mcp_registration_smoke.py
+  tests/integration/test_pr08_litellm_mcp_tools_live.py
+  tests/unit/test_pr08_litellm_mcp_allowed_tools.py
+  tests/unit/test_pr08_healthcheck_contract.py`:
+  9 passed.
+- `bash infra/litellm/test_models.sh`: success.
+- LiteLLM readiness: `http://127.0.0.1:4000/health/readiness` returned
+  `status=healthy`, `cache=local`, `litellm_version=1.83.14`.
+- Gateway chat smoke through `local_chat`: returned `QUIMERA_OK`.
+- Gateway embedding smoke through `quimera_embed`: returned a 768-dimension
+  float vector.
+- `./scripts/start_quimera.sh status --json`: `overall=ok`; LiteLLM host-only,
+  Ollama, Postgres 18.4 and Qdrant reported OK.
+
+Qdrant version finding:
+
+- Official Qdrant server release page shows `v1.18.2` as the newest server
+  release.
+- Official `qdrant-client` PyPI/GitHub release page shows `1.18.0` as the
+  newest Python client release.
+- PKD-D2P-00Y now accepts Qdrant server/client parity by `1.18.x` family:
+  active server target is `qdrant/qdrant:v1.18.2`, Python dependency floor is
+  `qdrant-client>=1.18`, and the current lockfile resolution is
+  `qdrant-client 1.18.0`.
+- Exact server/client patch parity remains diagnostic only
+  (`version_exact_parity_ok=false`) while official PyPI client release remains
+  `1.18.0`.
+- Local runtime observed before container recreation may still report Qdrant
+  server `1.18.1`; compose and version contract now point to `1.18.2`.
+
+Scope intentionally not changed:
+
+- No live Qdrant container restart or volume reset.
+- No destructive Qdrant operation.
+- No project dependency installation. Ruff was executed through `uvx`, not
+  added to `pyproject.toml`.
+- No generated PR-09 smoke artifact staged.
 
 ---
 
@@ -30,7 +117,7 @@ Implemented:
   `infra/postgres/sql/020_working_memory_checkpoints.sql`.
 - Added working-memory MCP tools/server on loopback Streamable HTTP
   `127.0.0.1:8813/mcp`.
-- Registered `quimera-working-memory` in host LiteLLM config and allowed only
+- Registered `quimera_working_memory` in host LiteLLM config and allowed only
   safe Agentic0 health/query tools by default. Upsert/snapshot are optional
   write tools; restore/cleanup remain disabled by default.
 - Added degraded-safe working-memory smoke report:

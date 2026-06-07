@@ -8,7 +8,6 @@ from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from statistics import median
 from typing import Any, Literal, Protocol, cast
 
 import yaml
@@ -360,7 +359,9 @@ def validate_routing_against_golden_questions(
     active_scorer = scorer or FakeConfidenceScorer(
         default_score=active_config.retrieval_score_min
     )
-    questions = tuple(question for question in load_all_golden_questions() if question.enabled)
+    questions = tuple(
+        question for question in load_all_golden_questions() if question.enabled
+    )
     decisions: list[RouteDecision] = []
     failed_question_ids: list[str] = []
     passed = 0
@@ -531,5 +532,7 @@ def _percentile(values: Sequence[float], percentile: int) -> float:
     if not values:
         return 0.0
     ordered = sorted(values)
-    index = min(len(ordered) - 1, max(0, round((percentile / 100) * (len(ordered) - 1))))
+    index = min(
+        len(ordered) - 1, max(0, round((percentile / 100) * (len(ordered) - 1)))
+    )
     return round(ordered[index], 3)

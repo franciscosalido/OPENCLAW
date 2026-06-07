@@ -12,7 +12,11 @@ from loguru import logger
 
 from backend.observability.decorators import traced_retrieval
 from backend.rag._validation import validate_question
-from backend.rag.context_packer import ContextBudgetResult, ContextPacker, RetrievedChunk
+from backend.rag.context_packer import (
+    ContextBudgetResult,
+    ContextPacker,
+    RetrievedChunk,
+)
 
 
 DEFAULT_TOP_K = 5
@@ -168,7 +172,9 @@ def _validate_top_k(top_k: int) -> None:
 def _validate_score_threshold(score_threshold: float | None) -> None:
     if score_threshold is None:
         return
-    if isinstance(score_threshold, bool) or not isinstance(score_threshold, (int, float)):
+    if isinstance(score_threshold, bool) or not isinstance(
+        score_threshold, (int, float)
+    ):
         raise TypeError("score_threshold must be numeric or None")
     if not 0.0 <= float(score_threshold) <= 1.0:
         raise ValueError("score_threshold must be between 0.0 and 1.0")

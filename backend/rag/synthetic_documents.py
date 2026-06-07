@@ -121,10 +121,7 @@ def vector_chunks_for_document(
         max_tokens=max_tokens,
         overlap_tokens=overlap_tokens,
     )
-    return [
-        _to_vector_store_chunk(document=document, chunk=chunk)
-        for chunk in chunks
-    ]
+    return [_to_vector_store_chunk(document=document, chunk=chunk) for chunk in chunks]
 
 
 def _to_vector_store_chunk(

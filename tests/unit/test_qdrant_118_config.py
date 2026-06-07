@@ -63,37 +63,40 @@ def _adr_machine_block() -> dict[str, object]:
     return parsed
 
 
-def test_version_contract_targets_server_1181_client_1180() -> None:
+def test_version_contract_targets_server_1182_client_1180_family_parity() -> None:
     contract = _contract()
 
     assert contract["decision_type"] == "D2P"
     assert contract["reversible"] is True
-    assert contract["server_target_version"] == "1.18.1"
-    assert contract["server_image"] == "qdrant/qdrant:v1.18.1"
+    assert contract["server_target_version"] == "1.18.2"
+    assert contract["server_image"] == "qdrant/qdrant:v1.18.2"
     assert contract["client_target_version"] == "1.18.0"
-    assert contract["client_dependency"] == "qdrant-client==1.18.0"
+    assert contract["client_dependency"] == "qdrant-client>=1.18"
     assert contract["version_family"] == "1.18"
     assert contract["rest_port"] == 6333
     assert contract["grpc_port"] == 6334
     assert contract["config_schema_version"] == "qdrant-local-config-v2"
 
 
-def test_pyproject_pins_qdrant_client_1180() -> None:
-    assert "qdrant-client==1.18.0" in _pyproject_dependencies()
+def test_pyproject_requires_qdrant_client_118_or_newer() -> None:
+    deps = _pyproject_dependencies()
+
+    assert "qdrant-client>=1.18" in deps
+    assert "qdrant-client==1.13.2" not in deps
 
 
-def test_requirements_rag_pins_qdrant_client_1180_if_present() -> None:
+def test_requirements_rag_requires_qdrant_client_118_or_newer_if_present() -> None:
     requirements_path = ROOT / "requirements-rag.txt"
     if not requirements_path.exists():
         return
     text = requirements_path.read_text(encoding="utf-8")
     if "qdrant-client" in text:
-        assert "qdrant-client==1.18.0" in text
-        assert "qdrant-client==1.18.1" not in text
+        assert "qdrant-client>=1.18" in text
+        assert "qdrant-client==1.13.2" not in text
 
 
-def test_docker_compose_pins_qdrant_1181() -> None:
-    assert _compose_service()["image"] == "qdrant/qdrant:v1.18.1"
+def test_docker_compose_pins_qdrant_1182() -> None:
+    assert _compose_service()["image"] == "qdrant/qdrant:v1.18.2"
 
 
 def test_no_qdrant_latest_tag_anywhere() -> None:
@@ -122,7 +125,7 @@ def test_server_and_client_versions_match_contract() -> None:
 
     assert contract["client_dependency"] in _pyproject_dependencies()
     assert image == contract["server_image"]
-    assert str(contract["client_target_version"]) in str(contract["client_dependency"])
+    assert str(contract["client_dependency"]).startswith("qdrant-client>=1.18")
     assert str(contract["server_target_version"]) in str(contract["server_image"])
     assert str(contract["server_target_version"]).startswith(str(contract["version_family"]))
     assert str(contract["client_target_version"]).startswith(str(contract["version_family"]))
@@ -159,7 +162,7 @@ def test_qdrant_image_has_explicit_version_tag() -> None:
 
     assert isinstance(image, str)
     assert image.count(":") == 1
-    assert image.rsplit(":", maxsplit=1)[1] == "v1.18.1"
+    assert image.rsplit(":", maxsplit=1)[1] == "v1.18.2"
 
 
 def test_qdrant_config_yaml_exists() -> None:
@@ -281,9 +284,9 @@ def test_adr_d2p_machine_readable_block_parseable() -> None:
     assert block["schema_version"] == "adr-d2p-qdrant-upgrade-v1"
     assert block["decision_type"] == "D2P"
     assert block["reversible"] is True
-    assert block["server_target_version"] == "1.18.1"
+    assert block["server_target_version"] == "1.18.2"
     assert block["client_target_version"] == "1.18.0"
-    assert block["docker_image"] == "qdrant/qdrant:v1.18.1"
+    assert block["docker_image"] == "qdrant/qdrant:v1.18.2"
 
 
 def test_adr_declares_two_way_door() -> None:
@@ -313,11 +316,11 @@ def test_python_rrf_remains_default() -> None:
 
 def _ready_report(**overrides: object) -> readiness.QdrantReadiness:
     values: dict[str, object] = {
-        "target_server_version": "1.18.1",
+        "target_server_version": "1.18.2",
         "target_client_version": "1.18.0",
         "version_family": "1.18",
         "qdrant_client_version": "1.18.0",
-        "qdrant_server_version": "1.18.1",
+        "qdrant_server_version": "1.18.2",
         "rest_port": 6333,
         "grpc_port": 6334,
         "rest_ok": True,
@@ -366,10 +369,10 @@ def test_readiness_to_dict_shape() -> None:
     assert as_dict == {
         "schema_version": "qdrant-readiness-v1",
         "checked_at_utc": "2026-05-23T00:00:00Z",
-        "target_server_version": "1.18.1",
+        "target_server_version": "1.18.2",
         "target_client_version": "1.18.0",
         "qdrant_client_version": "1.18.0",
-        "qdrant_server_version": "1.18.1",
+        "qdrant_server_version": "1.18.2",
         "version_family": "1.18",
         "version_family_ok": True,
         "version_exact_parity_ok": False,
@@ -381,7 +384,7 @@ def test_readiness_to_dict_shape() -> None:
     }
 
 
-def test_readiness_accepts_server_1181_client_1180() -> None:
+def test_readiness_accepts_server_1182_client_1180_family_parity() -> None:
     readiness.assert_qdrant_118_ready(_ready_report())
 
 
@@ -419,7 +422,7 @@ def test_assert_ready_fails_for_unexpected_server_patch_version() -> None:
 
     with pytest.raises(RuntimeError, match="server version"):
         readiness.assert_qdrant_118_ready(
-            _ready_report(qdrant_server_version="1.18.2"),
+            _ready_report(qdrant_server_version="1.18.1"),
         )
 
 
@@ -455,7 +458,7 @@ async def test_readiness_script_output_is_valid_json_on_stdout(
         assert host == "localhost"
         assert port == 6333
         assert timeout_s == 5.0
-        return "1.18.1"
+        return "1.18.2"
 
     async def fake_grpc_probe(host: str, grpc_port: int, timeout_s: float) -> bool:
         return host == "localhost" and grpc_port == 6334 and timeout_s == 5.0
@@ -473,10 +476,10 @@ async def test_readiness_script_output_is_valid_json_on_stdout(
     assert captured.err == ""
     assert payload["schema_version"] == "qdrant-readiness-v1"
     assert payload["ready"] is True
-    assert payload["target_server_version"] == "1.18.1"
+    assert payload["target_server_version"] == "1.18.2"
     assert payload["target_client_version"] == "1.18.0"
     assert payload["qdrant_client_version"] == "1.18.0"
-    assert payload["qdrant_server_version"] == "1.18.1"
+    assert payload["qdrant_server_version"] == "1.18.2"
     assert payload["version_family_ok"] is True
     assert payload["version_exact_parity_ok"] is False
 
@@ -534,7 +537,7 @@ def test_unit_tests_do_not_require_qdrant_env(monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.delenv("QDRANT_URL", raising=False)
     monkeypatch.delenv("RUN_HYBRID_SMOKE", raising=False)
 
-    assert _contract()["server_target_version"] == "1.18.1"
+    assert _contract()["server_target_version"] == "1.18.2"
 
 
 def test_unit_tests_do_not_import_docker_sdk() -> None:

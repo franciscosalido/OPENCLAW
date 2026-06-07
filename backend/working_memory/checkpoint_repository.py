@@ -77,7 +77,9 @@ class WorkingMemoryCheckpointRepository:
         return str(row["snapshot_id"])
 
     @traced_pg("working_memory_snapshot_points", "INSERT")
-    async def insert_snapshot_points(self, *, snapshot_id: str, points: Sequence[WorkingMemoryPoint]) -> None:
+    async def insert_snapshot_points(
+        self, *, snapshot_id: str, points: Sequence[WorkingMemoryPoint]
+    ) -> None:
         for point in points:
             await self._pool.execute(
                 """
@@ -116,7 +118,9 @@ class WorkingMemoryCheckpointRepository:
                 point.created_at,
             )
 
-    async def get_latest_snapshot(self, *, agent_id: str, session_id: str) -> dict[str, Any] | None:
+    async def get_latest_snapshot(
+        self, *, agent_id: str, session_id: str
+    ) -> dict[str, Any] | None:
         row = await self._pool.fetchrow(
             """
             SELECT *
@@ -190,13 +194,17 @@ def _vector_literal(vector: Sequence[float]) -> str:
 def _point_from_row(row: dict[str, Any]) -> WorkingMemoryPoint:
     vector_value = row.get("memory_vector", [])
     if isinstance(vector_value, str):
-        vector = tuple(float(item) for item in vector_value.strip("[]").split(",") if item)
+        vector = tuple(
+            float(item) for item in vector_value.strip("[]").split(",") if item
+        )
     else:
         vector = tuple(float(item) for item in vector_value)
     return WorkingMemoryPoint(
         point_id=str(row["point_id"]),
         agent_id=str(row["agent_id"]),
-        session_id=row["session_id"] if isinstance(row["session_id"], UUID) else UUID(str(row["session_id"])),
+        session_id=row["session_id"]
+        if isinstance(row["session_id"], UUID)
+        else UUID(str(row["session_id"])),
         memory_kind=str(row["memory_kind"]),  # type: ignore[arg-type]
         vector=vector,
         vector_dim=int(row["vector_dim"]),
@@ -204,11 +212,15 @@ def _point_from_row(row: dict[str, Any]) -> WorkingMemoryPoint:
         created_at=row["created_at"],
         updated_at=row["created_at"],
         expires_at=row["expires_at"],
-        ttl_seconds=max(1, int((row["expires_at"] - row["created_at"]).total_seconds())) if row["expires_at"] else 1,
+        ttl_seconds=max(1, int((row["expires_at"] - row["created_at"]).total_seconds()))
+        if row["expires_at"]
+        else 1,
         embedding_model=str(row["embedding_model"]),
         source_ref=row.get("source_ref"),
         topic=row.get("topic"),
-        importance=float(row["importance"]) if row.get("importance") is not None else 0.5,
+        importance=float(row["importance"])
+        if row.get("importance") is not None
+        else 0.5,
         safe_summary=row.get("safe_summary"),
         metadata=dict(row.get("metadata") or {}),
     )

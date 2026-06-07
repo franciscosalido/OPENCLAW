@@ -23,7 +23,9 @@ _PII_PATTERNS: tuple[tuple[PiiPatternCategory, re.Pattern[str]], ...] = (
     ("email", re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")),
     (
         "br_phone",
-        re.compile(r"(?<!\d)(?:\+55\s*)?(?:\(?\d{2}\)?\s*)?(?:9\s*)?\d{4}[-\s]?\d{4}(?!\d)"),
+        re.compile(
+            r"(?<!\d)(?:\+55\s*)?(?:\(?\d{2}\)?\s*)?(?:9\s*)?\d{4}[-\s]?\d{4}(?!\d)"
+        ),
     ),
 )
 

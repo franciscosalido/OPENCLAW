@@ -198,10 +198,10 @@ class LocalRagPipeline:
                 self.generator,
                 messages=messages,
                 temperature=self.temperature,
-            thinking_mode=self.thinking_mode,
-            generation_budget=generation_budget,
-            model_residency=model_residency,
-        )
+                thinking_mode=self.thinking_mode,
+                generation_budget=generation_budget,
+                model_residency=model_residency,
+            )
         except Exception as exc:
             self._emit_pipeline_event(
                 RagEventKind.GENERATION_FAILED,
@@ -388,9 +388,7 @@ class LocalRagPipeline:
                 else None
             ),
             keep_alive_skipped_reason=(
-                model_residency.skipped_reason
-                if model_residency is not None
-                else None
+                model_residency.skipped_reason if model_residency is not None else None
             ),
             prompt_build_ms=prompt_ms,
             generation_ms=generation_ms,
@@ -414,9 +412,15 @@ class LocalRagPipeline:
         config = self.observability_config
         if config is None or not config.enabled:
             return
-        if event_kind.value.startswith("retrieval_") and not config.retrieval_events_enabled:
+        if (
+            event_kind.value.startswith("retrieval_")
+            and not config.retrieval_events_enabled
+        ):
             return
-        if event_kind.value.startswith("generation_") and not config.generation_events_enabled:
+        if (
+            event_kind.value.startswith("generation_")
+            and not config.generation_events_enabled
+        ):
             return
         tracing = self.tracing_config
         event = RagObservabilityEvent(

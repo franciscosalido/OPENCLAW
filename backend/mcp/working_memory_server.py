@@ -14,10 +14,15 @@ from backend.mcp.working_memory_tools import (
     working_memory_snapshot,
     working_memory_upsert,
 )
-from backend.working_memory.config import WorkingMemorySettings, get_working_memory_settings
+from backend.working_memory.config import (
+    WorkingMemorySettings,
+    get_working_memory_settings,
+)
 
 
-def create_working_memory_server(settings: WorkingMemorySettings | None = None) -> FastMCP[Any]:
+def create_working_memory_server(
+    settings: WorkingMemorySettings | None = None,
+) -> FastMCP[Any]:
     resolved = settings or get_working_memory_settings()
     server: FastMCP[Any] = FastMCP("quimera-working-memory")
 
@@ -46,20 +51,44 @@ def create_working_memory_server(settings: WorkingMemorySettings | None = None) 
         )
 
     @server.tool
-    async def working_memory_points_query(agent_id: str, session_id: str, query_vector: list[float], limit: int = 10) -> dict[str, object]:
-        return await working_memory_query(agent_id, session_id, query_vector, limit=limit, settings=resolved, store=None)
+    async def working_memory_points_query(
+        agent_id: str, session_id: str, query_vector: list[float], limit: int = 10
+    ) -> dict[str, object]:
+        return await working_memory_query(
+            agent_id,
+            session_id,
+            query_vector,
+            limit=limit,
+            settings=resolved,
+            store=None,
+        )
 
     @server.tool
-    async def working_memory_session_snapshot(agent_id: str, session_id: str) -> dict[str, object]:
-        return await working_memory_snapshot(agent_id, session_id, snapshot_service=None)
+    async def working_memory_session_snapshot(
+        agent_id: str, session_id: str
+    ) -> dict[str, object]:
+        return await working_memory_snapshot(
+            agent_id, session_id, snapshot_service=None
+        )
 
     @server.tool
-    async def working_memory_session_restore(agent_id: str, session_id: str) -> dict[str, object]:
-        return await working_memory_restore(agent_id, session_id, settings=resolved, restore_service=None)
+    async def working_memory_session_restore(
+        agent_id: str, session_id: str
+    ) -> dict[str, object]:
+        return await working_memory_restore(
+            agent_id, session_id, settings=resolved, restore_service=None
+        )
 
     @server.tool
-    async def working_memory_expired_cleanup(agent_id: str | None = None, session_id: str | None = None) -> dict[str, object]:
-        return await working_memory_cleanup_expired(settings=resolved, cleanup_service=None, agent_id=agent_id, session_id=session_id)
+    async def working_memory_expired_cleanup(
+        agent_id: str | None = None, session_id: str | None = None
+    ) -> dict[str, object]:
+        return await working_memory_cleanup_expired(
+            settings=resolved,
+            cleanup_service=None,
+            agent_id=agent_id,
+            session_id=session_id,
+        )
 
     return server
 

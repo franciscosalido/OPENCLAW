@@ -375,7 +375,9 @@ def _cache_hit_from_point(point: object, *, score: float) -> CacheHit:
             retrieval_fingerprint=str(payload["retrieval_fingerprint"]),
             schema_version=str(payload["schema_version"]),
         )
-        doc_ids = tuple(str(item) for item in _sequence_payload(payload, "result_doc_ids"))
+        doc_ids = tuple(
+            str(item) for item in _sequence_payload(payload, "result_doc_ids")
+        )
         scores = tuple(
             _payload_float(item) for item in _sequence_payload(payload, "result_scores")
         )

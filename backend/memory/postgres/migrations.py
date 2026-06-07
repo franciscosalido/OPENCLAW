@@ -18,7 +18,9 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
     applied_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 """
-ADVISORY_LOCK_SQL = "SELECT pg_advisory_xact_lock(hashtext('quimera_postgres_migrations'))"
+ADVISORY_LOCK_SQL = (
+    "SELECT pg_advisory_xact_lock(hashtext('quimera_postgres_migrations'))"
+)
 
 
 class MigrationPool(Protocol):
@@ -81,7 +83,9 @@ def compute_checksum(sql: str) -> str:
     return hashlib.sha256(sql.encode("utf-8")).hexdigest()
 
 
-def list_migration_files(migrations_dir: Path = MIGRATIONS_DIR) -> tuple[MigrationFile, ...]:
+def list_migration_files(
+    migrations_dir: Path = MIGRATIONS_DIR,
+) -> tuple[MigrationFile, ...]:
     """Return SQL migrations in lexicographic order."""
 
     files = sorted(migrations_dir.glob("*.sql"))
@@ -141,10 +145,11 @@ async def run_migrations(
         async with connection.transaction():
             await connection.execute(ADVISORY_LOCK_SQL)
             await connection.execute(SCHEMA_MIGRATIONS_BOOTSTRAP_SQL)
-            rows = await connection.fetch("SELECT version, checksum FROM schema_migrations")
+            rows = await connection.fetch(
+                "SELECT version, checksum FROM schema_migrations"
+            )
             applied_checksums = {
-                str(row["version"]): str(row["checksum"])
-                for row in rows
+                str(row["version"]): str(row["checksum"]) for row in rows
             }
             pending = plan_pending_migrations(
                 migrations,

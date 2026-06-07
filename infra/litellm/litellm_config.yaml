@@ -180,17 +180,17 @@ callback_settings:
     message_logging: false
 
 mcp_servers:
-  quimera-postgres-memory:
+  quimera_postgres_memory:
     url: http://127.0.0.1:8811/mcp
-    transport: streamable_http
+    transport: http
     available_on_public_internet: false
-  quimera-qdrant-memory:
+  quimera_qdrant_memory:
     url: http://127.0.0.1:8812/mcp
-    transport: streamable_http
+    transport: http
     available_on_public_internet: false
-  quimera-working-memory:
+  quimera_working_memory:
     url: http://127.0.0.1:8813/mcp
-    transport: streamable_http
+    transport: http
     available_on_public_internet: false
 
 agentic0_tool_policy:

@@ -73,7 +73,9 @@ class ScoreStats:
     rank1_gap: float
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "count", _validate_non_negative_int(self.count, "count"))
+        object.__setattr__(
+            self, "count", _validate_non_negative_int(self.count, "count")
+        )
         for field_name in (
             "score_min",
             "score_max",
@@ -84,7 +86,9 @@ class ScoreStats:
             object.__setattr__(
                 self,
                 field_name,
-                _round_score(_validate_finite_number(getattr(self, field_name), field_name)),
+                _round_score(
+                    _validate_finite_number(getattr(self, field_name), field_name)
+                ),
             )
 
     def to_dict(self) -> dict[str, object]:
@@ -118,7 +122,9 @@ class FusionLogSummary:
         object.__setattr__(
             self,
             "profile",
-            None if self.profile is None else _validate_optional_text(self.profile, "profile"),
+            None
+            if self.profile is None
+            else _validate_optional_text(self.profile, "profile"),
         )
         for field_name in ("dense_weight", "sparse_weight", "k"):
             value = getattr(self, field_name)
@@ -174,7 +180,9 @@ class RetrievalEvent:
     def __post_init__(self) -> None:
         if self.schema_version != RETRIEVAL_LOG_SCHEMA_VERSION:
             raise ValueError("schema_version must match retrieval log schema")
-        object.__setattr__(self, "event_id", _validate_optional_text(self.event_id, "event_id"))
+        object.__setattr__(
+            self, "event_id", _validate_optional_text(self.event_id, "event_id")
+        )
         object.__setattr__(self, "level", _validate_level(self.level))
         object.__setattr__(self, "mode", _validate_mode(self.mode))
         object.__setattr__(
@@ -226,7 +234,9 @@ class RetrievalEvent:
                 field_name,
                 None if value is None else _validate_optional_text(value, field_name),
             )
-        if self.otelTraceSampled is not None and not isinstance(self.otelTraceSampled, bool):
+        if self.otelTraceSampled is not None and not isinstance(
+            self.otelTraceSampled, bool
+        ):
             raise TypeError("otelTraceSampled must be bool or None")
 
     def to_dict(self) -> dict[str, object]:
@@ -373,7 +383,10 @@ def sanitize_scores(
     """Cap and round scores for safe logs."""
 
     clean_limit = _validate_non_negative_int(limit, "limit")
-    return tuple(_round_score(_validate_finite_number(score, "score")) for score in scores[:clean_limit])
+    return tuple(
+        _round_score(_validate_finite_number(score, "score"))
+        for score in scores[:clean_limit]
+    )
 
 
 def event_to_log_dict(event: RetrievalEvent) -> dict[str, object]:
@@ -490,8 +503,9 @@ def configure_retrieval_log_sink(
         enqueue=True,
         diagnose=False,
         backtrace=False,
-        filter=lambda record: "schema_version" in record["extra"]
-        and "event_id" in record["extra"],
+        filter=lambda record: (
+            "schema_version" in record["extra"] and "event_id" in record["extra"]
+        ),
     )
 
 

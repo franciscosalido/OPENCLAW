@@ -133,7 +133,9 @@ def _split_large_paragraph(paragraph: _TextUnit, max_tokens: int) -> list[_TextU
         if sentence.token_count <= max_tokens:
             sentence_units.append(sentence)
         else:
-            sentence_units.extend(_split_large_sentence(sentence, max_tokens=max_tokens))
+            sentence_units.extend(
+                _split_large_sentence(sentence, max_tokens=max_tokens)
+            )
 
     return sentence_units
 

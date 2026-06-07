@@ -38,8 +38,7 @@ class ModelResidencyConfig:
         if not isinstance(self.enabled, bool):
             raise TypeError("rag.model_residency.enabled must be boolean")
         aliases = tuple(
-            _validate_model_residency_alias(alias)
-            for alias in self.apply_to_aliases
+            _validate_model_residency_alias(alias) for alias in self.apply_to_aliases
         )
         if not aliases:
             raise ValueError("rag.model_residency.apply_to_aliases cannot be empty")
@@ -183,8 +182,5 @@ def _validate_keep_alive(value: object) -> str | None:
         raise TypeError("rag.model_residency.keep_alive must be a string")
     clean = value.strip()
     if not clean or KEEP_ALIVE_PATTERN.fullmatch(clean) is None:
-        raise ValueError(
-            "rag.model_residency.keep_alive must match "
-            "^-?\\d+(?:s|m|h)?$"
-        )
+        raise ValueError("rag.model_residency.keep_alive must match ^-?\\d+(?:s|m|h)?$")
     return clean

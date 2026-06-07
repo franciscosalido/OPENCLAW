@@ -30,7 +30,9 @@ def setup_observability(*, instrument_asyncpg: bool = True) -> None:
 
 
 def get_tracer(name: str) -> "Tracer":
-    return cast("Tracer", import_module("backend.observability.tracer").get_tracer(name))
+    return cast(
+        "Tracer", import_module("backend.observability.tracer").get_tracer(name)
+    )
 
 
 def get_meter(name: str) -> "Meter":

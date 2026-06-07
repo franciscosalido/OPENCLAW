@@ -47,7 +47,9 @@ class CorpusDocument(BaseModel):
     def _validate_source_id(cls, value: str) -> str:
         clean_value = value.strip()
         if not _STABLE_ID_RE.fullmatch(clean_value):
-            raise ValueError("source_id must be a stable non-empty slug or UUID-like string")
+            raise ValueError(
+                "source_id must be a stable non-empty slug or UUID-like string"
+            )
         return clean_value
 
     @field_validator("doc_id", "domain", "license")

@@ -54,9 +54,13 @@ class WorkingMemorySettings(BaseSettings):
     def validate_collection_name(cls, value: str) -> str:
         clean = value.strip()
         if not clean.startswith("quimera_working_memory"):
-            raise ValueError("working memory collection must use quimera_working_memory prefix")
+            raise ValueError(
+                "working memory collection must use quimera_working_memory prefix"
+            )
         if clean in {"quimera_knowledge", "quimera_query_cache", "quimera_llm_cache"}:
-            raise ValueError("working memory collection must not reuse knowledge/cache collections")
+            raise ValueError(
+                "working memory collection must not reuse knowledge/cache collections"
+            )
         return clean
 
     @field_validator("vector_name", mode="after")
@@ -69,7 +73,11 @@ class WorkingMemorySettings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_runtime_bounds(self) -> Self:
-        if self.collection_name in {"quimera_knowledge", "quimera_query_cache", "quimera_llm_cache"}:
+        if self.collection_name in {
+            "quimera_knowledge",
+            "quimera_query_cache",
+            "quimera_llm_cache",
+        }:
             raise ValueError("working memory collection must be isolated")
         return self
 

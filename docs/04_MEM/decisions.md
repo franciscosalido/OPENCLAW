@@ -59,11 +59,16 @@ Never rewrite history as if the old architectural decision never existed.
 
 ## ADR-004 — Qdrant: Pinned Version + Docker
 
-**Date:** 2026-04-25 | **Status:** Accepted
+**Date:** 2026-04-25 | **Status:** Accepted — superseded for active runtime by ADR-018 and PKD-D2P-00Y
 
 **Decision:** `qdrant/qdrant:v1.13.2` pinned. `:latest` prohibited.
 
 **Why:** Reproducibility. `:latest` silently breaks between sessions.
+
+**Supersession note 2026-06-07:** active runtime now pins
+`qdrant/qdrant:v1.18.2` and accepts server/client parity by `1.18.x` family
+per `docs/pkd/PKD-D2P-00Y-qdrant-118-family-parity.md`. The `v1.13.2`
+reference is historical only.
 
 ---
 

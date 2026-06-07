@@ -58,7 +58,9 @@ class FinanceRepository:
         )
         return _market_instrument_from_record(_require_row(row))
 
-    async def get_market_instrument(self, instrument_id: UUID) -> MarketInstrument | None:
+    async def get_market_instrument(
+        self, instrument_id: UUID
+    ) -> MarketInstrument | None:
         row = await self._pool.fetchrow(
             "SELECT * FROM market_instruments WHERE instrument_id = $1",
             instrument_id,
@@ -574,7 +576,9 @@ def _kronos_forecast_from_record(row: asyncpg.Record) -> KronosForecast:
     )
 
 
-def _qlib_projection_manifest_from_record(row: asyncpg.Record) -> QlibProjectionManifest:
+def _qlib_projection_manifest_from_record(
+    row: asyncpg.Record,
+) -> QlibProjectionManifest:
     return QlibProjectionManifest(
         projection_id=row["projection_id"],
         projection_name=row["projection_name"],
