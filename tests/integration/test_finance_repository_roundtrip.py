@@ -18,6 +18,7 @@ from backend.temporal.finance_models import (
 )
 from backend.temporal.finance_repository import FinanceRepository
 from backend.temporal.timescale import is_timescale_available
+from tests.integration.postgres_isolated_db import isolated_postgres_client
 
 
 pytestmark = pytest.mark.integration
@@ -32,15 +33,13 @@ async def repo_client() -> AsyncGenerator[tuple[PostgresClient, FinanceRepositor
     dsn = _test_dsn()
     if not dsn:
         pytest.skip("TEST_POSTGRES_DSN or QUIMERA_POSTGRES_DSN is required")
-    client = await PostgresClient.create(dsn=dsn)
-    async with client.pool.acquire() as conn:
-        if not await is_timescale_available(conn):
-            pytest.skip("TimescaleDB extension is required for PR-02 integration tests")
-    await run_migrations(client)
-    try:
+
+    async with isolated_postgres_client(dsn, prefix="finance_repository") as client:
+        async with client.pool.acquire() as conn:
+            if not await is_timescale_available(conn):
+                pytest.skip("TimescaleDB extension is required for PR-02 integration tests")
+        await run_migrations(client)
         yield client, FinanceRepository(client)
-    finally:
-        await client.close()
 
 
 async def test_finance_repository_full_roundtrip(
