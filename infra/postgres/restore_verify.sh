@@ -9,6 +9,7 @@ fi
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DUMP_FILE="$1"
+POSTGRES_CONTAINER="${QUIMERA_POSTGRES_CONTAINER:-quimera-postgres-memory}"
 if [[ ! -f "${DUMP_FILE}" ]]; then
   echo "dump file not found" >&2
   exit 3
@@ -21,9 +22,37 @@ case "${RESTORE_DB}" in
 esac
 
 DATABASE="${QUIMERA_POSTGRES_DATABASE:-${POSTGRES_DB:-quimera}}"
+
+container_pg_tools_available() {
+  command -v docker >/dev/null 2>&1 || return 1
+  docker inspect -f '{{.State.Running}}' "${POSTGRES_CONTAINER}" 2>/dev/null | grep -qx true || return 1
+  docker exec "${POSTGRES_CONTAINER}" sh -lc 'command -v pg_restore' >/dev/null 2>&1
+}
+
+run_psql() {
+  if [[ "${PG_TOOL_MODE}" == "container" ]]; then
+    docker exec -i "${POSTGRES_CONTAINER}" psql "$@"
+  else
+    psql "$@"
+  fi
+}
+
+run_pg_restore() {
+  if [[ "${PG_TOOL_MODE}" == "container" ]]; then
+    docker exec -i "${POSTGRES_CONTAINER}" pg_restore --exit-on-error "${restore_args[@]}" < "${DUMP_FILE}"
+  else
+    pg_restore --exit-on-error "${restore_args[@]}" "${DUMP_FILE}"
+  fi
+}
+
 admin_args=()
 restore_args=()
 base_dsn=""
+PG_TOOL_MODE="host"
+if container_pg_tools_available; then
+  PG_TOOL_MODE="container"
+fi
+
 if [[ -n "${QUIMERA_POSTGRES_ADMIN_DSN:-}" ]]; then
   admin_args+=(--dbname "${QUIMERA_POSTGRES_ADMIN_DSN}")
   base_dsn="${QUIMERA_POSTGRES_ADMIN_DSN}"
@@ -33,6 +62,15 @@ elif [[ -n "${QUIMERA_POSTGRES_DSN:-}" ]]; then
 elif [[ -n "${TEST_POSTGRES_DSN:-}" ]]; then
   admin_args+=(--dbname "${TEST_POSTGRES_DSN}")
   base_dsn="${TEST_POSTGRES_DSN}"
+elif [[ "${PG_TOOL_MODE}" == "container" ]]; then
+  admin_args+=(
+    --username "${POSTGRES_USER:-quimera}"
+    --dbname "${DATABASE}"
+  )
+  restore_args+=(
+    --username "${POSTGRES_USER:-quimera}"
+    --dbname "${RESTORE_DB}"
+  )
 else
   admin_args+=(
     --host "${POSTGRES_HOST:-127.0.0.1}"
@@ -70,18 +108,21 @@ cleanup() {
   case "${RESTORE_DB}" in
     quimera_restore_verify_*)
       # DROP DATABASE is guarded by the quimera_restore_verify_ prefix above.
-      psql "${admin_args[@]}" -v restore_db="${RESTORE_DB}" -c 'DROP DATABASE IF EXISTS :"restore_db" WITH (FORCE)' >/dev/null 2>&1 || true
+      run_psql "${admin_args[@]}" -c "DROP DATABASE IF EXISTS \"${RESTORE_DB}\" WITH (FORCE)" >/dev/null 2>&1 || true
       ;;
   esac
 }
 trap cleanup EXIT
 
-psql "${admin_args[@]}" -v restore_db="${RESTORE_DB}" -c 'CREATE DATABASE :"restore_db"' >/dev/null
-pg_restore --exit-on-error "${restore_args[@]}" "${DUMP_FILE}"
-psql "${restore_args[@]}" -Atqc "SELECT 1" >/dev/null
+run_psql "${admin_args[@]}" -c "CREATE DATABASE \"${RESTORE_DB}\"" >/dev/null
+run_psql "${restore_args[@]}" -c "CREATE EXTENSION IF NOT EXISTS timescaledb" >/dev/null
+run_psql "${restore_args[@]}" -Atqc "SELECT timescaledb_pre_restore()" >/dev/null
+run_pg_restore
+run_psql "${restore_args[@]}" -Atqc "SELECT timescaledb_post_restore()" >/dev/null
+run_psql "${restore_args[@]}" -Atqc "SELECT 1" >/dev/null
 
 for table in sessions turns agent_states entity_mentions; do
-  psql "${restore_args[@]}" -v table="${table}" -Atqc \
+  run_psql "${restore_args[@]}" -v table="${table}" -Atqc \
     "SELECT to_regclass('public.${table}') IS NOT NULL" >/dev/null
 done
 

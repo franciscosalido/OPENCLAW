@@ -157,6 +157,49 @@ Validation:
 - `shellcheck` and `ruff` were not executed in this worktree because the tools
   were unavailable and no dependency installation was requested.
 
+### vibe_code_sandbox RC — Vibe integration residual failures
+
+Implemented:
+
+- Updated `Dockerfile.openclaw-sandbox` to install PostgreSQL 18 client tools
+  from the official PGDG apt repository and prepend
+  `/usr/lib/postgresql/18/bin` to `PATH`, so sandbox `pg_dump` is not older
+  than the canonical PostgreSQL 18.4 server.
+- Hardened `infra/postgres/backup.sh` and `restore_verify.sh` to prefer
+  PostgreSQL tools from the running `quimera-postgres-memory` container when
+  available, avoiding host/sandbox client drift.
+- Added TimescaleDB logical restore protocol to `restore_verify.sh`:
+  `CREATE EXTENSION IF NOT EXISTS timescaledb`,
+  `timescaledb_pre_restore()` before `pg_restore`, and
+  `timescaledb_post_restore()` after restore.
+- Added migration `017_enable_vector_extension.sql` instead of editing older
+  applied migrations, preserving checksum immutability while enabling pgvector
+  through the migration runner.
+- Added isolated live PostgreSQL test database helper for migration tests.
+  `test_postgres_migrations.py` and `test_finance_schema_migrations.py` now run
+  against per-test temporary databases and clean them up with a guarded
+  `quimera_test_` prefix.
+- Fixed the finance checksum assertion to compare only finance migrations when
+  querying `schema_migrations WHERE version >= '010'`.
+
+Validation:
+
+- Live reproduction block for the four reported failures:
+  4 passed.
+- Full affected integration files:
+  9 passed.
+- Static/unit block:
+  39 passed.
+- `bash -n infra/postgres/backup.sh infra/postgres/restore_verify.sh
+  ./start_quimera.sh scripts/start_quimera.sh scripts/star_quimera.sh`:
+  success.
+- `uv run mypy --strict` on touched test/helper files:
+  success.
+- `uv run pyright` on touched test/helper files:
+  0 errors.
+- `git diff --check`:
+  clean.
+
 ---
 
 ## RAG-01B PR-10 — Working Memory Qdrant + pgvector Checkpoints

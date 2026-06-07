@@ -8,6 +8,7 @@ import pytest
 from backend.memory.postgres.client import PostgresClient
 from backend.memory.postgres.migrations import run_migrations
 from backend.temporal.timescale import is_hypertable, is_timescale_available
+from tests.integration.postgres_isolated_db import isolated_postgres_client
 
 
 pytestmark = pytest.mark.integration
@@ -22,11 +23,8 @@ async def postgres_client() -> AsyncGenerator[PostgresClient, None]:
     dsn = _test_dsn()
     if not dsn:
         pytest.skip("TEST_POSTGRES_DSN or QUIMERA_POSTGRES_DSN is required")
-    client = await PostgresClient.create(dsn=dsn)
-    try:
+    async with isolated_postgres_client(dsn, prefix="finance_migrations") as client:
         yield client
-    finally:
-        await client.close()
 
 
 async def _require_timescale(client: PostgresClient) -> None:
@@ -61,8 +59,9 @@ async def test_finance_migrations_apply_twice_and_register_checksums(
         "016_create_qlib_projection_manifests",
     }
     recorded_versions = {row["version"] for row in rows}
+    first_finance_versions = {version for version in first if version >= "010"}
 
-    assert set(first).issubset(recorded_versions)
+    assert first_finance_versions.issubset(recorded_versions)
     assert expected_versions <= recorded_versions
     assert second == ()
     assert len(rows) >= 7
