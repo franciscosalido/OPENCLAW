@@ -122,6 +122,19 @@ _service_config_hash_expected() {
   _compose config --hash "${service}" 2>/dev/null || true
 }
 
+_service_has_build() {
+  local service="$1"
+  _compose config --format json | python3 -c '
+import json
+import sys
+
+service = sys.argv[1]
+data = json.load(sys.stdin)
+entry = data.get("services", {}).get(service, {})
+sys.exit(0 if entry.get("build") else 1)
+' "${service}"
+}
+
 _wait_service_healthy() {
   local service="$1"
   local timeout="${2:-${QUIMERA_WAIT_TIMEOUT:-90}}"
@@ -159,9 +172,13 @@ _wait_http_200() {
 }
 
 _check_docker() {
-  command -v docker >/dev/null 2>&1 || _die "Docker command not found"
-  docker info >/dev/null 2>&1 || _die "Docker is not available"
-  _compose config >/dev/null
+  _docker_available || _die "Docker is not available"
+}
+
+_docker_available() {
+  command -v docker >/dev/null 2>&1 || return 1
+  docker info >/dev/null 2>&1 || return 1
+  _compose config >/dev/null 2>&1 || return 1
 }
 
 _detect_postgres_service() {
@@ -178,7 +195,7 @@ _detect_postgres_service() {
     printf 'postgres-memory\n'
     return 0
   fi
-  _compose config --services | grep -E 'postgres' | head -n 1
+  _compose config --services | grep -E 'postgres' | head -n 1 || true
 }
 
 _detect_qdrant_service() {
@@ -191,7 +208,7 @@ _detect_qdrant_service() {
     printf 'qdrant\n'
     return 0
   fi
-  _compose config --services | grep -E 'qdrant' | head -n 1
+  _compose config --services | grep -E 'qdrant' | head -n 1 || true
 }
 
 _detect_litellm_runtime() {
@@ -265,7 +282,11 @@ _rebuild_postgres_if_needed() {
     exit 0
   fi
 
-  _compose build "${POSTGRES_SERVICE}"
+  if _service_has_build "${POSTGRES_SERVICE}"; then
+    _compose build "${POSTGRES_SERVICE}"
+  else
+    _compose pull "${POSTGRES_SERVICE}"
+  fi
   _compose stop "${POSTGRES_SERVICE}"
   _compose rm -f "${POSTGRES_SERVICE}"
   _compose up -d "${POSTGRES_SERVICE}"
@@ -283,16 +304,16 @@ _warmup_ollama_models() {
   fi
 
   if ! curl -fsS --max-time 30 -H 'Content-Type: application/json' \
-    -d "{\"model\":\"${chat_model}\",\"prompt\":\"\",\"keep_alive\":\"-1\",\"stream\":false}" \
+    -d "{\"model\":\"${chat_model}\",\"prompt\":\"\",\"keep_alive\":-1,\"stream\":false}" \
     "${base}/api/generate" >/dev/null 2>&1; then
     _warn "Ollama chat model unavailable; rode: ollama pull ${chat_model}"
   fi
 
   if ! curl -fsS --max-time 30 -H 'Content-Type: application/json' \
-    -d "{\"model\":\"${embed_model}\",\"input\":\"warmup\",\"keep_alive\":\"-1\"}" \
+    -d "{\"model\":\"${embed_model}\",\"input\":\"warmup\",\"keep_alive\":-1}" \
     "${base}/api/embed" >/dev/null 2>&1; then
     if ! curl -fsS --max-time 30 -H 'Content-Type: application/json' \
-      -d "{\"model\":\"${embed_model}\",\"prompt\":\"\",\"keep_alive\":\"-1\",\"stream\":false}" \
+      -d "{\"model\":\"${embed_model}\",\"prompt\":\"\",\"keep_alive\":-1,\"stream\":false}" \
       "${base}/api/generate" >/dev/null 2>&1; then
       _warn "Ollama embed model unavailable; rode: ollama pull ${embed_model}"
     fi
@@ -354,9 +375,10 @@ _status_table() {
   printf 'SERVIÇO | STATUS | VERSÃO/IMAGEM | PORTA/URL | HEALTH\n'
   printf '%s\n' '--- | --- | --- | --- | ---'
 
-  for service in $(_compose config --services); do
+  while read -r service; do
+    [[ -n "${service}" ]] || continue
     _service_status_row "${service}"
-  done
+  done < <(_compose config --services)
 
   postgres_service="$(_detect_postgres_service || true)"
   if [[ -n "${postgres_service}" ]]; then
@@ -401,6 +423,36 @@ _status_table() {
   fi
 }
 
+_status_table_without_docker() {
+  local qdrant_url="${QDRANT_API_BASE%/}"
+  local litellm_url="${LITELLM_BASE_URL%/}"
+  local ollama_url="${OLLAMA_BASE_URL%/}"
+
+  printf 'SERVIÇO | STATUS | VERSÃO/IMAGEM | PORTA/URL | HEALTH\n'
+  printf '%s\n' '--- | --- | --- | --- | ---'
+  printf 'docker | unavailable | - | local daemon | skipped\n'
+
+  if curl -fsS --max-time 2 "${ollama_url}/api/version" >/dev/null 2>&1; then
+    printf 'ollama-host | host-ok | unknown | %s | /api/version\n' "${ollama_url}"
+  else
+    printf 'ollama-host | host-fail | - | %s | /api/version\n' "${ollama_url}"
+  fi
+
+  if curl -fsS --max-time 2 "${qdrant_url}/readyz" >/dev/null 2>&1; then
+    printf 'qdrant-http | host-ok | unknown | %s | /readyz\n' "${qdrant_url}"
+  elif curl -fsS --max-time 2 "${qdrant_url}/healthz" >/dev/null 2>&1; then
+    printf 'qdrant-http | host-ok | unknown | %s | /healthz\n' "${qdrant_url}"
+  else
+    printf 'qdrant-http | unknown | - | %s | docker-unavailable\n' "${qdrant_url}"
+  fi
+
+  if curl -fsS --max-time 2 "${litellm_url}/health/readiness" >/dev/null 2>&1; then
+    printf 'litellm-host | host-ok | readiness | %s | /health/readiness\n' "${litellm_url}"
+  else
+    printf 'litellm-host | host-fail | - | %s | /health/readiness\n' "${litellm_url}"
+  fi
+}
+
 _start() {
   _load_env
   mkdir -p "${RUNTIME_DIR}"
@@ -434,7 +486,11 @@ _stop() {
 
 _status() {
   _load_env
-  _check_docker
+  if ! _docker_available; then
+    _warn "Docker unavailable; showing partial host-only status"
+    _status_table_without_docker
+    return 0
+  fi
   _status_table
 }
 

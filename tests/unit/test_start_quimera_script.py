@@ -71,14 +71,16 @@ def test_required_functions_exist() -> None:
         "_service_exists",
         "_service_container_id",
         "_service_image_current",
-        "_service_image_expected",
-        "_service_config_hash_current",
-        "_service_config_hash_expected",
-        "_wait_service_healthy",
-        "_wait_http_200",
-        "_check_docker",
-        "_detect_postgres_service",
-        "_detect_qdrant_service",
+            "_service_image_expected",
+            "_service_config_hash_current",
+            "_service_config_hash_expected",
+            "_service_has_build",
+            "_wait_service_healthy",
+            "_wait_http_200",
+            "_check_docker",
+            "_docker_available",
+            "_detect_postgres_service",
+            "_detect_qdrant_service",
         "_detect_litellm_runtime",
         "_detect_ollama_runtime",
         "_rebuild_postgres_if_needed",
@@ -111,6 +113,7 @@ def test_rebuild_uses_safe_recreate_without_volume_removal() -> None:
 
     assert 'docker inspect -f \'{{.Config.Image}}\'' in text
     assert 'docker inspect -f \'{{.Image}}\'' in text
+    assert 'if _service_has_build "${POSTGRES_SERVICE}"; then' in text
     assert '_compose stop "${POSTGRES_SERVICE}"' in text
     assert '_compose rm -f "${POSTGRES_SERVICE}"' in text
     assert '_compose up -d "${POSTGRES_SERVICE}"' in text
@@ -153,7 +156,8 @@ def test_ollama_warmup_and_shutdown_keep_alive_contracts() -> None:
     text = _script_text()
 
     assert 'export OLLAMA_KEEP_ALIVE="${OLLAMA_KEEP_ALIVE:--1}"' in text
-    assert '\\"keep_alive\\":\\"-1\\"' in text
+    assert '\\"keep_alive\\":-1' in text
+    assert '\\"keep_alive\\":\\"-1\\"' not in text
     assert '\\"keep_alive\\":0' in text
     assert "QUIMERA_OLLAMA_AUTO_PULL" not in text
     assert "ollama pull" in text
@@ -173,6 +177,24 @@ def test_status_table_headers_are_present() -> None:
 
     assert "SERVIÇO | STATUS | VERSÃO/IMAGEM | PORTA/URL | HEALTH" in text
     assert "_status_table()" in text
+
+
+def test_status_degrades_to_partial_table_without_docker() -> None:
+    text = _script_text()
+
+    assert "Docker unavailable; showing partial host-only status" in text
+    assert "_status_table_without_docker" in text
+    assert "docker | unavailable | - | local daemon | skipped" in text
+    assert "_check_docker" not in _function_body(text, "_status")
+
+
+def test_postgres_rebuild_builds_only_when_service_has_build_section() -> None:
+    text = _script_text()
+
+    rebuild_body = _function_body(text, "_rebuild_postgres_if_needed")
+    assert "_service_has_build" in rebuild_body
+    assert '_compose build "${POSTGRES_SERVICE}"' in rebuild_body
+    assert '_compose pull "${POSTGRES_SERVICE}"' in rebuild_body
 
 
 def test_postgres_service_detection_order() -> None:
@@ -209,3 +231,11 @@ def _line_containing(text: str, needle: str) -> str:
         if needle in line:
             return line
     raise AssertionError(f"missing line containing {needle!r}")
+
+
+def _function_body(text: str, function_name: str) -> str:
+    pattern = rf"^{function_name}\(\) \{{\n(?P<body>.*?)(?=^\S+\(\) \{{|\Z)"
+    match = re.search(pattern, text, re.MULTILINE | re.DOTALL)
+    if not match:
+        raise AssertionError(f"missing function {function_name}")
+    return match.group("body")

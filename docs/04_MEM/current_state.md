@@ -127,6 +127,36 @@ Scope intentionally not changed:
 - No live volume reset.
 - No pg_dump/restore behavior change yet.
 
+### vibe_code_sandbox RC — start_quimera Postgres rebuild hardening
+
+Implemented:
+
+- Refactored `scripts/start_quimera.sh` as the canonical operational entrypoint
+  behind the root `./start_quimera.sh` wrapper.
+- The script now accepts exactly `--start`, `--stop` and `--status`.
+- Postgres image/config drift is detected before start and requires explicit
+  human confirmation before rebuild.
+- Rebuild preserves data volumes: it uses compose build-or-pull, stop, rm -f
+  and up -d for the Postgres service only; no volume removal, compose down -v
+  or Docker prune command is present.
+- Ollama warmup uses numeric `keep_alive: -1`, matching the official Ollama API
+  preload examples and the existing numeric unload `keep_alive: 0` contract.
+- `--status` now degrades to a partial host-only table when Docker is not
+  available instead of aborting before rendering any status.
+- Postgres rebuild now calls `docker compose build` only when the service has a
+  Compose `build:` section; external image services use `docker compose pull`.
+
+Validation:
+
+- `bash -n ./start_quimera.sh scripts/start_quimera.sh scripts/star_quimera.sh`:
+  success.
+- `uv run pytest tests/unit/test_start_quimera_script.py`:
+  19 passed.
+- `git diff --check`:
+  clean.
+- `shellcheck` and `ruff` were not executed in this worktree because the tools
+  were unavailable and no dependency installation was requested.
+
 ---
 
 ## RAG-01B PR-10 — Working Memory Qdrant + pgvector Checkpoints
