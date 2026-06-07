@@ -14,7 +14,11 @@ DEFAULT_POSTGRES_DSN = "postgresql://quimera@127.0.0.1:5432/quimera"
 class PostgresSettings(BaseSettings):
     """Local-first settings for the asyncpg memory pool."""
 
-    model_config = SettingsConfigDict(extra="ignore", frozen=True)
+    model_config = SettingsConfigDict(
+        extra="ignore",
+        frozen=True,
+        populate_by_name=True,
+    )
 
     dsn: str = Field(
         default=DEFAULT_POSTGRES_DSN, validation_alias="QUIMERA_POSTGRES_DSN"

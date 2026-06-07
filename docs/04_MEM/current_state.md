@@ -96,6 +96,39 @@ Scope intentionally not changed:
 
 ---
 
+## vibe_code_sandbox — Postgres Extension Runtime Hardening
+
+Current worktree: `/Users/fas/projetos/vibe_code_sandbox`
+Branch: `vibe_code_sandbox`
+Base: local `main` at `cb0ba17` after merging `Testes-01` runtime contracts.
+
+Implemented:
+
+- Added `infra/postgres/Dockerfile`, a local runtime image derived from
+  `postgres:18.4-trixie`.
+- The image installs TimescaleDB `2.23.0` and pgvector `0.8.2` from source so
+  RAG-01B integration tests can create `timescaledb` hypertables and
+  `vector(768)` checkpoint columns without changing PostgreSQL major/minor.
+- Updated `docker/docker-compose.postgres.yml` and
+  `infra/docker/compose.quimera.local.yml` to build
+  `quimera/postgres-memory:18.4-trixie-timescaledb-pgvector`.
+- Updated Postgres startup to preload `timescaledb,pg_stat_statements`.
+- Updated initdb extension bootstrap to create `pgcrypto`, `timescaledb`,
+  `vector` and `pg_stat_statements`.
+- Updated working-memory checkpoint SQL to create `vector` before using the
+  `vector(768)` type, so existing databases with the extension package
+  available can self-heal on schema application.
+
+Scope intentionally not changed:
+
+- No PostgreSQL version change.
+- No switch to PostgreSQL 17/15.
+- No `postgres:latest`.
+- No live volume reset.
+- No pg_dump/restore behavior change yet.
+
+---
+
 ## RAG-01B PR-10 — Working Memory Qdrant + pgvector Checkpoints
 
 Current branch: `rag-01b/pr-10-working-memory-qdrant-pgvector`

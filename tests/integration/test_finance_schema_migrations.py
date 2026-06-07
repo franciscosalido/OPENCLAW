@@ -56,7 +56,14 @@ async def test_finance_migrations_apply_twice_and_register_checksums(
         "SELECT version, checksum FROM schema_migrations WHERE version >= '010' ORDER BY version"
     )
 
-    assert {"010_create_market_instruments", "016_create_qlib_projection_manifests"} <= set(first)
+    expected_versions = {
+        "010_create_market_instruments",
+        "016_create_qlib_projection_manifests",
+    }
+    recorded_versions = {row["version"] for row in rows}
+
+    assert set(first).issubset(recorded_versions)
+    assert expected_versions <= recorded_versions
     assert second == ()
     assert len(rows) >= 7
     assert all(len(row["checksum"]) == 64 for row in rows)

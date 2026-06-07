@@ -3,6 +3,14 @@
 The Quimera relational-temporal memory container uses PostgreSQL 18.4 and is
 defined in `docker/docker-compose.postgres.yml`.
 
+The runtime image is built locally as
+`quimera/postgres-memory:18.4-trixie-timescaledb-pgvector` from the pinned
+`postgres:18.4-trixie` base. This keeps ADR-0021's PostgreSQL version contract
+while installing the native extensions required by RAG-01B:
+
+- TimescaleDB `2.23.0` for temporal hypertables.
+- pgvector `0.8.2` for durable working-memory checkpoints.
+
 Create the local password file before starting the container:
 
 ```bash
@@ -24,11 +32,18 @@ docker compose -f docker/docker-compose.postgres.yml up -d
 PR-09 operational hardening enables `pg_stat_statements` in the local compose
 command line:
 
-- `shared_preload_libraries=pg_stat_statements`
+- `shared_preload_libraries=timescaledb,pg_stat_statements`
 - `compute_query_id=auto`
 - `pg_stat_statements.max=10000`
 - `pg_stat_statements.track=all`
 - `track_io_timing=on`
+
+The initdb bootstrap creates only extensions, not application tables:
+
+- `pgcrypto`
+- `timescaledb`
+- `vector`
+- `pg_stat_statements`
 
 Create a local custom-format backup:
 
