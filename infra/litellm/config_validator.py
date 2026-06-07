@@ -40,7 +40,7 @@ CANONICAL_OLLAMA_BASE_URL = "http://127.0.0.1:11434"
 CANONICAL_QDRANT_BASE_URL = "http://127.0.0.1:6333"
 CANONICAL_LLM_CACHE_COLLECTION = "quimera_llm_cache"
 CANONICAL_RAG_CACHE_COLLECTION = "quimera_query_cache"
-MCP_ALLOWED_PORTS = {8811, 8812}
+MCP_ALLOWED_PORTS = {8811, 8812, 8813}
 MCP_NAME_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 AGENTIC0_ALLOWED_TOOLS = {
     "postgres_memory_health",
@@ -49,8 +49,14 @@ AGENTIC0_ALLOWED_TOOLS = {
     "qdrant_memory_health",
     "qdrant_collection_list",
     "qdrant_scroll_safe",
+    "working_memory_health",
+    "working_memory_points_query",
 }
-AGENTIC0_OPTIONAL_WRITE_TOOLS = {"postgres_agent_state_upsert"}
+AGENTIC0_OPTIONAL_WRITE_TOOLS = {
+    "postgres_agent_state_upsert",
+    "working_memory_point_upsert",
+    "working_memory_session_snapshot",
+}
 DESTRUCTIVE_TOOL_PARTS = ("delete", "recreate", "drop", "truncate", "admin", "store")
 CHAT_TIMEOUT_SECONDS = 120
 CHAT_STREAM_TIMEOUT_SECONDS = 45
@@ -297,7 +303,7 @@ class McpServerEntry(BaseModel):
         if parsed.hostname not in {"127.0.0.1", "localhost"}:
             raise ValueError("MCP server URL must be loopback")
         if parsed.port not in MCP_ALLOWED_PORTS:
-            raise ValueError("MCP server URL must use approved PR-07 ports")
+            raise ValueError("MCP server URL must use approved local MCP ports")
         if parsed.path != "/mcp":
             raise ValueError("MCP server path must be /mcp")
         return value

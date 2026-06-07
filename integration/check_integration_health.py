@@ -21,6 +21,7 @@ ServiceStatus = Literal["ok", "fail", "skipped", "unknown"]
 EXPECTED_MCP_SERVERS = {
     "quimera-postgres-memory": ("postgres_memory_health", "postgres_recent_turns_get", "postgres_agent_state_get"),
     "quimera-qdrant-memory": ("qdrant_memory_health", "qdrant_collection_list", "qdrant_scroll_safe"),
+    "quimera-working-memory": ("working_memory_health", "working_memory_points_query"),
 }
 
 

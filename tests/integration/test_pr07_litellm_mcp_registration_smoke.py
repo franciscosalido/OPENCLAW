@@ -10,4 +10,4 @@ pytestmark = pytest.mark.integration
 def test_litellm_mcp_registration_validates_offline() -> None:
     cfg = validate_config(__import__("pathlib").Path("infra/litellm/litellm_config.yaml"), strict=False)
 
-    assert set(cfg.mcp_servers) == {"quimera-postgres-memory", "quimera-qdrant-memory"}
+    assert set(cfg.mcp_servers) == {"quimera-postgres-memory", "quimera-qdrant-memory", "quimera-working-memory"}

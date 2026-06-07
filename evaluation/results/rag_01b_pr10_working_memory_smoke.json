@@ -1,0 +1,17 @@
+{
+  "agent_id": "agent-pr10-smoke",
+  "checksum_ok": false,
+  "collection": "quimera_working_memory",
+  "generated_at": "2026-06-06T23:59:19.341959+00:00",
+  "query_after_restore_count": 0,
+  "query_before_restore_count": 0,
+  "restored_count": 0,
+  "schema_version": "rag-01b-pr10-working-memory-smoke-v1",
+  "session_id": "c515e95b-0c35-428d-975a-892b3e88cbaf",
+  "snapshot_id": null,
+  "status": "skipped",
+  "upserted_count": 0,
+  "warnings": [
+    "live stack not requested"
+  ]
+}

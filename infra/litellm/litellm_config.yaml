@@ -188,6 +188,10 @@ mcp_servers:
     url: http://127.0.0.1:8812/mcp
     transport: streamable_http
     available_on_public_internet: false
+  quimera-working-memory:
+    url: http://127.0.0.1:8813/mcp
+    transport: streamable_http
+    available_on_public_internet: false
 
 agentic0_tool_policy:
   virtual_key_name: agentic0-smoke
@@ -198,8 +202,12 @@ agentic0_tool_policy:
     - qdrant_memory_health
     - qdrant_collection_list
     - qdrant_scroll_safe
+    - working_memory_health
+    - working_memory_points_query
   optional_write_tools:
     - postgres_agent_state_upsert
+    - working_memory_point_upsert
+    - working_memory_session_snapshot
   destructive_tools_allowed: false
 
 general_settings:

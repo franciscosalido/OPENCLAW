@@ -5,7 +5,65 @@
 > meaningful sessions.
 
 **Last updated:** 2026-06-06
-**Updated by:** Codex — RAG-01B PR-09 RC-01 operational smoke hardening
+**Updated by:** Codex — RAG-01B PR-10 working memory Qdrant + pgvector
+
+---
+
+## RAG-01B PR-10 — Working Memory Qdrant + pgvector Checkpoints
+
+Current branch: `rag-01b/pr-10-working-memory-qdrant-pgvector`
+Base branch: `rag-01b/pr-08-integration-smoke` after PR-09 merge commit
+`a0870b14d441de9731c84cb3e027ae76fdbb787c`.
+
+Implemented:
+
+- Added accepted ADR-005 in both ADR trees:
+  `docs/adr/ADR-005-qdrant-working-memory-pgvector-checkpoints.md` and
+  `docs/ADR/ADR-005-qdrant-working-memory-pgvector-checkpoints.md`.
+- Added PR-10 SDD and memory handoff:
+  `docs/specs/rag-01b/pr-10-working-memory-qdrant-pgvector.md` and
+  `docs/04_MEM/WORKING_MEMORY_QDRANT.md`.
+- Added `backend/working_memory/` with settings, immutable models, safety
+  gates, Qdrant hot store, pgvector checkpoint repository, snapshot service,
+  restore service, cleanup and safe metric names.
+- Added pgvector checkpoint SQL:
+  `infra/postgres/sql/020_working_memory_checkpoints.sql`.
+- Added working-memory MCP tools/server on loopback Streamable HTTP
+  `127.0.0.1:8813/mcp`.
+- Registered `quimera-working-memory` in host LiteLLM config and allowed only
+  safe Agentic0 health/query tools by default. Upsert/snapshot are optional
+  write tools; restore/cleanup remain disabled by default.
+- Added degraded-safe working-memory smoke report:
+  `integration/working_memory_smoke.py` and
+  `evaluation/results/rag_01b_pr10_working_memory_smoke.json`.
+
+Scope explicitly not changed:
+
+- No Redis, Dragonfly or Python/RAM backend decision.
+- No HybridRAG collection mutation.
+- No `quimera_query_cache` or `quimera_llm_cache` mutation.
+- No pgvector ANN index as hot path.
+- No daemon/scheduler/dashboard/provider remoto/real data.
+- No `delete_collection` flow for working memory.
+
+Validation:
+
+- PR-10 unit/integration block: 67 passed / 4 skipped.
+- PR-10 + LiteLLM/MCP registration block: 75 passed / 4 skipped.
+- `uv run mypy --strict` on PR-10 working-memory, MCP, LiteLLM config and
+  tests: success.
+- `uv run pyright` on the same scope: 0 errors.
+- `uv run python -m infra.litellm.config_validator`: success with one expected
+  qdrant-semantic fallback warning.
+- `uv run python -m integration.working_memory_smoke`: generated skipped safe
+  smoke artifact because live stack was not requested.
+- `git diff --check`: clean.
+
+Operational note:
+
+- Live Qdrant/Postgres restore tests are opt-in and skip cleanly unless the
+  human operator exports the explicit `QUIMERA_TEST_WM_*` variables and a
+  test DSN.
 
 ---
 
