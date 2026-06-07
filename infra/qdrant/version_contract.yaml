@@ -1,8 +1,8 @@
 qdrant:
   decision_type: "D2P"
   reversible: true
-  server_target_version: "1.18.1"
-  server_image: "qdrant/qdrant:v1.18.1"
+  server_target_version: "1.18.2"
+  server_image: "qdrant/qdrant:v1.18.2"
   client_target_version: "1.18.0"
   client_dependency: "qdrant-client>=1.18"
   version_family: "1.18"
@@ -10,7 +10,7 @@ qdrant:
   grpc_port: 6334
   config_schema_version: "qdrant-local-config-v2"
   notes:
-    - "Server 1.18.1 is latest."
+    - "Server 1.18.2 is latest."
     - "Client dependency requires the 1.18 family or newer."
     - "uv.lock currently resolves qdrant-client 1.18.0."
-    - "Patch mismatch is accepted as D2P until qdrant-client 1.18.1 exists or the lock is refreshed."
+    - "Patch mismatch is accepted by PKD-D2P-00Y while official qdrant-client remains 1.18.0."

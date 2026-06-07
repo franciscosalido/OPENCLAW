@@ -44,6 +44,10 @@ Before touching Docker or dependencies:
 
 ## Q18-02 Result
 
+Supersession note 2026-06-07: active runtime version policy moved to
+`docs/pkd/PKD-D2P-00Y-qdrant-118-family-parity.md`. The historical Q18-02
+server target below is not the active runtime target.
+
 - Client dependency target: `qdrant-client>=1.18`; `uv.lock` currently
   resolves `1.18.0`.
 - Server image target: `qdrant/qdrant:v1.18.0`.

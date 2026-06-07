@@ -76,19 +76,20 @@ Qdrant version finding:
   release.
 - Official `qdrant-client` PyPI/GitHub release page shows `1.18.0` as the
   newest Python client release.
-- Local runtime currently reports Qdrant server `1.18.1` from
-  `http://127.0.0.1:6333/`, while the installed Python client is `1.18.0`.
-- Therefore, exact server/client patch parity is not currently respected and
-  cannot be satisfied using only official PyPI `qdrant-client` releases. A
-  human architecture decision is required: prefer latest server (`1.18.2`) with
-  client family compatibility (`>=1.18`) or downgrade server to the latest
-  exact common version (`1.18.0`).
+- PKD-D2P-00Y now accepts Qdrant server/client parity by `1.18.x` family:
+  active server target is `qdrant/qdrant:v1.18.2`, Python dependency floor is
+  `qdrant-client>=1.18`, and the current lockfile resolution is
+  `qdrant-client 1.18.0`.
+- Exact server/client patch parity remains diagnostic only
+  (`version_exact_parity_ok=false`) while official PyPI client release remains
+  `1.18.0`.
+- Local runtime observed before container recreation may still report Qdrant
+  server `1.18.1`; compose and version contract now point to `1.18.2`.
 
 Scope intentionally not changed:
 
-- No Qdrant server image change.
-- No Qdrant client/server parity policy change after discovering the official
-  release mismatch.
+- No live Qdrant container restart or volume reset.
+- No destructive Qdrant operation.
 - No project dependency installation. Ruff was executed through `uvx`, not
   added to `pyproject.toml`.
 - No generated PR-09 smoke artifact staged.

@@ -23,7 +23,7 @@ def test_compose_does_not_use_obsolete_postgres_or_qdrant() -> None:
     assert "postgres:17" not in text
     assert "qdrant/qdrant:v1.13" not in text
     assert "postgres:18.4-trixie" in text
-    assert "qdrant/qdrant:v1.18.1" in text
+    assert "qdrant/qdrant:v1.18.2" in text
 
 
 def test_canonical_adrs_exist() -> None:

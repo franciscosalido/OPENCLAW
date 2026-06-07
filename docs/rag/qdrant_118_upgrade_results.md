@@ -60,18 +60,18 @@ Python RRFFusion default: `true`.
 Native RRF decision: `keep_python_rrf_default`.
 TurboQuant decision: `accept_turboquant_experimental_only`.
 
-## D2P Update: Qdrant Server 1.18.1
+## D2P Update: Qdrant Server 1.18.2
 
 The benchmark matrix above was produced for Qdrant Server `1.18.0`; those
-numbers must not be rewritten as `1.18.1` evidence.
+numbers must not be rewritten as `1.18.2` evidence.
 
-ADR-D2P-018 now targets Qdrant Server `1.18.1` for local-first runtime
-evaluation because it is a reversible patch-level bugfix release. The Python
-client dependency requires `qdrant-client>=1.18`, with `uv.lock` currently
-resolved at `1.18.0`.
+ADR-D2P-018 and PKD-D2P-00Y now target Qdrant Server `1.18.2` for local-first
+runtime evaluation because it is the latest stable patch in the accepted
+`1.18.x` family. The Python client dependency requires `qdrant-client>=1.18`,
+with `uv.lock` currently resolved at `1.18.0`.
 
-Qwen3 benchmarks should be repeated against server version `1.18.1`, and new
-artifacts should record `qdrant_server_version=1.18.1`. Python RRFFusion remains
+Qwen3 benchmarks should be repeated against server version `1.18.2`, and new
+artifacts should record `qdrant_server_version=1.18.2`. Python RRFFusion remains
 the default, TurboQuant remains experimental, and PostgreSQL/GraphRAG remain
 outside this cycle.
 
