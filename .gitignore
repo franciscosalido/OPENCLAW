@@ -65,12 +65,7 @@ logs/*.jsonl
 *.log
 .runtime/
 tests/golden/reports/
-reports/golden/
-reports/gateway2/
-reports/ci/
-reports/gateway1_smoke/
-reports/g2_latency_baseline/
-reports/g2_alias_comparison/
+reports/
 !tests/golden/baseline/gateway2_baseline_summary.json
 !tests/golden/baseline/gateway2_baseline_results.jsonl
 !tests/golden/baseline/gateway2_baseline_scores.jsonl
