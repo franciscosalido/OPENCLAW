@@ -41,7 +41,7 @@ CANONICAL_QDRANT_BASE_URL = "http://127.0.0.1:6333"
 CANONICAL_LLM_CACHE_COLLECTION = "quimera_llm_cache"
 CANONICAL_RAG_CACHE_COLLECTION = "quimera_query_cache"
 MCP_ALLOWED_PORTS = {8811, 8812, 8813}
-MCP_NAME_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+MCP_NAME_RE = re.compile(r"^[a-z0-9]+(?:_[a-z0-9]+)*$")
 AGENTIC0_ALLOWED_TOOLS = {
     "postgres_memory_health",
     "postgres_recent_turns_get",
@@ -310,9 +310,9 @@ class McpServerEntry(BaseModel):
 
     @field_validator("transport")
     @classmethod
-    def transport_must_be_streamable_http(cls, value: str) -> str:
-        if value not in {"streamable_http", "streamable-http"}:
-            raise ValueError("MCP transport must be streamable_http")
+    def transport_must_be_http(cls, value: str) -> str:
+        if value != "http":
+            raise ValueError("MCP transport must be http")
         return value
 
     @model_validator(mode="after")
@@ -376,7 +376,7 @@ class ConfigRoot(BaseModel):
     def mcp_servers_are_local_first(self) -> "ConfigRoot":
         for name in self.mcp_servers:
             if not MCP_NAME_RE.fullmatch(name):
-                raise ValueError("MCP server names must be lowercase SEP-986-safe hyphenated identifiers")
+                raise ValueError("MCP server names must be lowercase LiteLLM-safe snake_case identifiers")
         return self
 
     @model_validator(mode="after")

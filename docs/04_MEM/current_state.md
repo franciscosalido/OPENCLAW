@@ -27,6 +27,17 @@ Implemented:
   while accepting the new `>=1.18` dependency floor.
 - Applied Ruff cleanup to `backend/`: `uvx ruff format backend/` reformatted
   65 files and `uvx ruff check --fix backend/` removed 13 unused imports.
+- Updated LiteLLM MCP server identifiers from hyphenated names to
+  LiteLLM-safe `snake_case` names:
+  `quimera_postgres_memory`, `quimera_qdrant_memory` and
+  `quimera_working_memory`.
+- Updated the LiteLLM MCP transport contract from `streamable_http` to `http`,
+  matching the currently installed LiteLLM gateway runtime.
+- Started LiteLLM as a host-only local LaunchAgent
+  `com.quimera.litellm.local`, bound to `127.0.0.1:4000`, using the rendered
+  runtime config from `infra/litellm/generated/litellm_config.runtime.yaml`
+  and explicit development placeholder keys. No `.env` or `.env.*` file was
+  read.
 
 Validation:
 
@@ -42,6 +53,22 @@ Validation:
 - Full host Python 3.12 regression with `.venv/bin/python -m pytest`:
   1891 passed / 65 skipped.
 - `git diff --check`: clean.
+- `python -m infra.litellm.config_validator infra/litellm/litellm_config.yaml`:
+  success; one expected qdrant-semantic fallback warning.
+- `.venv/bin/python -m pytest tests/unit/test_litellm_mcp_config_validator.py
+  tests/integration/test_pr07_litellm_mcp_registration_smoke.py
+  tests/integration/test_pr08_litellm_mcp_tools_live.py
+  tests/unit/test_pr08_litellm_mcp_allowed_tools.py
+  tests/unit/test_pr08_healthcheck_contract.py`:
+  9 passed.
+- `bash infra/litellm/test_models.sh`: success.
+- LiteLLM readiness: `http://127.0.0.1:4000/health/readiness` returned
+  `status=healthy`, `cache=local`, `litellm_version=1.83.14`.
+- Gateway chat smoke through `local_chat`: returned `QUIMERA_OK`.
+- Gateway embedding smoke through `quimera_embed`: returned a 768-dimension
+  float vector.
+- `./scripts/start_quimera.sh status --json`: `overall=ok`; LiteLLM host-only,
+  Ollama, Postgres 18.4 and Qdrant reported OK.
 
 Qdrant version finding:
 
@@ -89,7 +116,7 @@ Implemented:
   `infra/postgres/sql/020_working_memory_checkpoints.sql`.
 - Added working-memory MCP tools/server on loopback Streamable HTTP
   `127.0.0.1:8813/mcp`.
-- Registered `quimera-working-memory` in host LiteLLM config and allowed only
+- Registered `quimera_working_memory` in host LiteLLM config and allowed only
   safe Agentic0 health/query tools by default. Upsert/snapshot are optional
   write tools; restore/cleanup remain disabled by default.
 - Added degraded-safe working-memory smoke report:

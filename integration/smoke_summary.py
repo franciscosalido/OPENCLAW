@@ -53,8 +53,8 @@ def build_smoke_summary(*, mode: Mode, agentic0: dict[str, Any] | None = None, p
         "status": overall,
         "services": {
             **health.get("services", {}),
-            "mcp_postgres": {"status": health.get("mcp_servers", {}).get("quimera-postgres-memory", {}).get("status", "unknown")},
-            "mcp_qdrant": {"status": health.get("mcp_servers", {}).get("quimera-qdrant-memory", {}).get("status", "unknown")},
+            "mcp_postgres": {"status": health.get("mcp_servers", {}).get("quimera_postgres_memory", {}).get("status", "unknown")},
+            "mcp_qdrant": {"status": health.get("mcp_servers", {}).get("quimera_qdrant_memory", {}).get("status", "unknown")},
         },
         "agentic0": agentic0 or {"status": "skipped", "latency_ms": 0.0, "tool_calls": 0},
         "postgres": {
