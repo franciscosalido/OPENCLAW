@@ -53,7 +53,9 @@ def register(provider: str, factory: EmbedderFactory) -> None:
     provider_key = _normalize_provider(provider)
     with _REGISTRY_LOCK:
         if provider_key in _REGISTRY:
-            raise ValueError(f"embedder provider {provider_key!r} is already registered")
+            raise ValueError(
+                f"embedder provider {provider_key!r} is already registered"
+            )
         _REGISTRY[provider_key] = factory
 
 

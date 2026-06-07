@@ -61,13 +61,17 @@ class QdrantIngestionCommitStore:
         if self.embedding_metadata is None:
             self.embedding_metadata = load_active_embedding_metadata()
 
-    def commit(self, chunks: Sequence[VectorStoreChunk], *, collection: str | None) -> None:
+    def commit(
+        self, chunks: Sequence[VectorStoreChunk], *, collection: str | None
+    ) -> None:
         """Embed and upsert chunks into the closed mapped collection."""
 
         requested_collection = collection or self.collection_name
         assert_collection_namespace(requested_collection, DUAL_CORPUS_COLLECTIONS)
         if requested_collection != self.collection_name:
-            raise ValueError("requested collection does not match commit store namespace")
+            raise ValueError(
+                "requested collection does not match commit store namespace"
+            )
         if self.vector_store is None:
             raise RuntimeError("vector_store is not initialized")
         if self.embedding_metadata is None:
@@ -132,7 +136,10 @@ def _validate_chunk_namespace(
         raise ValueError("chunk namespace metadata does not match collection")
     if corpus == "internal" and collection_name != DUAL_CORPUS_COLLECTIONS["internal"]:
         raise ValueError("internal corpus cannot write outside openclaw_internal")
-    if corpus == "financial" and collection_name != DUAL_CORPUS_COLLECTIONS["financial"]:
+    if (
+        corpus == "financial"
+        and collection_name != DUAL_CORPUS_COLLECTIONS["financial"]
+    ):
         raise ValueError("financial corpus cannot write outside openclaw_financial")
 
 
@@ -146,5 +153,7 @@ def _embed_chunks(
     return asyncio.run(_embed_batch(active_embedder, [chunk.text for chunk in chunks]))
 
 
-async def _embed_batch(embedder: RagEmbedder, texts: Sequence[str]) -> list[list[float]]:
+async def _embed_batch(
+    embedder: RagEmbedder, texts: Sequence[str]
+) -> list[list[float]]:
     return await embedder.embed_batch(texts)

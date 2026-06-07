@@ -50,4 +50,3 @@ def get_quimera_context_attributes() -> dict[str, str]:
     }
     compact = {key: value for key, value in attrs.items() if value is not None}
     return {key: str(value) for key, value in validate_attributes(compact).items()}
-

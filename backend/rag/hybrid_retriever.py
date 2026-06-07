@@ -20,7 +20,7 @@ import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Final, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from backend.observability.decorators import traced_retrieval, traced_rrf
 from backend.rag.fusion import (
@@ -45,6 +45,7 @@ from backend.rag.sparse_vector import SparseVector
 # ---------------------------------------------------------------------------
 class RetrievalMode(Enum):
     """Retrieval channel selection."""
+
     HYBRID = "hybrid"
     DENSE_ONLY = "dense_only"
     SPARSE_ONLY = "sparse_only"
@@ -119,6 +120,7 @@ class SearchHit:
     score may be None when the searcher does not provide a relevance estimate.
     Payload must contain 'doc_id' for the retriever to build RankedResult objects.
     """
+
     result_id: str
     score: float | None
     payload: Mapping[str, object] = field(default_factory=dict)
@@ -146,6 +148,7 @@ class SearchHit:
 @dataclass(frozen=True)
 class HybridRetrieverConfig:
     """Immutable retrieval configuration."""
+
     collection_name: str
     dense_vector_name: str
     sparse_vector_name: str
@@ -158,7 +161,10 @@ class HybridRetrieverConfig:
     search_timeout_s: float = 5.0
 
     def __post_init__(self) -> None:
-        if not isinstance(self.collection_name, str) or not self.collection_name.strip():
+        if (
+            not isinstance(self.collection_name, str)
+            or not self.collection_name.strip()
+        ):
             raise ValueError("collection_name cannot be blank")
         if "\x00" in self.collection_name:
             raise ValueError("collection_name cannot contain null bytes")
@@ -168,11 +174,15 @@ class HybridRetrieverConfig:
             raise ValueError("sparse_vector_name cannot be empty")
         if self.dense_vector_name == self.sparse_vector_name:
             raise ValueError("dense_vector_name and sparse_vector_name must differ")
-        if isinstance(self.search_top_k, bool) or not isinstance(self.search_top_k, int):
+        if isinstance(self.search_top_k, bool) or not isinstance(
+            self.search_top_k, int
+        ):
             raise TypeError("search_top_k must be an integer")
         if self.search_top_k <= 0:
             raise ValueError("search_top_k must be >= 1")
-        if isinstance(self.return_top_k, bool) or not isinstance(self.return_top_k, int):
+        if isinstance(self.return_top_k, bool) or not isinstance(
+            self.return_top_k, int
+        ):
             raise TypeError("return_top_k must be an integer")
         if self.return_top_k <= 0:
             raise ValueError("return_top_k must be >= 1")
@@ -194,6 +204,7 @@ class HybridRetrievalTrace:
     """Diagnostic counters and latency breakdown.
     Does not contain query text, vectors, embeddings, or any payload value.
     """
+
     mode: str
     dense_candidates: int
     sparse_candidates: int
@@ -225,6 +236,7 @@ class HybridRetrievalTrace:
 @dataclass(frozen=True)
 class HybridRetrievalResult:
     """Output of one retrieve() call."""
+
     results: tuple[FusedResult, ...]
     trace: HybridRetrievalTrace
 
@@ -256,6 +268,7 @@ class AsyncHybridRetriever:
     All I/O calls (embedding, search) are async. RRF fusion is always
     invoked synchronously after both search channels return.
     """
+
     dense_embedder: DenseEmbedderProtocol
     sparse_embedder: SparseEmbedderProtocol
     dense_searcher: DenseSearcherProtocol
@@ -263,7 +276,9 @@ class AsyncHybridRetriever:
     config: HybridRetrieverConfig
     fusion: RRFFusion = field(default_factory=RRFFusion)
     clock: ClockProtocol = field(default_factory=lambda: _DEFAULT_CLOCK)
-    retrieval_logger: RetrievalLoggerProtocol = field(default_factory=NullRetrievalLogger)
+    retrieval_logger: RetrievalLoggerProtocol = field(
+        default_factory=NullRetrievalLogger
+    )
 
     @traced_retrieval(source="qdrant")
     async def retrieve(
@@ -281,7 +296,9 @@ class AsyncHybridRetriever:
         except HybridRetrievalError:
             raise
         except ValueError:
-            raise HybridRetrievalError("retrieval failed: invalid result data") from None
+            raise HybridRetrievalError(
+                "retrieval failed: invalid result data"
+            ) from None
         except Exception:
             raise HybridRetrievalError("retrieval failed") from None
 
@@ -441,7 +458,9 @@ class AsyncHybridRetriever:
         except Exception:
             raise HybridRetrievalError("dense embedding failed") from None
 
-    async def _embed_sparse(self, query: str, cfg: HybridRetrieverConfig) -> SparseVector:
+    async def _embed_sparse(
+        self, query: str, cfg: HybridRetrieverConfig
+    ) -> SparseVector:
         try:
             return await asyncio.wait_for(
                 self.sparse_embedder.embed(query), timeout=cfg.embed_timeout_s

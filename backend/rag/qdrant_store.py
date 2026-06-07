@@ -297,11 +297,15 @@ class QdrantVectorStore:
         if query_filter is None:
             raise RuntimeError("document delete filter could not be built")
 
-        existing = self._client().count(
-            collection_name=self.collection_name,
-            count_filter=query_filter,
-            exact=True,
-        ).count
+        existing = (
+            self._client()
+            .count(
+                collection_name=self.collection_name,
+                count_filter=query_filter,
+                exact=True,
+            )
+            .count
+        )
 
         self._client().delete(
             collection_name=self.collection_name,
@@ -337,10 +341,12 @@ class QdrantVectorStore:
         """Return the exact number of points in the collection."""
 
         return int(
-            self._client().count(
+            self._client()
+            .count(
                 collection_name=self.collection_name,
                 exact=True,
-            ).count
+            )
+            .count
         )
 
     def _client(self) -> QdrantClient:

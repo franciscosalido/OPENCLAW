@@ -52,7 +52,9 @@ class WorkingMemoryQdrantStore:
         self._settings = settings
 
     async def ensure_collection(self) -> None:
-        if await self._client.collection_exists(collection_name=self._settings.collection_name):
+        if await self._client.collection_exists(
+            collection_name=self._settings.collection_name
+        ):
             await self.assert_collection_compatible()
         else:
             await self._client.create_collection(
@@ -74,7 +76,9 @@ class WorkingMemoryQdrantStore:
             )
 
     async def assert_collection_compatible(self) -> None:
-        info = await self._client.get_collection(collection_name=self._settings.collection_name)
+        info = await self._client.get_collection(
+            collection_name=self._settings.collection_name
+        )
         vectors = _extract_vectors_config(info)
         if self._settings.vector_name not in vectors:
             raise ValueError("working memory vector name mismatch")
@@ -84,12 +88,17 @@ class WorkingMemoryQdrantStore:
             raise ValueError("working memory vector size is invalid")
         if raw_size != self._settings.vector_size:
             raise ValueError("working memory vector size mismatch")
-        if _normalize_distance(str(vector_config["distance"])) != self._settings.distance:
+        if (
+            _normalize_distance(str(vector_config["distance"]))
+            != self._settings.distance
+        ):
             raise ValueError("working memory distance mismatch")
         if vector_config.get("on_disk") is True:
             raise ValueError("working memory vector storage must be in-memory")
 
-    @traced_cache(operation="working_memory.upsert", collection="quimera_working_memory")
+    @traced_cache(
+        operation="working_memory.upsert", collection="quimera_working_memory"
+    )
     async def upsert_memory_point(self, point: WorkingMemoryPoint) -> str:
         self._validate_vector_dim(point.vector)
         await self._client.upsert(
@@ -120,7 +129,9 @@ class WorkingMemoryQdrantStore:
             collection_name=self._settings.collection_name,
             query=list(vector),
             using=self._settings.vector_name,
-            query_filter=_agent_session_filter(agent_id=agent_id, session_id=session_id),
+            query_filter=_agent_session_filter(
+                agent_id=agent_id, session_id=session_id
+            ),
             limit=clean_limit,
             with_payload=True,
             with_vectors=False,
@@ -128,17 +139,23 @@ class WorkingMemoryQdrantStore:
         points = list(getattr(result, "points", []))
         return [_safe_result_from_point(point) for point in points]
 
-    async def list_session_memory(self, *, agent_id: str, session_id: str, limit: int = 50) -> list[dict[str, Any]]:
+    async def list_session_memory(
+        self, *, agent_id: str, session_id: str, limit: int = 50
+    ) -> list[dict[str, Any]]:
         points, _ = await self._client.scroll(
             collection_name=self._settings.collection_name,
-            scroll_filter=_agent_session_filter(agent_id=agent_id, session_id=session_id),
+            scroll_filter=_agent_session_filter(
+                agent_id=agent_id, session_id=session_id
+            ),
             limit=_validate_limit(limit),
             with_payload=True,
             with_vectors=False,
         )
         return [_safe_result_from_point(point) for point in points]
 
-    async def mark_checkpointed(self, *, point_ids: Iterable[str], checkpoint_id: str) -> None:
+    async def mark_checkpointed(
+        self, *, point_ids: Iterable[str], checkpoint_id: str
+    ) -> None:
         ids = [point_id for point_id in point_ids if point_id.strip()]
         if not ids:
             return
@@ -149,7 +166,9 @@ class WorkingMemoryQdrantStore:
             wait=True,
         )
 
-    async def delete_expired_points(self, *, agent_id: str | None = None, session_id: str | None = None) -> int:
+    async def delete_expired_points(
+        self, *, agent_id: str | None = None, session_id: str | None = None
+    ) -> int:
         conditions: list[models.Condition] = [
             models.FieldCondition(
                 key="expires_at",
@@ -157,12 +176,22 @@ class WorkingMemoryQdrantStore:
             )
         ]
         if agent_id is not None:
-            conditions.append(models.FieldCondition(key="agent_id", match=models.MatchValue(value=agent_id)))
+            conditions.append(
+                models.FieldCondition(
+                    key="agent_id", match=models.MatchValue(value=agent_id)
+                )
+            )
         if session_id is not None:
-            conditions.append(models.FieldCondition(key="session_id", match=models.MatchValue(value=session_id)))
+            conditions.append(
+                models.FieldCondition(
+                    key="session_id", match=models.MatchValue(value=session_id)
+                )
+            )
         await self._client.delete(
             collection_name=self._settings.collection_name,
-            points_selector=models.FilterSelector(filter=models.Filter(must=conditions)),
+            points_selector=models.FilterSelector(
+                filter=models.Filter(must=conditions)
+            ),
             wait=True,
         )
         return 0
@@ -170,22 +199,33 @@ class WorkingMemoryQdrantStore:
     async def delete_session_points(self, *, agent_id: str, session_id: str) -> int:
         await self._client.delete(
             collection_name=self._settings.collection_name,
-            points_selector=models.FilterSelector(filter=_agent_session_filter(agent_id=agent_id, session_id=session_id)),
+            points_selector=models.FilterSelector(
+                filter=_agent_session_filter(agent_id=agent_id, session_id=session_id)
+            ),
             wait=True,
         )
         return 0
 
-    async def export_session_points_for_snapshot(self, *, agent_id: str, session_id: str, limit: int | None = None) -> list[WorkingMemoryPoint]:
+    async def export_session_points_for_snapshot(
+        self, *, agent_id: str, session_id: str, limit: int | None = None
+    ) -> list[WorkingMemoryPoint]:
         points, _ = await self._client.scroll(
             collection_name=self._settings.collection_name,
-            scroll_filter=_agent_session_filter(agent_id=agent_id, session_id=session_id),
+            scroll_filter=_agent_session_filter(
+                agent_id=agent_id, session_id=session_id
+            ),
             limit=limit or self._settings.max_points_per_session,
             with_payload=True,
             with_vectors=True,
         )
-        return [_point_from_qdrant_point(point, vector_name=self._settings.vector_name) for point in points]
+        return [
+            _point_from_qdrant_point(point, vector_name=self._settings.vector_name)
+            for point in points
+        ]
 
-    async def restore_points_from_snapshot(self, points: list[WorkingMemoryPoint]) -> int:
+    async def restore_points_from_snapshot(
+        self, points: list[WorkingMemoryPoint]
+    ) -> int:
         if not points:
             return 0
         for point in points:
@@ -227,8 +267,12 @@ def _agent_session_filter(*, agent_id: str, session_id: str) -> models.Filter:
     UUID(session_id)
     return models.Filter(
         must=[
-            models.FieldCondition(key="agent_id", match=models.MatchValue(value=agent_id)),
-            models.FieldCondition(key="session_id", match=models.MatchValue(value=session_id)),
+            models.FieldCondition(
+                key="agent_id", match=models.MatchValue(value=agent_id)
+            ),
+            models.FieldCondition(
+                key="session_id", match=models.MatchValue(value=session_id)
+            ),
         ]
     )
 

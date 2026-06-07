@@ -35,16 +35,16 @@ class GenerationBudgetConfig:
         if not isinstance(self.enabled, bool):
             raise TypeError("rag.generation_budget.enabled must be boolean")
         if self.max_tokens is not None:
-            if isinstance(self.max_tokens, bool) or not isinstance(self.max_tokens, int):
+            if isinstance(self.max_tokens, bool) or not isinstance(
+                self.max_tokens, int
+            ):
                 raise TypeError("rag.generation_budget.max_tokens must be an integer")
             if self.max_tokens <= 0:
                 raise ValueError(
                     "rag.generation_budget.max_tokens must be greater than zero"
                 )
         if not isinstance(self.enforce_conciseness, bool):
-            raise TypeError(
-                "rag.generation_budget.enforce_conciseness must be boolean"
-            )
+            raise TypeError("rag.generation_budget.enforce_conciseness must be boolean")
         if isinstance(self.target_sentences_min, bool) or not isinstance(
             self.target_sentences_min,
             int,
@@ -69,8 +69,7 @@ class GenerationBudgetConfig:
                 "or equal to target_sentences_min"
             )
         aliases = tuple(
-            _validate_generation_budget_alias(alias)
-            for alias in self.apply_to_aliases
+            _validate_generation_budget_alias(alias) for alias in self.apply_to_aliases
         )
         if not aliases:
             raise ValueError("rag.generation_budget.apply_to_aliases cannot be empty")
@@ -109,20 +108,14 @@ def decide_generation_budget(
     alias: str | None,
 ) -> GenerationBudgetDecision:
     """Return the generation budget decision for one model alias."""
-    if (
-        not config.enabled
-        or alias is None
-        or alias not in config.apply_to_aliases
-    ):
+    if not config.enabled or alias is None or alias not in config.apply_to_aliases:
         return GenerationBudgetDecision(
             enabled=False,
             max_tokens=None,
             conciseness_instruction=None,
         )
     instruction = (
-        _conciseness_instruction(config)
-        if config.enforce_conciseness
-        else None
+        _conciseness_instruction(config) if config.enforce_conciseness else None
     )
     return GenerationBudgetDecision(
         enabled=True,

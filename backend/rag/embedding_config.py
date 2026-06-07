@@ -117,9 +117,7 @@ class EmbeddingProfileConfig(BaseModel):
     def validate_mrl_consistency(self) -> EmbeddingProfileConfig:
         """Ensure Matryoshka dimensions are explicit and internally valid."""
         if self.effective_dimensions is not None and not self.mrl_supported:
-            raise ValueError(
-                "effective_dimensions requires mrl_supported=true"
-            )
+            raise ValueError("effective_dimensions requires mrl_supported=true")
         if (
             self.effective_dimensions is not None
             and self.effective_dimensions > self.dimensions
@@ -131,13 +129,9 @@ class EmbeddingProfileConfig(BaseModel):
     def validate_instruction_contract(self) -> EmbeddingProfileConfig:
         """Keep query instructions aligned with instruction-aware models."""
         if self.instruction_aware and not _has_text(self.query_instruction):
-            raise ValueError(
-                "instruction_aware=true requires query_instruction"
-            )
+            raise ValueError("instruction_aware=true requires query_instruction")
         if not self.instruction_aware and self.query_instruction is not None:
-            raise ValueError(
-                "instruction_aware=false requires query_instruction=null"
-            )
+            raise ValueError("instruction_aware=false requires query_instruction=null")
         return self
 
     @model_validator(mode="after")
@@ -155,10 +149,7 @@ class EmbeddingProfileConfig(BaseModel):
         if self.context_length is None:
             return self
         max_context_length = KNOWN_CONTEXT_LIMITS.get(self.model_family)
-        if (
-            max_context_length is not None
-            and self.context_length > max_context_length
-        ):
+        if max_context_length is not None and self.context_length > max_context_length:
             raise ValueError(
                 f"model_family {self.model_family!r} supports context_length "
                 f"<= {max_context_length}"
@@ -258,7 +249,9 @@ class EmbeddingsConfig(BaseModel):
             }
         )
         if missing:
-            raise ValueError(f"collection_bindings reference unknown profiles: {missing}")
+            raise ValueError(
+                f"collection_bindings reference unknown profiles: {missing}"
+            )
         return self
 
     @model_validator(mode="after")
@@ -306,9 +299,7 @@ def load_embeddings_config(path: Path) -> EmbeddingsConfig:
     if not isinstance(embeddings_config, Mapping):
         raise ValueError("embeddings block must contain a mapping")
 
-    return EmbeddingsConfig.model_validate(
-        cast("dict[str, object]", embeddings_config)
-    )
+    return EmbeddingsConfig.model_validate(cast("dict[str, object]", embeddings_config))
 
 
 def _has_text(value: str | None) -> bool:

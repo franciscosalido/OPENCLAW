@@ -260,7 +260,9 @@ class HybridCollectionSnapshot:
         object.__setattr__(
             self,
             "payload_indexes",
-            tuple(_validate_text(name, "payload_index") for name in self.payload_indexes),
+            tuple(
+                _validate_text(name, "payload_index") for name in self.payload_indexes
+            ),
         )
 
     def to_safe_dict(self) -> dict[str, object]:
@@ -316,7 +318,9 @@ class QdrantHybridSchemaClient118:
     async def collection_exists(self, collection_name: str) -> bool:
         """Return whether the benchmark collection already exists."""
 
-        return bool(await self._client.collection_exists(collection_name=collection_name))
+        return bool(
+            await self._client.collection_exists(collection_name=collection_name)
+        )
 
     async def create_collection(self, spec: HybridCollectionSpec118) -> None:
         """Create only the Q18-04 benchmark collection from the validated spec."""
@@ -361,8 +365,12 @@ class QdrantHybridSchemaClient118:
             "vectors": _extract_vectors_config(params),
             "sparse_vectors": _extract_sparse_vectors_config(params),
             "payload_indexes": tuple(sorted(payload_schema)),
-            "optimizer_config": _safe_mapping(config.get("optimizer_config")) if config else {},
-            "quantization_config": _safe_mapping(config.get("quantization_config")) if config else {},
+            "optimizer_config": _safe_mapping(config.get("optimizer_config"))
+            if config
+            else {},
+            "quantization_config": _safe_mapping(config.get("quantization_config"))
+            if config
+            else {},
         }
 
     async def get_qdrant_versions(self) -> Mapping[str, str | None]:
@@ -525,7 +533,9 @@ def validate_collection_info_against_spec(
     if spec.sparse_vector_name not in sparse_vectors:
         raise HybridSchemaError("sparse vector config is missing")
     payload_indexes = collection_info.get("payload_indexes")
-    if not isinstance(payload_indexes, Sequence) or isinstance(payload_indexes, (str, bytes, bytearray)):
+    if not isinstance(payload_indexes, Sequence) or isinstance(
+        payload_indexes, (str, bytes, bytearray)
+    ):
         raise HybridSchemaError("payload_indexes must be a sequence")
     missing = set(spec.payload_indexes) - {str(name) for name in payload_indexes}
     if missing:
@@ -576,7 +586,9 @@ def write_schema_snapshot(
         root = SNAPSHOT_ROOT.resolve()
         resolved = target.resolve()
         if root not in (resolved, *resolved.parents):
-            raise ValueError("schema snapshot path must stay under docs/specs/qdrant-1-18-upgrade")
+            raise ValueError(
+                "schema snapshot path must stay under docs/specs/qdrant-1-18-upgrade"
+            )
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(
         json.dumps(snapshot.to_safe_dict(), indent=2, sort_keys=True) + "\n",

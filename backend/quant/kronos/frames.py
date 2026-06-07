@@ -31,7 +31,9 @@ class KronosKLineFrame:
             raise ValueError("len(x_df) must equal len(x_timestamp)")
         if len(self.y_timestamp) < 1:
             raise ValueError("y_timestamp must contain at least one timestamp")
-        if self.source_manifest_id is not None and not isinstance(self.source_manifest_id, UUID):
+        if self.source_manifest_id is not None and not isinstance(
+            self.source_manifest_id, UUID
+        ):
             raise TypeError("source_manifest_id must be a UUID")
 
 

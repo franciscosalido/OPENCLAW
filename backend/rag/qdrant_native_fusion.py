@@ -14,7 +14,7 @@ import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any, Literal, Protocol, runtime_checkable
+from typing import Literal, Protocol, runtime_checkable
 
 BENCHMARK_COLLECTION = "quimera_benchmark_hybrid_118"
 CANDIDATE_COLLECTION = "quimera_knowledge_v2"
@@ -55,8 +55,12 @@ FORBIDDEN_SAFE_KEYS = frozenset(
 )
 
 _TICKER_RE = re.compile(r"\b[A-Z]{4}\d{1,2}\b")
-_ACRONYMS = frozenset({"CRI", "CRA", "CDI", "IPCA", "CDB", "FII", "ETF", "LCI", "LCA", "DY", "FGC"})
-_QUESTION_PREFIXES = frozenset({"qual", "como", "quando", "onde", "por que", "porque", "explique"})
+_ACRONYMS = frozenset(
+    {"CRI", "CRA", "CDI", "IPCA", "CDB", "FII", "ETF", "LCI", "LCA", "DY", "FGC"}
+)
+_QUESTION_PREFIXES = frozenset(
+    {"qual", "como", "quando", "onde", "por que", "porque", "explique"}
+)
 
 
 class NativeFusionDisabled(RuntimeError):
@@ -127,13 +131,27 @@ class RetrievalProfile:
     def __post_init__(self) -> None:
         if self.name not in {"neutral", "semantic_hybrid", "lexical_hybrid"}:
             raise ValueError("unsupported retrieval profile")
-        object.__setattr__(self, "dense_weight", _validate_non_negative_float(self.dense_weight, "dense_weight"))
-        object.__setattr__(self, "sparse_weight", _validate_non_negative_float(self.sparse_weight, "sparse_weight"))
+        object.__setattr__(
+            self,
+            "dense_weight",
+            _validate_non_negative_float(self.dense_weight, "dense_weight"),
+        )
+        object.__setattr__(
+            self,
+            "sparse_weight",
+            _validate_non_negative_float(self.sparse_weight, "sparse_weight"),
+        )
         object.__setattr__(self, "k", _validate_positive_float(self.k, "k"))
         if self.dense_weight == 0.0 and self.sparse_weight == 0.0:
             raise ValueError("at least one RRF weight must be positive")
-        object.__setattr__(self, "description", _validate_text(self.description, "description"))
-        object.__setattr__(self, "intended_query_style", _validate_text(self.intended_query_style, "intended_query_style"))
+        object.__setattr__(
+            self, "description", _validate_text(self.description, "description")
+        )
+        object.__setattr__(
+            self,
+            "intended_query_style",
+            _validate_text(self.intended_query_style, "intended_query_style"),
+        )
 
     def to_safe_dict(self) -> dict[str, object]:
         """Return a safe profile mapping."""
@@ -229,12 +247,28 @@ class NativeFusionConfig:
         if clean_collection in {CANDIDATE_COLLECTION, LEGACY_COLLECTION}:
             raise ValueError("protected collections cannot be used for native fusion")
         object.__setattr__(self, "collection_name", clean_collection)
-        object.__setattr__(self, "dense_vector_name", _validate_text(self.dense_vector_name, "dense_vector_name"))
-        object.__setattr__(self, "sparse_vector_name", _validate_text(self.sparse_vector_name, "sparse_vector_name"))
+        object.__setattr__(
+            self,
+            "dense_vector_name",
+            _validate_text(self.dense_vector_name, "dense_vector_name"),
+        )
+        object.__setattr__(
+            self,
+            "sparse_vector_name",
+            _validate_text(self.sparse_vector_name, "sparse_vector_name"),
+        )
         if self.dense_vector_name == self.sparse_vector_name:
             raise ValueError("dense_vector_name and sparse_vector_name must differ")
-        object.__setattr__(self, "search_top_k", _validate_positive_int(self.search_top_k, "search_top_k"))
-        object.__setattr__(self, "return_top_k", _validate_positive_int(self.return_top_k, "return_top_k"))
+        object.__setattr__(
+            self,
+            "search_top_k",
+            _validate_positive_int(self.search_top_k, "search_top_k"),
+        )
+        object.__setattr__(
+            self,
+            "return_top_k",
+            _validate_positive_int(self.return_top_k, "return_top_k"),
+        )
         if self.search_top_k < self.return_top_k:
             raise ValueError("search_top_k must be >= return_top_k")
         if self.fusion_mode not in {"rrf", "weighted_rrf"}:
@@ -259,7 +293,9 @@ class FusionCandidate:
     source: str | None = None
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "result_id", _validate_text(self.result_id, "result_id"))
+        object.__setattr__(
+            self, "result_id", _validate_text(self.result_id, "result_id")
+        )
         object.__setattr__(self, "doc_id", _validate_text(self.doc_id, "doc_id"))
         object.__setattr__(self, "rank", _validate_positive_int(self.rank, "rank"))
         object.__setattr__(
@@ -308,11 +344,29 @@ class FusionDivergence:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "query_id", _validate_text(self.query_id, "query_id"))
-        object.__setattr__(self, "profile_name", _validate_text(self.profile_name, "profile_name"))
-        object.__setattr__(self, "python_top_ids", tuple(_validate_text(item, "python_top_id") for item in self.python_top_ids))
-        object.__setattr__(self, "native_top_ids", tuple(_validate_text(item, "native_top_id") for item in self.native_top_ids))
-        object.__setattr__(self, "overlap_at_k", _validate_ratio(self.overlap_at_k, "overlap_at_k"))
-        object.__setattr__(self, "jaccard_at_k", _validate_ratio(self.jaccard_at_k, "jaccard_at_k"))
+        object.__setattr__(
+            self, "profile_name", _validate_text(self.profile_name, "profile_name")
+        )
+        object.__setattr__(
+            self,
+            "python_top_ids",
+            tuple(
+                _validate_text(item, "python_top_id") for item in self.python_top_ids
+            ),
+        )
+        object.__setattr__(
+            self,
+            "native_top_ids",
+            tuple(
+                _validate_text(item, "native_top_id") for item in self.native_top_ids
+            ),
+        )
+        object.__setattr__(
+            self, "overlap_at_k", _validate_ratio(self.overlap_at_k, "overlap_at_k")
+        )
+        object.__setattr__(
+            self, "jaccard_at_k", _validate_ratio(self.jaccard_at_k, "jaccard_at_k")
+        )
         if not isinstance(self.order_equal, bool):
             raise TypeError("order_equal must be a bool")
         if not isinstance(self.set_equal, bool):
@@ -325,7 +379,11 @@ class FusionDivergence:
             else _validate_non_negative_float(self.rank_delta_mean, "rank_delta_mean"),
         )
         if self.rank_delta_max is not None:
-            object.__setattr__(self, "rank_delta_max", _validate_non_negative_int(self.rank_delta_max, "rank_delta_max"))
+            object.__setattr__(
+                self,
+                "rank_delta_max",
+                _validate_non_negative_int(self.rank_delta_max, "rank_delta_max"),
+            )
         object.__setattr__(
             self,
             "score_correlation_hint",
@@ -333,13 +391,21 @@ class FusionDivergence:
             if self.score_correlation_hint is None
             else _validate_ratio(self.score_correlation_hint, "score_correlation_hint"),
         )
-        object.__setattr__(self, "tie_break_notes", tuple(_validate_text(note, "tie_break_note") for note in self.tie_break_notes))
+        object.__setattr__(
+            self,
+            "tie_break_notes",
+            tuple(
+                _validate_text(note, "tie_break_note") for note in self.tie_break_notes
+            ),
+        )
         for field_name in ("latency_python_ms", "latency_native_ms"):
             value = getattr(self, field_name)
             object.__setattr__(
                 self,
                 field_name,
-                None if value is None else _validate_non_negative_float(value, field_name),
+                None
+                if value is None
+                else _validate_non_negative_float(value, field_name),
             )
 
     def to_safe_dict(self) -> dict[str, object]:
@@ -385,12 +451,26 @@ class FusionComparisonEvent:
     def __post_init__(self) -> None:
         if self.schema_version != COMPARISON_SCHEMA_VERSION:
             raise ValueError("unsupported schema_version")
-        object.__setattr__(self, "query_hash", _validate_text(self.query_hash, "query_hash"))
+        object.__setattr__(
+            self, "query_hash", _validate_text(self.query_hash, "query_hash")
+        )
         object.__setattr__(self, "query_id", _validate_text(self.query_id, "query_id"))
-        object.__setattr__(self, "profile_name", _validate_text(self.profile_name, "profile_name"))
-        object.__setattr__(self, "python_backend", _validate_text(self.python_backend, "python_backend"))
-        object.__setattr__(self, "native_backend", _validate_text(self.native_backend, "native_backend"))
-        object.__setattr__(self, "overlap_at_k", _validate_ratio(self.overlap_at_k, "overlap_at_k"))
+        object.__setattr__(
+            self, "profile_name", _validate_text(self.profile_name, "profile_name")
+        )
+        object.__setattr__(
+            self,
+            "python_backend",
+            _validate_text(self.python_backend, "python_backend"),
+        )
+        object.__setattr__(
+            self,
+            "native_backend",
+            _validate_text(self.native_backend, "native_backend"),
+        )
+        object.__setattr__(
+            self, "overlap_at_k", _validate_ratio(self.overlap_at_k, "overlap_at_k")
+        )
         if not isinstance(self.order_equal, bool):
             raise TypeError("order_equal must be a bool")
         for field_name in ("latency_python_ms", "latency_native_ms"):
@@ -398,7 +478,9 @@ class FusionComparisonEvent:
             object.__setattr__(
                 self,
                 field_name,
-                None if value is None else _validate_non_negative_float(value, field_name),
+                None
+                if value is None
+                else _validate_non_negative_float(value, field_name),
             )
         for field_name in ("qdrant_server_version", "qdrant_client_version"):
             value = getattr(self, field_name)
@@ -492,7 +574,9 @@ def classify_query_profile(query: str) -> RetrievalProfile:
     clean_query = _validate_text(query, "query")
     words = clean_query.split()
     ticker_hits = len(_TICKER_RE.findall(clean_query))
-    acronym_hits = sum(1 for token in words if token.strip("?:,.;").upper() in _ACRONYMS)
+    acronym_hits = sum(
+        1 for token in words if token.strip("?:,.;").upper() in _ACRONYMS
+    )
     numeric_hits = sum(1 for token in words if any(char.isdigit() for char in token))
     uppercase_tokens = [
         token
@@ -501,9 +585,17 @@ def classify_query_profile(query: str) -> RetrievalProfile:
     ]
     uppercase_ratio = len(uppercase_tokens) / max(1, len(words))
     lower_query = clean_query.casefold()
-    natural_question = any(lower_query.startswith(prefix) for prefix in _QUESTION_PREFIXES) or "?" in clean_query
+    natural_question = (
+        any(lower_query.startswith(prefix) for prefix in _QUESTION_PREFIXES)
+        or "?" in clean_query
+    )
 
-    if ticker_hits > 0 or acronym_hits >= 2 or numeric_hits >= 2 or uppercase_ratio >= 0.5:
+    if (
+        ticker_hits > 0
+        or acronym_hits >= 2
+        or numeric_hits >= 2
+        or uppercase_ratio >= 0.5
+    ):
         return LEXICAL_HYBRID_PROFILE
     if natural_question and len(words) >= 6:
         return SEMANTIC_HYBRID_PROFILE
@@ -610,7 +702,11 @@ class QdrantNativeFusionRetriever:
         return _normalize_query_points_response(response, self._backend())
 
     def _backend(self) -> FusionBackend:
-        return "qdrant_weighted_rrf" if self._config.fusion_mode == "weighted_rrf" else "qdrant_rrf"
+        return (
+            "qdrant_weighted_rrf"
+            if self._config.fusion_mode == "weighted_rrf"
+            else "qdrant_rrf"
+        )
 
 
 def compute_overlap_at_k(
@@ -839,15 +935,21 @@ def _normalize_query_points_response(
 def _extract_points(response: object) -> Sequence[object]:
     if isinstance(response, Mapping):
         points = response.get("points")
-        if isinstance(points, Sequence) and not isinstance(points, (str, bytes, bytearray)):
+        if isinstance(points, Sequence) and not isinstance(
+            points, (str, bytes, bytearray)
+        ):
             return points
         result = response.get("result")
         if isinstance(result, Mapping):
             nested = result.get("points")
-            if isinstance(nested, Sequence) and not isinstance(nested, (str, bytes, bytearray)):
+            if isinstance(nested, Sequence) and not isinstance(
+                nested, (str, bytes, bytearray)
+            ):
                 return nested
     points_attr = getattr(response, "points", None)
-    if isinstance(points_attr, Sequence) and not isinstance(points_attr, (str, bytes, bytearray)):
+    if isinstance(points_attr, Sequence) and not isinstance(
+        points_attr, (str, bytes, bytearray)
+    ):
         return points_attr
     return ()
 

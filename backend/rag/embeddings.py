@@ -134,7 +134,9 @@ class OllamaEmbedder:
         )
 
         try:
-            response = await self._post_embed({"model": self.model, "input": clean_text})
+            response = await self._post_embed(
+                {"model": self.model, "input": clean_text}
+            )
             vector = _extract_single_embedding(response)
 
             if len(vector) != self.expected_dimensions:
@@ -204,9 +206,7 @@ class OllamaEmbedder:
                 return vector
 
         try:
-            vectors = list(
-                await asyncio.gather(*(_embed_one(t) for t in clean_texts))
-            )
+            vectors = list(await asyncio.gather(*(_embed_one(t) for t in clean_texts)))
         except Exception as exc:
             self._emit_embedding_event(
                 RagEventKind.EMBEDDING_CALL_FAILED,
@@ -250,9 +250,7 @@ class OllamaEmbedder:
                 if not _should_retry(exc) or attempt >= self.max_retries:
                     raise
                 wait = self.backoff_seconds * (2**attempt)
-                logger.debug(
-                    "embed retry | attempt={} wait={:.2f}s", attempt + 1, wait
-                )
+                logger.debug("embed retry | attempt={} wait={:.2f}s", attempt + 1, wait)
                 await self.sleep(wait)
 
         raise RuntimeError("unreachable retry state")  # pragma: no cover
@@ -267,11 +265,7 @@ class OllamaEmbedder:
         error_category: RagErrorCategory | None = None,
     ) -> None:
         config = self.observability_config
-        if (
-            config is None
-            or not config.enabled
-            or not config.embedding_events_enabled
-        ):
+        if config is None or not config.enabled or not config.embedding_events_enabled:
             return
         event = RagObservabilityEvent(
             event_kind=event_kind,

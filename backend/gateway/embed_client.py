@@ -306,11 +306,7 @@ class GatewayEmbedClient:
         error_category: RagErrorCategory | None = None,
     ) -> None:
         config = self.observability_config
-        if (
-            config is None
-            or not config.enabled
-            or not config.embedding_events_enabled
-        ):
+        if config is None or not config.enabled or not config.embedding_events_enabled:
             return
         event = RagObservabilityEvent(
             event_kind=event_kind,

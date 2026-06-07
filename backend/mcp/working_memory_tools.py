@@ -7,10 +7,14 @@ from typing import Any, Protocol
 from uuid import UUID, uuid4
 
 from backend.mcp.mcp_models import HealthResponse, ToolResponse
-from backend.mcp.mcp_safety import validate_limit, validate_non_empty_text, validate_uuid
+from backend.mcp.mcp_safety import (
+    validate_limit,
+    validate_non_empty_text,
+    validate_uuid,
+)
 from backend.working_memory.cleanup import CleanupService
 from backend.working_memory.config import WorkingMemorySettings
-from backend.working_memory.models import MemoryKind, WorkingMemoryPoint
+from backend.working_memory.models import WorkingMemoryPoint
 from backend.working_memory.restore_service import RestoreService
 from backend.working_memory.safety import sanitize_metadata, validate_safe_summary
 from backend.working_memory.snapshot_service import SnapshotService
@@ -18,7 +22,14 @@ from backend.working_memory.snapshot_service import SnapshotService
 
 class WorkingMemoryStoreLike(Protocol):
     async def upsert_memory_point(self, point: WorkingMemoryPoint) -> str: ...
-    async def query_working_memory(self, *, agent_id: str, session_id: str, query_vector: list[float], limit: int = 10) -> list[dict[str, Any]]: ...
+    async def query_working_memory(
+        self,
+        *,
+        agent_id: str,
+        session_id: str,
+        query_vector: list[float],
+        limit: int = 10,
+    ) -> list[dict[str, Any]]: ...
 
 
 def build_working_memory_health(settings: WorkingMemorySettings) -> dict[str, object]:
@@ -51,7 +62,13 @@ async def working_memory_upsert(
 ) -> dict[str, object]:
     validate_non_empty_text(agent_id, "agent_id")
     clean_session = validate_uuid(session_id, "session_id")
-    if memory_kind not in ("turn_summary", "agent_state", "scratchpad", "handoff", "tool_observation"):
+    if memory_kind not in (
+        "turn_summary",
+        "agent_state",
+        "scratchpad",
+        "handoff",
+        "tool_observation",
+    ):
         raise ValueError("memory_kind is unsupported")
     if len(vector) != settings.vector_size:
         raise ValueError("working memory vector dimension mismatch")
@@ -75,8 +92,13 @@ async def working_memory_upsert(
         safe_summary=validate_safe_summary(safe_summary),
         metadata=sanitize_metadata(metadata),
     )
-    point_id = await store.upsert_memory_point(point) if store is not None else point.point_id
-    return ToolResponse(ok=True, data={"point_ids": [point_id], "count": 1, "checksum": point.payload_checksum}).model_dump()
+    point_id = (
+        await store.upsert_memory_point(point) if store is not None else point.point_id
+    )
+    return ToolResponse(
+        ok=True,
+        data={"point_ids": [point_id], "count": 1, "checksum": point.payload_checksum},
+    ).model_dump()
 
 
 async def working_memory_query(
@@ -93,8 +115,20 @@ async def working_memory_query(
     validate_limit(limit, maximum=50)
     if len(query_vector) != settings.vector_size:
         raise ValueError("working memory vector dimension mismatch")
-    results = await store.query_working_memory(agent_id=agent_id, session_id=clean_session, query_vector=query_vector, limit=limit) if store is not None else []
-    return ToolResponse(ok=True, data={"results": results, "count": len(results), "vectors_exposed": False}).model_dump()
+    results = (
+        await store.query_working_memory(
+            agent_id=agent_id,
+            session_id=clean_session,
+            query_vector=query_vector,
+            limit=limit,
+        )
+        if store is not None
+        else []
+    )
+    return ToolResponse(
+        ok=True,
+        data={"results": results, "count": len(results), "vectors_exposed": False},
+    ).model_dump()
 
 
 async def working_memory_snapshot(
@@ -106,8 +140,12 @@ async def working_memory_snapshot(
     validate_non_empty_text(agent_id, "agent_id")
     clean_session = validate_uuid(session_id, "session_id")
     if snapshot_service is None:
-        return ToolResponse(ok=False, error="working memory snapshot unavailable").model_dump()
-    result = await snapshot_service.create_session_snapshot(agent_id=agent_id, session_id=clean_session)
+        return ToolResponse(
+            ok=False, error="working memory snapshot unavailable"
+        ).model_dump()
+    result = await snapshot_service.create_session_snapshot(
+        agent_id=agent_id, session_id=clean_session
+    )
     return ToolResponse(ok=True, data=result).model_dump()
 
 
@@ -121,11 +159,19 @@ async def working_memory_restore(
     validate_non_empty_text(agent_id, "agent_id")
     clean_session = validate_uuid(session_id, "session_id")
     if not settings.restore_enabled:
-        return ToolResponse(ok=False, error="working memory restore disabled").model_dump()
+        return ToolResponse(
+            ok=False, error="working memory restore disabled"
+        ).model_dump()
     if restore_service is None:
-        return ToolResponse(ok=False, error="working memory restore unavailable").model_dump()
-    report = await restore_service.restore_latest_snapshot(agent_id=agent_id, session_id=clean_session)
-    return ToolResponse(ok=report.status in {"ok", "warn"}, data=report.to_dict()).model_dump()
+        return ToolResponse(
+            ok=False, error="working memory restore unavailable"
+        ).model_dump()
+    report = await restore_service.restore_latest_snapshot(
+        agent_id=agent_id, session_id=clean_session
+    )
+    return ToolResponse(
+        ok=report.status in {"ok", "warn"}, data=report.to_dict()
+    ).model_dump()
 
 
 async def working_memory_cleanup_expired(
@@ -136,12 +182,21 @@ async def working_memory_cleanup_expired(
     session_id: str | None = None,
 ) -> dict[str, object]:
     if not settings.cleanup_enabled:
-        return ToolResponse(ok=False, error="working memory cleanup disabled").model_dump()
+        return ToolResponse(
+            ok=False, error="working memory cleanup disabled"
+        ).model_dump()
     if cleanup_service is None:
-        return ToolResponse(ok=False, error="working memory cleanup unavailable").model_dump()
+        return ToolResponse(
+            ok=False, error="working memory cleanup unavailable"
+        ).model_dump()
     if agent_id is not None:
         validate_non_empty_text(agent_id, "agent_id")
     if session_id is not None:
         validate_uuid(session_id, "session_id")
-    result = await cleanup_service.cleanup_expired(agent_id=agent_id, session_id=session_id)
-    return ToolResponse(ok=result.status == "ok", data={"deleted_count": result.deleted_count, "status": result.status}).model_dump()
+    result = await cleanup_service.cleanup_expired(
+        agent_id=agent_id, session_id=session_id
+    )
+    return ToolResponse(
+        ok=result.status == "ok",
+        data={"deleted_count": result.deleted_count, "status": result.status},
+    ).model_dump()

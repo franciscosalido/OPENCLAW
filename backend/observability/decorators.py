@@ -84,7 +84,23 @@ def _validate_safe_name(value: str, field_name: str) -> str:
     if not _SAFE_NAME_RE.fullmatch(value):
         raise ValueError(f"{field_name} must be a safe low-cardinality identifier")
     lowered = value.lower()
-    if any(token in lowered for token in ("prompt", "query", "answer", "response", "chunk", "vector", "embedding", "payload", "secret", "token", "password", "api_key")):
+    if any(
+        token in lowered
+        for token in (
+            "prompt",
+            "query",
+            "answer",
+            "response",
+            "chunk",
+            "vector",
+            "embedding",
+            "payload",
+            "secret",
+            "token",
+            "password",
+            "api_key",
+        )
+    ):
         raise ValueError(f"{field_name} must not contain sensitive content markers")
     return value
 
@@ -103,14 +119,24 @@ def _trace_async(
     async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         tracer = get_tracer("quimera.observability")
         attrs = {**get_quimera_context_attributes(), **dict(base_attrs)}
-        with tracer.start_as_current_span(span_name, attributes=validate_attributes(attrs)) as span:
+        with tracer.start_as_current_span(
+            span_name, attributes=validate_attributes(attrs)
+        ) as span:
             start_ns = time.perf_counter_ns()
             try:
                 result = await async_fn(*args, **kwargs)
             except Exception as exc:
-                _set_attrs(span, {latency_attr: _duration_ms(start_ns), ERROR_TYPE: type(exc).__name__})
+                _set_attrs(
+                    span,
+                    {
+                        latency_attr: _duration_ms(start_ns),
+                        ERROR_TYPE: type(exc).__name__,
+                    },
+                )
                 span.record_exception(exc)
-                span.set_status(Status(StatusCode.ERROR, sanitize_error_message(str(exc))))
+                span.set_status(
+                    Status(StatusCode.ERROR, sanitize_error_message(str(exc)))
+                )
                 raise
             _set_attrs(span, {latency_attr: _duration_ms(start_ns)})
             if enrich_result is not None:
@@ -120,7 +146,9 @@ def _trace_async(
     return wrapper
 
 
-def traced_embed(model: str | None = None) -> Callable[[Callable[P, Awaitable[R]]], AsyncCallable[P, R]]:
+def traced_embed(
+    model: str | None = None,
+) -> Callable[[Callable[P, Awaitable[R]]], AsyncCallable[P, R]]:
     def decorator(fn: Callable[P, Awaitable[R]]) -> AsyncCallable[P, R]:
         attrs: dict[str, object] = {
             GEN_AI_OPERATION_NAME: "embeddings",
@@ -128,7 +156,9 @@ def traced_embed(model: str | None = None) -> Callable[[Callable[P, Awaitable[R]
         }
         if model:
             attrs[GEN_AI_REQUEST_MODEL] = model
-        return _trace_async(fn, span_name="embeddings", base_attrs=attrs, latency_attr=LATENCY_EMBED_MS)
+        return _trace_async(
+            fn, span_name="embeddings", base_attrs=attrs, latency_attr=LATENCY_EMBED_MS
+        )
 
     return decorator
 
@@ -145,12 +175,19 @@ def traced_llm(
         }
         if model:
             attrs[GEN_AI_REQUEST_MODEL] = model
-        return _trace_async(fn, span_name=f"{operation} {model or 'local'}", base_attrs=attrs, latency_attr=LATENCY_LLM_MS)
+        return _trace_async(
+            fn,
+            span_name=f"{operation} {model or 'local'}",
+            base_attrs=attrs,
+            latency_attr=LATENCY_LLM_MS,
+        )
 
     return decorator
 
 
-def traced_retrieval(source: str | None = None) -> Callable[[Callable[P, Awaitable[R]]], AsyncCallable[P, R]]:
+def traced_retrieval(
+    source: str | None = None,
+) -> Callable[[Callable[P, Awaitable[R]]], AsyncCallable[P, R]]:
     def enrich(result: object) -> Mapping[str, object]:
         attrs: dict[str, object] = {}
         count = _result_count(result)
@@ -176,7 +213,9 @@ def traced_retrieval(source: str | None = None) -> Callable[[Callable[P, Awaitab
     return decorator
 
 
-def traced_rrf(*, backend: str = "python_rrf") -> Callable[[Callable[P, Awaitable[R]]], AsyncCallable[P, R]]:
+def traced_rrf(
+    *, backend: str = "python_rrf"
+) -> Callable[[Callable[P, Awaitable[R]]], AsyncCallable[P, R]]:
     def decorator(fn: Callable[P, Awaitable[R]]) -> AsyncCallable[P, R]:
         return _trace_async(
             fn,
@@ -188,7 +227,9 @@ def traced_rrf(*, backend: str = "python_rrf") -> Callable[[Callable[P, Awaitabl
     return decorator
 
 
-def traced_rerank(*, enabled: bool = True) -> Callable[[Callable[P, Awaitable[R]]], AsyncCallable[P, R]]:
+def traced_rerank(
+    *, enabled: bool = True
+) -> Callable[[Callable[P, Awaitable[R]]], AsyncCallable[P, R]]:
     def decorator(fn: Callable[P, Awaitable[R]]) -> AsyncCallable[P, R]:
         return _trace_async(
             fn,
@@ -222,7 +263,9 @@ def traced_cache(
     return decorator
 
 
-def traced_pg(table: str, operation: str) -> Callable[[Callable[P, Awaitable[R]]], AsyncCallable[P, R]]:
+def traced_pg(
+    table: str, operation: str
+) -> Callable[[Callable[P, Awaitable[R]]], AsyncCallable[P, R]]:
     safe_table = _validate_safe_name(table, "table")
     safe_operation = _validate_safe_name(operation.upper(), "operation")
 
@@ -253,7 +296,12 @@ def traced_agent(
         }
         if agent_id:
             attrs[GEN_AI_AGENT_ID] = agent_id
-        return _trace_async(fn, span_name=f"agent {agent_name}", base_attrs=attrs, latency_attr="latency.total_ms")
+        return _trace_async(
+            fn,
+            span_name=f"agent {agent_name}",
+            base_attrs=attrs,
+            latency_attr="latency.total_ms",
+        )
 
     return decorator
 
@@ -264,7 +312,9 @@ def traced_mcp_tool(
     method_name: str = "tools/call",
 ) -> Callable[[Callable[P, Awaitable[R]]], AsyncCallable[P, R]]:
     safe_tool_name = _validate_safe_name(tool_name, "tool_name")
-    safe_method_name = _validate_safe_name(method_name.replace("/", ":"), "method_name").replace(":", "/")
+    safe_method_name = _validate_safe_name(
+        method_name.replace("/", ":"), "method_name"
+    ).replace(":", "/")
 
     def decorator(fn: Callable[P, Awaitable[R]]) -> AsyncCallable[P, R]:
         return _trace_async(

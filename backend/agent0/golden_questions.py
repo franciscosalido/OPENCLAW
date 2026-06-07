@@ -32,7 +32,9 @@ Language = Literal["pt-BR"]
 RetrievalMode = Literal["fake", "qdrant"]
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_INTERNAL_QUESTIONS_PATH = REPO_ROOT / "tests" / "golden" / "internal_questions.yaml"
+DEFAULT_INTERNAL_QUESTIONS_PATH = (
+    REPO_ROOT / "tests" / "golden" / "internal_questions.yaml"
+)
 DEFAULT_FINANCIAL_QUESTIONS_PATH = (
     REPO_ROOT / "tests" / "golden" / "financial_questions.yaml"
 )
@@ -261,7 +263,9 @@ def load_all_golden_questions(
     )
     question_ids = [question.question_id for question in questions]
     duplicates = {
-        question_id for question_id in question_ids if question_ids.count(question_id) > 1
+        question_id
+        for question_id in question_ids
+        if question_ids.count(question_id) > 1
     }
     if duplicates:
         raise ValueError("question_id values must be unique across golden manifests")
@@ -349,7 +353,9 @@ def run_golden_questions(
                 "matched_doc_ids": list(matched_doc_ids),
                 "latency_ms": latency_ms,
                 "status": "passed" if citation_present else "failed",
-                "failure_reason": None if citation_present else "expected_citation_missing",
+                "failure_reason": None
+                if citation_present
+                else "expected_citation_missing",
             }
         )
 
@@ -442,5 +448,7 @@ def _percentile(values: Sequence[float], percentile: int) -> float:
     if not values:
         return 0.0
     ordered = sorted(values)
-    index = min(len(ordered) - 1, max(0, round((percentile / 100) * (len(ordered) - 1))))
+    index = min(
+        len(ordered) - 1, max(0, round((percentile / 100) * (len(ordered) - 1)))
+    )
     return ordered[index]

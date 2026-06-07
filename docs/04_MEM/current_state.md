@@ -25,6 +25,8 @@ Implemented:
   (`1.18.0`).
 - Updated Qdrant 1.18 unit contracts to reject legacy `qdrant-client==1.13.2`
   while accepting the new `>=1.18` dependency floor.
+- Applied Ruff cleanup to `backend/`: `uvx ruff format backend/` reformatted
+  65 files and `uvx ruff check --fix backend/` removed 13 unused imports.
 
 Validation:
 
@@ -33,12 +35,35 @@ Validation:
 - `uv lock --check`: success.
 - Host import/version check: installed `qdrant-client` is `1.18.0` and
   satisfies `>=1.18`.
+- `uvx ruff check backend/`: success.
+- `uvx ruff format --check backend/`: success.
+- `uv run mypy --strict backend`: success.
+- `uv run pyright backend`: 0 errors / 0 warnings.
+- Full host Python 3.12 regression with `.venv/bin/python -m pytest`:
+  1891 passed / 65 skipped.
 - `git diff --check`: clean.
+
+Qdrant version finding:
+
+- Official Qdrant server release page shows `v1.18.2` as the newest server
+  release.
+- Official `qdrant-client` PyPI/GitHub release page shows `1.18.0` as the
+  newest Python client release.
+- Local runtime currently reports Qdrant server `1.18.1` from
+  `http://127.0.0.1:6333/`, while the installed Python client is `1.18.0`.
+- Therefore, exact server/client patch parity is not currently respected and
+  cannot be satisfied using only official PyPI `qdrant-client` releases. A
+  human architecture decision is required: prefer latest server (`1.18.2`) with
+  client family compatibility (`>=1.18`) or downgrade server to the latest
+  exact common version (`1.18.0`).
 
 Scope intentionally not changed:
 
 - No Qdrant server image change.
-- No dependency installation.
+- No Qdrant client/server parity policy change after discovering the official
+  release mismatch.
+- No project dependency installation. Ruff was executed through `uvx`, not
+  added to `pyproject.toml`.
 - No generated PR-09 smoke artifact staged.
 
 ---

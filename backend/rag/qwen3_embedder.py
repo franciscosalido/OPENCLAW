@@ -63,9 +63,13 @@ class Qwen3Embedder(DenseEmbedder):
         self._effective_dimensions = profile.effective_dimensions or profile.dimensions
         self._truncate = self._effective_dimensions < profile.dimensions
         self._profile_fingerprint = compute_profile_fingerprint(profile)
-        self._encoder = encoder if encoder is not None else self._load_model(
-            profile.model,
-            device,
+        self._encoder = (
+            encoder
+            if encoder is not None
+            else self._load_model(
+                profile.model,
+                device,
+            )
         )
 
     @staticmethod

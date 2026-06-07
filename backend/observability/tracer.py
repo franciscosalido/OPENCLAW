@@ -10,11 +10,15 @@ from pathlib import Path
 from typing import Any
 
 from loguru import logger
-from opentelemetry import metrics, trace
+from opentelemetry import trace
 from opentelemetry.metrics import Meter
 from opentelemetry.sdk.resources import DEPLOYMENT_ENVIRONMENT, SERVICE_NAME, Resource
 from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter, SpanExportResult
+from opentelemetry.sdk.trace.export import (
+    BatchSpanProcessor,
+    ConsoleSpanExporter,
+    SpanExportResult,
+)
 from opentelemetry.trace import Tracer
 
 _TRACING_INITIALIZED = False
@@ -63,7 +67,9 @@ def batch_span_processor_config() -> BatchSpanProcessorConfig:
         export_timeout_millis=_env_int("QUIMERA_OTEL_EXPORT_TIMEOUT_MILLIS", 30000),
     )
     if config.max_export_batch_size > config.max_queue_size:
-        raise ValueError("QUIMERA_OTEL_MAX_EXPORT_BATCH_SIZE must be <= QUIMERA_OTEL_MAX_QUEUE_SIZE")
+        raise ValueError(
+            "QUIMERA_OTEL_MAX_EXPORT_BATCH_SIZE must be <= QUIMERA_OTEL_MAX_QUEUE_SIZE"
+        )
     return config
 
 
@@ -186,18 +192,25 @@ def build_doctor_report(config_path: Path | None = None) -> dict[str, object]:
         "trace_exporter": "otlp_http" if _otlp_endpoint() else "console",
         "traces_endpoint": _otlp_endpoint(),
         "semconv_gen_ai_latest_experimental": (
-            "gen_ai_latest_experimental" in {item.strip() for item in semconv.split(",") if item.strip()}
+            "gen_ai_latest_experimental"
+            in {item.strip() for item in semconv.split(",") if item.strip()}
             if semconv
             else False
         ),
         "litellm_otel_callback": litellm_validation["callbacks_present"],
-        "litellm_message_logging_disabled": litellm_validation["message_logging_disabled"],
+        "litellm_message_logging_disabled": litellm_validation[
+            "message_logging_disabled"
+        ],
         "backend_observability_imports_requests": imports_requests,
         "opentelemetry_packages_importable": packages_ok,
         "asyncpg_instrumentor_importable": asyncpg_ok,
     }
     status = "ok"
-    if not checks["litellm_otel_callback"] or not checks["litellm_message_logging_disabled"] or imports_requests:
+    if (
+        not checks["litellm_otel_callback"]
+        or not checks["litellm_message_logging_disabled"]
+        or imports_requests
+    ):
         status = "fail"
     elif semconv and not checks["semconv_gen_ai_latest_experimental"]:
         status = "warn"
@@ -208,7 +221,10 @@ def _imports_module(path: Path, module_name: str) -> bool:
     tree = ast.parse(path.read_text(encoding="utf-8"))
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
-            if any(alias.name == module_name or alias.name.startswith(f"{module_name}.") for alias in node.names):
+            if any(
+                alias.name == module_name or alias.name.startswith(f"{module_name}.")
+                for alias in node.names
+            ):
                 return True
         if isinstance(node, ast.ImportFrom) and node.module is not None:
             if node.module == module_name or node.module.startswith(f"{module_name}."):

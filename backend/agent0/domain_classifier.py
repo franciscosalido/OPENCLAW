@@ -211,4 +211,6 @@ def _normalize_query(query: str) -> str:
     if not clean_query:
         raise ValueError("query cannot be empty")
     normalized = unicodedata.normalize("NFKD", clean_query.lower())
-    return "".join(character for character in normalized if not unicodedata.combining(character))
+    return "".join(
+        character for character in normalized if not unicodedata.combining(character)
+    )

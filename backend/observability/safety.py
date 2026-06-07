@@ -38,7 +38,9 @@ def validate_attribute_key(key: str) -> str:
         raise ValueError(f"attribute key must be dotted lowercase tokens: {key}")
     if _is_forbidden_key(normalized):
         raise ValueError(f"attribute key is not safe for telemetry: {key}")
-    if normalized not in SAFE_ATTRS and not normalized.startswith(tuple(SAFE_ATTRIBUTE_PREFIXES)):
+    if normalized not in SAFE_ATTRS and not normalized.startswith(
+        tuple(SAFE_ATTRIBUTE_PREFIXES)
+    ):
         raise ValueError(f"attribute key prefix is not allowed: {key}")
     return normalized
 
@@ -53,7 +55,9 @@ def validate_attribute_value(value: object) -> AttributeValue:
     raise ValueError("attribute value must be a primitive")
 
 
-def validate_attributes(attributes: Mapping[str, object] | None) -> dict[str, AttributeValue]:
+def validate_attributes(
+    attributes: Mapping[str, object] | None,
+) -> dict[str, AttributeValue]:
     if attributes is None:
         return {}
     validated: dict[str, AttributeValue] = {}

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from types import MappingProxyType
 
@@ -83,7 +83,9 @@ class QuantizationConfig:
 
     def __post_init__(self) -> None:
         clean_kind = _coerce_enum(self.kind, QuantizationKind, "kind")
-        clean_description = _validate_text(self.description, "description", allow_empty=True)
+        clean_description = _validate_text(
+            self.description, "description", allow_empty=True
+        )
         clean_turbo_bits = (
             None
             if self.turbo_bits is None
@@ -99,7 +101,12 @@ class QuantizationConfig:
         if clean_kind is QuantizationKind.NONE:
             if any(
                 value is not None
-                for value in (self.bits, clean_turbo_bits, self.always_ram, self.rescore)
+                for value in (
+                    self.bits,
+                    clean_turbo_bits,
+                    self.always_ram,
+                    self.rescore,
+                )
             ):
                 raise ValueError("none quantization cannot define tuning fields")
         elif clean_kind is QuantizationKind.SCALAR:
@@ -113,7 +120,9 @@ class QuantizationConfig:
             if self.bits is not None and self.bits not in {1, 2, 4}:
                 raise ValueError("turboquant bits must be 1, 2 or 4")
             if clean_turbo_bits is None:
-                clean_turbo_bits = f"bits{self.bits}" if self.bits is not None else "bits4"
+                clean_turbo_bits = (
+                    f"bits{self.bits}" if self.bits is not None else "bits4"
+                )
             if clean_turbo_bits not in _ALLOWED_TURBO_BITS:
                 raise ValueError("turbo_bits is not supported")
 
@@ -185,7 +194,9 @@ class IndexTuningConfig:
                 "dense_on_disk": self.dense_on_disk,
                 "hnsw_on_disk": self.hnsw_on_disk,
                 "quantization": (
-                    None if self.quantization is None else self.quantization.to_safe_dict()
+                    None
+                    if self.quantization is None
+                    else self.quantization.to_safe_dict()
                 ),
             }
         )
@@ -358,7 +369,9 @@ class QdrantTuningProfile:
         return {
             "qdrant.profile": self.name.value,
             "qdrant.quantization": (
-                QuantizationKind.NONE.value if quantization is None else quantization.kind.value
+                QuantizationKind.NONE.value
+                if quantization is None
+                else quantization.kind.value
             ),
             "qdrant.dense_on_disk": self.index_config.dense_on_disk,
             "qdrant.hnsw_on_disk": self.index_config.hnsw_on_disk,
@@ -399,8 +412,12 @@ class QdrantTuningRunSummary:
     notes: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "profile_name", _validate_text(self.profile_name, "profile_name"))
-        object.__setattr__(self, "profile_config", _freeze_safe_mapping(self.profile_config))
+        object.__setattr__(
+            self, "profile_name", _validate_text(self.profile_name, "profile_name")
+        )
+        object.__setattr__(
+            self, "profile_config", _freeze_safe_mapping(self.profile_config)
+        )
         for field_name in ("qdrant_server_version", "qdrant_client_version"):
             value = getattr(self, field_name)
             object.__setattr__(
@@ -428,7 +445,9 @@ class QdrantTuningRunSummary:
             object.__setattr__(
                 self,
                 field_name,
-                None if value is None else _validate_non_negative_float(value, field_name),
+                None
+                if value is None
+                else _validate_non_negative_float(value, field_name),
             )
         object.__setattr__(
             self,
@@ -555,7 +574,9 @@ def turboquant_experimental_profile() -> QdrantTuningProfile:
         requires_benchmark=True,
         benchmark_readiness=BenchmarkReadiness.EXPERIMENTAL_REQUIRES_BENCHMARK,
         intended_use="experimental compression profile for Q18 benchmark",
-        notes=("Never promote before Recall@10, NDCG@5, latency and memory benchmark.",),
+        notes=(
+            "Never promote before Recall@10, NDCG@5, latency and memory benchmark.",
+        ),
     )
 
 
@@ -597,13 +618,19 @@ def get_all_profiles() -> tuple[QdrantTuningProfile, ...]:
 def profile_registry() -> Mapping[str, QdrantTuningProfile]:
     """Return an immutable profile registry keyed by profile name."""
 
-    return MappingProxyType({profile.name.value: profile for profile in get_all_profiles()})
+    return MappingProxyType(
+        {profile.name.value: profile for profile in get_all_profiles()}
+    )
 
 
 def get_profile(name: str | TuningProfileName) -> QdrantTuningProfile:
     """Return a profile by enum or string name."""
 
-    key = name.value if isinstance(name, TuningProfileName) else _validate_text(name, "name")
+    key = (
+        name.value
+        if isinstance(name, TuningProfileName)
+        else _validate_text(name, "name")
+    )
     try:
         return profile_registry()[key]
     except KeyError as exc:

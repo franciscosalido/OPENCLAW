@@ -66,7 +66,12 @@ def validate_non_empty_text(value: str, field_name: str) -> str:
 
 def validate_collection_name(name: str) -> str:
     clean = validate_non_empty_text(name, "collection_name")
-    if not _COLLECTION_RE.fullmatch(clean) or ".." in clean or "/" in clean or "\\" in clean:
+    if (
+        not _COLLECTION_RE.fullmatch(clean)
+        or ".." in clean
+        or "/" in clean
+        or "\\" in clean
+    ):
         raise McpSafetyError("collection_name must be a safe collection identifier")
     allowed = {"quimera_knowledge", "quimera_query_cache", "quimera_llm_cache"}
     if clean not in allowed and not clean.startswith("quimera_"):

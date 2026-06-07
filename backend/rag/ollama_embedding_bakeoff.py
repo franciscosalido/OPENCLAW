@@ -15,13 +15,14 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
 from types import MappingProxyType
-from typing import Any
 
 import httpx
 
 OLLAMA_READINESS_SCHEMA_VERSION = "ollama-readiness-v1"
 EMBEDDING_BAKEOFF_SUMMARY_SCHEMA_VERSION = "embedding-bakeoff-qwen3-4b-summary-v1"
-EMBEDDING_BAKEOFF_COLLECTION_SCHEMA_VERSION = "qdrant-hybrid-118-embedding-bakeoff-qwen3-4b-v1"
+EMBEDDING_BAKEOFF_COLLECTION_SCHEMA_VERSION = (
+    "qdrant-hybrid-118-embedding-bakeoff-qwen3-4b-v1"
+)
 
 OLLAMA_VERSION_CONTRACT_LAST_VERIFIED = "2026-05-28"
 OLLAMA_LATEST_STABLE_KNOWN = "0.24.0"
@@ -288,11 +289,19 @@ class EmbeddingBakeoffCollectionSpec:
 
     def __post_init__(self) -> None:
         _validate_text(self.collection_name, "collection_name")
-        if self.collection_name in {"quimera_knowledge", "quimera_knowledge_v2", "openclaw_knowledge"}:
+        if self.collection_name in {
+            "quimera_knowledge",
+            "quimera_knowledge_v2",
+            "openclaw_knowledge",
+        }:
             raise ValueError("protected collection cannot be used for bakeoff")
         if self.collection_name not in ALLOWED_BAKEOFF_COLLECTIONS:
             raise ValueError("collection must be a declared bakeoff collection")
-        names = {self.dense_nomic_vector_name, self.dense_qwen3_4b_vector_name, self.sparse_vector_name}
+        names = {
+            self.dense_nomic_vector_name,
+            self.dense_qwen3_4b_vector_name,
+            self.sparse_vector_name,
+        }
         if len(names) != 3:
             raise ValueError("vector names must be distinct")
         if self.nomic_dimensions != NOMIC_DEFAULT_DIMENSIONS:
@@ -305,8 +314,14 @@ class EmbeddingBakeoffCollectionSpec:
     def build_vectors_config(self) -> dict[str, object]:
         """Return conceptual named dense vector config."""
         return {
-            self.dense_nomic_vector_name: {"size": self.nomic_dimensions, "distance": "Cosine"},
-            self.dense_qwen3_4b_vector_name: {"size": self.qwen3_4b_dimensions, "distance": "Cosine"},
+            self.dense_nomic_vector_name: {
+                "size": self.nomic_dimensions,
+                "distance": "Cosine",
+            },
+            self.dense_qwen3_4b_vector_name: {
+                "size": self.qwen3_4b_dimensions,
+                "distance": "Cosine",
+            },
         }
 
     def build_sparse_vectors_config(self) -> dict[str, object]:
@@ -522,7 +537,9 @@ class OllamaEmbeddingClient:
 
     async def embed_queries(self, queries: Sequence[str]) -> EmbeddingBatchResult:
         """Embed queries with Qwen3 instruction formatting when configured."""
-        formatted = tuple(format_qwen3_query(query, self.query_instruction) for query in queries)
+        formatted = tuple(
+            format_qwen3_query(query, self.query_instruction) for query in queries
+        )
         return await self._embed_batch(formatted)
 
     async def preload_model(self) -> OllamaModelLoadResult:
@@ -569,7 +586,9 @@ class OllamaEmbeddingClient:
         raw_embeddings = data.get("embeddings")
         if not isinstance(raw_embeddings, list) or not raw_embeddings:
             raise ValueError("Ollama response did not contain embeddings")
-        embeddings = tuple(tuple(float(value) for value in vector) for vector in raw_embeddings)
+        embeddings = tuple(
+            tuple(float(value) for value in vector) for vector in raw_embeddings
+        )
         dimensions = len(embeddings[0])
         return EmbeddingBatchResult(
             model=self.model,
@@ -586,10 +605,14 @@ class OllamaEmbeddingClient:
     async def _post_embed(self, payload: Mapping[str, object]) -> Mapping[str, object]:
         async with self._semaphore:
             if self._client is None:
-                async with httpx.AsyncClient(base_url=self.base_url, timeout=self.timeout_s) as client:
+                async with httpx.AsyncClient(
+                    base_url=self.base_url, timeout=self.timeout_s
+                ) as client:
                     response = await client.post(OLLAMA_EMBED_PATH, json=dict(payload))
             else:
-                response = await self._client.post(OLLAMA_EMBED_PATH, json=dict(payload), timeout=self.timeout_s)
+                response = await self._client.post(
+                    OLLAMA_EMBED_PATH, json=dict(payload), timeout=self.timeout_s
+                )
         response.raise_for_status()
         data = response.json()
         if not isinstance(data, Mapping):
@@ -629,22 +652,120 @@ def default_bakeoff_collection_spec() -> EmbeddingBakeoffCollectionSpec:
 def declared_bakeoff_scenarios() -> tuple[EmbeddingBakeoffScenario, ...]:
     """Return the official Qwen3-4B vs Nomic scenario set."""
     return (
-        EmbeddingBakeoffScenario("nomic_dense_only", NOMIC_MODEL_ID, "dense_only", 768, False, False, "batched"),
-        EmbeddingBakeoffScenario("qwen3_4b_dense_only", QWEN3_4B_MODEL_ID, "dense_only", 2560, False, False, "batched"),
-        EmbeddingBakeoffScenario("nomic_hybrid_python_rrf", NOMIC_MODEL_ID, "hybrid", 768, False, False, "batched"),
-        EmbeddingBakeoffScenario("qwen3_4b_hybrid_python_rrf", QWEN3_4B_MODEL_ID, "hybrid", 2560, True, False, "batched"),
-        EmbeddingBakeoffScenario("qwen3_4b_instruction_on", QWEN3_4B_MODEL_ID, "hybrid", 2560, True, False, "batched"),
-        EmbeddingBakeoffScenario("qwen3_4b_instruction_off", QWEN3_4B_MODEL_ID, "hybrid", 2560, False, False, "batched"),
-        EmbeddingBakeoffScenario("qwen3_4b_dimensions_1024", QWEN3_4B_MODEL_ID, "hybrid", 1024, True, False, "batched"),
-        EmbeddingBakeoffScenario("qwen3_4b_dimensions_1536", QWEN3_4B_MODEL_ID, "hybrid", 1536, True, False, "batched"),
-        EmbeddingBakeoffScenario("qwen3_4b_dimensions_2560", QWEN3_4B_MODEL_ID, "hybrid", 2560, True, False, "batched"),
-        EmbeddingBakeoffScenario("cold_ollama_qwen3_4b", QWEN3_4B_MODEL_ID, "hybrid", 2560, True, True, "single"),
-        EmbeddingBakeoffScenario("warm_ollama_qwen3_4b", QWEN3_4B_MODEL_ID, "hybrid", 2560, True, False, "single"),
-        EmbeddingBakeoffScenario("batch_vs_single_embed", QWEN3_4B_MODEL_ID, "hybrid", 2560, True, False, "batch_vs_single"),
+        EmbeddingBakeoffScenario(
+            "nomic_dense_only",
+            NOMIC_MODEL_ID,
+            "dense_only",
+            768,
+            False,
+            False,
+            "batched",
+        ),
+        EmbeddingBakeoffScenario(
+            "qwen3_4b_dense_only",
+            QWEN3_4B_MODEL_ID,
+            "dense_only",
+            2560,
+            False,
+            False,
+            "batched",
+        ),
+        EmbeddingBakeoffScenario(
+            "nomic_hybrid_python_rrf",
+            NOMIC_MODEL_ID,
+            "hybrid",
+            768,
+            False,
+            False,
+            "batched",
+        ),
+        EmbeddingBakeoffScenario(
+            "qwen3_4b_hybrid_python_rrf",
+            QWEN3_4B_MODEL_ID,
+            "hybrid",
+            2560,
+            True,
+            False,
+            "batched",
+        ),
+        EmbeddingBakeoffScenario(
+            "qwen3_4b_instruction_on",
+            QWEN3_4B_MODEL_ID,
+            "hybrid",
+            2560,
+            True,
+            False,
+            "batched",
+        ),
+        EmbeddingBakeoffScenario(
+            "qwen3_4b_instruction_off",
+            QWEN3_4B_MODEL_ID,
+            "hybrid",
+            2560,
+            False,
+            False,
+            "batched",
+        ),
+        EmbeddingBakeoffScenario(
+            "qwen3_4b_dimensions_1024",
+            QWEN3_4B_MODEL_ID,
+            "hybrid",
+            1024,
+            True,
+            False,
+            "batched",
+        ),
+        EmbeddingBakeoffScenario(
+            "qwen3_4b_dimensions_1536",
+            QWEN3_4B_MODEL_ID,
+            "hybrid",
+            1536,
+            True,
+            False,
+            "batched",
+        ),
+        EmbeddingBakeoffScenario(
+            "qwen3_4b_dimensions_2560",
+            QWEN3_4B_MODEL_ID,
+            "hybrid",
+            2560,
+            True,
+            False,
+            "batched",
+        ),
+        EmbeddingBakeoffScenario(
+            "cold_ollama_qwen3_4b",
+            QWEN3_4B_MODEL_ID,
+            "hybrid",
+            2560,
+            True,
+            True,
+            "single",
+        ),
+        EmbeddingBakeoffScenario(
+            "warm_ollama_qwen3_4b",
+            QWEN3_4B_MODEL_ID,
+            "hybrid",
+            2560,
+            True,
+            False,
+            "single",
+        ),
+        EmbeddingBakeoffScenario(
+            "batch_vs_single_embed",
+            QWEN3_4B_MODEL_ID,
+            "hybrid",
+            2560,
+            True,
+            False,
+            "batch_vs_single",
+        ),
     )
 
 
-def format_qwen3_query(query: str, instruction: str | None = QWEN3_QUERY_INSTRUCTION) -> str:
+def format_qwen3_query(
+    query: str, instruction: str | None = QWEN3_QUERY_INSTRUCTION
+) -> str:
     """Apply the Qwen instruction format to a query; documents must not use this."""
     clean_query = _validate_text(query, "query")
     if instruction is None:
@@ -689,7 +810,11 @@ def parse_ollama_version(raw: str) -> str | None:
         candidate = token.removeprefix("v")
         if _looks_like_version(candidate):
             return candidate
-    return clean.removeprefix("v") if _looks_like_version(clean.removeprefix("v")) else None
+    return (
+        clean.removeprefix("v")
+        if _looks_like_version(clean.removeprefix("v"))
+        else None
+    )
 
 
 def select_latest_stable(
@@ -712,14 +837,18 @@ def select_latest_stable(
         parts = base.split(".")
         if len(parts) != 3 or not all(part.isdigit() for part in parts):
             continue
-        parsed.append(((int(parts[0]), int(parts[1]), int(parts[2])), normalized, is_prerelease))
+        parsed.append(
+            ((int(parts[0]), int(parts[1]), int(parts[2])), normalized, is_prerelease)
+        )
     if not parsed:
         return None
     parsed.sort(key=lambda item: item[0])
     return parsed[-1][1]
 
 
-def expected_dimension_for_model(model: str, dimensions: int | None = None) -> int | None:
+def expected_dimension_for_model(
+    model: str, dimensions: int | None = None
+) -> int | None:
     """Return expected output dimension for known models."""
     if model == QWEN3_4B_MODEL_ID:
         return dimensions or QWEN3_4B_DEFAULT_DIMENSIONS
@@ -769,11 +898,19 @@ def decide_embedding_candidate(
     return EmbeddingCandidateDecision.KEEP_NOMIC_DEFAULT
 
 
-def build_empty_bakeoff_summary(*, generated_at_utc: str | None = None) -> EmbeddingBakeoffSummary:
+def build_empty_bakeoff_summary(
+    *, generated_at_utc: str | None = None
+) -> EmbeddingBakeoffSummary:
     """Build an artifact-only summary with declared scenarios and no invented metrics."""
-    now = generated_at_utc or datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    now = generated_at_utc or datetime.now(UTC).replace(
+        microsecond=0
+    ).isoformat().replace("+00:00", "Z")
     runs = tuple(
-        EmbeddingBakeoffRun(scenario=scenario, metrics=EmbeddingBakeoffMetrics(), evidence_complete=False)
+        EmbeddingBakeoffRun(
+            scenario=scenario,
+            metrics=EmbeddingBakeoffMetrics(),
+            evidence_complete=False,
+        )
         for scenario in declared_bakeoff_scenarios()
     )
     return EmbeddingBakeoffSummary(

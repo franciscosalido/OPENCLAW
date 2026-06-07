@@ -179,7 +179,9 @@ class PostgresMemoryRepository:
         )
         return _entity_mention_from_record(_require_row(row))
 
-    async def get_entity_mentions_for_turn(self, turn_id: object) -> list[EntityMention]:
+    async def get_entity_mentions_for_turn(
+        self, turn_id: object
+    ) -> list[EntityMention]:
         rows = await self._pool.fetch(
             """
             SELECT *

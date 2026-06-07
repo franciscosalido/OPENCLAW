@@ -16,9 +16,15 @@ class PostgresSettings(BaseSettings):
 
     model_config = SettingsConfigDict(extra="ignore", frozen=True)
 
-    dsn: str = Field(default=DEFAULT_POSTGRES_DSN, validation_alias="QUIMERA_POSTGRES_DSN")
-    min_pool_size: int = Field(default=1, validation_alias="QUIMERA_POSTGRES_MIN_POOL_SIZE")
-    max_pool_size: int = Field(default=5, validation_alias="QUIMERA_POSTGRES_MAX_POOL_SIZE")
+    dsn: str = Field(
+        default=DEFAULT_POSTGRES_DSN, validation_alias="QUIMERA_POSTGRES_DSN"
+    )
+    min_pool_size: int = Field(
+        default=1, validation_alias="QUIMERA_POSTGRES_MIN_POOL_SIZE"
+    )
+    max_pool_size: int = Field(
+        default=5, validation_alias="QUIMERA_POSTGRES_MAX_POOL_SIZE"
+    )
     command_timeout: float = Field(
         default=30.0,
         validation_alias="QUIMERA_POSTGRES_COMMAND_TIMEOUT",

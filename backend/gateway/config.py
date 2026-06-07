@@ -164,9 +164,7 @@ class GatewayConfig(BaseModel):
         for alias in self.model_list:
             if alias.model_name == name:
                 return alias
-        raise GatewayModelAliasError(
-            f"Unknown gateway alias: {name!r}", alias=name
-        )
+        raise GatewayModelAliasError(f"Unknown gateway alias: {name!r}", alias=name)
 
     @property
     def alias_names(self) -> set[str]:

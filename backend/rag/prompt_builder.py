@@ -57,8 +57,7 @@ class PromptBuilder:
             f"{thinking_directive}\n\n"
             f"PERGUNTA:\n{clean_question}\n\n"
             f"CONTEXTO RECUPERADO:\n{context}\n\n"
-            "INSTRUCOES DE RESPOSTA:\n"
-            + "\n".join(response_instructions)
+            "INSTRUCOES DE RESPOSTA:\n" + "\n".join(response_instructions)
         )
 
         return [

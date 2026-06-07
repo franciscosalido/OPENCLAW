@@ -6,7 +6,6 @@ import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from statistics import median
 from typing import Any, Literal, Protocol, cast
 
 from backend.ingestion.commit_store import DUAL_CORPUS_COLLECTIONS
@@ -45,7 +44,9 @@ BOOTSTRAP_FORBIDDEN_KEYS = {
 class BootstrapCommitStore(Protocol):
     """Commit store interface used by bootstrap orchestration."""
 
-    def commit(self, chunks: Sequence[VectorStoreChunk], *, collection: str | None) -> None:
+    def commit(
+        self, chunks: Sequence[VectorStoreChunk], *, collection: str | None
+    ) -> None:
         """Persist vector chunks into the mapped collection."""
 
 

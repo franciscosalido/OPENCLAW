@@ -21,7 +21,6 @@ import httpx
 from loguru import logger
 
 from backend.gateway.client import (
-    DEFAULT_LLM_BASE_URL,
     DEFAULT_LLM_JSON_MODEL,
     DEFAULT_LLM_MODEL,
     DEFAULT_LLM_RAG_MODEL,

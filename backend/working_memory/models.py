@@ -17,7 +17,9 @@ from backend.working_memory.safety import (
 
 
 SCHEMA_VERSION_POINT_V1 = "working-memory-point-v1"
-MemoryKind = Literal["turn_summary", "agent_state", "scratchpad", "handoff", "tool_observation"]
+MemoryKind = Literal[
+    "turn_summary", "agent_state", "scratchpad", "handoff", "tool_observation"
+]
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -54,7 +56,13 @@ class WorkingMemoryPoint:
         _require_non_empty(self.embedding_model, "embedding_model")
         if not isinstance(self.session_id, UUID):
             raise TypeError("session_id must be a UUID")
-        if self.memory_kind not in ("turn_summary", "agent_state", "scratchpad", "handoff", "tool_observation"):
+        if self.memory_kind not in (
+            "turn_summary",
+            "agent_state",
+            "scratchpad",
+            "handoff",
+            "tool_observation",
+        ):
             raise ValueError("memory_kind is unsupported")
         _validate_vector(self.vector)
         if self.vector_dim != len(self.vector):
@@ -69,8 +77,12 @@ class WorkingMemoryPoint:
             raise ValueError("ttl_seconds must be > 0")
         if self.schema_version != SCHEMA_VERSION_POINT_V1:
             raise ValueError("schema_version must be working-memory-point-v1")
-        object.__setattr__(self, "safe_summary", validate_safe_summary(self.safe_summary))
-        object.__setattr__(self, "metadata", sanitize_metadata(validate_safe_payload(self.metadata)))
+        object.__setattr__(
+            self, "safe_summary", validate_safe_summary(self.safe_summary)
+        )
+        object.__setattr__(
+            self, "metadata", sanitize_metadata(validate_safe_payload(self.metadata))
+        )
 
     @property
     def payload_checksum(self) -> str:
@@ -113,7 +125,9 @@ class WorkingMemoryPoint:
         }
 
 
-def point_from_payload(*, point_id: str, vector: tuple[float, ...], payload: dict[str, Any]) -> WorkingMemoryPoint:
+def point_from_payload(
+    *, point_id: str, vector: tuple[float, ...], payload: dict[str, Any]
+) -> WorkingMemoryPoint:
     """Build a point from a Qdrant/Postgres payload."""
 
     return WorkingMemoryPoint(
@@ -135,7 +149,9 @@ def point_from_payload(*, point_id: str, vector: tuple[float, ...], payload: dic
         importance=float(payload.get("importance", 0.5)),
         checkpoint_id=_optional_str(payload.get("checkpoint_id")),
         safe_summary=_optional_str(payload.get("safe_summary")),
-        metadata=dict(payload.get("metadata", {})) if isinstance(payload.get("metadata"), dict) else {},
+        metadata=dict(payload.get("metadata", {}))
+        if isinstance(payload.get("metadata"), dict)
+        else {},
     )
 
 

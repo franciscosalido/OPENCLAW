@@ -194,9 +194,7 @@ class FusedResult:
             "first_seen_order",
         )
         present_ranks = [
-            rank
-            for rank in (clean_dense_rank, clean_sparse_rank)
-            if rank is not None
+            rank for rank in (clean_dense_rank, clean_sparse_rank) if rank is not None
         ]
         if clean_best_rank != min(present_ranks):
             raise ValueError("best_rank must be the minimum present source rank")
@@ -427,8 +425,7 @@ def _validate_doc_id_consistency(
 ) -> None:
     if accumulator is not None and accumulator.doc_id != result.doc_id:
         raise ValueError(
-            "conflicting doc_id for the same result_id: "
-            f"{result.result_id}"
+            f"conflicting doc_id for the same result_id: {result.result_id}"
         )
 
 

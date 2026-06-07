@@ -9,13 +9,22 @@ from pathlib import Path
 from typing import Any, Protocol, cast
 
 from backend.ingestion.fingerprint import file_sha256, normalized_text_sha256
-from backend.ingestion.manifest import CorpusDocument, load_manifest, resolve_corpus_path
+from backend.ingestion.manifest import (
+    CorpusDocument,
+    load_manifest,
+    resolve_corpus_path,
+)
 from backend.ingestion.parsers import (
     ParserRejectedError,
     ParserUnavailableError,
     parse_document,
 )
-from backend.ingestion.report import DocumentReport, DocumentStatus, IngestionMode, build_report
+from backend.ingestion.report import (
+    DocumentReport,
+    DocumentStatus,
+    IngestionMode,
+    build_report,
+)
 from backend.ingestion.sanitizer import reject_manifest_pii, sanitize_parsed_text
 from backend.rag.chunking import DEFAULT_MAX_TOKENS, DEFAULT_OVERLAP_TOKENS, chunk_text
 from backend.rag.qdrant_store import VectorStoreChunk
@@ -36,7 +45,9 @@ class IngestionOptions:
 class IngestionCommitStore(Protocol):
     """Optional commit abstraction used by tests or future Qdrant wiring."""
 
-    def commit(self, chunks: Sequence[VectorStoreChunk], *, collection: str | None) -> None:
+    def commit(
+        self, chunks: Sequence[VectorStoreChunk], *, collection: str | None
+    ) -> None:
         """Persist chunks behind an explicit commit mode."""
 
 
@@ -278,7 +289,8 @@ def _validate_commit_allowed(
     blocking_reasons: set[str] = {
         report.rejection_reason
         for report in document_reports
-        if report.status in {"rejected", "duplicate"} and report.rejection_reason is not None
+        if report.status in {"rejected", "duplicate"}
+        and report.rejection_reason is not None
     }
     if fail_on_pending:
         blocking_reasons.update(

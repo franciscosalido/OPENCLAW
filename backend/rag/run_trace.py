@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Literal
+from typing import Literal
 from uuid import uuid4
 
 import yaml
@@ -76,7 +76,9 @@ class RagTracingConfig:
             "rag.embedding.embedding_alias",
         )
         if self.embedding_dimensions <= 0:
-            raise ValueError("rag.embedding.embedding_dimensions must be greater than zero")
+            raise ValueError(
+                "rag.embedding.embedding_dimensions must be greater than zero"
+            )
         return RagTracingConfig(
             enabled=self.enabled,
             log_level=log_level,
@@ -240,9 +242,7 @@ class RagRunTrace:
                 {"disabled", "alias_not_in_scope", "no_keep_alive_value"},
             )
         if self.run_context is not None and self.run_context not in RUN_CONTEXTS:
-            raise ValueError(
-                f"run_context must be one of {sorted(RUN_CONTEXTS)}"
-            )
+            raise ValueError(f"run_context must be one of {sorted(RUN_CONTEXTS)}")
         if self.ollama_metrics_available and not any(
             value is not None
             for value in (
@@ -419,9 +419,7 @@ def build_rag_run_trace(
         generation_ms=generation_ms,
         total_ms=total_ms,
         run_context=run_context,
-        ollama_metrics_available=bool(
-            safe_ollama_metrics["ollama_metrics_available"]
-        ),
+        ollama_metrics_available=bool(safe_ollama_metrics["ollama_metrics_available"]),
         ollama_total_duration_ms=_optional_float_metric(
             safe_ollama_metrics,
             "ollama_total_duration_ms",

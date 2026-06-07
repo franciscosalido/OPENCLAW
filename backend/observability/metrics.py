@@ -17,7 +17,10 @@ RETRIEVAL_OPERATION_DURATION_METRIC_NAME = "quimera.retrieval.operation.duration
 
 
 def setup_metrics() -> None:
-    global _GENAI_OPERATION_DURATION, _METRICS_INITIALIZED, _RETRIEVAL_OPERATION_DURATION
+    global \
+        _GENAI_OPERATION_DURATION, \
+        _METRICS_INITIALIZED, \
+        _RETRIEVAL_OPERATION_DURATION
     if _METRICS_INITIALIZED or is_otel_disabled():
         return
     provider = MeterProvider(resource=build_resource())
@@ -48,7 +51,9 @@ def record_genai_operation_duration(
     setup_metrics()
     if _GENAI_OPERATION_DURATION is None:
         return
-    _GENAI_OPERATION_DURATION.record(duration_ms / 1000.0, validate_attributes(attributes))
+    _GENAI_OPERATION_DURATION.record(
+        duration_ms / 1000.0, validate_attributes(attributes)
+    )
 
 
 def record_retrieval_duration(
@@ -62,7 +67,10 @@ def record_retrieval_duration(
 
 
 def _reset_for_tests() -> None:
-    global _GENAI_OPERATION_DURATION, _METRICS_INITIALIZED, _RETRIEVAL_OPERATION_DURATION
+    global \
+        _GENAI_OPERATION_DURATION, \
+        _METRICS_INITIALIZED, \
+        _RETRIEVAL_OPERATION_DURATION
     _METRICS_INITIALIZED = False
     _GENAI_OPERATION_DURATION = None
     _RETRIEVAL_OPERATION_DURATION = None
