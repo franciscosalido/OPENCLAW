@@ -27,8 +27,9 @@ class FakeStore:
 
 
 class FakeRepository:
-    def __init__(self, points: list[WorkingMemoryPoint]) -> None:
+    def __init__(self, points: list[WorkingMemoryPoint], *, checksum_ok: bool = True) -> None:
         self.points = points
+        self.checksum_ok = checksum_ok
         self.validated: str | None = None
 
     async def get_latest_snapshot(self, *, agent_id: str, session_id: str) -> dict[str, object] | None:
@@ -39,7 +40,7 @@ class FakeRepository:
 
     async def validate_snapshot_checksum(self, snapshot_id: str) -> bool:
         self.validated = snapshot_id
-        return True
+        return self.checksum_ok
 
     async def mark_snapshot_restored(self, snapshot_id: str) -> None:
         self.validated = snapshot_id
@@ -94,3 +95,34 @@ async def test_restore_replace_deletes_only_agent_session_scope() -> None:
     await service.restore_snapshot("snap-1", agent_id=point.agent_id, session_id=str(point.session_id), replace=True)
 
     assert store.deleted_scope == (point.agent_id, str(point.session_id))
+
+
+async def test_restore_can_abort_on_checksum_mismatch() -> None:
+    point = _point()
+    store = FakeStore()
+    service = RestoreService(
+        store=store,
+        repository=FakeRepository([point], checksum_ok=False),
+        abort_on_checksum_fail=True,
+    )
+
+    result = await service.restore_snapshot("snap-1", agent_id=point.agent_id, session_id=str(point.session_id))
+
+    assert result.status == "fail"
+    assert result.checksum_ok is False
+    assert result.restored_count == 0
+    assert store.restored == []
+    assert result.warnings == ["snapshot checksum mismatch; restore aborted"]
+
+
+async def test_restore_warns_but_continues_on_checksum_mismatch_by_default() -> None:
+    point = _point()
+    store = FakeStore()
+    service = RestoreService(store=store, repository=FakeRepository([point], checksum_ok=False))
+
+    result = await service.restore_snapshot("snap-1", agent_id=point.agent_id, session_id=str(point.session_id))
+
+    assert result.status == "warn"
+    assert result.checksum_ok is False
+    assert result.restored_count == 1
+    assert store.restored == [point]

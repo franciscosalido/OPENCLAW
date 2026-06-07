@@ -3,6 +3,9 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
+import pytest
+
+from backend.working_memory import snapshot_service
 from backend.working_memory.models import WorkingMemoryPoint
 from backend.working_memory.snapshot_service import SnapshotService, compute_snapshot_checksum
 
@@ -48,6 +51,18 @@ async def test_snapshot_service_filters_expired_points_and_epoch_is_monotonic() 
 
     assert [point.point_id for point in active] == ["a"]
     assert epoch2 > epoch1
+    assert epoch1 > 1_700_000_000_000
+
+
+def test_snapshot_epoch_uses_wall_clock_milliseconds(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("backend.working_memory.snapshot_service.time.time_ns", lambda: 1_800_000_000_000_000_000)
+    monkeypatch.setattr(snapshot_service, "_LAST_EPOCH_MS", 0)
+
+    first = snapshot_service.next_snapshot_epoch_ms()
+    second = snapshot_service.next_snapshot_epoch_ms()
+
+    assert first == 1_800_000_000_000
+    assert second == 1_800_000_000_001
 
 
 def test_should_snapshot_policy() -> None:

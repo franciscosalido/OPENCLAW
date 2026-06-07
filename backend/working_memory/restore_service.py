@@ -45,10 +45,18 @@ class RestoreReport:
 class RestoreService:
     """Merge or gated-replace restore service."""
 
-    def __init__(self, *, store: RestoreStore, repository: RestoreRepository, replace_enabled: bool = False) -> None:
+    def __init__(
+        self,
+        *,
+        store: RestoreStore,
+        repository: RestoreRepository,
+        replace_enabled: bool = False,
+        abort_on_checksum_fail: bool = False,
+    ) -> None:
         self._store = store
         self._repository = repository
         self._replace_enabled = replace_enabled
+        self._abort_on_checksum_fail = abort_on_checksum_fail
 
     async def restore_latest_snapshot(self, *, agent_id: str, session_id: str) -> RestoreReport:
         snapshot = await self._repository.get_latest_snapshot(agent_id=agent_id, session_id=session_id)
@@ -61,6 +69,15 @@ class RestoreService:
         if replace and not self._replace_enabled:
             raise ValueError("working memory replace restore is disabled")
         checksum_ok = await self._repository.validate_snapshot_checksum(snapshot_id)
+        if not checksum_ok and self._abort_on_checksum_fail:
+            return RestoreReport(
+                status="fail",
+                snapshot_id=snapshot_id,
+                restored_count=0,
+                skipped_expired_count=0,
+                checksum_ok=False,
+                warnings=["snapshot checksum mismatch; restore aborted"],
+            )
         points = await self._repository.load_snapshot_points(snapshot_id)
         now = datetime.now(UTC)
         active = [point for point in points if not point.is_expired(now)]

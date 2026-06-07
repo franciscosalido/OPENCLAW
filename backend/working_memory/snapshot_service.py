@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from datetime import UTC, datetime
-from itertools import count
+import time
 from typing import Any, Protocol
 
 from backend.observability.decorators import traced_cache
@@ -23,7 +23,7 @@ class SnapshotRepository(Protocol):
     async def insert_snapshot_points(self, *, snapshot_id: str, points: list[WorkingMemoryPoint]) -> None: ...
 
 
-_EPOCH_COUNTER = count(1)
+_LAST_EPOCH_MS = 0
 
 
 class SnapshotService:
@@ -75,7 +75,7 @@ class SnapshotService:
     def next_snapshot_epoch(self, agent_id: str, session_id: str) -> int:
         if not agent_id.strip() or not session_id.strip():
             raise ValueError("agent_id and session_id are required")
-        return next(_EPOCH_COUNTER)
+        return next_snapshot_epoch_ms()
 
     def should_snapshot(self, *, write_count: int, elapsed_seconds: int) -> bool:
         return write_count >= self._settings.snapshot_every_writes or elapsed_seconds >= self._settings.snapshot_interval_seconds
@@ -87,3 +87,14 @@ def compute_snapshot_checksum(points: Iterable[WorkingMemoryPoint]) -> str:
         for point in sorted(points, key=lambda item: item.point_id)
     ]
     return compute_payload_checksum({"points": rows})
+
+
+def next_snapshot_epoch_ms() -> int:
+    """Return a wall-clock millisecond epoch with a per-process monotonic guard."""
+
+    global _LAST_EPOCH_MS
+    current = time.time_ns() // 1_000_000
+    if current <= _LAST_EPOCH_MS:
+        current = _LAST_EPOCH_MS + 1
+    _LAST_EPOCH_MS = current
+    return current

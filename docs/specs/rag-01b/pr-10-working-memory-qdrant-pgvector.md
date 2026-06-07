@@ -51,6 +51,17 @@ Restore upserts points back into Qdrant. Replace mode is disabled unless
 explicitly enabled and may only delete points for the same `agent_id` and
 `session_id`.
 
+Checksum mismatch defaults to availability-first behavior: restore continues
+with `status=warn`, `checksum_ok=false` and an explicit warning. Operators that
+prefer integrity over availability can construct `RestoreService` with
+`abort_on_checksum_fail=true`; in that mode no point is restored after checksum
+mismatch.
+
+`snapshot_epoch` is a wall-clock millisecond epoch with a local monotonic guard.
+It does not reset to `1` after process restart and remains sortable across
+process lifetimes. PostgreSQL still enforces uniqueness by
+`(agent_id, session_id, snapshot_epoch)`.
+
 ## TTL And Cleanup
 
 Every point has `expires_at` and `ttl_seconds`. Cleanup only removes expired
@@ -86,6 +97,10 @@ No Redis, Dragonfly, final Python/RAM backend decision, new knowledge
 collection, HybridRAG mutation, cache collection mutation, pgvector ANN hot
 path, scheduler daemon, dashboard, remote provider, real data or real
 collection deletion.
+
+`integration/hybrid_fixture.py` uses `delete_collection` only as teardown for
+synthetic HybridRAG test collections. PR-10 does not add `delete_collection` to
+`backend/working_memory` or the working-memory MCP path.
 
 ## Future Handoff
 

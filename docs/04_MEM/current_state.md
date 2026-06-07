@@ -65,6 +65,30 @@ Operational note:
   human operator exports the explicit `QUIMERA_TEST_WM_*` variables and a
   test DSN.
 
+### RAG-01B PR-10 RC-01 — Restore Integrity and Host Python 3.12 Gate
+
+Implemented:
+
+- Added `abort_on_checksum_fail` to `RestoreService`. Default remains
+  availability-first warn-and-restore; strict operators can now abort restore
+  before any point is written when checksum validation fails.
+- Replaced module-level `count(1)` snapshot epochs with wall-clock millisecond
+  epochs plus a local monotonic guard, avoiding restart-to-1 behavior.
+- Documented that `integration/hybrid_fixture.py` uses `delete_collection` only
+  for synthetic HybridRAG fixture teardown and not in working-memory runtime.
+
+Validation:
+
+- `.venv/bin/python --version`: Python 3.12.13.
+- Required host Python 3.12 unit block:
+  66 passed.
+- PR-10 focused unit/integration block:
+  70 passed / 4 skipped.
+- Full host Python 3.12 regression with `.venv/bin/python -m pytest`:
+  1889 passed / 65 skipped.
+- `uv run mypy --strict` on PR-10 working-memory/MCP/tests:
+  success.
+
 ---
 
 ## RAG-01B PR-09 — Operational Hardening + Smoke CLI
