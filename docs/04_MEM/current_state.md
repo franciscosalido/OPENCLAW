@@ -96,6 +96,112 @@ Scope intentionally not changed:
 
 ---
 
+## vibe_code_sandbox — Postgres Extension Runtime Hardening
+
+Current worktree: `/Users/fas/projetos/vibe_code_sandbox`
+Branch: `vibe_code_sandbox`
+Base: local `main` at `cb0ba17` after merging `Testes-01` runtime contracts.
+
+Implemented:
+
+- Added `infra/postgres/Dockerfile`, a local runtime image derived from
+  `postgres:18.4-trixie`.
+- The image installs TimescaleDB `2.23.0` and pgvector `0.8.2` from source so
+  RAG-01B integration tests can create `timescaledb` hypertables and
+  `vector(768)` checkpoint columns without changing PostgreSQL major/minor.
+- Updated `docker/docker-compose.postgres.yml` and
+  `infra/docker/compose.quimera.local.yml` to build
+  `quimera/postgres-memory:18.4-trixie-timescaledb-pgvector`.
+- Updated Postgres startup to preload `timescaledb,pg_stat_statements`.
+- Updated initdb extension bootstrap to create `pgcrypto`, `timescaledb`,
+  `vector` and `pg_stat_statements`.
+- Updated working-memory checkpoint SQL to create `vector` before using the
+  `vector(768)` type, so existing databases with the extension package
+  available can self-heal on schema application.
+
+Scope intentionally not changed:
+
+- No PostgreSQL version change.
+- No switch to PostgreSQL 17/15.
+- No `postgres:latest`.
+- No live volume reset.
+- No pg_dump/restore behavior change yet.
+
+### vibe_code_sandbox RC — start_quimera Postgres rebuild hardening
+
+Implemented:
+
+- Refactored `scripts/start_quimera.sh` as the canonical operational entrypoint
+  behind the root `./start_quimera.sh` wrapper.
+- The script now accepts exactly `--start`, `--stop` and `--status`.
+- Postgres image/config drift is detected before start and requires explicit
+  human confirmation before rebuild.
+- Rebuild preserves data volumes: it uses compose build-or-pull, stop, rm -f
+  and up -d for the Postgres service only; no volume removal, compose down -v
+  or Docker prune command is present.
+- Ollama warmup uses numeric `keep_alive: -1`, matching the official Ollama API
+  preload examples and the existing numeric unload `keep_alive: 0` contract.
+- `--status` now degrades to a partial host-only table when Docker is not
+  available instead of aborting before rendering any status.
+- Postgres rebuild now calls `docker compose build` only when the service has a
+  Compose `build:` section; external image services use `docker compose pull`.
+
+Validation:
+
+- `bash -n ./start_quimera.sh scripts/start_quimera.sh scripts/star_quimera.sh`:
+  success.
+- `uv run pytest tests/unit/test_start_quimera_script.py`:
+  19 passed.
+- `git diff --check`:
+  clean.
+- `shellcheck` and `ruff` were not executed in this worktree because the tools
+  were unavailable and no dependency installation was requested.
+
+### vibe_code_sandbox RC — Vibe integration residual failures
+
+Implemented:
+
+- Updated `Dockerfile.openclaw-sandbox` to install PostgreSQL 18 client tools
+  from the official PGDG apt repository and prepend
+  `/usr/lib/postgresql/18/bin` to `PATH`, so sandbox `pg_dump` is not older
+  than the canonical PostgreSQL 18.4 server.
+- Hardened `infra/postgres/backup.sh` and `restore_verify.sh` to prefer
+  PostgreSQL tools from the running `quimera-postgres-memory` container when
+  available, avoiding host/sandbox client drift.
+- Added TimescaleDB logical restore protocol to `restore_verify.sh`:
+  `CREATE EXTENSION IF NOT EXISTS timescaledb`,
+  `timescaledb_pre_restore()` before `pg_restore`, and
+  `timescaledb_post_restore()` after restore.
+- Added migration `017_enable_vector_extension.sql` instead of editing older
+  applied migrations, preserving checksum immutability while enabling pgvector
+  through the migration runner.
+- Added isolated live PostgreSQL test database helper for migration tests.
+  `test_postgres_migrations.py` and `test_finance_schema_migrations.py` now run
+  against per-test temporary databases and clean them up with a guarded
+  `quimera_test_` prefix.
+- Fixed the finance checksum assertion to compare only finance migrations when
+  querying `schema_migrations WHERE version >= '010'`.
+
+Validation:
+
+- Live reproduction block for the four reported failures:
+  4 passed.
+- Full affected integration files:
+  9 passed.
+- Static/unit block:
+  39 passed.
+- `bash -n infra/postgres/backup.sh infra/postgres/restore_verify.sh
+  ./start_quimera.sh scripts/start_quimera.sh scripts/star_quimera.sh`:
+  success.
+- `uv run mypy --strict` on touched test/helper files:
+  success.
+- `uv run pyright` on touched test/helper files:
+  0 errors.
+- `git diff --check`:
+  clean.
+
+---
+
 ## RAG-01B PR-10 — Working Memory Qdrant + pgvector Checkpoints
 
 Current branch: `rag-01b/pr-10-working-memory-qdrant-pgvector`

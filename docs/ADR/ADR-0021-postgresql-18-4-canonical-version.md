@@ -12,7 +12,10 @@ infraestrutura de memoria relacional-temporal.
 A partir deste ADR:
 
 - Toda documentacao ativa deve referenciar PostgreSQL 18.4.
-- Docker Compose deve usar tag fixa `postgres:18.4-trixie`.
+- Docker Compose deve usar PostgreSQL 18.4 sobre base fixa
+  `postgres:18.4-trixie`. Quando extensoes nativas forem necessarias, a imagem
+  runtime pode ser uma derivada local dessa base, mas nao pode mudar a major,
+  minor ou codename da base.
 - Nao usar `postgres:latest`.
 - Nao usar `postgres:18` sem minor pin.
 - Nao usar PostgreSQL 16 em docs ativas, exceto quando explicitamente marcado
@@ -25,8 +28,10 @@ A partir deste ADR:
 - ORM pesado continua proibido.
 
 `postgres:18.4-trixie` e a base operacional aprovada pelo time para o container
-local. PostgreSQL 16 era referencia anterior do blueprint; foi superseded por
-ADR-0021.
+local. A imagem local `quimera/postgres-memory:18.4-trixie-timescaledb-pgvector`
+e uma derivada dessa base para disponibilizar TimescaleDB e pgvector no mesmo
+PostgreSQL canonico. PostgreSQL 16 era referencia anterior do blueprint; foi
+superseded por ADR-0021.
 
 ## Contexto
 
@@ -43,6 +48,8 @@ antigas a PostgreSQL 16 no SDD RAG-01B.
 - Migrations SQL do RAG-01B devem ser compativeis com PostgreSQL 18.4.
 - Extensoes futuras como pgvector, TimescaleDB e Kronos devem respeitar esta
   base.
+- Containers locais que precisam de TimescaleDB/pgvector devem declarar a base
+  `postgres:18.4-trixie` explicitamente e nao usar imagens unpinned.
 - Qualquer incompatibilidade futura deve ser tratada como issue de
   implementacao, nao como reabertura da decisao.
 

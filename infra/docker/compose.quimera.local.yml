@@ -3,7 +3,15 @@ name: quimera-local
 services:
   postgres-memory:
     container_name: quimera-postgres-memory
-    image: postgres:18.4-trixie
+    image: quimera/postgres-memory:18.4-trixie-timescaledb-pgvector
+    build:
+      context: ../..
+      dockerfile: infra/postgres/Dockerfile
+      args:
+        POSTGRES_BASE_IMAGE: postgres:18.4-trixie
+        PG_MAJOR: "18"
+        TIMESCALEDB_VERSION: "2.23.0"
+        PGVECTOR_VERSION: "0.8.2"
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
@@ -15,6 +23,18 @@ services:
       - POSTGRES_USER=quimera
       - POSTGRES_PASSWORD_FILE=/run/secrets/quimera_postgres_password
       - PGDATA=/var/lib/postgresql/18/docker
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=timescaledb,pg_stat_statements
+      - -c
+      - compute_query_id=auto
+      - -c
+      - pg_stat_statements.max=10000
+      - -c
+      - pg_stat_statements.track=all
+      - -c
+      - track_io_timing=on
     restart: unless-stopped
     healthcheck:
       test:

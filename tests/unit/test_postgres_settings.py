@@ -14,6 +14,18 @@ def test_settings_load_dsn_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
     assert settings.dsn == dsn
 
 
+def test_settings_accepts_explicit_dsn_by_field_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    env_dsn = "postgresql://quimera@127.0.0.1:5432/env_db"
+    explicit_dsn = "postgresql://quimera:pw@127.0.0.1:6543/explicit_db"
+    monkeypatch.setenv("QUIMERA_POSTGRES_DSN", env_dsn)
+
+    settings = PostgresSettings(dsn=explicit_dsn)
+
+    assert settings.dsn == explicit_dsn
+
+
 def test_pool_defaults_are_local_safe(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("QUIMERA_POSTGRES_MIN_POOL_SIZE", raising=False)
     monkeypatch.delenv("QUIMERA_POSTGRES_MAX_POOL_SIZE", raising=False)

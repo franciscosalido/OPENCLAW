@@ -7,6 +7,7 @@ import pytest
 
 from backend.memory.postgres.client import PostgresClient
 from backend.memory.postgres.migrations import run_migrations
+from tests.integration.postgres_isolated_db import isolated_postgres_client
 
 
 pytestmark = pytest.mark.integration
@@ -21,11 +22,8 @@ async def postgres_client() -> AsyncGenerator[PostgresClient, None]:
     dsn = _test_dsn()
     if not dsn:
         pytest.skip("TEST_POSTGRES_DSN or QUIMERA_POSTGRES_DSN is required")
-    client = await PostgresClient.create(dsn=dsn)
-    try:
+    async with isolated_postgres_client(dsn, prefix="migrations") as client:
         yield client
-    finally:
-        await client.close()
 
 
 async def test_migrations_apply_once(postgres_client: PostgresClient) -> None:

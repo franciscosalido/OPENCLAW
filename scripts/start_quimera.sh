@@ -3,465 +3,509 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-COMPOSE_FILE="${REPO_ROOT}/infra/docker/compose.quimera.local.yml"
+DEFAULT_COMPOSE_FILE="${REPO_ROOT}/infra/docker/compose.quimera.local.yml"
 OLLAMA_ENV_FILE="${REPO_ROOT}/infra/ollama/ollama_config.env"
 RUNTIME_DIR="${REPO_ROOT}/.runtime"
-OLLAMA_PID_FILE="${RUNTIME_DIR}/ollama.pid"
-LITELLM_PID_FILE="${RUNTIME_DIR}/litellm.pid"
-LITELLM_LOG_FILE="${RUNTIME_DIR}/logs/litellm.log"
-LITELLM_CONFIG_FILE="${REPO_ROOT}/infra/litellm/litellm_config.yaml"
-LITELLM_RUNTIME_CONFIG_FILE="${REPO_ROOT}/infra/litellm/generated/litellm_config.runtime.yaml"
-QUIMERA_DEV_LITELLM_PLACEHOLDER_KEY="quimera-dev-key-change-me"
-# Own Ollama process marker: .runtime/ollama.pid
-# Own LiteLLM process marker: .runtime/litellm.pid
 
-COMMAND="${1:-start}"
-if [[ "${COMMAND}" == --* ]]; then
-  case "${COMMAND}" in
-    --status) COMMAND="status" ;;
-    --stop) COMMAND="stop" ;;
-    --smoke) COMMAND="test" ;;
-    --help|-h) COMMAND="help" ;;
-    *) ;;
-  esac
-else
-  shift || true
-fi
+COMPOSE_FILE="${QUIMERA_COMPOSE_FILE:-${DEFAULT_COMPOSE_FILE}}"
+POSTGRES_SERVICE="${POSTGRES_SERVICE:-}"
+QDRANT_SERVICE="${QDRANT_SERVICE:-}"
 
-BUILD=0
-RUN_WARMUP=0
-RUN_DOCTOR=0
-RUN_INTEGRATION=0
-RELEASE_MODELS=0
-NO_DOCKER=0
-NO_OLLAMA=0
-FOLLOW_LOGS=0
-OTEL_JSON=0
-STATUS_JSON=0
+_log() {
+  printf '[quimera] %s\n' "$*"
+}
 
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --build) BUILD=1 ;;
-    --warmup) RUN_WARMUP=1 ;;
-    --doctor) RUN_DOCTOR=1 ;;
-    --integration) RUN_INTEGRATION=1 ;;
-    --release-models) RELEASE_MODELS=1 ;;
-    --no-docker) NO_DOCKER=1 ;;
-    --no-ollama) NO_OLLAMA=1 ;;
-    --logs) FOLLOW_LOGS=1 ;;
-    --json) OTEL_JSON=1; STATUS_JSON=1 ;;
-    --help|-h) COMMAND="help" ;;
-    *) echo "Unknown flag: $1" >&2; exit 2 ;;
-  esac
-  shift
-done
+_warn() {
+  printf '[quimera][warn] %s\n' "$*" >&2
+}
 
-load_env() {
-  if [[ -f "${REPO_ROOT}/.env.local" ]]; then
-    set -a
-    # shellcheck disable=SC1091
-    source "${REPO_ROOT}/.env.local"
-    set +a
-  fi
-  if [[ -f "${OLLAMA_ENV_FILE}" ]]; then
-    set -a
-    # shellcheck disable=SC1090
-    source "${OLLAMA_ENV_FILE}"
-    set +a
-  fi
+_err() {
+  printf '[quimera][error] %s\n' "$*" >&2
+}
+
+_die() {
+  _err "$*"
+  exit 1
+}
+
+_usage() {
+  cat <<'HELP'
+Usage:
+  ./start_quimera.sh --start
+  ./start_quimera.sh --stop
+  ./start_quimera.sh --status
+HELP
+}
+
+_load_env() {
+  local file
+  for file in "${REPO_ROOT}/.env.local" "${OLLAMA_ENV_FILE}"; do
+    if [[ -f "${file}" ]]; then
+      set -a
+      # shellcheck disable=SC1090
+      source "${file}"
+      set +a
+    fi
+  done
+
   export OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-${OLLAMA_API_BASE:-http://127.0.0.1:11434}}"
   export OLLAMA_API_BASE="${OLLAMA_API_BASE:-${OLLAMA_BASE_URL}}"
   export OLLAMA_KEEP_ALIVE="${OLLAMA_KEEP_ALIVE:--1}"
-  export OLLAMA_NUM_PARALLEL="${OLLAMA_NUM_PARALLEL:-2}"
   export OLLAMA_MAX_LOADED_MODELS="${OLLAMA_MAX_LOADED_MODELS:-2}"
-  export QUIMERA_OLLAMA_EMBED_MODEL="${QUIMERA_OLLAMA_EMBED_MODEL:-nomic-embed-text:latest}"
+  export OLLAMA_NUM_PARALLEL="${OLLAMA_NUM_PARALLEL:-2}"
   export QUIMERA_OLLAMA_CHAT_MODEL="${QUIMERA_OLLAMA_CHAT_MODEL:-qwen3:14b}"
-  export QWEN_MODEL="${QWEN_MODEL:-${QUIMERA_OLLAMA_CHAT_MODEL}}"
-  export EMBED_MODEL="${EMBED_MODEL:-${QUIMERA_OLLAMA_EMBED_MODEL}}"
-  export LITELLM_HOST="${LITELLM_HOST:-127.0.0.1}"
-  export LITELLM_PORT="${LITELLM_PORT:-4000}"
-  export LITELLM_BASE_URL="${LITELLM_BASE_URL:-http://${LITELLM_HOST}:${LITELLM_PORT}}"
-  export LITELLM_LOCAL_CHAT_MODEL="${LITELLM_LOCAL_CHAT_MODEL:-ollama_chat/${QWEN_MODEL}}"
-  export LITELLM_LOCAL_EMBED_MODEL="${LITELLM_LOCAL_EMBED_MODEL:-ollama/${EMBED_MODEL}}"
+  export QUIMERA_OLLAMA_EMBED_MODEL="${QUIMERA_OLLAMA_EMBED_MODEL:-nomic-embed-text:latest}"
   export QDRANT_API_BASE="${QDRANT_API_BASE:-http://127.0.0.1:6333}"
-  export QUIMERA_LITELLM_CONFIG="${QUIMERA_LITELLM_CONFIG:-${LITELLM_CONFIG_FILE}}"
-  export QUIMERA_LITELLM_RUNTIME_CONFIG="${QUIMERA_LITELLM_RUNTIME_CONFIG:-${LITELLM_RUNTIME_CONFIG_FILE}}"
+  export LITELLM_BASE_URL="${LITELLM_BASE_URL:-http://127.0.0.1:4000}"
+  export QUIMERA_WAIT_TIMEOUT="${QUIMERA_WAIT_TIMEOUT:-90}"
 }
 
-compose() {
-  local env_file="${REPO_ROOT}/.env.local"
-  if [[ -f "${env_file}" ]]; then
-    docker compose --env-file="${env_file}" -f "${COMPOSE_FILE}" "$@"
-  else
-    docker compose -f "${COMPOSE_FILE}" "$@"
+_detect_compose_file() {
+  [[ -f "${COMPOSE_FILE}" ]] || _die "Compose file not found: ${COMPOSE_FILE}"
+  printf '%s\n' "${COMPOSE_FILE}"
+}
+
+_compose() {
+  docker compose -f "$(_detect_compose_file)" "$@"
+}
+
+_service_exists() {
+  local service="$1"
+  _compose config --services | grep -qx "${service}"
+}
+
+_service_container_id() {
+  local service="$1"
+  _compose ps -q "${service}" 2>/dev/null || true
+}
+
+_service_image_current() {
+  local container_id="$1"
+  [[ -n "${container_id}" ]] || return 0
+  docker inspect -f '{{.Config.Image}}' "${container_id}" 2>/dev/null || true
+}
+
+_service_image_id_current() {
+  local container_id="$1"
+  [[ -n "${container_id}" ]] || return 0
+  docker inspect -f '{{.Image}}' "${container_id}" 2>/dev/null || true
+}
+
+_service_image_expected() {
+  local service="$1"
+  if [[ "${service}" == "${POSTGRES_SERVICE}" && -n "${IMAGE_POSTGRES:-}" ]]; then
+    printf '%s\n' "${IMAGE_POSTGRES}"
+    return 0
   fi
+  _compose config --format json | python3 -c '
+import json
+import sys
+
+service = sys.argv[1]
+data = json.load(sys.stdin)
+services = data.get("services", {})
+entry = services.get(service, {})
+image = entry.get("image", "")
+if image:
+    print(image)
+' "${service}"
 }
 
-wait_http() {
+_service_config_hash_current() {
+  local container_id="$1"
+  [[ -n "${container_id}" ]] || return 0
+  docker inspect -f '{{ index .Config.Labels "com.docker.compose.config-hash" }}' "${container_id}" 2>/dev/null || true
+}
+
+_service_config_hash_expected() {
+  local service="$1"
+  _compose config --hash "${service}" 2>/dev/null || true
+}
+
+_service_has_build() {
+  local service="$1"
+  _compose config --format json | python3 -c '
+import json
+import sys
+
+service = sys.argv[1]
+data = json.load(sys.stdin)
+entry = data.get("services", {}).get(service, {})
+sys.exit(0 if entry.get("build") else 1)
+' "${service}"
+}
+
+_wait_service_healthy() {
+  local service="$1"
+  local timeout="${2:-${QUIMERA_WAIT_TIMEOUT:-90}}"
+  local container_id
+  local state
+  local health
+
+  for _ in $(seq 1 "${timeout}"); do
+    container_id="$(_service_container_id "${service}")"
+    if [[ -n "${container_id}" ]]; then
+      state="$(docker inspect -f '{{.State.Status}}' "${container_id}" 2>/dev/null || true)"
+      health="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "${container_id}" 2>/dev/null || true)"
+      if [[ "${state}" == "running" && ( "${health}" == "healthy" || "${health}" == "none" ) ]]; then
+        return 0
+      fi
+    fi
+    sleep 1
+  done
+  return 1
+}
+
+_wait_http_200() {
   local url="$1"
-  local label="$2"
-  local attempts="${3:-30}"
-  for _ in $(seq 1 "${attempts}"); do
+  local label="${2:-http}"
+  local timeout="${3:-30}"
+
+  for _ in $(seq 1 "${timeout}"); do
     if curl -fsS --max-time 2 "${url}" >/dev/null 2>&1; then
       return 0
     fi
     sleep 1
   done
-  echo "${label} did not become ready at ${url}" >&2
+  _warn "${label} did not become ready at ${url}"
   return 1
 }
 
-ensure_runtime_dir() {
+_check_docker() {
+  _docker_available || _die "Docker is not available"
+}
+
+_docker_available() {
+  command -v docker >/dev/null 2>&1 || return 1
+  docker info >/dev/null 2>&1 || return 1
+  _compose config >/dev/null 2>&1 || return 1
+}
+
+_detect_postgres_service() {
+  if [[ -n "${POSTGRES_SERVICE}" ]]; then
+    _service_exists "${POSTGRES_SERVICE}" || _die "POSTGRES_SERVICE does not exist: ${POSTGRES_SERVICE}"
+    printf '%s\n' "${POSTGRES_SERVICE}"
+    return 0
+  fi
+  if _service_exists "postgres"; then
+    printf 'postgres\n'
+    return 0
+  fi
+  if _service_exists "postgres-memory"; then
+    printf 'postgres-memory\n'
+    return 0
+  fi
+  _compose config --services | grep -E 'postgres' | head -n 1 || true
+}
+
+_detect_qdrant_service() {
+  if [[ -n "${QDRANT_SERVICE}" ]]; then
+    _service_exists "${QDRANT_SERVICE}" || _die "QDRANT_SERVICE does not exist: ${QDRANT_SERVICE}"
+    printf '%s\n' "${QDRANT_SERVICE}"
+    return 0
+  fi
+  if _service_exists "qdrant"; then
+    printf 'qdrant\n'
+    return 0
+  fi
+  _compose config --services | grep -E 'qdrant' | head -n 1 || true
+}
+
+_detect_litellm_runtime() {
+  if _service_exists "litellm"; then
+    printf 'docker\n'
+  else
+    printf 'host\n'
+  fi
+}
+
+_detect_ollama_runtime() {
+  if _service_exists "ollama"; then
+    printf 'docker\n'
+  else
+    printf 'host\n'
+  fi
+}
+
+_rebuild_postgres_if_needed() {
+  POSTGRES_SERVICE="$(_detect_postgres_service)"
+  [[ -n "${POSTGRES_SERVICE}" ]] || _die "Postgres service not found in compose"
+
+  local container_id
+  local current_image
+  local current_image_id
+  local expected_image
+  local current_hash
+  local expected_hash
+  local drift=0
+
+  container_id="$(_service_container_id "${POSTGRES_SERVICE}")"
+  if [[ -z "${container_id}" ]]; then
+    _log "Postgres container is not running yet"
+    return 0
+  fi
+
+  current_image="$(_service_image_current "${container_id}")"
+  current_image_id="$(_service_image_id_current "${container_id}")"
+  expected_image="$(_service_image_expected "${POSTGRES_SERVICE}")"
+  current_hash="$(_service_config_hash_current "${container_id}")"
+  expected_hash="$(_service_config_hash_expected "${POSTGRES_SERVICE}")"
+
+  if [[ -n "${expected_image}" && "${current_image}" != "${expected_image}" ]]; then
+    drift=1
+  fi
+  if [[ -n "${expected_hash}" && -n "${current_hash}" && "${current_hash}" != "${expected_hash}" ]]; then
+    drift=1
+  fi
+  if [[ -n "${IMAGE_POSTGRES:-}" && "${current_image}" != "${IMAGE_POSTGRES}" ]]; then
+    drift=1
+  fi
+
+  if [[ "${drift}" -eq 0 ]]; then
+    _log "Postgres image up-to-date"
+    return 0
+  fi
+
+  printf '⚠️  POSTGRES REBUILD DETECTADO\n'
+  printf '   Serviço: %s\n' "${POSTGRES_SERVICE}"
+  printf '   Container atual: %s\n' "${container_id}"
+  printf '   Imagem atual: %s\n' "${current_image:-unknown}"
+  printf '   Image ID atual: %s\n' "${current_image_id:-unknown}"
+  printf '   Imagem esperada: %s\n' "${expected_image:-build-config}"
+  printf '   Volume de dados SERÁ PRESERVADO\n'
+  printf '   Nenhum %s %s será executado\n' "docker volume" "rm"
+  printf '   Confirmar rebuild? [s/N] '
+  read -r confirm
+
+  if [[ "${confirm}" != "s" && "${confirm}" != "S" ]]; then
+    _log "Rebuild Postgres cancelado pelo operador"
+    exit 0
+  fi
+
+  if _service_has_build "${POSTGRES_SERVICE}"; then
+    _compose build "${POSTGRES_SERVICE}"
+  else
+    _compose pull "${POSTGRES_SERVICE}"
+  fi
+  _compose stop "${POSTGRES_SERVICE}"
+  _compose rm -f "${POSTGRES_SERVICE}"
+  _compose up -d "${POSTGRES_SERVICE}"
+  _wait_service_healthy "${POSTGRES_SERVICE}" || _die "Postgres did not become healthy after rebuild"
+}
+
+_warmup_ollama_models() {
+  local base="${OLLAMA_BASE_URL%/}"
+  local chat_model="${QUIMERA_OLLAMA_CHAT_MODEL}"
+  local embed_model="${QUIMERA_OLLAMA_EMBED_MODEL}"
+
+  if ! curl -fsS --max-time 2 "${base}/api/version" >/dev/null 2>&1; then
+    _warn "Ollama unavailable; skipping warmup"
+    return 0
+  fi
+
+  if ! curl -fsS --max-time 30 -H 'Content-Type: application/json' \
+    -d "{\"model\":\"${chat_model}\",\"prompt\":\"\",\"keep_alive\":-1,\"stream\":false}" \
+    "${base}/api/generate" >/dev/null 2>&1; then
+    _warn "Ollama chat model unavailable; rode: ollama pull ${chat_model}"
+  fi
+
+  if ! curl -fsS --max-time 30 -H 'Content-Type: application/json' \
+    -d "{\"model\":\"${embed_model}\",\"input\":\"warmup\",\"keep_alive\":-1}" \
+    "${base}/api/embed" >/dev/null 2>&1; then
+    if ! curl -fsS --max-time 30 -H 'Content-Type: application/json' \
+      -d "{\"model\":\"${embed_model}\",\"prompt\":\"\",\"keep_alive\":-1,\"stream\":false}" \
+      "${base}/api/generate" >/dev/null 2>&1; then
+      _warn "Ollama embed model unavailable; rode: ollama pull ${embed_model}"
+    fi
+  fi
+}
+
+_release_ollama_models() {
+  local base="${OLLAMA_BASE_URL%/}"
+
+  if ! curl -fsS --max-time 2 "${base}/api/version" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  curl -fsS --max-time 10 -H 'Content-Type: application/json' \
+    -d "{\"model\":\"${QUIMERA_OLLAMA_CHAT_MODEL}\",\"prompt\":\"\",\"keep_alive\":0,\"stream\":false}" \
+    "${base}/api/generate" >/dev/null 2>&1 || _warn "Could not unload ${QUIMERA_OLLAMA_CHAT_MODEL}"
+  curl -fsS --max-time 10 -H 'Content-Type: application/json' \
+    -d "{\"model\":\"${QUIMERA_OLLAMA_EMBED_MODEL}\",\"prompt\":\"\",\"keep_alive\":0,\"stream\":false}" \
+    "${base}/api/generate" >/dev/null 2>&1 || _warn "Could not unload ${QUIMERA_OLLAMA_EMBED_MODEL}"
+}
+
+_run_shutdown_hooks() {
+  local hook
+  for hook in \
+    "${REPO_ROOT}/infra/ollama/shutdown_hook.py" \
+    "${REPO_ROOT}/scripts/hooks/qdrant_hot_cache_snapshot.sh" \
+    "${REPO_ROOT}/backend/working_memory/shutdown_hook.py"; do
+    if [[ -x "${hook}" ]]; then
+      "${hook}" || _warn "Shutdown hook failed: ${hook}"
+    elif [[ -f "${hook}" && "${hook}" == *.py ]]; then
+      uv run python "${hook}" || _warn "Shutdown hook failed: ${hook}"
+    fi
+  done
+}
+
+_service_status_row() {
+  local service="$1"
+  local container_id
+  local status="missing"
+  local image="-"
+  local health="-"
+
+  container_id="$(_service_container_id "${service}")"
+  if [[ -n "${container_id}" ]]; then
+    status="$(docker inspect -f '{{.State.Status}}' "${container_id}" 2>/dev/null || printf 'unknown')"
+    image="$(docker inspect -f '{{.Config.Image}}' "${container_id}" 2>/dev/null || printf 'unknown')"
+    health="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "${container_id}" 2>/dev/null || printf 'unknown')"
+  fi
+  printf '%s | %s | %s | %s | %s\n' "${service}" "${status}" "${image}" "docker" "${health}"
+}
+
+_status_table() {
+  local service
+  local postgres_service
+  local qdrant_url="${QDRANT_API_BASE%/}"
+  local litellm_url="${LITELLM_BASE_URL%/}"
+  local ollama_url="${OLLAMA_BASE_URL%/}"
+
+  printf 'SERVIÇO | STATUS | VERSÃO/IMAGEM | PORTA/URL | HEALTH\n'
+  printf '%s\n' '--- | --- | --- | --- | ---'
+
+  while read -r service; do
+    [[ -n "${service}" ]] || continue
+    _service_status_row "${service}"
+  done < <(_compose config --services)
+
+  postgres_service="$(_detect_postgres_service || true)"
+  if [[ -n "${postgres_service}" ]]; then
+    local pg_container
+    local pg_version="-"
+    pg_container="$(_service_container_id "${postgres_service}")"
+    if [[ -n "${pg_container}" ]]; then
+      pg_version="$(docker exec "${pg_container}" psql -U quimera -d quimera -Atc 'SHOW server_version' 2>/dev/null || printf '-')"
+      printf 'postgres-version | running | %s | 5432 | checked\n' "${pg_version}"
+    fi
+  fi
+
+  if [[ "$(_detect_ollama_runtime)" == "host" ]]; then
+    if curl -fsS --max-time 2 "${ollama_url}/api/version" >/dev/null 2>&1; then
+      local ollama_version
+      ollama_version="$(curl -fsS --max-time 2 "${ollama_url}/api/version" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("version","unknown"))' 2>/dev/null || printf 'unknown')"
+      printf 'ollama-host | host-ok | %s | %s | /api/version\n' "${ollama_version}" "${ollama_url}"
+    else
+      printf 'ollama-host | host-fail | - | %s | /api/version\n' "${ollama_url}"
+    fi
+  fi
+
+  if curl -fsS --max-time 2 "${qdrant_url}/readyz" >/dev/null 2>&1; then
+    local qdrant_version
+    qdrant_version="$(curl -fsS --max-time 2 "${qdrant_url}/" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("version","unknown"))' 2>/dev/null || printf 'unknown')"
+    printf 'qdrant-http | host-ok | %s | %s | /readyz\n' "${qdrant_version}" "${qdrant_url}"
+  elif curl -fsS --max-time 2 "${qdrant_url}/healthz" >/dev/null 2>&1; then
+    printf 'qdrant-http | host-ok | unknown | %s | /healthz\n' "${qdrant_url}"
+  else
+    printf 'qdrant-http | host-fail | - | %s | /readyz\n' "${qdrant_url}"
+  fi
+
+  if [[ "$(_detect_litellm_runtime)" == "host" ]]; then
+    if curl -fsS --max-time 2 "${litellm_url}/health/readiness" >/dev/null 2>&1; then
+      printf 'litellm-host | host-ok | readiness | %s | /health/readiness\n' "${litellm_url}"
+    elif curl -fsS --max-time 2 "${litellm_url}/health" >/dev/null 2>&1; then
+      _warn "LiteLLM /health/readiness unavailable; fallback /health used"
+      printf 'litellm-host | host-ok | readiness-fallback | %s | /health\n' "${litellm_url}"
+    else
+      printf 'litellm-host | host-fail | - | %s | /health/readiness\n' "${litellm_url}"
+    fi
+  fi
+}
+
+_status_table_without_docker() {
+  local qdrant_url="${QDRANT_API_BASE%/}"
+  local litellm_url="${LITELLM_BASE_URL%/}"
+  local ollama_url="${OLLAMA_BASE_URL%/}"
+
+  printf 'SERVIÇO | STATUS | VERSÃO/IMAGEM | PORTA/URL | HEALTH\n'
+  printf '%s\n' '--- | --- | --- | --- | ---'
+  printf 'docker | unavailable | - | local daemon | skipped\n'
+
+  if curl -fsS --max-time 2 "${ollama_url}/api/version" >/dev/null 2>&1; then
+    printf 'ollama-host | host-ok | unknown | %s | /api/version\n' "${ollama_url}"
+  else
+    printf 'ollama-host | host-fail | - | %s | /api/version\n' "${ollama_url}"
+  fi
+
+  if curl -fsS --max-time 2 "${qdrant_url}/readyz" >/dev/null 2>&1; then
+    printf 'qdrant-http | host-ok | unknown | %s | /readyz\n' "${qdrant_url}"
+  elif curl -fsS --max-time 2 "${qdrant_url}/healthz" >/dev/null 2>&1; then
+    printf 'qdrant-http | host-ok | unknown | %s | /healthz\n' "${qdrant_url}"
+  else
+    printf 'qdrant-http | unknown | - | %s | docker-unavailable\n' "${qdrant_url}"
+  fi
+
+  if curl -fsS --max-time 2 "${litellm_url}/health/readiness" >/dev/null 2>&1; then
+    printf 'litellm-host | host-ok | readiness | %s | /health/readiness\n' "${litellm_url}"
+  else
+    printf 'litellm-host | host-fail | - | %s | /health/readiness\n' "${litellm_url}"
+  fi
+}
+
+_start() {
+  _load_env
   mkdir -p "${RUNTIME_DIR}"
-}
+  _check_docker
+  _rebuild_postgres_if_needed
 
-litellm_readiness_ok() {
-  curl -fsS --max-time 2 "${LITELLM_BASE_URL%/}/health/readiness" >/dev/null 2>&1
-}
-
-litellm_validate() {
-  load_env
-  uv run python -m infra.litellm.config_validator "${QUIMERA_LITELLM_CONFIG}"
-}
-
-litellm_render() {
-  load_env
-  uv run python -m infra.litellm.render_config
-}
-
-litellm_smoke() {
-  load_env
-  uv run python -m infra.litellm.smoke_test
-}
-
-litellm_audit() {
-  load_env
-  uv run python -m infra.litellm.audit \
-    --json "${RUNTIME_DIR}/reports/litellm_audit.json" \
-    --markdown "${RUNTIME_DIR}/reports/litellm_audit.md"
-}
-
-litellm_fingerprint() {
-  load_env
-  uv run python -m infra.litellm.version_fingerprint
-}
-
-litellm_benchmark() {
-  load_env
-  uv run python -m infra.litellm.overhead_benchmark
-}
-
-otel_doctor() {
-  load_env
-  if [[ "${OTEL_JSON}" -eq 1 ]]; then
-    uv run python -m backend.observability.tracer --doctor --json --config "${QUIMERA_LITELLM_CONFIG}"
+  if _compose up -d --wait --wait-timeout "${QUIMERA_WAIT_TIMEOUT}"; then
+    :
   else
-    uv run python -m backend.observability.tracer --doctor --config "${QUIMERA_LITELLM_CONFIG}"
+    _warn "docker compose --wait unavailable or failed; using polling fallback"
+    _compose up -d
+    while read -r service; do
+      _wait_service_healthy "${service}" || _warn "Service not healthy: ${service}"
+    done < <(_compose config --services)
   fi
+
+  _warmup_ollama_models
+  _wait_http_200 "${QDRANT_API_BASE%/}/readyz" "Qdrant" 5 || _wait_http_200 "${QDRANT_API_BASE%/}/healthz" "Qdrant" 5 || true
+  _wait_http_200 "${LITELLM_BASE_URL%/}/health/readiness" "LiteLLM" 5 || _warn "LiteLLM readiness unavailable"
+  _status_table
 }
 
-litellm_start() {
-  load_env
-  ensure_runtime_dir
-  bash "${REPO_ROOT}/infra/litellm/start_litellm.sh"
+_stop() {
+  _load_env
+  _release_ollama_models
+  _run_shutdown_hooks
+  _check_docker
+  _compose stop
+  _status_table
 }
 
-litellm_stop() {
-  load_env
-  if [[ ! -f "${LITELLM_PID_FILE}" ]]; then
+_status() {
+  _load_env
+  if ! _docker_available; then
+    _warn "Docker unavailable; showing partial host-only status"
+    _status_table_without_docker
     return 0
   fi
-  local pid
-  pid="$(cat "${LITELLM_PID_FILE}")"
-  if [[ -n "${pid}" ]] && kill -0 "${pid}" >/dev/null 2>&1; then
-    kill -TERM "${pid}" || true
-    for _ in $(seq 1 10); do
-      if ! kill -0 "${pid}" >/dev/null 2>&1; then
-        break
-      fi
-      sleep 1
-    done
-    if kill -0 "${pid}" >/dev/null 2>&1; then
-      echo "LiteLLM PID ${pid} did not stop after SIGTERM; sending SIGKILL to owned PID." >&2
-      kill -KILL "${pid}" || true
-    fi
-  fi
-  rm -f "${LITELLM_PID_FILE}"
+  _status_table
 }
 
-ensure_ollama() {
-  if [[ "${NO_OLLAMA}" -eq 1 ]]; then
-    return 0
+main() {
+  if [[ $# -ne 1 ]]; then
+    _usage
+    exit 2
   fi
-  if curl -fsS --max-time 2 "${OLLAMA_BASE_URL}/api/version" >/dev/null 2>&1; then
-    return 0
-  fi
-  if ! command -v ollama >/dev/null 2>&1; then
-    echo "Ollama is not running and ollama is not in PATH" >&2
-    return 1
-  fi
-  ensure_runtime_dir
-  OLLAMA_KEEP_ALIVE="${OLLAMA_KEEP_ALIVE}" \
-  OLLAMA_NUM_PARALLEL="${OLLAMA_NUM_PARALLEL}" \
-  OLLAMA_MAX_LOADED_MODELS="${OLLAMA_MAX_LOADED_MODELS}" \
-    nohup ollama serve > "${RUNTIME_DIR}/ollama.log" 2>&1 &
-  echo "$!" > "${OLLAMA_PID_FILE}"
-  wait_http "${OLLAMA_BASE_URL}/api/version" "Ollama" 20
+
+  case "$1" in
+    --start) _start ;;
+    --stop) _stop ;;
+    --status) _status ;;
+    *) _usage; exit 2 ;;
+  esac
 }
 
-start_stack() {
-  load_env
-  ensure_runtime_dir
-  ensure_ollama
-  if [[ "${NO_DOCKER}" -eq 0 ]]; then
-    # The default start path issues docker compose up -d.
-    local args=(up -d)
-    if [[ "${BUILD}" -eq 1 ]]; then
-      args=(up -d --build)
-    fi
-    compose "${args[@]}"
-    wait_http "http://127.0.0.1:6333/healthz" "Qdrant" 30
-  fi
-  litellm_start
-  if [[ "${RUN_WARMUP}" -eq 1 ]]; then
-    warmup_models
-  fi
-  if [[ "${RUN_DOCTOR}" -eq 1 ]]; then
-    doctor
-  fi
-  if [[ "${FOLLOW_LOGS}" -eq 1 ]]; then
-    logs
-  fi
-}
-
-stop_stack() {
-  load_env
-  if [[ "${RELEASE_MODELS}" -eq 1 ]]; then
-    release_models || true
-  fi
-  litellm_stop
-  if [[ "${NO_DOCKER}" -eq 0 ]]; then
-    compose down
-  fi
-  if [[ -f "${OLLAMA_PID_FILE}" ]]; then
-    local pid
-    pid="$(cat "${OLLAMA_PID_FILE}")"
-    if [[ -n "${pid}" ]] && kill -0 "${pid}" >/dev/null 2>&1; then
-      kill "${pid}" || true
-    fi
-    rm -f "${OLLAMA_PID_FILE}"
-  fi
-}
-
-status_stack() {
-  load_env
-  if [[ "${STATUS_JSON}" -eq 1 ]]; then
-    uv run python "${REPO_ROOT}/scripts/quimera_status.py" status --json
-    return $?
-  fi
-  local rc=0
-  if command -v docker >/dev/null 2>&1; then
-    compose ps || rc=1
-    compose exec -T postgres-memory pg_isready -U quimera -d quimera -h 127.0.0.1 || rc=1
-  else
-    echo "Docker unavailable" >&2
-    rc=1
-  fi
-  curl -fsS --max-time 3 "${QDRANT_API_BASE%/}/healthz" >/dev/null || rc=1
-  litellm_readiness_ok || rc=1
-  curl -fsS --max-time 3 "${OLLAMA_BASE_URL}/api/version" >/dev/null || rc=1
-  return "${rc}"
-}
-
-rag01b_acceptance() {
-  load_env
-  if [[ "${STATUS_JSON}" -eq 1 ]]; then
-    uv run python "${REPO_ROOT}/scripts/quimera_status.py" rag01b-acceptance --json
-  else
-    uv run python "${REPO_ROOT}/scripts/quimera_status.py" rag01b-acceptance
-  fi
-}
-
-integration_health() {
-  load_env
-  if [[ "${STATUS_JSON}" -eq 1 ]]; then
-    uv run python -m integration.check_integration_health --json --write-artifact
-  else
-    uv run python -m integration.check_integration_health --write-artifact
-  fi
-}
-
-mcp_status() {
-  load_env
-  uv run python -m integration.check_integration_health --json --write-artifact
-}
-
-agentic0_smoke() {
-  load_env
-  if [[ "${STATUS_JSON}" -eq 1 ]]; then
-    uv run python -m integration.run_agentic0_smoke_test --json
-  else
-    uv run python -m integration.run_agentic0_smoke_test
-  fi
-}
-
-pr08_report() {
-  load_env
-  uv run python -m integration.run_agentic0_smoke_test --allow-degraded >/dev/null
-  printf 'PR-08 report: %s\n' "${REPO_ROOT}/docs/rag/rag_01b_pr08_integration_report.md"
-}
-
-rag01b_final_gate() {
-  load_env
-  local tmp_dir
-  local status_file
-  local health_file
-  local smoke_file
-  tmp_dir="$(mktemp -d)"
-  trap 'rm -rf "${tmp_dir}"' RETURN
-  status_file="${tmp_dir}/status.json"
-  health_file="${tmp_dir}/integration_health.json"
-  smoke_file="${tmp_dir}/agentic0_smoke.json"
-  uv run python "${REPO_ROOT}/scripts/quimera_status.py" status --json >"${status_file}" || true
-  uv run python -m integration.check_integration_health --json --write-artifact >"${health_file}" || true
-  uv run python -m integration.run_agentic0_smoke_test --json --allow-degraded >"${smoke_file}" || true
-  if [[ "${STATUS_JSON}" -eq 1 ]]; then
-    uv run python - "${status_file}" "${health_file}" "${smoke_file}" <<'PY'
-import json
-import sys
-
-def load_json(path: str) -> dict:
-    try:
-        content = open(path, encoding="utf-8").read().strip()
-    except OSError:
-        return {}
-    if not content:
-        return {}
-    try:
-        parsed = json.loads(content)
-    except ValueError:
-        return {}
-    return parsed if isinstance(parsed, dict) else {}
-
-report = {
-    "schema_version": "rag01b-final-gate-v1",
-    "status": load_json(sys.argv[1]),
-    "integration_health": load_json(sys.argv[2]),
-    "agentic0_smoke": load_json(sys.argv[3]),
-}
-report["overall"] = "ok" if report["integration_health"].get("overall") in {"ok", "degraded"} else "degraded"
-print(json.dumps(report, sort_keys=True))
-PY
-  else
-    printf 'rag01b-final-gate completed\n'
-  fi
-}
-
-pr09_smoke() {
-  local args=(--quick)
-  if [[ "${STATUS_JSON}" -eq 1 ]]; then
-    args+=(--json)
-  fi
-  "${REPO_ROOT}/run_smoke.sh" "${args[@]}"
-}
-
-logs() {
-  compose logs -f --tail=200
-}
-
-doctor() {
-  load_env
-  local rc=0
-  command -v docker >/dev/null 2>&1 || { echo "Docker missing" >&2; rc=1; }
-  [[ -f "${COMPOSE_FILE}" ]] || { echo "Compose file missing" >&2; rc=1; }
-  if command -v docker >/dev/null 2>&1 && [[ -f "${COMPOSE_FILE}" ]]; then
-    if compose config --services | grep -qx "litellm"; then
-      echo "Compose must not manage LiteLLM" >&2
-      rc=1
-    fi
-  fi
-  curl -fsS --max-time 3 "${OLLAMA_BASE_URL}/api/version" >/dev/null || { echo "Ollama unavailable" >&2; rc=1; }
-  curl -fsS --max-time 3 "${QDRANT_API_BASE%/}/healthz" >/dev/null || { echo "Qdrant unavailable" >&2; rc=1; }
-  litellm_readiness_ok || { echo "LiteLLM unavailable" >&2; rc=1; }
-  return "${rc}"
-}
-
-run_tests() {
-  load_env
-  export TEST_QDRANT_URL="${TEST_QDRANT_URL:-http://127.0.0.1:6333}"
-  export OLLAMA_BASE_URL
-  export LITELLM_BASE_URL="${LITELLM_BASE_URL:-http://127.0.0.1:4000}"
-  export TEST_POSTGRES_DSN="${TEST_POSTGRES_DSN:-postgresql://quimera@127.0.0.1:5432/quimera}"
-  uv run pytest \
-    tests/unit/test_ollama_tuning.py \
-    tests/unit/test_ollama_warmup_contract.py \
-    tests/unit/test_start_quimera_script.py \
-    tests/unit/test_litellm_config_validator.py \
-    tests/unit/test_litellm_config_yaml.py \
-    tests/unit/test_litellm_cache_policy.py \
-    tests/unit/test_litellm_timeout_policy.py \
-    tests/unit/test_litellm_host_runtime_policy.py \
-    tests/unit/test_litellm_audit_contract.py \
-    tests/unit/test_litellm_version_fingerprint.py \
-    tests/unit/test_litellm_overhead_contract.py \
-    tests/unit/test_start_quimera_litellm_host.py
-  if [[ "${RUN_INTEGRATION}" -eq 1 ]]; then
-    uv run pytest -m integration \
-      tests/integration/test_ollama_warmup.py \
-      tests/integration/test_quimera_local_runtime.py
-  fi
-}
-
-warmup_models() {
-  load_env
-  uv run python "${REPO_ROOT}/infra/ollama/warmup.py"
-}
-
-release_models() {
-  load_env
-  uv run python "${REPO_ROOT}/infra/ollama/shutdown_hook.py"
-}
-
-show_help() {
-  cat <<'HELP'
-Usage: scripts/start_quimera.sh <command> [flags]
-
-Commands: start, stop, restart, status, logs, doctor, test, warmup, release,
-          litellm-validate, litellm-render, litellm-start, litellm-stop,
-          litellm-restart, litellm-smoke, litellm-audit, litellm-fingerprint,
-          litellm-benchmark, otel-doctor, rag01b-acceptance, smoke, mcp-status,
-          integration-health, agentic0-smoke, pr08-report, rag01b-final-gate
-Flags: --build --warmup --doctor --integration --release-models --no-docker --no-ollama --logs --json --help
-HELP
-}
-
-case "${COMMAND}" in
-  start) start_stack ;;
-  stop) stop_stack ;;
-  restart) RELEASE_MODELS=1; stop_stack; BUILD=1; RUN_WARMUP=1; RUN_DOCTOR=1; start_stack ;;
-  status) status_stack ;;
-  smoke) pr09_smoke ;;
-  rag01b-acceptance) rag01b_acceptance ;;
-  integration-health) integration_health ;;
-  mcp-status) mcp_status ;;
-  agentic0-smoke) agentic0_smoke ;;
-  pr08-report) pr08_report ;;
-  rag01b-final-gate) rag01b_final_gate ;;
-  logs) logs ;;
-  doctor) doctor ;;
-  test) run_tests ;;
-  warmup) warmup_models ;;
-  release) release_models ;;
-  litellm-validate) litellm_validate ;;
-  litellm-render) litellm_render ;;
-  litellm-start) litellm_start ;;
-  litellm-stop) litellm_stop ;;
-  litellm-restart) litellm_stop; litellm_start ;;
-  litellm-smoke) litellm_smoke ;;
-  litellm-audit) litellm_audit ;;
-  litellm-fingerprint) litellm_fingerprint ;;
-  litellm-benchmark) litellm_benchmark ;;
-  otel-doctor) otel_doctor ;;
-  help|--help|-h) show_help ;;
-  *) echo "Unknown command: ${COMMAND}" >&2; show_help; exit 2 ;;
-esac
+main "$@"

@@ -14,9 +14,21 @@ def _dsn() -> str | None:
     return os.getenv("QUIMERA_POSTGRES_DSN") or os.getenv("TEST_POSTGRES_DSN")
 
 
+def _postgres_container_available() -> bool:
+    result = subprocess.run(
+        ["docker", "inspect", "-f", "{{.State.Running}}", "quimera-postgres-memory"],
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        check=False,
+        timeout=10,
+    )
+    return result.returncode == 0 and result.stdout.strip() == "true"
+
+
 def test_pr09_pg_dump_restore_verify_live(tmp_path: Path) -> None:
-    if not _dsn():
-        pytest.skip("Postgres DSN not configured")
+    if not _dsn() and not _postgres_container_available():
+        pytest.skip("Postgres DSN or quimera-postgres-memory container is required")
 
     env = os.environ.copy()
     env["QUIMERA_POSTGRES_BACKUP_DIR"] = str(tmp_path)

@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 import os
+import re
+import subprocess
 from pathlib import Path
 
 
+ROOT_SCRIPT = Path("start_quimera.sh")
 SCRIPT = Path("scripts/start_quimera.sh")
 STAR_WRAPPER = Path("scripts/star_quimera.sh")
 COMPOSE = Path("infra/docker/compose.quimera.local.yml")
-PR04_SDD = Path("docs/specs/rag-01b/pr-04-ollama-tuning-keepalive.md")
-PR05_SDD = Path("docs/specs/rag-01b/pr-05-litellm-host-cache-timeout.md")
-ENV_EXAMPLE = Path(".env.local.example")
 
 
 def _script_text() -> str:
@@ -17,108 +17,193 @@ def _script_text() -> str:
 
 
 def test_start_quimera_script_exists_and_is_executable() -> None:
+    assert ROOT_SCRIPT.exists()
     assert SCRIPT.exists()
+    assert os.access(ROOT_SCRIPT, os.X_OK)
     assert os.access(SCRIPT, os.X_OK)
 
 
-def test_start_quimera_script_declares_required_subcommands() -> None:
+def test_shell_syntax_is_valid() -> None:
+    subprocess.run(["bash", "-n", str(ROOT_SCRIPT)], check=True)
+    subprocess.run(["bash", "-n", str(SCRIPT)], check=True)
+    subprocess.run(["bash", "-n", str(STAR_WRAPPER)], check=True)
+
+
+def test_accepts_exactly_start_stop_status_flags() -> None:
     text = _script_text()
 
-    for command in (
-        "start",
-        "stop",
-        "restart",
-        "status",
-        "logs",
-        "doctor",
-        "test",
-        "warmup",
-        "release",
-        "litellm-validate",
-        "litellm-render",
-        "litellm-start",
-        "litellm-stop",
-        "litellm-restart",
-        "litellm-smoke",
-        "litellm-audit",
-        "litellm-fingerprint",
-        "litellm-benchmark",
+    assert "--start) _start ;;" in text
+    assert "--stop) _stop ;;" in text
+    assert "--status) _status ;;" in text
+    for legacy in (
+        "restart)",
+        "logs)",
+        "doctor)",
+        "test)",
+        "warmup)",
+        "release)",
+        "litellm-start)",
+        "litellm-stop)",
+        "smoke)",
     ):
-        assert f"{command})" in text
+        assert legacy not in text
 
 
-def test_start_quimera_exports_ollama_tuning_env() -> None:
+def test_invalid_arguments_print_usage_and_exit_2_contract() -> None:
     text = _script_text()
 
-    assert "export OLLAMA_KEEP_ALIVE" in text
-    assert "export OLLAMA_NUM_PARALLEL" in text
-    assert "export OLLAMA_MAX_LOADED_MODELS" in text
+    assert "_usage" in text
+    assert "exit 2" in text
+    assert "Usage:" in text
 
 
-def test_start_quimera_uses_compose_without_destructive_prune() -> None:
+def test_required_functions_exist() -> None:
     text = _script_text()
 
-    assert "compose.quimera.local.yml" in text
-    assert "docker compose" in text
-    assert " up -d" in text
-    assert "down -v" not in text
-    assert "docker system prune" not in text
+    for function_name in (
+        "_log",
+        "_warn",
+        "_err",
+        "_die",
+        "_load_env",
+        "_detect_compose_file",
+        "_compose",
+        "_service_exists",
+        "_service_container_id",
+        "_service_image_current",
+            "_service_image_expected",
+            "_service_config_hash_current",
+            "_service_config_hash_expected",
+            "_service_has_build",
+            "_wait_service_healthy",
+            "_wait_http_200",
+            "_check_docker",
+            "_docker_available",
+            "_detect_postgres_service",
+            "_detect_qdrant_service",
+        "_detect_litellm_runtime",
+        "_detect_ollama_runtime",
+        "_rebuild_postgres_if_needed",
+        "_warmup_ollama_models",
+        "_release_ollama_models",
+        "_run_shutdown_hooks",
+        "_status_table",
+        "_start",
+        "_stop",
+        "_status",
+        "_usage",
+    ):
+        assert re.search(rf"^{function_name}\(\) \{{", text, re.MULTILINE)
 
 
-def test_compose_does_not_manage_litellm() -> None:
-    text = COMPOSE.read_text(encoding="utf-8")
-
-    assert "quimera-litellm" not in text
-    assert ("berriai/" + "litellm") not in text
-    assert ("docker." + "litellm.ai") not in text
-    assert "127.0.0.1:4000:4000" not in text
-    assert "\n  litellm:" not in text
-
-
-def test_start_quimera_does_not_kill_external_ollama() -> None:
+def test_rebuild_postgres_preserves_data_and_requires_human_confirmation() -> None:
     text = _script_text()
 
-    assert "killall ollama" not in text
-    assert "pkill ollama" not in text
-    assert ".runtime/ollama.pid" in text
+    assert "_rebuild_postgres_if_needed()" in text
+    assert "POSTGRES REBUILD DETECTADO" in text
+    assert "Volume de dados SERÁ PRESERVADO" in text
+    assert "Confirmar rebuild? [s/N]" in text
+    assert "read -r confirm" in text
+    assert "Rebuild Postgres cancelado pelo operador" in text
+    assert 'exit 0' in text
 
 
-def test_start_quimera_controls_only_own_litellm_pid() -> None:
+def test_rebuild_uses_safe_recreate_without_volume_removal() -> None:
     text = _script_text()
 
-    assert "pkill litellm" not in text
-    assert "killall litellm" not in text
-    assert ".runtime/litellm.pid" in text
-    assert "litellm_start()" in text
-    assert "litellm_stop()" in text
-    assert 'kill -TERM "${pid}"' in text
-    assert 'kill -KILL "${pid}"' in text
+    assert 'docker inspect -f \'{{.Config.Image}}\'' in text
+    assert 'docker inspect -f \'{{.Image}}\'' in text
+    assert 'if _service_has_build "${POSTGRES_SERVICE}"; then' in text
+    assert '_compose stop "${POSTGRES_SERVICE}"' in text
+    assert '_compose rm -f "${POSTGRES_SERVICE}"' in text
+    assert '_compose up -d "${POSTGRES_SERVICE}"' in text
+    assert "-v" not in _line_containing(text, '_compose rm -f "${POSTGRES_SERVICE}"')
 
 
-def test_start_quimera_reuses_existing_litellm_gateway() -> None:
-    text = _script_text()
-    start_text = Path("infra/litellm/start_litellm.sh").read_text(encoding="utf-8")
-
-    assert "litellm_readiness_ok" in text
-    assert "already healthy" in start_text
-    assert "return 0" in text
-
-
-def test_start_quimera_warns_on_placeholder_litellm_master_key() -> None:
-    text = _script_text()
-    start_text = Path("infra/litellm/start_litellm.sh").read_text(encoding="utf-8")
-
-    assert "QUIMERA_DEV_LITELLM_PLACEHOLDER_KEY" in text
-    assert "placeholder LITELLM_MASTER_KEY" in start_text
-
-
-def test_start_quimera_wires_warmup_and_release_hooks() -> None:
+def test_script_contains_no_forbidden_destructive_operations() -> None:
     text = _script_text()
 
-    assert "infra/ollama/warmup.py" in text
-    assert "infra/ollama/shutdown_hook.py" in text
-    assert "--warmup" in text
-    assert "--release-models" in text
+    forbidden = (
+        "down -v",
+        "docker system prune",
+        "docker volume rm",
+        "docker volume prune",
+        "--volumes",
+        "docker compose rm -v",
+        "rm -rf",
+    )
+    for token in forbidden:
+        assert token not in text
+
+
+def test_start_uses_docker_compose_up_wait_or_polling_fallback() -> None:
+    text = _script_text()
+
+    assert "_compose up -d --wait" in text
+    assert "--wait-timeout" in text
+    assert "polling fallback" in text
+    assert "_wait_service_healthy" in text
+
+
+def test_stop_uses_compose_stop_not_down() -> None:
+    text = _script_text()
+
+    assert "_compose stop" in text
+    assert "compose down" not in text
+
+
+def test_ollama_warmup_and_shutdown_keep_alive_contracts() -> None:
+    text = _script_text()
+
+    assert 'export OLLAMA_KEEP_ALIVE="${OLLAMA_KEEP_ALIVE:--1}"' in text
+    assert '\\"keep_alive\\":-1' in text
+    assert '\\"keep_alive\\":\\"-1\\"' not in text
+    assert '\\"keep_alive\\":0' in text
+    assert "QUIMERA_OLLAMA_AUTO_PULL" not in text
+    assert "ollama pull" in text
+
+
+def test_litellm_and_qdrant_health_contracts() -> None:
+    text = _script_text()
+
+    assert "/health/readiness" in text
+    assert "/readyz" in text
+    assert "/healthz" in text
+    assert "fallback /health used" in text
+
+
+def test_status_table_headers_are_present() -> None:
+    text = _script_text()
+
+    assert "SERVIÇO | STATUS | VERSÃO/IMAGEM | PORTA/URL | HEALTH" in text
+    assert "_status_table()" in text
+
+
+def test_status_degrades_to_partial_table_without_docker() -> None:
+    text = _script_text()
+
+    assert "Docker unavailable; showing partial host-only status" in text
+    assert "_status_table_without_docker" in text
+    assert "docker | unavailable | - | local daemon | skipped" in text
+    assert "_check_docker" not in _function_body(text, "_status")
+
+
+def test_postgres_rebuild_builds_only_when_service_has_build_section() -> None:
+    text = _script_text()
+
+    rebuild_body = _function_body(text, "_rebuild_postgres_if_needed")
+    assert "_service_has_build" in rebuild_body
+    assert '_compose build "${POSTGRES_SERVICE}"' in rebuild_body
+    assert '_compose pull "${POSTGRES_SERVICE}"' in rebuild_body
+
+
+def test_postgres_service_detection_order() -> None:
+    text = _script_text()
+
+    assert "POSTGRES_SERVICE" in text
+    assert '_service_exists "postgres"' in text
+    assert '_service_exists "postgres-memory"' in text
+    assert "grep -E 'postgres'" in text
 
 
 def test_star_quimera_wrapper_execs_start_script() -> None:
@@ -128,30 +213,29 @@ def test_star_quimera_wrapper_execs_start_script() -> None:
     assert 'exec "$(dirname "$0")/start_quimera.sh" "$@"' in text
 
 
-def test_compose_does_not_require_litellm_master_key() -> None:
+def test_root_start_quimera_wrapper_execs_canonical_script() -> None:
+    text = ROOT_SCRIPT.read_text(encoding="utf-8")
+
+    assert 'exec "$(dirname "$0")/scripts/start_quimera.sh" "$@"' in text
+
+
+def test_compose_still_does_not_manage_litellm() -> None:
     text = COMPOSE.read_text(encoding="utf-8")
 
-    assert "LITELLM_MASTER_KEY" not in text
+    assert "quimera-litellm" not in text
+    assert "\n  litellm:" not in text
 
 
-def test_local_env_example_documents_litellm_master_key() -> None:
-    text = ENV_EXAMPLE.read_text(encoding="utf-8")
-
-    assert "LITELLM_MASTER_KEY=quimera-dev-key" in text
-    assert "QUIMERA_LLM_API_KEY=${LITELLM_MASTER_KEY}" in text
-
-
-def test_sdd_documents_manual_volume_reset_policy() -> None:
-    text = PR04_SDD.read_text(encoding="utf-8").lower()
-
-    assert "reset de volume" in text
-    assert "manual" in text
-    assert "docker volume rm" in text
+def _line_containing(text: str, needle: str) -> str:
+    for line in text.splitlines():
+        if needle in line:
+            return line
+    raise AssertionError(f"missing line containing {needle!r}")
 
 
-def test_pr05_sdd_documents_litellm_host_policy() -> None:
-    text = PR05_SDD.read_text(encoding="utf-8")
-
-    assert "LiteLLM e um processo Python local do host" in text
-    assert "Docker Compose nao gerencia LiteLLM" in text
-    assert "Compose gerencia apenas Postgres e Qdrant" in text
+def _function_body(text: str, function_name: str) -> str:
+    pattern = rf"^{function_name}\(\) \{{\n(?P<body>.*?)(?=^\S+\(\) \{{|\Z)"
+    match = re.search(pattern, text, re.MULTILINE | re.DOTALL)
+    if not match:
+        raise AssertionError(f"missing function {function_name}")
+    return match.group("body")

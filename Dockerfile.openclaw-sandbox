@@ -1,8 +1,17 @@
 FROM python:3.14-slim
 
-# Install uv and minimal build tools
+# Install uv, minimal build tools, and PostgreSQL 18 client tools.
+# pg_dump must be at least as new as the PostgreSQL server it dumps.
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends gcc python3-dev && \
+    apt-get install -y --no-install-recommends ca-certificates curl gnupg gcc python3-dev && \
+    install -d /usr/share/postgresql-common/pgdg && \
+    curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+      -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc && \
+    . /etc/os-release && \
+    echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" \
+      > /etc/apt/sources.list.d/pgdg.list && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends postgresql-client-18 && \
     rm -rf /var/lib/apt/lists/* && \
     pip install uv --no-cache-dir
 
@@ -20,7 +29,7 @@ RUN uv sync --frozen && \
     rm -rf /tmp/setup
 
 ENV VIRTUAL_ENV=/opt/openclaw-venv
-ENV PATH=/opt/openclaw-venv/bin:$PATH
+ENV PATH=/usr/lib/postgresql/18/bin:/opt/openclaw-venv/bin:$PATH
 # Project source arrives via volume mount at runtime
 ENV PYTHONPATH=/workspace
 

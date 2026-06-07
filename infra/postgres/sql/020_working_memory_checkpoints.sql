@@ -1,3 +1,5 @@
+CREATE EXTENSION IF NOT EXISTS vector;
+
 CREATE TABLE IF NOT EXISTS working_memory_snapshots (
     snapshot_id UUID PRIMARY KEY DEFAULT uuidv7(),
     agent_id TEXT NOT NULL,

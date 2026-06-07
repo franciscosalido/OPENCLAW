@@ -1,12 +1,22 @@
 # PostgreSQL relational memory
-# Version is PINNED by ADR-0021 - never change postgres:18.4-trixie to latest
+# Base version is PINNED by ADR-0021 - never change postgres:18.4-trixie to latest.
+# Runtime image is a local derivative with TimescaleDB + pgvector extensions.
 services:
   postgres:
-    image: postgres:18.4-trixie
+    image: quimera/postgres-memory:18.4-trixie-timescaledb-pgvector
+    build:
+      context: ..
+      dockerfile: infra/postgres/Dockerfile
+      args:
+        POSTGRES_BASE_IMAGE: postgres:18.4-trixie
+        PG_MAJOR: "18"
+        TIMESCALEDB_VERSION: "2.23.0"
+        PGVECTOR_VERSION: "0.8.2"
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql
+      - ../infra/postgres/initdb:/docker-entrypoint-initdb.d:ro
       - ../infra/postgres/secrets/postgres_password.txt:/run/secrets/quimera_postgres_password:ro
     environment:
       - POSTGRES_DB=quimera
@@ -16,7 +26,7 @@ services:
     command:
       - postgres
       - -c
-      - shared_preload_libraries=pg_stat_statements
+      - shared_preload_libraries=timescaledb,pg_stat_statements
       - -c
       - compute_query_id=auto
       - -c
