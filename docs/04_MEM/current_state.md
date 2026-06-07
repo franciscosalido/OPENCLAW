@@ -72,8 +72,10 @@ Implemented:
 - Added `abort_on_checksum_fail` to `RestoreService`. Default remains
   availability-first warn-and-restore; strict operators can now abort restore
   before any point is written when checksum validation fails.
-- Replaced module-level `count(1)` snapshot epochs with wall-clock millisecond
-  epochs plus a local monotonic guard, avoiding restart-to-1 behavior.
+- Replaced module-level `count(1)` snapshot epochs in the real snapshot flow
+  with PostgreSQL `MAX(snapshot_epoch) + 1` allocation under an advisory lock
+  scoped to `(agent_id, session_id)`, avoiding restart-to-1 behavior and
+  cross-process epoch races.
 - Documented that `integration/hybrid_fixture.py` uses `delete_collection` only
   for synthetic HybridRAG fixture teardown and not in working-memory runtime.
 
@@ -81,13 +83,15 @@ Validation:
 
 - `.venv/bin/python --version`: Python 3.12.13.
 - Required host Python 3.12 unit block:
-  66 passed.
+  68 passed.
 - PR-10 focused unit/integration block:
   70 passed / 4 skipped.
 - Full host Python 3.12 regression with `.venv/bin/python -m pytest`:
-  1889 passed / 65 skipped.
+  1891 passed / 65 skipped.
 - `uv run mypy --strict` on PR-10 working-memory/MCP/tests:
   success.
+- `uv run pyright` on PR-10 working-memory/MCP/tests:
+  0 errors / 0 warnings.
 
 ---
 

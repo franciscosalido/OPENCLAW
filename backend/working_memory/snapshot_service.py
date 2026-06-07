@@ -52,7 +52,7 @@ class SnapshotService:
         snapshot_id = await self._repository.create_snapshot_header(
             agent_id=agent_id,
             session_id=session_id,
-            snapshot_epoch=self.next_snapshot_epoch(agent_id, session_id),
+            snapshot_epoch=None,
             collection_name=self._settings.collection_name,
             vector_name=self._settings.vector_name,
             embedding_model=points[0].embedding_model if points else "unknown",

@@ -57,9 +57,11 @@ prefer integrity over availability can construct `RestoreService` with
 `abort_on_checksum_fail=true`; in that mode no point is restored after checksum
 mismatch.
 
-`snapshot_epoch` is a wall-clock millisecond epoch with a local monotonic guard.
-It does not reset to `1` after process restart and remains sortable across
-process lifetimes. PostgreSQL still enforces uniqueness by
+`snapshot_epoch` is allocated by PostgreSQL with `MAX(snapshot_epoch) + 1`
+for the same `(agent_id, session_id)` inside snapshot header insertion. The
+repository takes a transaction-scoped advisory lock for that agent/session pair
+before reading the max epoch, so process restarts and concurrent processes do
+not reset or race the durable ordering. PostgreSQL still enforces uniqueness by
 `(agent_id, session_id, snapshot_epoch)`.
 
 ## TTL And Cleanup

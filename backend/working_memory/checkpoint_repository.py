@@ -32,7 +32,7 @@ class WorkingMemoryCheckpointRepository:
         *,
         agent_id: str,
         session_id: str,
-        snapshot_epoch: int,
+        snapshot_epoch: int | None,
         collection_name: str,
         vector_name: str,
         embedding_model: str,
@@ -45,12 +45,20 @@ class WorkingMemoryCheckpointRepository:
     ) -> str:
         row = await self._pool.fetchrow(
             """
+            WITH locked AS (
+                SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2::text))
+            ),
+            next_epoch AS (
+                SELECT COALESCE($3::bigint, COALESCE(MAX(snapshot_epoch), 0) + 1) AS snapshot_epoch
+                FROM working_memory_snapshots, locked
+                WHERE agent_id = $1 AND session_id = $2
+            )
             INSERT INTO working_memory_snapshots (
                 agent_id, session_id, snapshot_epoch, collection_name, vector_name,
                 embedding_model, vector_dim, snapshot_kind, point_count, checksum,
                 expires_at, metadata
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            VALUES ($1, $2, (SELECT snapshot_epoch FROM next_epoch), $4, $5, $6, $7, $8, $9, $10, $11, $12)
             RETURNING snapshot_id
             """,
             agent_id,
