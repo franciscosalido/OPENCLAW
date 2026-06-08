@@ -30,5 +30,16 @@ def test_start_quimera_status_json_live_shape() -> None:
     data = json.loads(result.stdout)
 
     assert data["schema_version"] == "quimera-status-v1"
-    assert "postgres" in data["services"]
-    assert "qdrant" in data["services"]
+    assert data["overall"] in {"ok", "fail"}
+    assert isinstance(data["services"], dict)
+    for service_name in ("postgres", "qdrant", "litellm", "ollama"):
+        service = data["services"][service_name]
+        assert isinstance(service, dict)
+        assert service["status"] in {
+            "ok",
+            "fail",
+            "skipped",
+            "loaded",
+            "missing",
+            "unknown",
+        }

@@ -9,13 +9,23 @@ from backend.agent0.openclaw import OpenClaw
 
 
 RUN_AGENT0_E2E = "RUN_AGENT0_E2E"
+QUIMERA_E2E = "QUIMERA_E2E"
 E2E_P95_BUDGET_MS = 15_000.0
 MIN_CITATION_HITS = 5
 
 
+def _truthy_env(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _agent0_e2e_enabled() -> bool:
+    return _truthy_env(RUN_AGENT0_E2E) or _truthy_env(QUIMERA_E2E)
+
+
 @unittest.skipUnless(
-    os.environ.get(RUN_AGENT0_E2E) == "1",
-    "Agent-0 E2E requires RUN_AGENT0_E2E=1 and local services/corpora.",
+    _agent0_e2e_enabled(),
+    "Agent-0 E2E requires RUN_AGENT0_E2E=1 or QUIMERA_E2E=true "
+    "and local services/corpora.",
 )
 class Agent0E2ETests(unittest.TestCase):
     def test_golden_questions_meet_slos(self) -> None:

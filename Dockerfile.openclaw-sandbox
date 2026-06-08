@@ -32,5 +32,8 @@ ENV VIRTUAL_ENV=/opt/openclaw-venv
 ENV PATH=/usr/lib/postgresql/18/bin:/opt/openclaw-venv/bin:$PATH
 # Project source arrives via volume mount at runtime
 ENV PYTHONPATH=/workspace
+# The Vibe sandbox is an integration environment. E2E tests still self-skip
+# when required services, corpora, or local gateway credentials are unavailable.
+ENV QUIMERA_E2E=true
 
 WORKDIR /workspace
