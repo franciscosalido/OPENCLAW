@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Any, Protocol
 from uuid import UUID
 
-import asyncpg  # type: ignore[import-untyped]
+import asyncpg  # type: ignore[import-untyped, unused-ignore]
 
 from backend.observability.decorators import traced_pg
 from backend.working_memory.models import WorkingMemoryPoint

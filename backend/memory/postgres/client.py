@@ -6,7 +6,7 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
-import asyncpg  # type: ignore[import-untyped]
+import asyncpg  # type: ignore[import-untyped, unused-ignore]
 
 from backend.memory.postgres.models import AgentState, EntityMention, Session, Turn
 from backend.memory.postgres.settings import PostgresSettings

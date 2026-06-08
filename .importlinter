@@ -1,0 +1,12 @@
+[importlinter]
+root_package = backend
+
+[importlinter:contract:agent0-does-not-import-memory-backends]
+name = Agent0 must not import memory backends directly
+type = forbidden
+source_modules =
+    backend.agent0
+forbidden_modules =
+    backend.memory
+    backend.working_memory
+    backend.temporal

@@ -11,6 +11,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import Enum
 from types import MappingProxyType
+from typing import TypeVar
 
 DEFAULT_PROFILE_NAME = "balanced_local"
 MONITORING_METRICS_ENDPOINT = "/metrics?per_collection=true"
@@ -42,6 +43,7 @@ FORBIDDEN_SAFE_DICT_KEYS = frozenset(
 )
 
 _ALLOWED_TURBO_BITS = frozenset({"bits4", "bits2", "bits1_5", "bits1"})
+_EnumT = TypeVar("_EnumT", bound=Enum)
 
 
 class QuantizationKind(str, Enum):
@@ -98,33 +100,13 @@ class QuantizationConfig:
         if self.rescore is not None and not isinstance(self.rescore, bool):
             raise TypeError("rescore must be a bool or None")
 
-        if clean_kind is QuantizationKind.NONE:
-            if any(
-                value is not None
-                for value in (
-                    self.bits,
-                    clean_turbo_bits,
-                    self.always_ram,
-                    self.rescore,
-                )
-            ):
-                raise ValueError("none quantization cannot define tuning fields")
-        elif clean_kind is QuantizationKind.SCALAR:
-            if self.bits not in (None, 8):
-                raise ValueError("scalar quantization only supports bits=8 in Q18-05")
-            if clean_turbo_bits is not None:
-                raise ValueError("scalar quantization cannot define turbo_bits")
-        elif clean_kind is QuantizationKind.TURBOQUANT:
-            if self.bits is not None and clean_turbo_bits is not None:
-                raise ValueError("turboquant must use bits or turbo_bits, not both")
-            if self.bits is not None and self.bits not in {1, 2, 4}:
-                raise ValueError("turboquant bits must be 1, 2 or 4")
-            if clean_turbo_bits is None:
-                clean_turbo_bits = (
-                    f"bits{self.bits}" if self.bits is not None else "bits4"
-                )
-            if clean_turbo_bits not in _ALLOWED_TURBO_BITS:
-                raise ValueError("turbo_bits is not supported")
+        clean_turbo_bits = _validate_quantization_fields(
+            kind=clean_kind,
+            bits=self.bits,
+            turbo_bits=clean_turbo_bits,
+            always_ram=self.always_ram,
+            rescore=self.rescore,
+        )
 
         object.__setattr__(self, "kind", clean_kind)
         object.__setattr__(self, "turbo_bits", clean_turbo_bits)
@@ -166,6 +148,63 @@ class QuantizationConfig:
                 "rescore": self.rescore,
             }
         )
+
+
+def _validate_quantization_fields(
+    *,
+    kind: QuantizationKind,
+    bits: int | None,
+    turbo_bits: str | None,
+    always_ram: bool | None,
+    rescore: bool | None,
+) -> str | None:
+    if kind is QuantizationKind.NONE:
+        _validate_no_quantization_tuning(
+            bits=bits,
+            turbo_bits=turbo_bits,
+            always_ram=always_ram,
+            rescore=rescore,
+        )
+        return None
+    if kind is QuantizationKind.SCALAR:
+        _validate_scalar_quantization(bits=bits, turbo_bits=turbo_bits)
+        return None
+    return _validate_turboquant(bits=bits, turbo_bits=turbo_bits)
+
+
+def _validate_no_quantization_tuning(
+    *,
+    bits: int | None,
+    turbo_bits: str | None,
+    always_ram: bool | None,
+    rescore: bool | None,
+) -> None:
+    if any(value is not None for value in (bits, turbo_bits, always_ram, rescore)):
+        raise ValueError("none quantization cannot define tuning fields")
+
+
+def _validate_scalar_quantization(
+    *,
+    bits: int | None,
+    turbo_bits: str | None,
+) -> None:
+    if bits not in (None, 8):
+        raise ValueError("scalar quantization only supports bits=8 in Q18-05")
+    if turbo_bits is not None:
+        raise ValueError("scalar quantization cannot define turbo_bits")
+
+
+def _validate_turboquant(*, bits: int | None, turbo_bits: str | None) -> str:
+    if bits is not None and turbo_bits is not None:
+        raise ValueError("turboquant must use bits or turbo_bits, not both")
+    if bits is not None and bits not in {1, 2, 4}:
+        raise ValueError("turboquant bits must be 1, 2 or 4")
+    clean_turbo_bits = turbo_bits
+    if clean_turbo_bits is None:
+        clean_turbo_bits = f"bits{bits}" if bits is not None else "bits4"
+    if clean_turbo_bits not in _ALLOWED_TURBO_BITS:
+        raise ValueError("turbo_bits is not supported")
+    return clean_turbo_bits
 
 
 @dataclass(frozen=True, slots=True)
@@ -748,7 +787,7 @@ def _validate_non_negative_float(value: float, field_name: str) -> float:
     return clean
 
 
-def _coerce_enum(value: object, enum_type: type[Enum], field_name: str) -> Enum:
+def _coerce_enum(value: object, enum_type: type[_EnumT], field_name: str) -> _EnumT:
     if isinstance(value, enum_type):
         return value
     if isinstance(value, str):

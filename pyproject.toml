@@ -56,3 +56,15 @@ pythonVersion = "3.12"
 typeCheckingMode = "basic"
 venvPath = "."
 venv = ".venv"
+
+[tool.vulture]
+paths = ["backend"]
+min_confidence = 80
+ignore_names = [
+    "normalize_embeddings",
+    "sentences",
+    "show_progress_bar",
+    "sparse_vectors_config",
+    "vectors_config",
+    "with_payload",
+]

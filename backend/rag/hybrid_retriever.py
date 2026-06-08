@@ -55,6 +55,18 @@ class HybridRetrievalError(Exception):
     """Sanitized retrieval error — never contains query text or raw vectors."""
 
 
+def _require_dense_vector(vector: list[float] | None) -> list[float]:
+    if vector is None:
+        raise HybridRetrievalError("retrieval invariant failed: dense vector missing")
+    return vector
+
+
+def _require_sparse_vector(vector: SparseVector | None) -> SparseVector:
+    if vector is None:
+        raise HybridRetrievalError("retrieval invariant failed: sparse vector missing")
+    return vector
+
+
 # ---------------------------------------------------------------------------
 # Protocols
 # ---------------------------------------------------------------------------
@@ -336,8 +348,8 @@ class AsyncHybridRetriever:
         sparse_hits: Sequence[SearchHit] = ()
 
         if mode is RetrievalMode.HYBRID:
-            assert dense_vec is not None
-            assert sparse_vec is not None
+            dense_vec = _require_dense_vector(dense_vec)
+            sparse_vec = _require_sparse_vector(sparse_vec)
             d_srch: asyncio.Task[Sequence[SearchHit]] = asyncio.create_task(
                 self._search_dense(dense_vec, cfg)
             )
@@ -346,10 +358,10 @@ class AsyncHybridRetriever:
             )
             dense_hits, sparse_hits = await asyncio.gather(d_srch, s_srch)
         elif mode is RetrievalMode.DENSE_ONLY:
-            assert dense_vec is not None
+            dense_vec = _require_dense_vector(dense_vec)
             dense_hits = await self._search_dense(dense_vec, cfg)
         else:
-            assert sparse_vec is not None
+            sparse_vec = _require_sparse_vector(sparse_vec)
             sparse_hits = await self._search_sparse(sparse_vec, cfg)
 
         search_ms = _elapsed_ms(t_search, self.clock.perf_counter())

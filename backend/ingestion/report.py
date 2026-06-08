@@ -74,6 +74,16 @@ class DocumentReport:
         }
 
 
+@dataclass(frozen=True)
+class ReportStats:
+    enabled_documents: int
+    approved_documents: int
+    chunked_documents: int
+    coverage: float
+    p50_ingestion_ms: float
+    p95_ingestion_ms: float
+
+
 def build_report(
     *,
     mode: IngestionMode,
@@ -83,22 +93,7 @@ def build_report(
 ) -> dict[str, Any]:
     """Build an allowlisted report with no document text or payloads."""
 
-    enabled_reports = [
-        report for report in document_reports if report.rejection_reason != "disabled"
-    ]
-    approved_documents = [
-        report
-        for report in enabled_reports
-        if report.rejection_reason not in {"curation_status_not_approved"}
-    ]
-    latencies = [
-        report.latency_ms for report in document_reports if report.status == "chunked"
-    ]
-    chunked_documents = sum(
-        1 for report in document_reports if report.status == "chunked"
-    )
-    total_approved = len(approved_documents)
-    coverage = round(chunked_documents / total_approved, 6) if total_approved else 0.0
+    stats = _build_report_stats(document_reports)
 
     report: dict[str, Any] = {
         "run_id": str(uuid4()),
@@ -107,28 +102,81 @@ def build_report(
         "manifest_path_relative": manifest_path_relative,
         "manifest_sha256": file_sha256(manifest_path),
         "total_documents": len(document_reports),
-        "enabled_documents": len(enabled_reports),
-        "approved_documents": total_approved,
-        "rejected_documents": sum(
-            1 for result in document_reports if result.status == "rejected"
-        ),
-        "skipped_documents": sum(
-            1 for result in document_reports if result.status == "skipped"
-        ),
-        "duplicate_documents": sum(
-            1 for result in document_reports if result.status == "duplicate"
-        ),
-        "parsed_documents": sum(
-            1 for result in document_reports if result.status in {"parsed", "chunked"}
-        ),
-        "chunked_documents": chunked_documents,
-        "coverage": coverage,
-        "p50_ingestion_ms": round(float(median(latencies)), 3) if latencies else 0.0,
-        "p95_ingestion_ms": round(_percentile(latencies, 95), 3) if latencies else 0.0,
+        "enabled_documents": stats.enabled_documents,
+        "approved_documents": stats.approved_documents,
+        "rejected_documents": _count_status(document_reports, "rejected"),
+        "skipped_documents": _count_status(document_reports, "skipped"),
+        "duplicate_documents": _count_status(document_reports, "duplicate"),
+        "parsed_documents": _count_parsed_documents(document_reports),
+        "chunked_documents": stats.chunked_documents,
+        "coverage": stats.coverage,
+        "p50_ingestion_ms": stats.p50_ingestion_ms,
+        "p95_ingestion_ms": stats.p95_ingestion_ms,
         "per_document": [result.to_dict() for result in document_reports],
     }
     assert_report_is_sanitized(report)
     return report
+
+
+def _build_report_stats(reports: list[DocumentReport]) -> ReportStats:
+    enabled_reports = _enabled_reports(reports)
+    approved_count = len(_approved_reports(enabled_reports))
+    latencies = _chunked_latencies(reports)
+    chunked_count = _count_status(reports, "chunked")
+    return ReportStats(
+        enabled_documents=len(enabled_reports),
+        approved_documents=approved_count,
+        chunked_documents=chunked_count,
+        coverage=_coverage(chunked_count, approved_count),
+        p50_ingestion_ms=_median_latency(latencies),
+        p95_ingestion_ms=_p95_latency(latencies),
+    )
+
+
+def _enabled_reports(reports: list[DocumentReport]) -> list[DocumentReport]:
+    return [report for report in reports if report.rejection_reason != "disabled"]
+
+
+def _approved_reports(reports: list[DocumentReport]) -> list[DocumentReport]:
+    return [
+        report
+        for report in reports
+        if report.rejection_reason not in {"curation_status_not_approved"}
+    ]
+
+
+def _chunked_latencies(reports: list[DocumentReport]) -> list[float]:
+    return [report.latency_ms for report in reports if report.status == "chunked"]
+
+
+def _coverage(chunked_documents: int, approved_documents: int) -> float:
+    if approved_documents == 0:
+        return 0.0
+    return round(chunked_documents / approved_documents, 6)
+
+
+def _median_latency(latencies: list[float]) -> float:
+    if not latencies:
+        return 0.0
+    return round(float(median(latencies)), 3)
+
+
+def _p95_latency(latencies: list[float]) -> float:
+    if not latencies:
+        return 0.0
+    return round(_percentile(latencies, 95), 3)
+
+
+def _count_status(
+    reports: list[DocumentReport],
+    status: DocumentStatus,
+) -> int:
+    return sum(1 for report in reports if report.status == status)
+
+
+def _count_parsed_documents(reports: list[DocumentReport]) -> int:
+    parsed_statuses = {"parsed", "chunked"}
+    return sum(1 for report in reports if report.status in parsed_statuses)
 
 
 def assert_report_is_sanitized(report: dict[str, Any]) -> None:

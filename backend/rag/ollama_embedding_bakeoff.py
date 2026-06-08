@@ -94,6 +94,15 @@ FORBIDDEN_OUTPUT_KEYS = frozenset(
 )
 
 
+def _require_metric(value: float | None, name: str) -> float:
+    if value is None:
+        raise RuntimeError(
+            "embedding bakeoff invariant failed: "
+            f"{name} missing after completeness check"
+        )
+    return value
+
+
 class EmbeddingCandidateDecision(str, Enum):
     """Possible D2P outcomes for the Qwen3-4B vs Nomic bakeoff."""
 
@@ -881,12 +890,24 @@ def decide_embedding_candidate(
     )
     if any(value is None for value in required):
         return EmbeddingCandidateDecision.QWEN3_4B_EXPERIMENTAL_ONLY
-    assert qwen3_ndcg_at_5 is not None
-    assert nomic_ndcg_at_5 is not None
-    assert qwen3_recall_at_10 is not None
-    assert nomic_recall_at_10 is not None
-    assert qwen3_total_p95_ms is not None
-    assert nomic_total_p95_ms is not None
+    qwen3_ndcg_at_5 = _require_metric(qwen3_ndcg_at_5, "qwen3_ndcg_at_5")
+    nomic_ndcg_at_5 = _require_metric(nomic_ndcg_at_5, "nomic_ndcg_at_5")
+    qwen3_recall_at_10 = _require_metric(
+        qwen3_recall_at_10,
+        "qwen3_recall_at_10",
+    )
+    nomic_recall_at_10 = _require_metric(
+        nomic_recall_at_10,
+        "nomic_recall_at_10",
+    )
+    qwen3_total_p95_ms = _require_metric(
+        qwen3_total_p95_ms,
+        "qwen3_total_p95_ms",
+    )
+    nomic_total_p95_ms = _require_metric(
+        nomic_total_p95_ms,
+        "nomic_total_p95_ms",
+    )
     if memory_ok is False or qwen3_total_p95_ms > nomic_total_p95_ms * 2.0:
         return EmbeddingCandidateDecision.DEFER_DUE_TO_LATENCY_OR_MEMORY
     ndcg_gain = qwen3_ndcg_at_5 - nomic_ndcg_at_5

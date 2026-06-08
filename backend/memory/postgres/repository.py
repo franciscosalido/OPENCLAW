@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, cast
 from uuid import UUID
 
-import asyncpg  # type: ignore[import-untyped]
+import asyncpg  # type: ignore[import-untyped, unused-ignore]
 
 from backend.observability.decorators import traced_pg
 from backend.memory.postgres.models import (

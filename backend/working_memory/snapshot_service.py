@@ -89,6 +89,8 @@ class SnapshotService:
     async def create_delta_snapshot(
         self, *, agent_id: str, session_id: str, since_checkpoint_id: str
     ) -> dict[str, Any]:
+        if not since_checkpoint_id.strip():
+            raise ValueError("since_checkpoint_id is required")
         return await self.create_session_snapshot(
             agent_id=agent_id, session_id=session_id, kind="delta"
         )

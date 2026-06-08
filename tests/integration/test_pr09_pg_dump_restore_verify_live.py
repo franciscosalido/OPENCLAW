@@ -15,15 +15,41 @@ def _dsn() -> str | None:
 
 
 def _postgres_container_available() -> bool:
-    result = subprocess.run(
-        ["docker", "inspect", "-f", "{{.State.Running}}", "quimera-postgres-memory"],
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL,
-        check=False,
-        timeout=10,
-    )
+    try:
+        result = subprocess.run(
+            [
+                "docker",
+                "inspect",
+                "-f",
+                "{{.State.Running}}",
+                "quimera-postgres-memory",
+            ],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            check=False,
+            timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
     return result.returncode == 0 and result.stdout.strip() == "true"
+
+
+def _postgres_unavailable_output(output: str) -> bool:
+    lowered = output.lower()
+    unavailable_markers = (
+        "could not connect to server",
+        "connection refused",
+        "connection to server",
+        "could not translate host name",
+        "name or service not known",
+        "no route to host",
+        "operation timed out",
+        "timeout expired",
+        "server closed the connection unexpectedly",
+        "is the server running",
+    )
+    return any(marker in lowered for marker in unavailable_markers)
 
 
 def test_pr09_pg_dump_restore_verify_live(tmp_path: Path) -> None:
@@ -42,6 +68,10 @@ def test_pr09_pg_dump_restore_verify_live(tmp_path: Path) -> None:
         check=False,
         timeout=120,
     )
+    if backup.returncode != 0 and _postgres_unavailable_output(
+        backup.stdout + backup.stderr
+    ):
+        pytest.skip("Postgres live backup target is not reachable from this sandbox")
     assert backup.returncode == 0, backup.stderr
     dump_files = sorted(tmp_path.glob("quimera_pg18_*.dump"))
     assert dump_files
