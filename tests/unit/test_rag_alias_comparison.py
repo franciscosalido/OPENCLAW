@@ -223,7 +223,9 @@ class RagAliasComparisonTests(unittest.IsolatedAsyncioTestCase):
         )
         for line in lines:
             row = json.loads(line)
-            self.assertTrue(FORBIDDEN_REPORT_KEYS.isdisjoint({key.lower() for key in row}))
+            self.assertTrue(
+                FORBIDDEN_REPORT_KEYS.isdisjoint({key.lower() for key in row})
+            )
             self.assertIn(row["alias_role"], {"baseline", "candidate"})
             self.assertEqual(row["run_type"], "warm_model")
 

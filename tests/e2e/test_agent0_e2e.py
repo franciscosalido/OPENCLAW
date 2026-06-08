@@ -42,7 +42,9 @@ class Agent0E2ETests(unittest.TestCase):
                         )
                     results.append((question.question_id, answer))
         except Exception as exc:
-            self.skipTest(f"local Agent-0 services unavailable: {exc.__class__.__name__}")
+            self.skipTest(
+                f"local Agent-0 services unavailable: {exc.__class__.__name__}"
+            )
 
         report = build_e2e_report(results)
 
@@ -54,9 +56,13 @@ class Agent0E2ETests(unittest.TestCase):
         try:
             answer = OpenClaw().ask("qual o estado do GW-07?")
         except Exception as exc:
-            self.skipTest(f"local Agent-0 services unavailable: {exc.__class__.__name__}")
+            self.skipTest(
+                f"local Agent-0 services unavailable: {exc.__class__.__name__}"
+            )
         if answer.error_category is not None:
-            self.skipTest(f"local Agent-0 services unavailable: {answer.error_category}")
+            self.skipTest(
+                f"local Agent-0 services unavailable: {answer.error_category}"
+            )
 
         self.assertTrue(answer.answer)
         self.assertTrue(answer.citation_present)

@@ -51,7 +51,11 @@ def test_quimera_status_reports_when_stack_is_online() -> None:
         ollama = httpx.get("http://127.0.0.1:11434/api/version", timeout=2.0)
     except httpx.HTTPError as exc:
         pytest.skip(f"local runtime is not fully online: {exc.__class__.__name__}")
-    if qdrant.status_code >= 400 or litellm.status_code >= 400 or ollama.status_code >= 400:
+    if (
+        qdrant.status_code >= 400
+        or litellm.status_code >= 400
+        or ollama.status_code >= 400
+    ):
         pytest.skip("local runtime is not fully online")
 
     result = subprocess.run(

@@ -6,7 +6,6 @@ import os
 import re
 import stat
 import subprocess
-import tempfile
 import unittest
 from pathlib import Path
 
@@ -36,16 +35,14 @@ _REMOTE_MODEL_PREFIX = re.compile(
 def _strip_yaml_comments(text: str) -> str:
     """Mirror the sed '/^[[:space:]]*#/d' used in healthcheck.sh."""
     return "\n".join(
-        line for line in text.splitlines()
-        if not _COMMENT_LINE.match(line)
+        line for line in text.splitlines() if not _COMMENT_LINE.match(line)
     )
 
 
 def _has_remote_marker(active_text: str) -> bool:
     """Return True if active (comment-stripped) YAML text contains remote provider markers."""
     return bool(
-        _REMOTE_API_KEY.search(active_text)
-        or _REMOTE_MODEL_PREFIX.search(active_text)
+        _REMOTE_API_KEY.search(active_text) or _REMOTE_MODEL_PREFIX.search(active_text)
     )
 
 
@@ -196,10 +193,14 @@ class HealthcheckConfigGuardTests(unittest.TestCase):
             "Active (non-comment) config content must not contain remote provider markers.",
         )
 
-    def test_config_comments_contain_provider_names_but_active_content_does_not(self) -> None:
+    def test_config_comments_contain_provider_names_but_active_content_does_not(
+        self,
+    ) -> None:
         """Documents the root cause: comments mention OpenAI/Anthropic but active lines do not."""
         text = CONFIG_PATH.read_text(encoding="utf-8")
-        comment_lines = [l for l in text.splitlines() if _COMMENT_LINE.match(l)]
+        comment_lines = [
+            line for line in text.splitlines() if _COMMENT_LINE.match(line)
+        ]
         has_provider_in_comment = any(
             word in line.lower()
             for line in comment_lines

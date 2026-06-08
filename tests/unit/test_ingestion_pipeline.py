@@ -108,7 +108,9 @@ class IngestionPipelineTests(unittest.TestCase):
             manifest = _write_manifest(
                 root,
                 _doc_yaml(source_id="synth-test-001", doc_id="doc_a", path="docs/a.md")
-                + _doc_yaml(source_id="synth-test-002", doc_id="doc_b", path="docs/b.md"),
+                + _doc_yaml(
+                    source_id="synth-test-002", doc_id="doc_b", path="docs/b.md"
+                ),
             )
 
             result = run_ingestion(IngestionOptions(manifest_path=manifest))
@@ -119,13 +121,17 @@ class IngestionPipelineTests(unittest.TestCase):
         self.assertEqual(result.report["duplicate_documents"], 1)
 
     def test_report_contains_no_forbidden_keys(self) -> None:
-        result = run_ingestion(IngestionOptions(manifest_path=Path("data/corpus/manifest.yaml")))
+        result = run_ingestion(
+            IngestionOptions(manifest_path=Path("data/corpus/manifest.yaml"))
+        )
 
         assert_report_is_sanitized(result.report)
         self.assertTrue(FORBIDDEN_REPORT_KEYS.isdisjoint(result.report))
 
     def test_coverage_and_latency_metrics_for_ten_synthetic_docs(self) -> None:
-        result = run_ingestion(IngestionOptions(manifest_path=Path("data/corpus/manifest.yaml")))
+        result = run_ingestion(
+            IngestionOptions(manifest_path=Path("data/corpus/manifest.yaml"))
+        )
 
         self.assertEqual(result.report["total_documents"], 10)
         self.assertEqual(result.report["chunked_documents"], 10)

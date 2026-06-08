@@ -74,7 +74,9 @@ def test_working_memory_point_validation(field: str, value: object, match: str) 
 
 
 def test_working_memory_point_repr_does_not_leak_summary_or_vector() -> None:
-    point = _point(safe_summary="classified but safe short text", vector=(0.1, 0.2, 0.3, 0.4))
+    point = _point(
+        safe_summary="classified but safe short text", vector=(0.1, 0.2, 0.3, 0.4)
+    )
 
     rendered = repr(point)
 

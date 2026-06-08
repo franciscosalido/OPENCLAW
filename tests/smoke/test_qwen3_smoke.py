@@ -45,7 +45,9 @@ def test_qwen3_real_adapter_returns_normalized_4096_dimensional_vectors() -> Non
 
     query_vector = embedder.embed_query(text)
     document_vector = embedder.embed_document(text)
-    batch_vectors = embedder.embed_documents(["documento a", "documento b", "documento c"])
+    batch_vectors = embedder.embed_documents(
+        ["documento a", "documento b", "documento c"]
+    )
 
     query_norm = math.sqrt(sum(value * value for value in query_vector))
     dot = sum(q * d for q, d in zip(query_vector, document_vector, strict=True))

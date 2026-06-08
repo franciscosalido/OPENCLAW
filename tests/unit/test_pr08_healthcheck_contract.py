@@ -20,7 +20,15 @@ def test_integration_health_json_schema(monkeypatch: pytest.MonkeyPatch) -> None
             }
         },
     )
-    monkeypatch.setattr(check_integration_health, "_litellm_models", lambda: {"status": "ok", "aliases": ["qwen3-local", "nomic-embed-text"], "required_aliases_present": True})
+    monkeypatch.setattr(
+        check_integration_health,
+        "_litellm_models",
+        lambda: {
+            "status": "ok",
+            "aliases": ["qwen3-local", "nomic-embed-text"],
+            "required_aliases_present": True,
+        },
+    )
 
     report = check_integration_health.build_integration_health_report()
     encoded = json.dumps(report)
@@ -30,4 +38,9 @@ def test_integration_health_json_schema(monkeypatch: pytest.MonkeyPatch) -> None
     assert {"ollama", "litellm", "qdrant", "postgres"}.issubset(report["services"])
     assert "dsn" not in encoded.lower()
     assert "secret" not in encoded.lower()
-    assert report["mcp_servers"]["quimera_postgres_memory"]["gateway_introspection_skipped"] is True
+    assert (
+        report["mcp_servers"]["quimera_postgres_memory"][
+            "gateway_introspection_skipped"
+        ]
+        is True
+    )

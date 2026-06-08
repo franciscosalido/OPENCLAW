@@ -128,7 +128,9 @@ class DenseEmbeddingABTests(unittest.TestCase):
                 rows = list(csv.DictReader(csv_file))
             self.assertEqual(len(rows), 4)
             self.assertEqual(rows[0]["profile_id"], "nomic_dense_v1")
-            self.assertNotIn("query alpha", result.paths.csv_path.read_text(encoding="utf-8"))
+            self.assertNotIn(
+                "query alpha", result.paths.csv_path.read_text(encoding="utf-8")
+            )
 
             payload = _json_mapping(result.paths.json_path)
             self.assertIn("decision_gate", payload)
@@ -196,7 +198,9 @@ Q_002:
             )
             second = load_benchmark(benchmark_path, expected_path)
 
-            self.assertNotEqual(first.expected_results_hash, second.expected_results_hash)
+            self.assertNotEqual(
+                first.expected_results_hash, second.expected_results_hash
+            )
             self.assertNotEqual(first.benchmark_hash, second.benchmark_hash)
 
     def test_cli_dry_run_validates_inputs_without_writing_artifacts(self) -> None:

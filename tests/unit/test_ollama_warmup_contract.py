@@ -165,7 +165,9 @@ async def test_warmup_and_release_all_return_dict_by_model() -> None:
 @pytest.mark.asyncio
 async def test_warmup_failure_returns_false_without_payload_leak() -> None:
     FakeAsyncClient.status_codes = [500]
-    spec = WarmupSpec(model="qwen3:14b", mode="chat", keep_alive=-1, test_input="secret")
+    spec = WarmupSpec(
+        model="qwen3:14b", mode="chat", keep_alive=-1, test_input="secret"
+    )
 
     assert not await warmup.warmup_model(
         spec,

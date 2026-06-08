@@ -38,7 +38,9 @@ from backend.rag.ollama_embedding_bakeoff import (
 )
 from evaluation import run_q18_benchmark_profile as profile_runner
 
-MODULE_PATH = Path(__file__).resolve().parents[2] / "backend/rag/ollama_embedding_bakeoff.py"
+MODULE_PATH = (
+    Path(__file__).resolve().parents[2] / "backend/rag/ollama_embedding_bakeoff.py"
+)
 
 
 def test_qwen3_4b_contract_dimensions_2560() -> None:
@@ -139,7 +141,11 @@ def test_fallback_qwen3_collection_is_allowed_in_spec() -> None:
 
 
 def test_production_collections_still_blocked_with_expanded_allowlist() -> None:
-    for collection in ("quimera_knowledge", "quimera_knowledge_v2", "openclaw_knowledge"):
+    for collection in (
+        "quimera_knowledge",
+        "quimera_knowledge_v2",
+        "openclaw_knowledge",
+    ):
         with pytest.raises(ValueError, match="protected"):
             EmbeddingBakeoffCollectionSpec(collection_name=collection)
 
@@ -195,7 +201,9 @@ async def test_ollama_embedding_client_batches_and_preserves_order() -> None:
         )
 
     transport = httpx.MockTransport(handler)
-    async with httpx.AsyncClient(transport=transport, base_url="http://localhost:11434") as http_client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://localhost:11434"
+    ) as http_client:
         client = OllamaEmbeddingClient(
             model=QWEN3_4B_MODEL_ID,
             dimensions=2,
@@ -236,11 +244,17 @@ async def test_ollama_embedding_client_applies_instruction_only_to_queries() -> 
     def handler(request: httpx.Request) -> httpx.Response:
         payload = json.loads(request.content.decode("utf-8"))
         seen_payloads.append(payload)
-        return httpx.Response(200, json={"embeddings": [[0.1, 0.2]], "total_duration": 1})
+        return httpx.Response(
+            200, json={"embeddings": [[0.1, 0.2]], "total_duration": 1}
+        )
 
     transport = httpx.MockTransport(handler)
-    async with httpx.AsyncClient(transport=transport, base_url="http://localhost:11434") as http_client:
-        client = OllamaEmbeddingClient(model=QWEN3_4B_MODEL_ID, dimensions=2, client=http_client)
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://localhost:11434"
+    ) as http_client:
+        client = OllamaEmbeddingClient(
+            model=QWEN3_4B_MODEL_ID, dimensions=2, client=http_client
+        )
         await client.embed_queries(("qual CDI?",))
         await client.embed_documents(("documento CDI",))
 

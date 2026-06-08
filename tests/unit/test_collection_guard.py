@@ -103,7 +103,9 @@ class CollectionGuardTests(unittest.TestCase):
                 {"internal": "openclaw_internal", "financial": "openclaw_financial"},
             )
 
-    def test_assert_collection_namespace_rejects_arbitrary_and_empty_names(self) -> None:
+    def test_assert_collection_namespace_rejects_arbitrary_and_empty_names(
+        self,
+    ) -> None:
         allowed = {"internal": "openclaw_internal", "financial": "openclaw_financial"}
         for collection_name in ("", "custom_collection"):
             with self.subTest(collection_name=collection_name):
@@ -130,7 +132,9 @@ class CollectionGuardTests(unittest.TestCase):
         )
 
         self.assertFalse(result.backend_matches)
-        self.assertTrue(any("collection_backend_mismatch" in msg for msg in self.log_messages))
+        self.assertTrue(
+            any("collection_backend_mismatch" in msg for msg in self.log_messages)
+        )
 
     def test_model_mismatch_warns_with_reindex_recommendation(self) -> None:
         result = _check(
@@ -148,7 +152,9 @@ class CollectionGuardTests(unittest.TestCase):
         )
 
         self.assertFalse(result.contract_matches)
-        self.assertTrue(any("collection_contract_mismatch" in msg for msg in self.log_messages))
+        self.assertTrue(
+            any("collection_contract_mismatch" in msg for msg in self.log_messages)
+        )
 
     def test_alias_mismatch_warns_without_raising(self) -> None:
         result = _check(
@@ -156,7 +162,9 @@ class CollectionGuardTests(unittest.TestCase):
         )
 
         self.assertFalse(result.alias_matches)
-        self.assertTrue(any("collection_alias_mismatch" in msg for msg in self.log_messages))
+        self.assertTrue(
+            any("collection_alias_mismatch" in msg for msg in self.log_messages)
+        )
 
     def test_metadata_absent_warns_and_counts_missing_payloads(self) -> None:
         result = _check(
@@ -165,7 +173,9 @@ class CollectionGuardTests(unittest.TestCase):
 
         self.assertEqual(result.sample.metadata_absent_count, 1)
         self.assertFalse(result.metadata_complete)
-        self.assertTrue(any("collection_metadata_absent" in msg for msg in self.log_messages))
+        self.assertTrue(
+            any("collection_metadata_absent" in msg for msg in self.log_messages)
+        )
 
     def test_dimensions_mismatch_always_raises(self) -> None:
         with self.assertRaises(EmbeddingDimensionMismatchError):
@@ -173,9 +183,13 @@ class CollectionGuardTests(unittest.TestCase):
                 _client([_point(_payload(embedding_dimensions=1536))]),
             )
 
-        self.assertTrue(any("collection_dimension_mismatch" in msg for msg in self.log_messages))
+        self.assertTrue(
+            any("collection_dimension_mismatch" in msg for msg in self.log_messages)
+        )
 
-    def test_strict_true_raises_on_backend_model_contract_and_alias_mismatch(self) -> None:
+    def test_strict_true_raises_on_backend_model_contract_and_alias_mismatch(
+        self,
+    ) -> None:
         mismatched_payload = _payload(
             embedding_backend="direct_ollama_current",
             embedding_model="other-model",

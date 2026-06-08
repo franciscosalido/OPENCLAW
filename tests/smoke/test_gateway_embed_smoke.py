@@ -29,8 +29,7 @@ _SYNTHETIC_BATCH = [
 pytestmark = pytest.mark.skipif(
     os.environ.get("RUN_LITELLM_EMBED_SMOKE") != "1",
     reason=(
-        "LiteLLM embedding smoke skipped; set RUN_LITELLM_EMBED_SMOKE=1 "
-        "to enable."
+        "LiteLLM embedding smoke skipped; set RUN_LITELLM_EMBED_SMOKE=1 to enable."
     ),
 )
 

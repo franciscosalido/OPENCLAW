@@ -316,7 +316,9 @@ class RagRunTraceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(data["run_context"], "warm_model")
         self.assertTrue(FORBIDDEN_KEYS.isdisjoint({key.lower() for key in data}))
 
-    def test_legacy_latency_fields_mirror_segment_fields_for_compatibility(self) -> None:
+    def test_legacy_latency_fields_mirror_segment_fields_for_compatibility(
+        self,
+    ) -> None:
         # Intentional backward compatibility, not accidental duplication:
         # new consumers should prefer prompt_build_ms/generation_ms/total_ms.
         trace = _trace(
@@ -585,7 +587,9 @@ class RagRunTraceTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("synthetic chunk text", str(trace))
         self.assertNotIn("do-not-log", str(trace))
 
-    async def test_pipeline_trace_contains_generation_and_prompt_build_timings(self) -> None:
+    async def test_pipeline_trace_contains_generation_and_prompt_build_timings(
+        self,
+    ) -> None:
         traces: list[dict[str, object]] = []
 
         def sink(message: Any) -> None:
@@ -673,7 +677,9 @@ class RagRunTraceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(trace["context_estimated_tokens_used"], 24)
         self.assertTrue(FORBIDDEN_KEYS.isdisjoint({key.lower() for key in trace}))
 
-    async def test_local_rag_generation_budget_forwards_max_tokens_and_trace_metadata(self) -> None:
+    async def test_local_rag_generation_budget_forwards_max_tokens_and_trace_metadata(
+        self,
+    ) -> None:
         traces: list[dict[str, object]] = []
         generator = CapturingGenerator("local_rag")
 

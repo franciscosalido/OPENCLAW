@@ -5,7 +5,65 @@
 > meaningful sessions.
 
 **Last updated:** 2026-06-07
-**Updated by:** Codex — RC Vibe minor integration recommendations
+**Updated by:** Codex — RC Vibe dedicated test style cleanup
+
+---
+
+## codex/rc-vibe-test-style-only — Dedicated Test Style and Lint RC
+
+Current branch: `codex/rc-vibe-test-style-only`
+Base branch: local `main` at `1f19862`.
+
+Purpose:
+
+- Split the mass `ruff format tests` cleanup out of the mixed Vibe Smoke RC so
+  reviewers can inspect the style-only churn independently.
+- Keep the required golden baseline gate contract fix in this branch because
+  unit tests must pass before local merge.
+
+Implemented:
+
+- Renamed the golden baseline ignore test to
+  `test_generated_report_dirs_are_ignored_and_baseline_files_are_tracked`,
+  making the behavior under test explicit.
+- Reworked that test to validate effective Git ignore behavior via
+  `git check-ignore --no-index` instead of asserting stale literal
+  `.gitignore` strings. `reports/` is accepted as covering generated
+  `reports/golden/`, `reports/gateway2/` and `reports/ci/` outputs, while
+  official files under `tests/golden/baseline/` remain tracked.
+- Ran `uvx ruff check tests --fix`, removing the 14 unused imports reported by
+  Vibe Smoke.
+- Replaced the ambiguous variable name `l` in
+  `tests/unit/test_litellm_infra_scripts.py`.
+- Ran `uvx ruff format tests`, applying the dedicated test-formatting pass.
+
+Research notes:
+
+- Git's current `gitignore` documentation confirms a directory pattern matches
+  the directory and paths underneath it, so `reports/` covers generated report
+  subdirectories.
+- Ruff's current linter documentation distinguishes safe fixes from unsafe
+  ones; unused-import cleanup is handled by Ruff's safe fix path in ordinary
+  test modules.
+- Ruff's formatter documentation defines `ruff format --check` as the
+  non-writing verification mode for the same formatting contract.
+
+Validation:
+
+- `uvx ruff check tests`: all checks passed.
+- `uvx ruff format --check tests`: 234 files already formatted.
+- `uv run pyright tests`: 0 errors / 0 warnings.
+- `uv run pytest tests/unit`: 1867 passed.
+- `uv run pytest tests/integration`: 34 passed / 48 skipped in this local
+  host environment.
+- `uv run pytest tests/smoke`: 5 passed / 13 skipped.
+- `git diff --check`: clean.
+
+Scope intentionally not changed:
+
+- No backend runtime code.
+- No `.env`, `.env.*`, secrets, service runtime state or data.
+- Existing generated PR-08/PR-09 artifacts remain unstaged.
 
 ---
 

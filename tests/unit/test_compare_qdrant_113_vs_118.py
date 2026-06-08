@@ -194,13 +194,19 @@ def test_defer_due_to_quality_regression() -> None:
         for run in _complete_runs()
     )
 
-    assert build_summary(runs=runs).final_decision == BenchmarkDecision.DEFER_DUE_TO_REGRESSION.value
+    assert (
+        build_summary(runs=runs).final_decision
+        == BenchmarkDecision.DEFER_DUE_TO_REGRESSION.value
+    )
 
 
 def test_turboquant_experimental_only_even_when_memory_improves() -> None:
     summary = build_summary(runs=_complete_runs())
 
-    assert summary.turboquant_decision == BenchmarkDecision.ACCEPT_TURBOQUANT_EXPERIMENTAL_ONLY.value
+    assert (
+        summary.turboquant_decision
+        == BenchmarkDecision.ACCEPT_TURBOQUANT_EXPERIMENTAL_ONLY.value
+    )
 
 
 def test_keep_python_rrf_default_without_native_clear_win() -> None:
@@ -212,29 +218,43 @@ def test_keep_python_rrf_default_without_native_clear_win() -> None:
     )
     summary = build_summary(runs=runs)
 
-    assert summary.native_rrf_decision == BenchmarkDecision.KEEP_PYTHON_RRF_DEFAULT.value
+    assert (
+        summary.native_rrf_decision == BenchmarkDecision.KEEP_PYTHON_RRF_DEFAULT.value
+    )
     assert summary.python_rrf_default is True
 
 
 def test_promote_native_rrf_only_with_strong_evidence() -> None:
     summary = build_summary(runs=_complete_runs())
 
-    assert summary.native_rrf_decision == BenchmarkDecision.PROMOTE_QDRANT_NATIVE_RRF.value
+    assert (
+        summary.native_rrf_decision == BenchmarkDecision.PROMOTE_QDRANT_NATIVE_RRF.value
+    )
 
 
 def test_inconclusive_when_baseline_missing() -> None:
     summary = build_summary(runs=(_run("qdrant_118_baseline_ram"),))
 
-    assert summary.final_decision == BenchmarkDecision.INCONCLUSIVE_MISSING_EVIDENCE.value
+    assert (
+        summary.final_decision == BenchmarkDecision.INCONCLUSIVE_MISSING_EVIDENCE.value
+    )
 
 
 def test_all_five_nomic_scenarios_are_declared() -> None:
-    nomic_ids = {s.scenario.value for s in COMPARISONS if "qwen3" not in s.scenario.value and "nomic_vs_qwen" not in s.scenario.value}
+    nomic_ids = {
+        s.scenario.value
+        for s in COMPARISONS
+        if "qwen3" not in s.scenario.value and "nomic_vs_qwen" not in s.scenario.value
+    }
     assert len(nomic_ids) == 5
 
 
 def test_all_qwen3_scenarios_are_declared() -> None:
-    qwen3_ids = {s.scenario.value for s in COMPARISONS if "qwen3" in s.scenario.value or "nomic_vs_qwen3" in s.scenario.value}
+    qwen3_ids = {
+        s.scenario.value
+        for s in COMPARISONS
+        if "qwen3" in s.scenario.value or "nomic_vs_qwen3" in s.scenario.value
+    }
     assert len(qwen3_ids) == 6
 
 
@@ -251,7 +271,9 @@ def test_scenario_ids_are_stable() -> None:
 def test_scenario_summary_has_profile_a_and_b() -> None:
     summary = build_summary(runs=())
 
-    assert all(scenario.profile_a and scenario.profile_b for scenario in summary.scenarios)
+    assert all(
+        scenario.profile_a and scenario.profile_b for scenario in summary.scenarios
+    )
 
 
 def test_postgresql_is_out_of_scope() -> None:
@@ -277,7 +299,9 @@ def test_comparison_span_attributes_are_otel_compatible() -> None:
         evidence_complete=False,
     )
 
-    assert build_comparison_span_attributes(result)["benchmark.evidence_complete"] is False
+    assert (
+        build_comparison_span_attributes(result)["benchmark.evidence_complete"] is False
+    )
 
 
 def test_attrs_do_not_include_query_text_payload_vectors() -> None:
@@ -356,7 +380,10 @@ def test_load_historical_baseline_none_marks_absent() -> None:
 def test_artifact_only_does_not_call_qdrant() -> None:
     tree = ast.parse(MODULE_PATH.read_text(encoding="utf-8"))
 
-    assert not any(isinstance(node, ast.Import) and "qdrant" in ast.dump(node) for node in ast.walk(tree))
+    assert not any(
+        isinstance(node, ast.Import) and "qdrant" in ast.dump(node)
+        for node in ast.walk(tree)
+    )
 
 
 def test_live_benchmark_requires_env_and_flag(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -365,7 +392,9 @@ def test_live_benchmark_requires_env_and_flag(monkeypatch: pytest.MonkeyPatch) -
     assert compare.main(["--execute-live-benchmark"]) == 2
 
 
-def test_script_does_not_import_qdrant_client_in_unit_path_unless_live_guarded() -> None:
+def test_script_does_not_import_qdrant_client_in_unit_path_unless_live_guarded() -> (
+    None
+):
     tree = ast.parse(MODULE_PATH.read_text(encoding="utf-8"))
 
     for node in ast.walk(tree):
@@ -377,7 +406,12 @@ def test_script_does_not_import_qdrant_client_in_unit_path_unless_live_guarded()
 
 def test_script_does_not_create_delete_collections() -> None:
     tree = ast.parse(MODULE_PATH.read_text(encoding="utf-8"))
-    forbidden = {"create_collection", "delete_collection", "recreate_collection", "upsert"}
+    forbidden = {
+        "create_collection",
+        "delete_collection",
+        "recreate_collection",
+        "upsert",
+    }
 
     for node in ast.walk(tree):
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
@@ -394,13 +428,25 @@ def test_script_does_not_import_postgres_drivers() -> None:
 def test_outputs_do_not_contain_forbidden_terms() -> None:
     output = json.dumps(build_summary(runs=()).to_safe_dict())
 
-    for forbidden in ('"query_text"', "chunk_text", '"payload"', '"vector"', '"embedding"', '"prompt"', '"answer"'):
+    for forbidden in (
+        '"query_text"',
+        "chunk_text",
+        '"payload"',
+        '"vector"',
+        '"embedding"',
+        '"prompt"',
+        '"answer"',
+    ):
         assert forbidden not in output
 
 
 def test_run_id_or_summary_deterministic_with_fixed_inputs() -> None:
-    first = build_summary(runs=(), generated_at_utc="2026-05-24T00:00:00+00:00").to_safe_dict()
-    second = build_summary(runs=(), generated_at_utc="2026-05-24T00:00:00+00:00").to_safe_dict()
+    first = build_summary(
+        runs=(), generated_at_utc="2026-05-24T00:00:00+00:00"
+    ).to_safe_dict()
+    second = build_summary(
+        runs=(), generated_at_utc="2026-05-24T00:00:00+00:00"
+    ).to_safe_dict()
 
     assert first == second
 
@@ -414,7 +460,10 @@ def test_seed_recorded_if_any_randomness_exists() -> None:
 def test_no_random_global_without_seed() -> None:
     tree = ast.parse(MODULE_PATH.read_text(encoding="utf-8"))
 
-    assert not any(isinstance(node, ast.Import) and "random" in ast.dump(node) for node in ast.walk(tree))
+    assert not any(
+        isinstance(node, ast.Import) and "random" in ast.dump(node)
+        for node in ast.walk(tree)
+    )
 
 
 def test_latency_and_memory_helpers() -> None:
@@ -463,17 +512,24 @@ def test_report_and_adr_document_canonical_adr_directory() -> None:
 
 # ── safe-text guard correctness ───────────────────────────────────────────────
 
+
 def test_safe_text_allows_dense_vector_name_metadata() -> None:
     """dense_vector_name is safe metadata; the guard must not block it."""
-    compare._assert_safe_text('{"dense_vector_name": "dense", "sparse_vector_name": "sparse"}')
+    compare._assert_safe_text(
+        '{"dense_vector_name": "dense", "sparse_vector_name": "sparse"}'
+    )
 
 
 def test_safe_text_allows_sparse_vector_name_metadata() -> None:
-    compare._assert_safe_text('{"sparse_vector_name": "sparse", "embedding_model": "Qwen/Qwen3-Embedding-0.6B"}')
+    compare._assert_safe_text(
+        '{"sparse_vector_name": "sparse", "embedding_model": "Qwen/Qwen3-Embedding-0.6B"}'
+    )
 
 
 def test_safe_text_allows_embedding_model_metadata() -> None:
-    compare._assert_safe_text('{"embedding_model": "nomic-embed-text", "embedding_dimensions": 768}')
+    compare._assert_safe_text(
+        '{"embedding_model": "nomic-embed-text", "embedding_dimensions": 768}'
+    )
 
 
 def test_safe_text_blocks_dense_vector_key() -> None:

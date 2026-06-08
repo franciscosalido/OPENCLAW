@@ -149,9 +149,7 @@ class OllamaEmbedderTests(unittest.IsolatedAsyncioTestCase):
 
         async with httpx.AsyncClient(
             base_url="http://ollama.test",
-            transport=httpx.MockTransport(
-                lambda _request: httpx.Response(200)
-            ),
+            transport=httpx.MockTransport(lambda _request: httpx.Response(200)),
         ) as client:
             embedder = OllamaEmbedder(client=client)
             with self.assertRaises(ValueError):
@@ -164,9 +162,7 @@ class OllamaEmbedderTests(unittest.IsolatedAsyncioTestCase):
         async with httpx.AsyncClient(
             base_url="http://ollama.test",
             transport=httpx.MockTransport(
-                lambda _request: httpx.Response(
-                    200, json={"embeddings": [[]]}
-                )
+                lambda _request: httpx.Response(200, json={"embeddings": [[]]})
             ),
         ) as client:
             embedder = OllamaEmbedder(client=client)

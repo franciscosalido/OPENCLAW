@@ -49,27 +49,37 @@ class PrecisionAtKTests(unittest.TestCase):
 
     def test_precision_canonical_denominator_k_case(self) -> None:
         score = precision_at_k(["a"], frozenset({"a"}), 5)
-        self.assertAlmostEqual(score, 0.2)  # proof: 1 hit / k=5, denominator is k, not min(k, len(retrieved)).
+        self.assertAlmostEqual(
+            score, 0.2
+        )  # proof: 1 hit / k=5, denominator is k, not min(k, len(retrieved)).
 
     def test_precision_respects_cutoff(self) -> None:
         score = precision_at_k(["x", "a"], frozenset({"a"}), 1)
         self.assertEqual(score, 0.0)  # proof: top-1 is x, so 0 hits / k=1.
 
     def test_precision_rejects_zero_k(self) -> None:
-        with self.assertRaises(ValueError):  # proof: k=0 is outside the valid cutoff domain.
+        with self.assertRaises(
+            ValueError
+        ):  # proof: k=0 is outside the valid cutoff domain.
             precision_at_k(["a"], frozenset({"a"}), 0)
 
     def test_precision_rejects_negative_k(self) -> None:
-        with self.assertRaises(ValueError):  # proof: k=-1 is outside the valid cutoff domain.
+        with self.assertRaises(
+            ValueError
+        ):  # proof: k=-1 is outside the valid cutoff domain.
             precision_at_k(["a"], frozenset({"a"}), -1)
 
     def test_precision_rejects_empty_expected_ids(self) -> None:
-        with self.assertRaises(ValueError):  # proof: no ground truth means precision is undefined.
+        with self.assertRaises(
+            ValueError
+        ):  # proof: no ground truth means precision is undefined.
             precision_at_k(["a"], frozenset(), 1)
 
     def test_precision_expected_ids_are_unordered(self) -> None:
         score = precision_at_k(["b", "a"], frozenset({"a", "b"}), 2)
-        self.assertEqual(score, 1.0)  # proof: 2 hits / k=2 regardless of expected set order.
+        self.assertEqual(
+            score, 1.0
+        )  # proof: 2 hits / k=2 regardless of expected set order.
 
     def test_precision_ignores_hits_after_cutoff(self) -> None:
         score = precision_at_k(["x", "y", "a"], frozenset({"a"}), 2)
@@ -81,19 +91,27 @@ class RecallAtKTests(unittest.TestCase):
 
     def test_recall_counts_relevant_docs_found(self) -> None:
         score = recall_at_k(["a", "b", "x"], frozenset({"a", "b", "c"}), 3)
-        self.assertAlmostEqual(score, 2.0 / 3.0)  # proof: found {a,b} / 3 relevant docs.
+        self.assertAlmostEqual(
+            score, 2.0 / 3.0
+        )  # proof: found {a,b} / 3 relevant docs.
 
     def test_recall_can_reach_one_with_k_larger_than_result_count(self) -> None:
         score = recall_at_k(["a", "b"], frozenset({"a", "b"}), 5)
-        self.assertEqual(score, 1.0)  # proof: found all 2 relevant docs / 2 expected docs.
+        self.assertEqual(
+            score, 1.0
+        )  # proof: found all 2 relevant docs / 2 expected docs.
 
     def test_recall_duplicate_doc_id_does_not_accumulate_credit(self) -> None:
         score = recall_at_k(["a", "a"], frozenset({"a", "b"}), 2)
-        self.assertAlmostEqual(score, 1.0 / 2.0)  # proof: unique hit {a} / 2 expected docs.
+        self.assertAlmostEqual(
+            score, 1.0 / 2.0
+        )  # proof: unique hit {a} / 2 expected docs.
 
     def test_recall_returns_zero_for_empty_retrieved_ids(self) -> None:
         score = recall_at_k([], frozenset({"a", "b"}), 2)
-        self.assertEqual(score, 0.0)  # proof: empty retrieved list finds 0 of 2 relevant docs.
+        self.assertEqual(
+            score, 0.0
+        )  # proof: empty retrieved list finds 0 of 2 relevant docs.
 
     def test_recall_returns_zero_when_no_hits(self) -> None:
         score = recall_at_k(["x", "y"], frozenset({"a", "b"}), 2)
@@ -106,11 +124,15 @@ class RecallAtKTests(unittest.TestCase):
     def test_recall_rejects_non_positive_k(self) -> None:
         for invalid_k in (0, -2):
             with self.subTest(k=invalid_k):
-                with self.assertRaises(ValueError):  # proof: valid recall cutoff requires k > 0.
+                with self.assertRaises(
+                    ValueError
+                ):  # proof: valid recall cutoff requires k > 0.
                     recall_at_k(["a"], frozenset({"a"}), invalid_k)
 
     def test_recall_rejects_empty_expected_ids(self) -> None:
-        with self.assertRaises(ValueError):  # proof: no ground truth means recall is undefined.
+        with self.assertRaises(
+            ValueError
+        ):  # proof: no ground truth means recall is undefined.
             recall_at_k(["a"], frozenset(), 1)
 
 
@@ -123,7 +145,9 @@ class ReciprocalRankTests(unittest.TestCase):
 
     def test_reciprocal_rank_hit_at_first_despite_duplicates(self) -> None:
         score = reciprocal_rank(["a", "a", "a"], frozenset({"a"}))
-        self.assertEqual(score, 1.0)  # proof: first a is rank 1, so RR = 1/1; later duplicates are ignored.
+        self.assertEqual(
+            score, 1.0
+        )  # proof: first a is rank 1, so RR = 1/1; later duplicates are ignored.
 
     def test_reciprocal_rank_second_result_hit(self) -> None:
         score = reciprocal_rank(["x", "a"], frozenset({"a"}))
@@ -131,7 +155,9 @@ class ReciprocalRankTests(unittest.TestCase):
 
     def test_reciprocal_rank_uses_raw_rank_with_duplicates(self) -> None:
         score = reciprocal_rank(["x", "x", "a"], frozenset({"a"}))
-        self.assertAlmostEqual(score, 1.0 / 3.0)  # proof: first hit is at raw rank 3, so 1/3.
+        self.assertAlmostEqual(
+            score, 1.0 / 3.0
+        )  # proof: first hit is at raw rank 3, so 1/3.
 
     def test_reciprocal_rank_returns_zero_without_hit(self) -> None:
         score = reciprocal_rank(["x", "y"], frozenset({"a"}))
@@ -139,10 +165,14 @@ class ReciprocalRankTests(unittest.TestCase):
 
     def test_reciprocal_rank_returns_zero_for_empty_retrieved_ids(self) -> None:
         score = reciprocal_rank([], frozenset({"a"}))
-        self.assertEqual(score, 0.0)  # proof: empty retrieved list has no relevant rank.
+        self.assertEqual(
+            score, 0.0
+        )  # proof: empty retrieved list has no relevant rank.
 
     def test_reciprocal_rank_rejects_empty_expected_ids(self) -> None:
-        with self.assertRaises(ValueError):  # proof: no ground truth means first relevant rank is undefined.
+        with self.assertRaises(
+            ValueError
+        ):  # proof: no ground truth means first relevant rank is undefined.
             reciprocal_rank(["a"], frozenset())
 
     def test_mean_reciprocal_rank_averages_scores(self) -> None:
@@ -151,14 +181,18 @@ class ReciprocalRankTests(unittest.TestCase):
 
     def test_mean_reciprocal_rank_accepts_single_zero(self) -> None:
         score = mean_reciprocal_rank([0.0])
-        self.assertEqual(score, 0.0)  # proof: single score mean is the score itself, 0/1.
+        self.assertEqual(
+            score, 0.0
+        )  # proof: single score mean is the score itself, 0/1.
 
     def test_mean_reciprocal_rank_rejects_empty_scores(self) -> None:
         with self.assertRaises(ValueError):  # proof: mean denominator would be 0.
             mean_reciprocal_rank([])
 
     def test_mean_reciprocal_rank_rejects_negative_scores(self) -> None:
-        with self.assertRaises(ValueError):  # proof: RR cannot be below 0 by definition.
+        with self.assertRaises(
+            ValueError
+        ):  # proof: RR cannot be below 0 by definition.
             mean_reciprocal_rank([0.5, -0.1])
 
     def test_mean_reciprocal_rank_rejects_scores_above_one(self) -> None:
@@ -168,7 +202,9 @@ class ReciprocalRankTests(unittest.TestCase):
     def test_mean_reciprocal_rank_rejects_non_finite_scores(self) -> None:
         for invalid_score in (math.inf, -math.inf, math.nan):
             with self.subTest(score=invalid_score):
-                with self.assertRaises(ValueError):  # proof: non-finite values cannot form a finite mean.
+                with self.assertRaises(
+                    ValueError
+                ):  # proof: non-finite values cannot form a finite mean.
                     mean_reciprocal_rank([invalid_score])
 
 
@@ -181,7 +217,9 @@ class DcgNdcgTests(unittest.TestCase):
 
     def test_dcg_two_ranked_scores(self) -> None:
         score = dcg_at_k([2.0, 1.0], 2)
-        expected = 3.0 + (1.0 / math.log2(3.0))  # proof: rank1 gain 3 + rank2 gain 1/log2(3).
+        expected = 3.0 + (
+            1.0 / math.log2(3.0)
+        )  # proof: rank1 gain 3 + rank2 gain 1/log2(3).
         self.assertAlmostEqual(score, expected)
 
     def test_dcg_respects_cutoff(self) -> None:
@@ -197,16 +235,22 @@ class DcgNdcgTests(unittest.TestCase):
             dcg_at_k([1.0], 0)
 
     def test_dcg_rejects_negative_relevance(self) -> None:
-        with self.assertRaises(ValueError):  # proof: graded relevance domain is non-negative.
+        with self.assertRaises(
+            ValueError
+        ):  # proof: graded relevance domain is non-negative.
             dcg_at_k([-1.0], 1)
 
     def test_ndcg_is_one_for_ideal_ranking(self) -> None:
         score = ndcg_at_k([2.0, 1.0], 2)
-        self.assertEqual(score, 1.0)  # proof: actual DCG equals ideal DCG, so ratio is 1.
+        self.assertEqual(
+            score, 1.0
+        )  # proof: actual DCG equals ideal DCG, so ratio is 1.
 
     def test_ndcg_is_one_when_all_relevance_scores_are_equal(self) -> None:
         score = ndcg_at_k([2.0, 2.0, 2.0], 3)
-        self.assertEqual(score, 1.0)  # proof: DCG([2,2,2]) equals IDCG([2,2,2]) because sorting changes no scores.
+        self.assertEqual(
+            score, 1.0
+        )  # proof: DCG([2,2,2]) equals IDCG([2,2,2]) because sorting changes no scores.
 
     def test_ndcg_penalizes_misordered_relevance(self) -> None:
         score = ndcg_at_k([1.0, 0.0, 2.0], 3)
@@ -216,11 +260,15 @@ class DcgNdcgTests(unittest.TestCase):
 
     def test_ndcg_returns_zero_when_ideal_dcg_is_zero(self) -> None:
         score = ndcg_at_k([0.0, 0.0], 2)
-        self.assertEqual(score, 0.0)  # proof: actual=0 and ideal=0, convention returns 0.
+        self.assertEqual(
+            score, 0.0
+        )  # proof: actual=0 and ideal=0, convention returns 0.
 
     def test_ndcg_with_fewer_scores_than_k_can_still_be_ideal(self) -> None:
         score = ndcg_at_k([1.0], 5)
-        self.assertEqual(score, 1.0)  # proof: actual DCG 1 equals ideal DCG 1 despite k=5.
+        self.assertEqual(
+            score, 1.0
+        )  # proof: actual DCG 1 equals ideal DCG 1 despite k=5.
 
 
 class LatencyPercentileTests(unittest.TestCase):
@@ -250,11 +298,15 @@ class LatencyPercentileTests(unittest.TestCase):
 
     def test_latency_percentile_single_sample_reused_for_all_percentiles(self) -> None:
         result = latency_percentiles([42.0])
-        self.assertEqual(result, {50: 42.0, 95: 42.0, 99: 42.0})  # proof: n=1 makes every rank 0.
+        self.assertEqual(
+            result, {50: 42.0, 95: 42.0, 99: 42.0}
+        )  # proof: n=1 makes every rank 0.
 
     def test_latency_percentile_zero_and_hundred_are_min_and_max(self) -> None:
         result = latency_percentiles([7.0, 3.0, 11.0], (0, 100))
-        self.assertEqual(result, {0: 3.0, 100: 11.0})  # proof: rank 0 is min, rank n-1 is max.
+        self.assertEqual(
+            result, {0: 3.0, 100: 11.0}
+        )  # proof: rank 0 is min, rank n-1 is max.
 
     def test_latency_percentile_rejects_empty_latencies(self) -> None:
         with self.assertRaises(ValueError):  # proof: percentile rank needs n >= 1.
@@ -271,7 +323,9 @@ class LatencyPercentileTests(unittest.TestCase):
     def test_latency_percentile_rejects_non_finite_latencies(self) -> None:
         for invalid_latency in (math.inf, -math.inf, math.nan):
             with self.subTest(latency=invalid_latency):
-                with self.assertRaises(ValueError):  # proof: non-finite latency has no finite percentile.
+                with self.assertRaises(
+                    ValueError
+                ):  # proof: non-finite latency has no finite percentile.
                     latency_percentiles([1.0, invalid_latency])
 
 
@@ -280,8 +334,7 @@ class MetricInvariantTests(unittest.TestCase):
 
     def test_recall_is_monotonic_non_decreasing_with_larger_k(self) -> None:
         scores = [
-            recall_at_k(["a", "x", "b"], frozenset({"a", "b"}), k)
-            for k in (1, 2, 3)
+            recall_at_k(["a", "x", "b"], frozenset({"a", "b"}), k) for k in (1, 2, 3)
         ]
         self.assertEqual(scores, [0.5, 0.5, 1.0])  # proof: hits are 1/2, 1/2, then 2/2.
         self.assertLessEqual(scores[0], scores[1])
@@ -291,37 +344,53 @@ class MetricInvariantTests(unittest.TestCase):
         first = dcg_at_k([1.0, 2.0], 1)
         second = dcg_at_k([1.0, 2.0], 2)
         self.assertEqual(first, 1.0)  # proof: rank1 gain is (2^1 - 1) / log2(2) = 1.
-        self.assertGreater(second, first)  # proof: rank2 has positive gain, so adding it increases DCG.
+        self.assertGreater(
+            second, first
+        )  # proof: rank2 has positive gain, so adding it increases DCG.
 
     def test_reciprocal_rank_is_positive_whenever_there_is_a_hit(self) -> None:
         for retrieved in (["a"], ["x", "a"], ["x", "y", "a"]):
             with self.subTest(retrieved=retrieved):
                 score = reciprocal_rank(retrieved, frozenset({"a"}))
-                self.assertGreater(score, 0.0)  # proof: finite positive first-hit rank means 1/rank in (0,1].
+                self.assertGreater(
+                    score, 0.0
+                )  # proof: finite positive first-hit rank means 1/rank in (0,1].
 
     def test_latency_percentiles_are_monotonic_non_decreasing(self) -> None:
         result = latency_percentiles([1.0, 2.0, 3.0, 4.0], (50, 95, 99))
-        self.assertLessEqual(result[50], result[95])  # proof: sorted empirical quantiles preserve order.
-        self.assertLessEqual(result[95], result[99])  # proof: p95 rank is below p99 rank.
+        self.assertLessEqual(
+            result[50], result[95]
+        )  # proof: sorted empirical quantiles preserve order.
+        self.assertLessEqual(
+            result[95], result[99]
+        )  # proof: p95 rank is below p99 rank.
 
     def test_precision_stays_within_unit_interval(self) -> None:
         scores = [
             precision_at_k(["a"], frozenset({"a"}), 1),
             precision_at_k(["x"], frozenset({"a"}), 1),
         ]
-        self.assertEqual(scores, [1.0, 0.0])  # proof: possible hit counts are bounded by 0 and k.
+        self.assertEqual(
+            scores, [1.0, 0.0]
+        )  # proof: possible hit counts are bounded by 0 and k.
 
     def test_recall_stays_within_unit_interval(self) -> None:
         scores = [
             recall_at_k(["a", "b"], frozenset({"a", "b"}), 2),
             recall_at_k(["x"], frozenset({"a", "b"}), 1),
         ]
-        self.assertEqual(scores, [1.0, 0.0])  # proof: possible hit counts are bounded by 0 and expected size.
+        self.assertEqual(
+            scores, [1.0, 0.0]
+        )  # proof: possible hit counts are bounded by 0 and expected size.
 
     def test_ndcg_stays_within_unit_interval_for_valid_scores(self) -> None:
         score = ndcg_at_k([1.0, 0.0, 2.0], 3)
-        self.assertGreaterEqual(score, 0.0)  # proof: DCG and IDCG use non-negative gains.
-        self.assertLessEqual(score, 1.0)  # proof: ideal DCG is the maximum ordering for same gains.
+        self.assertGreaterEqual(
+            score, 0.0
+        )  # proof: DCG and IDCG use non-negative gains.
+        self.assertLessEqual(
+            score, 1.0
+        )  # proof: ideal DCG is the maximum ordering for same gains.
 
 
 class MacroAverageTests(unittest.TestCase):
@@ -333,7 +402,9 @@ class MacroAverageTests(unittest.TestCase):
             (["x"], frozenset({"a"})),
         ]
         score = mean_precision_at_k(results, 1)
-        self.assertEqual(score, 0.5)  # proof: per-query precision scores are 1 and 0; mean=(1+0)/2.
+        self.assertEqual(
+            score, 0.5
+        )  # proof: per-query precision scores are 1 and 0; mean=(1+0)/2.
 
     def test_mean_recall_at_k_averages_query_scores(self) -> None:
         results: list[tuple[Sequence[str], frozenset[str]]] = [
@@ -341,20 +412,30 @@ class MacroAverageTests(unittest.TestCase):
             (["b", "c"], frozenset({"b", "c"})),
         ]
         score = mean_recall_at_k(results, 2)
-        self.assertEqual(score, 0.75)  # proof: per-query recall scores are 1/2 and 1; mean=1.5/2.
+        self.assertEqual(
+            score, 0.75
+        )  # proof: per-query recall scores are 1/2 and 1; mean=1.5/2.
 
     def test_mean_ndcg_at_k_averages_query_scores(self) -> None:
         score = mean_ndcg_at_k([[2.0, 1.0], [0.0, 0.0]], 2)
-        self.assertEqual(score, 0.5)  # proof: per-query NDCG scores are 1 and 0; mean=(1+0)/2.
+        self.assertEqual(
+            score, 0.5
+        )  # proof: per-query NDCG scores are 1 and 0; mean=(1+0)/2.
 
     def test_mean_precision_at_k_rejects_empty_results(self) -> None:
-        with self.assertRaises(ValueError):  # proof: macro precision mean denominator would be 0.
+        with self.assertRaises(
+            ValueError
+        ):  # proof: macro precision mean denominator would be 0.
             mean_precision_at_k([], 1)
 
     def test_mean_recall_at_k_rejects_empty_results(self) -> None:
-        with self.assertRaises(ValueError):  # proof: macro recall mean denominator would be 0.
+        with self.assertRaises(
+            ValueError
+        ):  # proof: macro recall mean denominator would be 0.
             mean_recall_at_k([], 1)
 
     def test_mean_ndcg_at_k_rejects_empty_results(self) -> None:
-        with self.assertRaises(ValueError):  # proof: macro NDCG mean denominator would be 0.
+        with self.assertRaises(
+            ValueError
+        ):  # proof: macro NDCG mean denominator would be 0.
             mean_ndcg_at_k([], 1)

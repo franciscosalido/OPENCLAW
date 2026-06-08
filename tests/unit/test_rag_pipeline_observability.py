@@ -99,7 +99,9 @@ class RagPipelineObservabilityTests(unittest.IsolatedAsyncioTestCase):
                 "generation_finished",
             ],
         )
-        self.assertTrue(all(event["query_id"] == events[0]["query_id"] for event in events))
+        self.assertTrue(
+            all(event["query_id"] == events[0]["query_id"] for event in events)
+        )
         self.assertEqual(events[1]["chunk_count"], 1)
         self.assertEqual(events[3]["gateway_alias"], "local_rag")
         joined = str(events)

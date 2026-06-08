@@ -12,8 +12,12 @@ pytestmark = pytest.mark.integration
 
 async def test_pr08_postgres_mcp_degrades_cleanly_without_dsn() -> None:
     if os.getenv("TEST_POSTGRES_DSN") or os.getenv("QUIMERA_POSTGRES_DSN"):
-        pytest.skip("live Postgres DSN present; real roundtrip is covered by PR-01/PR-07 tests")
-    server = create_postgres_memory_server(PostgresMcpConfig(dsn=None, write_enabled=False))
+        pytest.skip(
+            "live Postgres DSN present; real roundtrip is covered by PR-01/PR-07 tests"
+        )
+    server = create_postgres_memory_server(
+        PostgresMcpConfig(dsn=None, write_enabled=False)
+    )
 
     result = await server.call_tool(
         "postgres_recent_turns_get",

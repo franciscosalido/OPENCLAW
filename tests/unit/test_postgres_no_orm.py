@@ -5,7 +5,15 @@ from pathlib import Path
 
 
 PACKAGE = Path("backend/memory/postgres")
-FORBIDDEN_IMPORTS = {"sqlalchemy", "django", "peewee", "tortoise", "pony", "py2neo", "neo4j"}
+FORBIDDEN_IMPORTS = {
+    "sqlalchemy",
+    "django",
+    "peewee",
+    "tortoise",
+    "pony",
+    "py2neo",
+    "neo4j",
+}
 
 
 def _python_files() -> list[Path]:

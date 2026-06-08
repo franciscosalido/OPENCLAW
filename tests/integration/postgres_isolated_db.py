@@ -12,7 +12,9 @@ from backend.memory.postgres.client import PostgresClient
 
 def database_dsn(base_dsn: str, database: str) -> str:
     parts = urlsplit(base_dsn)
-    return urlunsplit((parts.scheme, parts.netloc, f"/{database}", parts.query, parts.fragment))
+    return urlunsplit(
+        (parts.scheme, parts.netloc, f"/{database}", parts.query, parts.fragment)
+    )
 
 
 def isolated_database_name(prefix: str) -> str:

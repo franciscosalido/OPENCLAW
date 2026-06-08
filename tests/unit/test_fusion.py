@@ -267,7 +267,9 @@ def test_two_chunks_same_doc_id_different_result_id_do_not_collapse() -> None:
     assert {result.doc_id for result in fused} == {"doc-a"}
 
 
-def test_first_seen_order_uses_concatenated_input_position_even_with_duplicates() -> None:
+def test_first_seen_order_uses_concatenated_input_position_even_with_duplicates() -> (
+    None
+):
     fused = fuse(
         dense_results=[rr("A", rank=1), rr("A", rank=2), rr("B", rank=3)],
         sparse_results=[rr("C", rank=1)],

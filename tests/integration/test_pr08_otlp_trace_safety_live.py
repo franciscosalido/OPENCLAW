@@ -15,7 +15,15 @@ def test_pr08_otlp_trace_safety_contract() -> None:
     provider = TracerProvider()
     provider.add_span_processor(SimpleSpanProcessor(exporter))
     tracer = provider.get_tracer("pr08-test")
-    for name in ("agentic0.smoke", "integration.health", "litellm.chat", "mcp.postgres.tool", "mcp.qdrant.tool", "qdrant.hybrid_query", "postgres.memory_context"):
+    for name in (
+        "agentic0.smoke",
+        "integration.health",
+        "litellm.chat",
+        "mcp.postgres.tool",
+        "mcp.qdrant.tool",
+        "qdrant.hybrid_query",
+        "postgres.memory_context",
+    ):
         with tracer.start_as_current_span(name) as span:
             span.set_attribute("quimera.correlation_id", "trace-safe")
             span.set_attribute("gen_ai.operation.name", "integration")

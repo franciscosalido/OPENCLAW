@@ -53,7 +53,7 @@ def test_parse_metrics_snapshot_extracts_safe_fields() -> None:
 def test_parse_metrics_snapshot_uses_telemetry_version_fallback() -> None:
     parsed = snapshot.parse_metrics_snapshot(
         collection="quimera_benchmark_hybrid_118_qwen3",
-        metrics_text="collection_points{collection=\"quimera_benchmark_hybrid_118_qwen3\"} 1",
+        metrics_text='collection_points{collection="quimera_benchmark_hybrid_118_qwen3"} 1',
         telemetry={"result": {"app": {"version": "1.18.1"}}},
     )
 

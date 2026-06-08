@@ -5,7 +5,9 @@ from backend.rag._validation import validate_question
 
 class ValidationTests(unittest.TestCase):
     def test_validate_question_strips_text(self) -> None:
-        self.assertEqual(validate_question("  pergunta sintetica  "), "pergunta sintetica")
+        self.assertEqual(
+            validate_question("  pergunta sintetica  "), "pergunta sintetica"
+        )
 
     def test_validate_question_rejects_empty_text(self) -> None:
         with self.assertRaises(ValueError):

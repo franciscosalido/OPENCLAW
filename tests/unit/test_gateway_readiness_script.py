@@ -12,7 +12,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "scripts" / "check_gateway_readiness.sh"
 
 
-def _run_script(env_updates: dict[str, str | None] | None = None) -> subprocess.CompletedProcess[str]:
+def _run_script(
+    env_updates: dict[str, str | None] | None = None,
+) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     for key in (
         "QUIMERA_LLM_BASE_URL",

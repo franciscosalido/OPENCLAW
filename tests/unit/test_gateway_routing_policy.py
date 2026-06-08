@@ -91,7 +91,9 @@ class GatewayRoutingPolicyTests(unittest.TestCase):
 
         self.assertFalse(policy.remote_enabled)
         self.assertEqual(policy.allowed_remote_providers, ())
-        self.assertEqual(policy.blocked_task_types, ("trade_execution", "brokerage_login"))
+        self.assertEqual(
+            policy.blocked_task_types, ("trade_execution", "brokerage_login")
+        )
 
     def test_load_routing_policy_rejects_invalid_config_types(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -154,7 +156,9 @@ class GatewayRoutingPolicyTests(unittest.TestCase):
         self.assertTrue(decision.requires_sanitization)
         self.assertEqual(decision.estimated_remote_tokens_avoided, 2_800)
 
-    def test_high_value_task_can_be_remote_candidate_when_explicitly_enabled(self) -> None:
+    def test_high_value_task_can_be_remote_candidate_when_explicitly_enabled(
+        self,
+    ) -> None:
         decision = decide_route(
             task_type="architecture_review",
             estimated_prompt_tokens=2_000,
@@ -270,7 +274,9 @@ class GatewayRoutingPolicyTests(unittest.TestCase):
 
         data = decision.to_log_dict()
 
-        self.assertTrue(FORBIDDEN_SERIALIZED_KEYS.isdisjoint({key.lower() for key in data}))
+        self.assertTrue(
+            FORBIDDEN_SERIALIZED_KEYS.isdisjoint({key.lower() for key in data})
+        )
         self.assertEqual(data["route"], "local")
         self.assertEqual(data["risk_level"], "low")
 
@@ -342,7 +348,9 @@ class GatewayRoutingPolicyTests(unittest.TestCase):
         self.assertEqual(record.local_tokens_estimated, 150)
         self.assertEqual(record.remote_tokens_avoided_estimated, 150)
         self.assertEqual(data["cost_estimate_mode"], "estimated_not_billed")
-        self.assertTrue(FORBIDDEN_SERIALIZED_KEYS.isdisjoint({key.lower() for key in data}))
+        self.assertTrue(
+            FORBIDDEN_SERIALIZED_KEYS.isdisjoint({key.lower() for key in data})
+        )
 
     def test_invalid_inputs_raise(self) -> None:
         with self.assertRaises(ValueError):
@@ -362,7 +370,14 @@ class GatewayRoutingPolicyTests(unittest.TestCase):
     def test_module_does_not_read_secrets_or_call_network(self) -> None:
         source = inspect.getsource(routing_policy)
 
-        for forbidden in ("os.environ", "getenv", "httpx", "requests", "urllib", "socket"):
+        for forbidden in (
+            "os.environ",
+            "getenv",
+            "httpx",
+            "requests",
+            "urllib",
+            "socket",
+        ):
             with self.subTest(forbidden=forbidden):
                 self.assertNotIn(forbidden, source)
 

@@ -168,7 +168,9 @@ class GatewayChatClientTests(unittest.IsolatedAsyncioTestCase):
         def handler(request: httpx.Request) -> httpx.Response:
             seen_payloads.append(json.loads(request.content.decode("utf-8")))
             seen_auth_headers.append(request.headers.get("authorization"))
-            seen_timeouts.append(cast("dict[str, float]", request.extensions["timeout"]))
+            seen_timeouts.append(
+                cast("dict[str, float]", request.extensions["timeout"])
+            )
             self.assertEqual(request.url.path, "/v1/chat/completions")
             return httpx.Response(
                 200,
@@ -327,7 +329,9 @@ class GatewayChatClientTests(unittest.IsolatedAsyncioTestCase):
         seen_timeouts: list[dict[str, float]] = []
 
         def handler(request: httpx.Request) -> httpx.Response:
-            seen_timeouts.append(cast("dict[str, float]", request.extensions["timeout"]))
+            seen_timeouts.append(
+                cast("dict[str, float]", request.extensions["timeout"])
+            )
             return httpx.Response(
                 200,
                 json={"choices": [{"message": {"content": "ok"}}]},

@@ -274,7 +274,9 @@ async def test_execute_with_zero_points_never_calls_upsert() -> None:
     assert client.calls == []
 
 
-def test_main_missing_corpus_flag_returns_error(capsys: pytest.CaptureFixture[str]) -> None:
+def test_main_missing_corpus_flag_returns_error(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     """main sem --synthetic e sem --corpus-path → exit 2."""
     exit_code = ingest.main([])
     captured = capsys.readouterr()
@@ -290,7 +292,9 @@ def test_main_max_chunks_zero_returns_error(capsys: pytest.CaptureFixture[str]) 
     assert "hybrid ingest failed" in captured.err
 
 
-def test_main_embedding_dimensions_zero_returns_error(capsys: pytest.CaptureFixture[str]) -> None:
+def test_main_embedding_dimensions_zero_returns_error(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     """--embedding-dimensions 0 é rejeitado por _validate_positive_int."""
     exit_code = ingest.main(["--synthetic", "--embedding-dimensions", "0"])
     captured = capsys.readouterr()
@@ -298,7 +302,9 @@ def test_main_embedding_dimensions_zero_returns_error(capsys: pytest.CaptureFixt
     assert "hybrid ingest failed" in captured.err
 
 
-def test_main_stderr_format_is_class_name_only(capsys: pytest.CaptureFixture[str]) -> None:
+def test_main_stderr_format_is_class_name_only(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     """Formato do stderr: exatamente 'hybrid ingest failed: <ClassName>'.
 
     Verifica que o output de erro nunca vaza o conteúdo da mensagem da exceção,
@@ -446,7 +452,9 @@ async def test_deterministic_dense_embedder_values_in_range() -> None:
     embedder = ingest._DeterministicDenseEmbedder()
     v = list(await embedder.embed("range check"))
     out_of_range = [x for x in v if not (-1.0 <= x <= 1.0)]
-    assert not out_of_range, f"{len(out_of_range)} values outside [-1.0, 1.0]: {out_of_range[:5]}"
+    assert not out_of_range, (
+        f"{len(out_of_range)} values outside [-1.0, 1.0]: {out_of_range[:5]}"
+    )
 
 
 async def test_deterministic_dense_embedder_exact_dimensions() -> None:
@@ -816,7 +824,9 @@ def test_summary_json_serialisable() -> None:
 def test_script_does_not_use_uuid4() -> None:
     """uuid4() produziria IDs não-determinísticos — proibido."""
     source = _production_source()
-    assert "uuid4" not in source, "uuid4 encontrado no script — IDs não seriam determinísticos"
+    assert "uuid4" not in source, (
+        "uuid4 encontrado no script — IDs não seriam determinísticos"
+    )
 
 
 def test_script_does_not_import_random_module() -> None:
@@ -887,9 +897,20 @@ def test_protected_collections_contains_only_legacy() -> None:
 def test_forbidden_summary_keys_contains_all_expected_keys() -> None:
     """FORBIDDEN_SUMMARY_KEYS deve cobrir todos os tipos de dado sensível."""
     required_forbidden = {
-        "text", "chunk_text", "raw_text", "content", "page_content",
-        "vector", "vectors", "dense_vector", "sparse_vector",
-        "embedding", "embeddings", "prompt", "answer", "payload",
+        "text",
+        "chunk_text",
+        "raw_text",
+        "content",
+        "page_content",
+        "vector",
+        "vectors",
+        "dense_vector",
+        "sparse_vector",
+        "embedding",
+        "embeddings",
+        "prompt",
+        "answer",
+        "payload",
     }
     assert required_forbidden.issubset(ingest.FORBIDDEN_SUMMARY_KEYS), (
         f"Chaves sensíveis faltando em FORBIDDEN_SUMMARY_KEYS: "
@@ -1037,7 +1058,14 @@ def test_extended_tests_do_not_require_network_or_docker() -> None:
     """
     source = Path(__file__).read_text(encoding="utf-8")
     tree = ast.parse(source)
-    forbidden_import_roots = {"docker", "ollama", "httpx", "requests", "socket", "urllib3"}
+    forbidden_import_roots = {
+        "docker",
+        "ollama",
+        "httpx",
+        "requests",
+        "socket",
+        "urllib3",
+    }
     imported_roots: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -1047,4 +1075,6 @@ def test_extended_tests_do_not_require_network_or_docker() -> None:
             if node.module:
                 imported_roots.add(node.module.split(".")[0])
     violations = imported_roots & forbidden_import_roots
-    assert not violations, f"Import proibido encontrado nos testes estendidos: {violations}"
+    assert not violations, (
+        f"Import proibido encontrado nos testes estendidos: {violations}"
+    )

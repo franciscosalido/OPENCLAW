@@ -29,7 +29,9 @@ def test_fingerprint_tolerates_unavailable_services() -> None:
     assert fingerprint.values["python_executable"]
     assert fingerprint.values["docker_compose"] is None
     assert any(warning["component"] == "ollama" for warning in fingerprint.warnings)
-    assert any(warning["component"] == "qdrant_ready" for warning in fingerprint.warnings)
+    assert any(
+        warning["component"] == "qdrant_ready" for warning in fingerprint.warnings
+    )
 
 
 def test_fingerprint_contains_package_versions_when_installed() -> None:

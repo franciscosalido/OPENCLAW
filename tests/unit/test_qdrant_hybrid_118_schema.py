@@ -28,7 +28,6 @@ from backend.rag.qdrant_hybrid_118 import (
     ensure_benchmark_collection_118,
     schema_snapshot_from_collection_info,
     validate_collection_info_against_spec,
-    validate_spec_118,
     write_schema_snapshot,
 )
 from scripts import qdrant_create_hybrid_schema_118 as schema_cli
@@ -187,7 +186,9 @@ def test_to_safe_dict_has_no_forbidden_fields() -> None:
 def test_config_builders_are_pure_and_idempotent() -> None:
     spec = default_hybrid_collection_spec_118()
 
-    assert build_collection_create_payload(spec) == build_collection_create_payload(spec)
+    assert build_collection_create_payload(spec) == build_collection_create_payload(
+        spec
+    )
     assert spec == default_hybrid_collection_spec_118()
 
 
@@ -237,7 +238,9 @@ def test_validate_collection_detects_wrong_dense_dimension() -> None:
     dense["size"] = 768
 
     with pytest.raises(HybridSchemaError, match="dimension"):
-        validate_collection_info_against_spec(info, default_hybrid_collection_spec_118())
+        validate_collection_info_against_spec(
+            info, default_hybrid_collection_spec_118()
+        )
 
 
 def test_validate_collection_detects_missing_sparse_vector() -> None:
@@ -245,7 +248,9 @@ def test_validate_collection_detects_missing_sparse_vector() -> None:
     info["sparse_vectors"] = {}
 
     with pytest.raises(HybridSchemaError, match="sparse"):
-        validate_collection_info_against_spec(info, default_hybrid_collection_spec_118())
+        validate_collection_info_against_spec(
+            info, default_hybrid_collection_spec_118()
+        )
 
 
 def test_validate_collection_detects_missing_payload_index() -> None:
@@ -253,7 +258,9 @@ def test_validate_collection_detects_missing_payload_index() -> None:
     info["payload_indexes"] = ["doc_id"]
 
     with pytest.raises(HybridSchemaError, match="payload indexes"):
-        validate_collection_info_against_spec(info, default_hybrid_collection_spec_118())
+        validate_collection_info_against_spec(
+            info, default_hybrid_collection_spec_118()
+        )
 
 
 @pytest.mark.asyncio
@@ -365,7 +372,10 @@ def test_write_schema_snapshot_json_parseable(tmp_path: Path) -> None:
 
     write_schema_snapshot(snapshot, path, allow_any_path=True)
 
-    assert json.loads(path.read_text(encoding="utf-8"))["collection_name"] == BENCHMARK_COLLECTION
+    assert (
+        json.loads(path.read_text(encoding="utf-8"))["collection_name"]
+        == BENCHMARK_COLLECTION
+    )
 
 
 def test_snapshot_path_default_is_under_docs_specs() -> None:
@@ -444,8 +454,7 @@ def test_concrete_schema_adapter_public_methods_have_docstrings() -> None:
     adapter = next(
         node
         for node in ast.walk(tree)
-        if isinstance(node, ast.ClassDef)
-        and node.name == "QdrantHybridSchemaClient118"
+        if isinstance(node, ast.ClassDef) and node.name == "QdrantHybridSchemaClient118"
     )
     expected_methods = {
         "collection_exists",
@@ -457,8 +466,7 @@ def test_concrete_schema_adapter_public_methods_have_docstrings() -> None:
     docstrings = {
         node.name: ast.get_docstring(node)
         for node in adapter.body
-        if isinstance(node, ast.AsyncFunctionDef)
-        and node.name in expected_methods
+        if isinstance(node, ast.AsyncFunctionDef) and node.name in expected_methods
     }
 
     assert set(docstrings) == expected_methods
@@ -567,7 +575,9 @@ async def test_async_main_passes_grpc_port_to_real_client_builder(
 
 
 @pytest.mark.asyncio
-async def test_cli_dry_run_outputs_safe_json(capsys: pytest.CaptureFixture[str]) -> None:
+async def test_cli_dry_run_outputs_safe_json(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     client = FakeHybridSchemaClient(exists=False)
 
     exit_code = await schema_cli.async_main([], client=client, env={})

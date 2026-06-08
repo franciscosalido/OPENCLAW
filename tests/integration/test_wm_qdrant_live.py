@@ -18,8 +18,12 @@ pytestmark = pytest.mark.integration
 @pytest.mark.asyncio
 async def test_wm_qdrant_live_upsert_query_list() -> None:
     if os.environ.get("QUIMERA_TEST_WM_QDRANT_LIVE") != "1":
-        pytest.skip("set QUIMERA_TEST_WM_QDRANT_LIVE=1 to run live Qdrant working-memory test")
-    settings = WorkingMemorySettings(collection_name=f"quimera_working_memory_test_{uuid4().hex}", vector_size=4)
+        pytest.skip(
+            "set QUIMERA_TEST_WM_QDRANT_LIVE=1 to run live Qdrant working-memory test"
+        )
+    settings = WorkingMemorySettings(
+        collection_name=f"quimera_working_memory_test_{uuid4().hex}", vector_size=4
+    )
     client = AsyncQdrantClient(url=settings.qdrant_url)
     store = WorkingMemoryQdrantStore(client, settings)
     await store.ensure_collection()
@@ -42,10 +46,16 @@ async def test_wm_qdrant_live_upsert_query_list() -> None:
     )
     await store.upsert_memory_point(point)
 
-    results = await store.query_working_memory(agent_id=point.agent_id, session_id=str(session_id), query_vector=point.vector)
-    listed = await store.list_session_memory(agent_id=point.agent_id, session_id=str(session_id))
+    results = await store.query_working_memory(
+        agent_id=point.agent_id, session_id=str(session_id), query_vector=point.vector
+    )
+    listed = await store.list_session_memory(
+        agent_id=point.agent_id, session_id=str(session_id)
+    )
 
     assert results
     assert listed
     assert "vector" not in results[0]
-    await store.delete_session_points(agent_id=point.agent_id, session_id=str(session_id))
+    await store.delete_session_points(
+        agent_id=point.agent_id, session_id=str(session_id)
+    )

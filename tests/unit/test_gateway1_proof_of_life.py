@@ -164,7 +164,10 @@ class GatewayProofOfLifeUnitTests(unittest.IsolatedAsyncioTestCase):
             self.assertFalse(kwargs.get("use_rag", False))
             return _fake_result(alias="local_chat", used_rag=False)
 
-        with patch("scripts.test_gateway1_proof_of_life.run_local_agent.run_agent", fake_run_agent):
+        with patch(
+            "scripts.test_gateway1_proof_of_life.run_local_agent.run_agent",
+            fake_run_agent,
+        ):
             result = await proof.run_local_chat_smoke()
 
         self.assertTrue(result.ok)
@@ -176,7 +179,10 @@ class GatewayProofOfLifeUnitTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(kwargs.get("use_rag"))
             return _fake_result(alias="local_rag", used_rag=True)
 
-        with patch("scripts.test_gateway1_proof_of_life.run_local_agent.run_agent", fake_run_agent):
+        with patch(
+            "scripts.test_gateway1_proof_of_life.run_local_agent.run_agent",
+            fake_run_agent,
+        ):
             result = await proof.run_rag_smoke()
 
         self.assertTrue(result.ok)
@@ -191,7 +197,10 @@ class GatewayProofOfLifeUnitTests(unittest.IsolatedAsyncioTestCase):
                 fallback_reason=FallbackReason.QDRANT_UNAVAILABLE,
             )
 
-        with patch("scripts.test_gateway1_proof_of_life.run_local_agent.run_agent", fake_run_agent):
+        with patch(
+            "scripts.test_gateway1_proof_of_life.run_local_agent.run_agent",
+            fake_run_agent,
+        ):
             result = await proof.run_rag_smoke()
 
         self.assertTrue(result.ok)
@@ -332,7 +341,11 @@ class GatewayProofOfLifeUnitTests(unittest.IsolatedAsyncioTestCase):
                 patch.object(proof, "probe_ollama", _fake_probe("ollama", True)),
                 patch.object(proof, "probe_qdrant", _fake_probe("qdrant", True)),
                 patch.object(proof, "probe_litellm", _fake_litellm_probe(True)),
-                patch.object(proof, "run_local_chat_smoke", _fake_runner_smoke("local_chat", True)),
+                patch.object(
+                    proof,
+                    "run_local_chat_smoke",
+                    _fake_runner_smoke("local_chat", True),
+                ),
                 patch.object(proof, "run_rag_smoke", _fake_runner_smoke("rag", True)),
             ):
                 summary, _ = await proof.run_proof_of_life(output_dir=temp_dir)
@@ -362,7 +375,9 @@ class GatewayProofOfLifeUnitTests(unittest.IsolatedAsyncioTestCase):
                 del url, kwargs
                 raise httpx.ConnectError("FAKE_SECRET_MESSAGE")
 
-        with patch("scripts.test_gateway1_proof_of_life.httpx.AsyncClient", RaisingAsyncClient):
+        with patch(
+            "scripts.test_gateway1_proof_of_life.httpx.AsyncClient", RaisingAsyncClient
+        ):
             result = await proof.probe_ollama("http://127.0.0.1:11434")
 
         self.assertFalse(result.ok)
@@ -380,7 +395,9 @@ class GatewayProofOfLifeUnitTests(unittest.IsolatedAsyncioTestCase):
                     clear=True,
                 ),
                 patch.object(proof, "probe_ollama", _fake_probe("ollama", True)),
-                patch.object(proof, "probe_qdrant", _fake_probe("qdrant", False, "connection")),
+                patch.object(
+                    proof, "probe_qdrant", _fake_probe("qdrant", False, "connection")
+                ),
                 patch.object(proof, "probe_litellm", _fake_litellm_probe(True)),
             ):
                 summary, _ = await proof.run_proof_of_life(output_dir=temp_dir)
@@ -428,7 +445,10 @@ class GatewayProofOfLifeUnitTests(unittest.IsolatedAsyncioTestCase):
                 CapturingAsyncClient.captured_headers = headers
                 return Response()
 
-        with patch("scripts.test_gateway1_proof_of_life.httpx.AsyncClient", CapturingAsyncClient):
+        with patch(
+            "scripts.test_gateway1_proof_of_life.httpx.AsyncClient",
+            CapturingAsyncClient,
+        ):
             result = await proof.probe_litellm(
                 "http://127.0.0.1:4000/v1",
                 api_key=sentinel,
@@ -472,7 +492,11 @@ class GatewayProofOfLifeUnitTests(unittest.IsolatedAsyncioTestCase):
                 patch.object(proof, "probe_ollama", slow_probe_ollama),
                 patch.object(proof, "probe_qdrant", slow_probe_qdrant),
                 patch.object(proof, "probe_litellm", slow_probe_litellm),
-                patch.object(proof, "run_local_chat_smoke", _fake_runner_smoke("local_chat", True)),
+                patch.object(
+                    proof,
+                    "run_local_chat_smoke",
+                    _fake_runner_smoke("local_chat", True),
+                ),
                 patch.object(proof, "run_rag_smoke", _fake_runner_smoke("rag", True)),
             ):
                 wall_start = time.perf_counter()
@@ -570,7 +594,9 @@ class GatewayProofOfLifeProbeTests(unittest.IsolatedAsyncioTestCase):
                 del url, headers
                 return Response()
 
-        with patch("scripts.test_gateway1_proof_of_life.httpx.AsyncClient", AliasAsyncClient):
+        with patch(
+            "scripts.test_gateway1_proof_of_life.httpx.AsyncClient", AliasAsyncClient
+        ):
             result = await proof.probe_litellm(
                 "http://127.0.0.1:4000/v1",
                 api_key="dev-key",

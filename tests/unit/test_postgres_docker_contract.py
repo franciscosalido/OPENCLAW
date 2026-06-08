@@ -31,7 +31,9 @@ def test_postgres_compose_builds_from_pinned_postgres_18_4_trixie() -> None:
     build = cast(dict[str, Any], postgres["build"])
     args = cast(dict[str, str], build["args"])
 
-    assert postgres["image"] == "quimera/postgres-memory:18.4-trixie-timescaledb-pgvector"
+    assert (
+        postgres["image"] == "quimera/postgres-memory:18.4-trixie-timescaledb-pgvector"
+    )
     assert build["dockerfile"] == "infra/postgres/Dockerfile"
     assert args["POSTGRES_BASE_IMAGE"] == "postgres:18.4-trixie"
     assert args["PG_MAJOR"] == "18"
@@ -61,7 +63,9 @@ def test_postgres_compose_uses_named_volume_for_memory_remount() -> None:
         "../infra/postgres/secrets/postgres_password.txt:"
         "/run/secrets/quimera_postgres_password:ro"
     ) in volumes
-    assert "POSTGRES_PASSWORD_FILE=/run/secrets/quimera_postgres_password" in environment
+    assert (
+        "POSTGRES_PASSWORD_FILE=/run/secrets/quimera_postgres_password" in environment
+    )
     assert "PGDATA=/var/lib/postgresql/18/docker" in environment
     assert "POSTGRES_HOST_AUTH_METHOD=trust" not in environment
 
@@ -91,7 +95,9 @@ def test_local_quimera_compose_uses_same_postgres_extension_image() -> None:
     args = cast(dict[str, str], build["args"])
     command = cast(list[str], postgres["command"])
 
-    assert postgres["image"] == "quimera/postgres-memory:18.4-trixie-timescaledb-pgvector"
+    assert (
+        postgres["image"] == "quimera/postgres-memory:18.4-trixie-timescaledb-pgvector"
+    )
     assert build["dockerfile"] == "infra/postgres/Dockerfile"
     assert args["POSTGRES_BASE_IMAGE"] == "postgres:18.4-trixie"
     assert "shared_preload_libraries=timescaledb,pg_stat_statements" in command

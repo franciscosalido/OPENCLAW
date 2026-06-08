@@ -71,16 +71,16 @@ def test_required_functions_exist() -> None:
         "_service_exists",
         "_service_container_id",
         "_service_image_current",
-            "_service_image_expected",
-            "_service_config_hash_current",
-            "_service_config_hash_expected",
-            "_service_has_build",
-            "_wait_service_healthy",
-            "_wait_http_200",
-            "_check_docker",
-            "_docker_available",
-            "_detect_postgres_service",
-            "_detect_qdrant_service",
+        "_service_image_expected",
+        "_service_config_hash_current",
+        "_service_config_hash_expected",
+        "_service_has_build",
+        "_wait_service_healthy",
+        "_wait_http_200",
+        "_check_docker",
+        "_docker_available",
+        "_detect_postgres_service",
+        "_detect_qdrant_service",
         "_detect_litellm_runtime",
         "_detect_ollama_runtime",
         "_rebuild_postgres_if_needed",
@@ -105,14 +105,14 @@ def test_rebuild_postgres_preserves_data_and_requires_human_confirmation() -> No
     assert "Confirmar rebuild? [s/N]" in text
     assert "read -r confirm" in text
     assert "Rebuild Postgres cancelado pelo operador" in text
-    assert 'exit 0' in text
+    assert "exit 0" in text
 
 
 def test_rebuild_uses_safe_recreate_without_volume_removal() -> None:
     text = _script_text()
 
-    assert 'docker inspect -f \'{{.Config.Image}}\'' in text
-    assert 'docker inspect -f \'{{.Image}}\'' in text
+    assert "docker inspect -f '{{.Config.Image}}'" in text
+    assert "docker inspect -f '{{.Image}}'" in text
     assert 'if _service_has_build "${POSTGRES_SERVICE}"; then' in text
     assert '_compose stop "${POSTGRES_SERVICE}"' in text
     assert '_compose rm -f "${POSTGRES_SERVICE}"' in text

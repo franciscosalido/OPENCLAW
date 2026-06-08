@@ -96,7 +96,9 @@ def test_kronos_contracts_do_not_import_runtime_ml_packages() -> None:
 
 
 def test_kronos_prediction_params_validation() -> None:
-    assert KronosPredictionParams(lookback=64, pred_len=16, sample_count=1).pred_len == 16
+    assert (
+        KronosPredictionParams(lookback=64, pred_len=16, sample_count=1).pred_len == 16
+    )
     with pytest.raises(ValueError, match="lookback"):
         KronosPredictionParams(lookback=0, pred_len=16, sample_count=1)
     with pytest.raises(ValueError, match="pred_len"):

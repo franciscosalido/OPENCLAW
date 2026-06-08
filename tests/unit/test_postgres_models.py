@@ -108,7 +108,9 @@ def test_agent_state_rejects_empty_schema_version() -> None:
 
 
 @pytest.mark.parametrize("confidence", [-0.01, 1.01])
-def test_entity_mention_rejects_confidence_outside_unit_interval(confidence: float) -> None:
+def test_entity_mention_rejects_confidence_outside_unit_interval(
+    confidence: float,
+) -> None:
     with pytest.raises(ValueError, match="confidence"):
         EntityMention(
             mention_id=uuid4(),

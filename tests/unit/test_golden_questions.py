@@ -41,10 +41,16 @@ class GoldenQuestionManifestTests(unittest.TestCase):
 
         self.assertEqual(len(manifest.questions), 5)
         self.assertTrue(
-            all(question.question_id.startswith("iq-") for question in manifest.questions)
+            all(
+                question.question_id.startswith("iq-")
+                for question in manifest.questions
+            )
         )
         self.assertTrue(
-            all(question.expected_corpus == "internal" for question in manifest.questions)
+            all(
+                question.expected_corpus == "internal"
+                for question in manifest.questions
+            )
         )
         self.assertTrue(
             all(
@@ -70,10 +76,16 @@ class GoldenQuestionManifestTests(unittest.TestCase):
 
         self.assertEqual(len(manifest.questions), 9)
         self.assertTrue(
-            all(question.question_id.startswith("fq-") for question in manifest.questions)
+            all(
+                question.question_id.startswith("fq-")
+                for question in manifest.questions
+            )
         )
         self.assertTrue(
-            all(question.expected_corpus == "financial" for question in manifest.questions)
+            all(
+                question.expected_corpus == "financial"
+                for question in manifest.questions
+            )
         )
         self.assertTrue(
             all(

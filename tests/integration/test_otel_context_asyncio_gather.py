@@ -21,4 +21,7 @@ async def test_otel_context_asyncio_gather_isolated() -> None:
         await asyncio.sleep(0)
         return get_quimera_context_attributes()["quimera.task_id"]
 
-    assert list(await asyncio.gather(worker("task-a"), worker("task-b"))) == ["task-a", "task-b"]
+    assert list(await asyncio.gather(worker("task-a"), worker("task-b"))) == [
+        "task-a",
+        "task-b",
+    ]

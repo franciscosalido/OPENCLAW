@@ -16,7 +16,12 @@ def test_latency_baseline_exists_and_thresholds_are_positive() -> None:
 
     assert data["schema_version"] == "quimera-latency-baseline-v1"
     assert data["regression_multiplier"] >= 1.0
-    for key in ("postgres_p95_ms", "qdrant_p95_ms", "litellm_p95_ms", "agentic0_p95_ms"):
+    for key in (
+        "postgres_p95_ms",
+        "qdrant_p95_ms",
+        "litellm_p95_ms",
+        "agentic0_p95_ms",
+    ):
         assert data[key] > 0
 
 
@@ -32,12 +37,19 @@ def test_latency_regression_detection_modes() -> None:
     assert full["exit_code"] == 5
 
 
-def test_smoke_summary_exposes_status_alias_for_overall(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_smoke_summary_exposes_status_alias_for_overall(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(
         "integration.smoke_summary.build_integration_health_report",
         lambda: {
             "overall": "ok",
-            "services": {"postgres": "ok", "qdrant": "ok", "litellm": "ok", "ollama": "ok"},
+            "services": {
+                "postgres": "ok",
+                "qdrant": "ok",
+                "litellm": "ok",
+                "ollama": "ok",
+            },
             "mcp_servers": {},
             "service_latencies_ms": {},
             "warnings": [],

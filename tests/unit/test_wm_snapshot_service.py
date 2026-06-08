@@ -7,9 +7,14 @@ from uuid import UUID, uuid4
 import pytest
 
 from backend.working_memory import snapshot_service
-from backend.working_memory.checkpoint_repository import WorkingMemoryCheckpointRepository
+from backend.working_memory.checkpoint_repository import (
+    WorkingMemoryCheckpointRepository,
+)
 from backend.working_memory.models import WorkingMemoryPoint
-from backend.working_memory.snapshot_service import SnapshotService, compute_snapshot_checksum
+from backend.working_memory.snapshot_service import (
+    SnapshotService,
+    compute_snapshot_checksum,
+)
 
 
 NOW = datetime(2026, 6, 6, 12, 0, tzinfo=UTC)
@@ -29,7 +34,9 @@ def _point(point_id: str, *, expired: bool = False) -> WorkingMemoryPoint:
         recency_ts=NOW,
         created_at=created_at,
         updated_at=created_at,
-        expires_at=NOW - timedelta(seconds=1) if expired else NOW + timedelta(seconds=60),
+        expires_at=NOW - timedelta(seconds=1)
+        if expired
+        else NOW + timedelta(seconds=60),
         ttl_seconds=60,
         embedding_model="nomic",
     )
@@ -40,10 +47,14 @@ class FakeStore:
         self.points = points
         self.checkpointed: tuple[list[str], str] | None = None
 
-    async def export_session_points_for_snapshot(self, *, agent_id: str, session_id: str, limit: int | None = None) -> list[WorkingMemoryPoint]:
+    async def export_session_points_for_snapshot(
+        self, *, agent_id: str, session_id: str, limit: int | None = None
+    ) -> list[WorkingMemoryPoint]:
         return self.points
 
-    async def mark_checkpointed(self, *, point_ids: Iterable[str], checkpoint_id: str) -> None:
+    async def mark_checkpointed(
+        self, *, point_ids: Iterable[str], checkpoint_id: str
+    ) -> None:
         self.checkpointed = (list(point_ids), checkpoint_id)
 
 
@@ -55,7 +66,9 @@ class FakeRepository:
         self.header_kwargs = kwargs
         return "snapshot-1"
 
-    async def insert_snapshot_points(self, *, snapshot_id: str, points: list[WorkingMemoryPoint]) -> None:
+    async def insert_snapshot_points(
+        self, *, snapshot_id: str, points: list[WorkingMemoryPoint]
+    ) -> None:
         assert snapshot_id == "snapshot-1"
         assert points
 
@@ -98,8 +111,13 @@ async def test_snapshot_service_filters_expired_points_and_epoch_is_monotonic() 
     assert epoch1 > 1_700_000_000_000
 
 
-def test_snapshot_epoch_uses_wall_clock_milliseconds(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("backend.working_memory.snapshot_service.time.time_ns", lambda: 1_800_000_000_000_000_000)
+def test_snapshot_epoch_uses_wall_clock_milliseconds(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "backend.working_memory.snapshot_service.time.time_ns",
+        lambda: 1_800_000_000_000_000_000,
+    )
     monkeypatch.setattr(snapshot_service, "_LAST_EPOCH_MS", 0)
 
     first = snapshot_service.next_snapshot_epoch_ms()
@@ -130,7 +148,9 @@ async def test_create_session_snapshot_lets_repository_allocate_epoch() -> None:
     repository = FakeRepository()
     service = SnapshotService(store=store, repository=repository)
 
-    result = await service.create_session_snapshot(agent_id=point.agent_id, session_id=str(point.session_id))
+    result = await service.create_session_snapshot(
+        agent_id=point.agent_id, session_id=str(point.session_id)
+    )
 
     assert result["snapshot_id"] == "snapshot-1"
     assert repository.header_kwargs is not None

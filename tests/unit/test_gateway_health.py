@@ -232,5 +232,6 @@ class TestCheckLiteLLMGateway(unittest.TestCase):
                 check_litellm_gateway()
             self.assertEqual(ctx.exception.code, 1)
 
+
 if __name__ == "__main__":
     unittest.main()

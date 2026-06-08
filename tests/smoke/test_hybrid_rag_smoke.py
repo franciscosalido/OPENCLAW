@@ -202,7 +202,9 @@ async def _assert_hybrid_collection_ready(client: Any, collection_name: str) -> 
 
 
 async def _legacy_snapshot(client: Any) -> frozenset[str]:
-    collections = await asyncio.wait_for(client.get_collections(), timeout=SETUP_TIMEOUT_S)
+    collections = await asyncio.wait_for(
+        client.get_collections(), timeout=SETUP_TIMEOUT_S
+    )
     return frozenset(collection.name for collection in collections.collections)
 
 
@@ -249,13 +251,29 @@ def _synthetic_financial_documents() -> list[Document]:
 
 
 def test_synthetic_corpus_has_no_real_data_markers() -> None:
-    forbidden = {"cpf", "cnpj", "conta", "carteira", "patrimônio", "posicao real", "posição real"}
-    corpus_text = " ".join(document.text.casefold() for document in _synthetic_financial_documents())
+    forbidden = {
+        "cpf",
+        "cnpj",
+        "conta",
+        "carteira",
+        "patrimônio",
+        "posicao real",
+        "posição real",
+    }
+    corpus_text = " ".join(
+        document.text.casefold() for document in _synthetic_financial_documents()
+    )
     assert forbidden.isdisjoint(corpus_text)
 
 
 def test_safe_delete_rejects_dangerous_collection_names() -> None:
-    for name in ("", "bad\x00name", LEGACY_COLLECTION_NAME, HYBRID_COLLECTION_NAME, "not_a_smoke_collection"):
+    for name in (
+        "",
+        "bad\x00name",
+        LEGACY_COLLECTION_NAME,
+        HYBRID_COLLECTION_NAME,
+        "not_a_smoke_collection",
+    ):
         with pytest.raises((TypeError, ValueError)):
             _assert_smoke_collection_name(name)
 
@@ -405,7 +423,9 @@ def _scored_point_to_search_hit(point: Any) -> SearchHit:
 def _retriever_sparse_to_ingest_sparse(vector: RetrieverSparseVector) -> Any:
     from scripts.rag_ingest_hybrid import SparseVector as IngestSparseVector
 
-    return IngestSparseVector(indices=tuple(vector.indices), values=tuple(vector.values))
+    return IngestSparseVector(
+        indices=tuple(vector.indices), values=tuple(vector.values)
+    )
 
 
 async def _prepare_and_upload_documents(client: Any, collection_name: str) -> None:

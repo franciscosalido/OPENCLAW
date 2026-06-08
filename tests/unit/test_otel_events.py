@@ -41,11 +41,12 @@ def test_add_evaluation_score_records_genai_event() -> None:
 def test_add_cache_decision_event_records_safe_reason() -> None:
     span = FakeSpan()
 
-    add_cache_decision_event(span, hit=False, backend="qdrant", reason="schema_version_miss")
+    add_cache_decision_event(
+        span, hit=False, backend="qdrant", reason="schema_version_miss"
+    )
 
     assert span.events[0][1] == {
         "cache.hit": False,
         "cache.backend": "qdrant",
         "quimera.cache_reason": "schema_version_miss",
     }
-

@@ -5,7 +5,6 @@ from dataclasses import FrozenInstanceError
 
 from backend.agent0.domain_routing import (
     FakeConfidenceScorer,
-    RouteDecision,
     SystemState,
     load_domain_routing_config,
     route,
@@ -126,7 +125,9 @@ class DomainRoutingTests(unittest.TestCase):
         self.assertEqual(decision.collection_name, "openclaw_financial")
         self.assertEqual(decision.reason_code, "retrieval_confident")
 
-    def test_low_confidence_fq_prefix_without_keyword_keeps_financial_context(self) -> None:
+    def test_low_confidence_fq_prefix_without_keyword_keeps_financial_context(
+        self,
+    ) -> None:
         decision = route(
             "pergunta sintetica sem termos financeiros mapeados",
             self.state,

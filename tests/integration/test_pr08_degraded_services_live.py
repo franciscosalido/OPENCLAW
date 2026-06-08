@@ -11,7 +11,9 @@ pytestmark = pytest.mark.integration
 
 def test_pr08_degraded_services_contract_is_safe_by_default() -> None:
     if os.getenv("QUIMERA_TEST_CAN_CONTROL_RUNTIME") == "1":
-        pytest.skip("runtime-control destructive scenarios are not executed by the default suite")
+        pytest.skip(
+            "runtime-control destructive scenarios are not executed by the default suite"
+        )
 
     report = build_integration_health_report()
 

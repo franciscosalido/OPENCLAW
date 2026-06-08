@@ -34,8 +34,6 @@ import backend.rag.hybrid_retriever as hr_module
 from backend.rag.fusion import FusedResult, RRFFusion, RRFWeightProfile, RankedResult
 from backend.rag.hybrid_retriever import (
     AsyncHybridRetriever,
-    ClockProtocol,
-    DenseEmbedderProtocol,
     DenseSearcherProtocol,
     HybridRetrievalError,
     HybridRetrievalResult,
@@ -43,7 +41,6 @@ from backend.rag.hybrid_retriever import (
     HybridRetrieverConfig,
     RetrievalMode,
     SearchHit,
-    SparseEmbedderProtocol,
     SparseSearcherProtocol,
 )
 from backend.rag.sparse_vector import SparseVector
@@ -51,6 +48,7 @@ from backend.rag.sparse_vector import SparseVector
 # ===========================================================================
 # ── Clocks ───────────────────────────────────────────────────────────────────
 # ===========================================================================
+
 
 class FakeClock:
     """Returns values from a pre-set list. Raises StopIteration if exhausted."""
@@ -151,6 +149,7 @@ class FakeSparseEmbedder:
 # ── Searchers ────────────────────────────────────────────────────────────────
 # ===========================================================================
 
+
 @dataclass
 class _SearchCall:
     collection_name: str
@@ -247,6 +246,7 @@ class FakeSparseSearcher:
 # ── SpyFusion ────────────────────────────────────────────────────────────────
 # ===========================================================================
 
+
 class SpyFusion:
     """Synchronous (non-async) fusion spy for test B20."""
 
@@ -275,6 +275,7 @@ class SpyFusion:
 # ── Guarded fakes (must NOT be called during retrieve) ───────────────────────
 # ===========================================================================
 
+
 class GuardedDenseSearcher(FakeDenseSearcher):
     """Fails immediately if any mutation method is called."""
 
@@ -302,6 +303,7 @@ class GuardedSparseSearcher(FakeSparseSearcher):
 # ===========================================================================
 # ── Builders ──────────────────────────────────────────────────────────────────
 # ===========================================================================
+
 
 def make_config(**overrides: Any) -> HybridRetrieverConfig:
     defaults: dict[str, Any] = {
@@ -350,12 +352,21 @@ def hit(
 # ── A: PASSIVE (1–7) ─────────────────────────────────────────────────────────
 # ===========================================================================
 
+
 # A01
 def test_hybrid_retriever_module_has_no_qdrant_fastapi_mcp_imports() -> None:
     """Production module must not import forbidden packages."""
     source = inspect.getsource(hr_module)
     tree = ast.parse(source)
-    forbidden = {"qdrant_client", "fastapi", "mcp", "requests", "httpx", "torch", "numpy"}
+    forbidden = {
+        "qdrant_client",
+        "fastapi",
+        "mcp",
+        "requests",
+        "httpx",
+        "torch",
+        "numpy",
+    }
     imported: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -458,6 +469,7 @@ def test_search_hit_validates_result_id_score_and_payload_keys() -> None:
 def test_result_to_dict_is_json_friendly_and_does_not_include_query() -> None:
     """to_dict on HybridRetrievalTrace must not expose any sensitive key."""
     from backend.rag.fusion import SOURCE_DENSE
+
     fused = FusedResult(
         result_id="chunk-x",
         doc_id="doc-x",
@@ -489,10 +501,17 @@ def test_result_to_dict_is_json_friendly_and_does_not_include_query() -> None:
     assert "trace" in d
     td = trace.to_dict()
     assert set(td.keys()) == {
-        "mode", "dense_candidates", "sparse_candidates",
-        "dense_filtered_by_threshold", "sparse_filtered_by_threshold",
-        "fused_count", "returned_count",
-        "embed_ms", "search_ms", "fusion_ms", "total_ms",
+        "mode",
+        "dense_candidates",
+        "sparse_candidates",
+        "dense_filtered_by_threshold",
+        "sparse_filtered_by_threshold",
+        "fused_count",
+        "returned_count",
+        "embed_ms",
+        "search_ms",
+        "fusion_ms",
+        "total_ms",
     }
     sensitive = {"query", "embedding", "vector", "prompt", "answer"}
     assert not sensitive & set(td.keys())
@@ -501,6 +520,7 @@ def test_result_to_dict_is_json_friendly_and_does_not_include_query() -> None:
 # ===========================================================================
 # ── B: ACTIVE (8–40) ─────────────────────────────────────────────────────────
 # ===========================================================================
+
 
 # B01
 async def test_hybrid_retriever_rejects_empty_query() -> None:
@@ -520,8 +540,10 @@ async def test_hybrid_mode_calls_both_embedders_and_both_searchers() -> None:
     ss = FakeSparseSearcher(hits=[hit("c1", "doc-1", 5.0)])
     cfg = make_config(mode=RetrievalMode.HYBRID, search_top_k=15)
     r = make_retriever(
-        dense_embedder=de, sparse_embedder=se,
-        dense_searcher=ds, sparse_searcher=ss,
+        dense_embedder=de,
+        sparse_embedder=se,
+        dense_searcher=ds,
+        sparse_searcher=ss,
         config=cfg,
     )
     await r.retrieve("test query")
@@ -560,6 +582,7 @@ async def test_hybrid_retriever_returns_fused_results() -> None:
 
     chunk_b = next(fr for fr in result.results if fr.result_id == "chunk-b")
     from backend.rag.fusion import SOURCE_DENSE, SOURCE_SPARSE
+
     assert SOURCE_DENSE in chunk_b.sources and SOURCE_SPARSE in chunk_b.sources
 
     t = result.trace
@@ -573,8 +596,8 @@ async def test_hybrid_retriever_returns_fused_results() -> None:
 async def test_rank_is_derived_from_filtered_position() -> None:
     """Survivor at position 0 after score filter must receive dense_rank=1."""
     dense_hits = [
-        hit("hit-a", "doc-a", 0.5),   # filtered out
-        hit("hit-b", "doc-b", 0.9),   # position 0 after filter → rank 1
+        hit("hit-a", "doc-a", 0.5),  # filtered out
+        hit("hit-b", "doc-b", 0.9),  # position 0 after filter → rank 1
         hit("hit-c", "doc-c", 0.95),  # position 1 after filter → rank 2
     ]
     cfg = make_config(dense_min_score=0.7, return_top_k=10)
@@ -637,7 +660,10 @@ async def test_score_none_is_kept_without_min_score() -> None:
 # B08
 async def test_score_none_is_filtered_when_min_score_is_set() -> None:
     """Hits with score=None are discarded when min_score is configured."""
-    dense_hits = [hit("null-score", "doc-n", score=None), hit("real-score", "doc-r", 0.9)]
+    dense_hits = [
+        hit("null-score", "doc-n", score=None),
+        hit("real-score", "doc-r", 0.9),
+    ]
     cfg = make_config(dense_min_score=0.5)
     r = make_retriever(dense_searcher=FakeDenseSearcher(hits=dense_hits), config=cfg)
     result = await r.retrieve("q")
@@ -674,7 +700,9 @@ async def test_two_chunks_same_doc_id_do_not_collapse() -> None:
 
 
 # B11
-async def test_conflicting_doc_id_for_same_result_id_becomes_hybrid_retrieval_error() -> None:
+async def test_conflicting_doc_id_for_same_result_id_becomes_hybrid_retrieval_error() -> (
+    None
+):
     """result_id with different doc_id in dense vs sparse raises HybridRetrievalError."""
     dense_hits = [hit("chunk-conflict", "doc-a", 0.9)]
     sparse_hits = [hit("chunk-conflict", "doc-b", 5.0)]
@@ -704,8 +732,10 @@ async def test_dense_only_mode_skips_sparse_embedder_and_sparse_searcher() -> No
     ss = FakeSparseSearcher()
     cfg = make_config(mode=RetrievalMode.DENSE_ONLY)
     r = make_retriever(
-        dense_embedder=de, sparse_embedder=se,
-        dense_searcher=ds, sparse_searcher=ss,
+        dense_embedder=de,
+        sparse_embedder=se,
+        dense_searcher=ds,
+        sparse_searcher=ss,
         config=cfg,
     )
     result = await r.retrieve("q")
@@ -724,8 +754,10 @@ async def test_sparse_only_mode_skips_dense_embedder_and_dense_searcher() -> Non
     ss = FakeSparseSearcher(hits=[hit("c1", "doc-1")])
     cfg = make_config(mode=RetrievalMode.SPARSE_ONLY)
     r = make_retriever(
-        dense_embedder=de, sparse_embedder=se,
-        dense_searcher=ds, sparse_searcher=ss,
+        dense_embedder=de,
+        sparse_embedder=se,
+        dense_searcher=ds,
+        sparse_searcher=ss,
         config=cfg,
     )
     result = await r.retrieve("q")
@@ -755,6 +787,7 @@ async def test_channel_empty_but_other_channel_returns_results() -> None:
     )
     result = await r.retrieve("q")
     from backend.rag.fusion import SOURCE_SPARSE
+
     assert len(result.results) == 2
     for fr in result.results:
         assert SOURCE_SPARSE in fr.sources
@@ -862,7 +895,9 @@ async def test_search_tasks_run_concurrently_in_hybrid_mode() -> None:
     gate: asyncio.Event = asyncio.Event()
 
     ds = FakeDenseSearcher(hits=[hit("c1", "doc-1")], started=started_dense, gate=gate)
-    ss = FakeSparseSearcher(hits=[hit("c1", "doc-1")], started=started_sparse, gate=gate)
+    ss = FakeSparseSearcher(
+        hits=[hit("c1", "doc-1")], started=started_sparse, gate=gate
+    )
 
     r = make_retriever(dense_searcher=ds, sparse_searcher=ss)
     task: asyncio.Task[HybridRetrievalResult] = asyncio.create_task(r.retrieve("q"))
@@ -921,7 +956,15 @@ async def test_result_trace_does_not_include_sensitive_fields() -> None:
     r = make_retriever(dense_searcher=FakeDenseSearcher(hits=[hit("c1", "doc-1")]))
     result = await r.retrieve("sensitive query")
     td = result.trace.to_dict()
-    forbidden_keys = {"query", "text", "chunk_text", "vector", "embedding", "prompt", "answer"}
+    forbidden_keys = {
+        "query",
+        "text",
+        "chunk_text",
+        "vector",
+        "embedding",
+        "prompt",
+        "answer",
+    }
     assert not forbidden_keys & set(td.keys())
 
 
@@ -952,8 +995,12 @@ async def test_determinism_across_repeated_calls() -> None:
     res1 = await make_r().retrieve("q")
     res2 = await make_r().retrieve("q")
 
-    assert [fr.result_id for fr in res1.results] == [fr.result_id for fr in res2.results]
-    assert [fr.rrf_score for fr in res1.results] == [fr.rrf_score for fr in res2.results]
+    assert [fr.result_id for fr in res1.results] == [
+        fr.result_id for fr in res2.results
+    ]
+    assert [fr.rrf_score for fr in res1.results] == [
+        fr.rrf_score for fr in res2.results
+    ]
 
 
 # B29
@@ -967,8 +1014,10 @@ async def test_mode_override_per_retrieve() -> None:
     override_cfg = make_config(mode=RetrievalMode.DENSE_ONLY)
 
     r = make_retriever(
-        dense_embedder=de, sparse_embedder=se,
-        dense_searcher=ds, sparse_searcher=ss,
+        dense_embedder=de,
+        sparse_embedder=se,
+        dense_searcher=ds,
+        sparse_searcher=ss,
         config=instance_cfg,
     )
     await r.retrieve("q", config=override_cfg)
@@ -984,7 +1033,9 @@ async def test_custom_rrf_profile_changes_order() -> None:
     sparse_hits = [hit("sparse-only", "doc-s", 9.0)]
 
     sparse_heavy = RRFFusion(
-        profile=RRFWeightProfile(dense_weight=1.0, sparse_weight=100.0, name="sparse-heavy")
+        profile=RRFWeightProfile(
+            dense_weight=1.0, sparse_weight=100.0, name="sparse-heavy"
+        )
     )
     r_sh = make_retriever(
         dense_searcher=FakeDenseSearcher(hits=list(dense_hits)),
@@ -995,7 +1046,9 @@ async def test_custom_rrf_profile_changes_order() -> None:
     assert res_sh.results[0].result_id == "sparse-only"
 
     dense_heavy = RRFFusion(
-        profile=RRFWeightProfile(dense_weight=100.0, sparse_weight=1.0, name="dense-heavy")
+        profile=RRFWeightProfile(
+            dense_weight=100.0, sparse_weight=1.0, name="dense-heavy"
+        )
     )
     r_dh = make_retriever(
         dense_searcher=FakeDenseSearcher(hits=list(dense_hits)),
@@ -1025,7 +1078,8 @@ def test_qdrant_native_prefetch_is_not_used_in_v0() -> None:
     # Protocol inspection
     for protocol_cls in (DenseSearcherProtocol, SparseSearcherProtocol):
         methods = [
-            name for name, _ in inspect.getmembers(protocol_cls)
+            name
+            for name, _ in inspect.getmembers(protocol_cls)
             if not name.startswith("__")
         ]
         assert "prefetch" not in methods
@@ -1053,6 +1107,7 @@ def test_hybrid_retriever_does_not_create_client() -> None:
 # ── C: ECCENTRIC (41–50) ──────────────────────────────────────────────────────
 # ===========================================================================
 
+
 # C01
 async def test_duplicate_result_id_same_doc_id_across_channels_fuses() -> None:
     """Same result_id + doc_id in both channels → single result with both sources."""
@@ -1067,6 +1122,7 @@ async def test_duplicate_result_id_same_doc_id_across_channels_fuses() -> None:
     fr = result.results[0]
     assert fr.result_id == "chunk-dup"
     from backend.rag.fusion import SOURCE_DENSE, SOURCE_SPARSE
+
     assert SOURCE_DENSE in fr.sources and SOURCE_SPARSE in fr.sources
 
 
@@ -1105,7 +1161,9 @@ async def test_zero_weight_rrf_profile_dense_weight_zero() -> None:
     dense_hits = [hit("dense-only", "doc-d", 0.99)]
     sparse_hits = [hit("sparse-only", "doc-s", 1.0)]
     sparse_fusion = RRFFusion(
-        profile=RRFWeightProfile(dense_weight=0.0, sparse_weight=1.0, name="sparse-only-weight")
+        profile=RRFWeightProfile(
+            dense_weight=0.0, sparse_weight=1.0, name="sparse-only-weight"
+        )
     )
     r = make_retriever(
         dense_searcher=FakeDenseSearcher(hits=dense_hits),
@@ -1146,7 +1204,9 @@ async def test_invalid_clock_value_raises_or_clamps() -> None:
         t = result.trace
         for field_name in ("embed_ms", "search_ms", "fusion_ms", "total_ms"):
             val = getattr(t, field_name)
-            assert math.isfinite(val), f"Expected clamped finite {field_name}, got {val}"
+            assert math.isfinite(val), (
+                f"Expected clamped finite {field_name}, got {val}"
+            )
     except HybridRetrievalError:
         pass  # also acceptable
 
@@ -1179,17 +1239,26 @@ def test_result_id_null_byte_in_search_hit_fails_on_construction() -> None:
 # C10 — Snapshot
 async def test_to_dict_stable_key_shape_snapshot() -> None:
     """HybridRetrievalResult.to_dict() must have exactly the expected key structure."""
-    r = make_retriever(dense_searcher=FakeDenseSearcher(hits=[hit("chunk-snap", "doc-snap", 0.9)]))
+    r = make_retriever(
+        dense_searcher=FakeDenseSearcher(hits=[hit("chunk-snap", "doc-snap", 0.9)])
+    )
     result = await r.retrieve("snapshot query")
     d = result.to_dict()
 
     assert set(d.keys()) == {"results", "trace"}
 
     expected_trace_keys = {
-        "mode", "dense_candidates", "sparse_candidates",
-        "dense_filtered_by_threshold", "sparse_filtered_by_threshold",
-        "fused_count", "returned_count",
-        "embed_ms", "search_ms", "fusion_ms", "total_ms",
+        "mode",
+        "dense_candidates",
+        "sparse_candidates",
+        "dense_filtered_by_threshold",
+        "sparse_filtered_by_threshold",
+        "fused_count",
+        "returned_count",
+        "embed_ms",
+        "search_ms",
+        "fusion_ms",
+        "total_ms",
     }
     trace_dict = d["trace"]
     assert isinstance(trace_dict, dict)
@@ -1198,12 +1267,19 @@ async def test_to_dict_stable_key_shape_snapshot() -> None:
     results_list = d["results"]
     assert isinstance(results_list, list) and len(results_list) >= 1
     expected_result_keys = {
-        "result_id", "doc_id", "rrf_score",
-        "dense_rank", "sparse_rank",
-        "dense_contribution", "sparse_contribution",
-        "best_rank", "first_seen_order",
-        "dense_raw_score", "sparse_raw_score",
-        "sources", "payload",
+        "result_id",
+        "doc_id",
+        "rrf_score",
+        "dense_rank",
+        "sparse_rank",
+        "dense_contribution",
+        "sparse_contribution",
+        "best_rank",
+        "first_seen_order",
+        "dense_raw_score",
+        "sparse_raw_score",
+        "sources",
+        "payload",
     }
     assert set(results_list[0].keys()) == expected_result_keys
 

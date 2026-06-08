@@ -16,7 +16,12 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 def _run_status_helper(command: str) -> subprocess.CompletedProcess[str]:
     env = {**os.environ, "PYTHONPATH": str(REPO_ROOT)}
     return subprocess.run(
-        [sys.executable, str(REPO_ROOT / "scripts/quimera_status.py"), command, "--json"],
+        [
+            sys.executable,
+            str(REPO_ROOT / "scripts/quimera_status.py"),
+            command,
+            "--json",
+        ],
         text=True,
         capture_output=True,
         check=False,
@@ -44,9 +49,13 @@ def test_rag01b_acceptance_json_is_parseable() -> None:
     assert data["adr"] == "accepted"
 
 
-def test_litellm_docker_container_is_reported_as_host_only_violation(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_litellm_docker_container_is_reported_as_host_only_violation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     def fake_run(*_args: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
-        return subprocess.CompletedProcess(args=[], returncode=0, stdout="quimera-litellm\n", stderr="")
+        return subprocess.CompletedProcess(
+            args=[], returncode=0, stdout="quimera-litellm\n", stderr=""
+        )
 
     monkeypatch.setattr("scripts.quimera_status.subprocess.run", fake_run)
 

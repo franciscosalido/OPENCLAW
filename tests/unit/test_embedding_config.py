@@ -215,16 +215,16 @@ class EmbeddingConfigTests(unittest.TestCase):
 
     def test_instruction_aware_contract(self) -> None:
         qwen_without_instruction = _valid_embeddings_config()
-        _profile(qwen_without_instruction, "qwen3_dense_8b_v1")[
-            "query_instruction"
-        ] = None
+        _profile(qwen_without_instruction, "qwen3_dense_8b_v1")["query_instruction"] = (
+            None
+        )
         with self.assertRaisesRegex(ValueError, "requires query_instruction"):
             _load_config(qwen_without_instruction)
 
         nomic_with_instruction = _valid_embeddings_config()
-        _profile(nomic_with_instruction, "nomic_dense_v1")[
-            "query_instruction"
-        ] = "Use this query instruction."
+        _profile(nomic_with_instruction, "nomic_dense_v1")["query_instruction"] = (
+            "Use this query instruction."
+        )
         with self.assertRaisesRegex(ValueError, "query_instruction=null"):
             _load_config(nomic_with_instruction)
 
@@ -235,7 +235,9 @@ class EmbeddingConfigTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "cannot contain null bytes"):
             _load_config(data)
 
-    def test_document_instruction_blank_normalizes_to_none_for_fingerprint(self) -> None:
+    def test_document_instruction_blank_normalizes_to_none_for_fingerprint(
+        self,
+    ) -> None:
         data = _valid_embeddings_config()
         blank_document_instruction = deepcopy(_profile(data, "nomic_dense_v1"))
         blank_document_instruction["document_instruction"] = ""

@@ -148,7 +148,9 @@ class EvaluationContractTests(unittest.TestCase):
     def test_expected_doc_ids_not_empty(self) -> None:
         for query in self.queries:
             expected_doc_ids = _query_list(query, "expected_doc_ids")
-            self.assertTrue(expected_doc_ids, f"expected_doc_ids vazio em {query['id']}")
+            self.assertTrue(
+                expected_doc_ids, f"expected_doc_ids vazio em {query['id']}"
+            )
 
     def test_results_gitignore_exists(self) -> None:
         content = GITIGNORE_FILE.read_text(encoding="utf-8")
@@ -202,7 +204,9 @@ class EvaluationContractTests(unittest.TestCase):
 
         for query in self.queries:
             query_id = _query_text(query, "id")
-            expected_doc_ids = {str(doc_id) for doc_id in _query_list(query, "expected_doc_ids")}
+            expected_doc_ids = {
+                str(doc_id) for doc_id in _query_list(query, "expected_doc_ids")
+            }
             graded_results = data.get(query_id)
             if not isinstance(graded_results, dict):
                 raise AssertionError(f"{query_id} não existe em expected_results.yaml")

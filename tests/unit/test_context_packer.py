@@ -167,7 +167,9 @@ class ContextPackerTests(unittest.TestCase):
 
         self.assertEqual(len(packed), 3)
         self.assertEqual([item.chunk_index for item in packed], [0, 1, 2])
-        self.assertEqual([item.citation_id for item in packed], ["doc-a#0", "doc-a#1", "doc-a#2"])
+        self.assertEqual(
+            [item.citation_id for item in packed], ["doc-a#0", "doc-a#1", "doc-a#2"]
+        )
         self.assertEqual(packed[0].payload["doc_id"], "doc-a")
         self.assertEqual(packed[0].payload["chunk_id"], "doc-a#0")
         self.assertTrue(packer.last_budget_result.enabled)

@@ -18,7 +18,9 @@ from evaluation.compare_session_context_backends import (
 )
 
 
-async def test_benchmark_otel_attributes_are_safe(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_benchmark_otel_attributes_are_safe(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     exporter = InMemorySpanExporter()
     provider = TracerProvider()
     provider.add_span_processor(SimpleSpanProcessor(exporter))

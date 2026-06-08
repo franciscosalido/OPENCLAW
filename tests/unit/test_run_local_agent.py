@@ -98,7 +98,9 @@ def _assert_safe_schema(
     )
     test_case.assertIsInstance(data["decision_id"], str)
     test_case.assertTrue(data["decision_id"])
-    test_case.assertTrue(FORBIDDEN_OUTPUT_KEYS.isdisjoint({key.lower() for key in data}))
+    test_case.assertTrue(
+        FORBIDDEN_OUTPUT_KEYS.isdisjoint({key.lower() for key in data})
+    )
 
 
 def _assert_fallback_metadata(
@@ -149,11 +151,15 @@ class RunLocalAgentCliTests(unittest.TestCase):
 
     def test_parse_args_accepts_temperature_bounds(self) -> None:
         self.assertEqual(
-            run_local_agent.parse_args(["pergunta", "--temperature", "0.0"]).temperature,
+            run_local_agent.parse_args(
+                ["pergunta", "--temperature", "0.0"]
+            ).temperature,
             0.0,
         )
         self.assertEqual(
-            run_local_agent.parse_args(["pergunta", "--temperature", "2.0"]).temperature,
+            run_local_agent.parse_args(
+                ["pergunta", "--temperature", "2.0"]
+            ).temperature,
             2.0,
         )
 
@@ -442,7 +448,9 @@ class RunLocalAgentTests(unittest.IsolatedAsyncioTestCase):
             expect_error="json_unavailable",
         )
 
-    async def test_json_mode_keeps_model_answer_as_string_inside_runner_schema(self) -> None:
+    async def test_json_mode_keeps_model_answer_as_string_inside_runner_schema(
+        self,
+    ) -> None:
         async def chat_call(
             question: str,
             *,
@@ -554,7 +562,9 @@ class RunLocalAgentTests(unittest.IsolatedAsyncioTestCase):
             reason=FallbackReason.QDRANT_UNAVAILABLE,
         )
 
-    async def test_rag_unavailable_and_fallback_chat_failure_has_no_double_fallback(self) -> None:
+    async def test_rag_unavailable_and_fallback_chat_failure_has_no_double_fallback(
+        self,
+    ) -> None:
         calls: list[str] = []
 
         async def chat_call(
@@ -662,9 +672,19 @@ class RunLocalAgentTests(unittest.IsolatedAsyncioTestCase):
                 self.assertNotIn(forbidden, source.lower())
 
     async def test_token_estimate_consistency(self) -> None:
-        for question in ("", " ", "a", "abcd", "abcde", "Olá, decisão local.", "x" * 100):
+        for question in (
+            "",
+            " ",
+            "a",
+            "abcd",
+            "abcde",
+            "Olá, decisão local.",
+            "x" * 100,
+        ):
             with self.subTest(question=question):
-                result = await run_local_agent.run_agent(question=question, dry_run=True)
+                result = await run_local_agent.run_agent(
+                    question=question, dry_run=True
+                )
                 self.assertIsInstance(result.estimated_remote_tokens_avoided, int)
                 self.assertGreaterEqual(result.estimated_remote_tokens_avoided, 0)
 
@@ -883,7 +903,9 @@ class RunLocalAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(event["original_alias"], "local_rag")
         self.assertEqual(event["fallback_alias"], "local_chat")
         self.assertTrue(event["fallback_succeeded"])
-        self.assertTrue(FORBIDDEN_OUTPUT_KEYS.isdisjoint({key.lower() for key in event}))
+        self.assertTrue(
+            FORBIDDEN_OUTPUT_KEYS.isdisjoint({key.lower() for key in event})
+        )
 
     async def test_no_fallback_event_without_fallback(self) -> None:
         async def chat_call(

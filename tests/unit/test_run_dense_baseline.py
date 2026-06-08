@@ -85,13 +85,17 @@ class DenseBaselineRunnerTests(unittest.TestCase):
 
             jsonl_rows = _read_jsonl(result.paths.jsonl_path)
             self.assertEqual(len(jsonl_rows), 2)
-            self.assertEqual([row["query_id"] for row in jsonl_rows], ["Q_001", "Q_002"])
+            self.assertEqual(
+                [row["query_id"] for row in jsonl_rows], ["Q_001", "Q_002"]
+            )
             self.assertEqual(result.metadata["runner_version"], "rag-1a-pr03")
             self.assertEqual(result.metadata["git_commit"], "abc123")
             self.assertIn("global", result.aggregate)
             self.assertIn("by_category", result.aggregate)
             self.assertEqual(result.results[0]["status"], "ok")
-            self.assertEqual(result.results[0]["relevance_scores"], [2.0, 0.0, 0.0, 0.0, 0.0])
+            self.assertEqual(
+                result.results[0]["relevance_scores"], [2.0, 0.0, 0.0, 0.0, 0.0]
+            )
 
             snapshot = _read_json(result.paths.json_path)
             self.assertIn("metadata", snapshot)
@@ -132,9 +136,7 @@ Q_002:
 """.lstrip(),
                 encoding="utf-8",
             )
-            retriever = FakeRetriever(
-                {"query beta": (ScoredDocument("doc_c", 0.7),)}
-            )
+            retriever = FakeRetriever({"query beta": (ScoredDocument("doc_c", 0.7),)})
 
             result = run_dense_baseline(
                 retriever=retriever,
@@ -186,7 +188,9 @@ Q_002:
             self.assertFalse((output_dir / "dense_baseline.json").exists())
             self.assertFalse((output_dir / "dense_baseline.csv").exists())
 
-    def test_cold_start_is_excluded_from_latency_percentiles_when_disabled(self) -> None:
+    def test_cold_start_is_excluded_from_latency_percentiles_when_disabled(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             benchmark_path = root / "benchmark_queries.yaml"

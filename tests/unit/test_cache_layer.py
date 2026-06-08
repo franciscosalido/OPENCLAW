@@ -2,21 +2,23 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from typing import Any
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 
 from backend.rag.cache.cache_config import CacheSettings
 from backend.rag.cache.cache_layer import CacheLayer
 from backend.rag.cache.cache_models import CacheFingerprint, RetrievalResult
-from backend.rag.cache.errors import CachePayloadError, CacheVectorDimensionError
+from backend.rag.cache.errors import CacheVectorDimensionError
 
 
 NOW = datetime(2026, 6, 4, 12, 0, tzinfo=UTC)
 
 
 class FakePoint:
-    def __init__(self, *, point_id: str, score: float, payload: dict[str, object]) -> None:
+    def __init__(
+        self, *, point_id: str, score: float, payload: dict[str, object]
+    ) -> None:
         self.id = point_id
         self.score = score
         self.payload = payload
@@ -46,7 +48,9 @@ class FakeQdrantClient:
             FakePoint(
                 point_id=point_id,
                 score=_float_payload_value(payload.get("_score", 0.99)),
-                payload={key: value for key, value in payload.items() if key != "_score"},
+                payload={
+                    key: value for key, value in payload.items() if key != "_score"
+                },
             )
             for point_id, payload in self.points.items()
         ]
@@ -110,7 +114,12 @@ async def test_disabled_lookup_returns_none_without_qdrant_call() -> None:
     client = FakeQdrantClient()
     layer = CacheLayer(client, _settings(enabled=False))
 
-    assert await layer.lookup(query_vector=(0.1, 0.2, 0.3, 0.4), fingerprint=_fingerprint()) is None
+    assert (
+        await layer.lookup(
+            query_vector=(0.1, 0.2, 0.3, 0.4), fingerprint=_fingerprint()
+        )
+        is None
+    )
     assert client.query_calls == []
 
 
@@ -119,9 +128,19 @@ async def test_lookup_miss_and_below_threshold_return_none() -> None:
     client = FakeQdrantClient()
     layer = CacheLayer(client, _settings())
 
-    assert await layer.lookup(query_vector=(0.1, 0.2, 0.3, 0.4), fingerprint=_fingerprint()) is None
+    assert (
+        await layer.lookup(
+            query_vector=(0.1, 0.2, 0.3, 0.4), fingerprint=_fingerprint()
+        )
+        is None
+    )
     client.points[str(uuid4())] = _payload(_score=0.5)
-    assert await layer.lookup(query_vector=(0.1, 0.2, 0.3, 0.4), fingerprint=_fingerprint()) is None
+    assert (
+        await layer.lookup(
+            query_vector=(0.1, 0.2, 0.3, 0.4), fingerprint=_fingerprint()
+        )
+        is None
+    )
 
 
 @pytest.mark.asyncio
@@ -131,7 +150,9 @@ async def test_lookup_hit_uses_filter_and_no_vectors() -> None:
     client.points[str(cache_id)] = _payload(_score=0.95)
     layer = CacheLayer(client, _settings())
 
-    hit = await layer.lookup(query_vector=(0.1, 0.2, 0.3, 0.4), fingerprint=_fingerprint())
+    hit = await layer.lookup(
+        query_vector=(0.1, 0.2, 0.3, 0.4), fingerprint=_fingerprint()
+    )
 
     assert hit is not None
     assert hit.cache_id == cache_id
@@ -148,7 +169,9 @@ async def test_lookup_corrupted_payload_returns_none_not_raises() -> None:
     layer = CacheLayer(client, _settings())
 
     assert (
-        await layer.lookup(query_vector=(0.1, 0.2, 0.3, 0.4), fingerprint=_fingerprint())
+        await layer.lookup(
+            query_vector=(0.1, 0.2, 0.3, 0.4), fingerprint=_fingerprint()
+        )
         is None
     )
 
@@ -157,9 +180,18 @@ async def test_lookup_corrupted_payload_returns_none_not_raises() -> None:
 async def test_lookup_expired_payload_returns_none() -> None:
     client = FakeQdrantClient()
     layer = CacheLayer(client, _settings())
-    client.points = {str(uuid4()): _payload(expires_at=(NOW - timedelta(seconds=1)).isoformat(), _score=0.95)}
+    client.points = {
+        str(uuid4()): _payload(
+            expires_at=(NOW - timedelta(seconds=1)).isoformat(), _score=0.95
+        )
+    }
 
-    assert await layer.lookup(query_vector=(0.1, 0.2, 0.3, 0.4), fingerprint=_fingerprint()) is None
+    assert (
+        await layer.lookup(
+            query_vector=(0.1, 0.2, 0.3, 0.4), fingerprint=_fingerprint()
+        )
+        is None
+    )
 
 
 @pytest.mark.asyncio
@@ -181,7 +213,9 @@ async def test_store_writes_vector_not_payload_and_validates_size() -> None:
     assert "vector" not in point.payload
     assert point.payload["schema_version"] == "query-cache-v1"
     with pytest.raises(CacheVectorDimensionError):
-        await layer.store(query_vector=(0.1,), result=_result(), fingerprint=_fingerprint())
+        await layer.store(
+            query_vector=(0.1,), result=_result(), fingerprint=_fingerprint()
+        )
 
 
 @pytest.mark.asyncio
@@ -189,7 +223,11 @@ async def test_store_rejects_too_many_docs_and_sensitive_metadata() -> None:
     layer = CacheLayer(FakeQdrantClient(), _settings(max_result_docs=1))
 
     with pytest.raises(ValueError, match="max_result_docs"):
-        await layer.store(query_vector=(0.1, 0.2, 0.3, 0.4), result=_result(), fingerprint=_fingerprint())
+        await layer.store(
+            query_vector=(0.1, 0.2, 0.3, 0.4),
+            result=_result(),
+            fingerprint=_fingerprint(),
+        )
     with pytest.raises(ValueError, match="metadata"):
         _result(metadata={"secret": "bad"})
 

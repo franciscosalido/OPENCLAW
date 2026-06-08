@@ -68,7 +68,9 @@ async def test_finance_migrations_apply_twice_and_register_checksums(
     assert all(len(row["checksum"]) == 64 for row in rows)
 
 
-async def test_finance_hypertables_and_uuidv7_available(postgres_client: PostgresClient) -> None:
+async def test_finance_hypertables_and_uuidv7_available(
+    postgres_client: PostgresClient,
+) -> None:
     await _require_timescale(postgres_client)
     await _require_uuidv7(postgres_client)
     await run_migrations(postgres_client)
@@ -76,11 +78,15 @@ async def test_finance_hypertables_and_uuidv7_available(postgres_client: Postgre
         assert await is_hypertable(conn, "market_bars")
         assert await is_hypertable(conn, "market_features")
         assert await is_hypertable(conn, "kronos_forecasts")
-    version = await postgres_client.pool.fetchval("SELECT uuid_extract_version(uuidv7())")
+    version = await postgres_client.pool.fetchval(
+        "SELECT uuid_extract_version(uuidv7())"
+    )
     assert version == 7
 
 
-async def test_finance_constraints_are_enforced(postgres_client: PostgresClient) -> None:
+async def test_finance_constraints_are_enforced(
+    postgres_client: PostgresClient,
+) -> None:
     await _require_timescale(postgres_client)
     await _require_uuidv7(postgres_client)
     await run_migrations(postgres_client)

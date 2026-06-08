@@ -53,7 +53,9 @@ class GenerationBudgetConfigTests(unittest.TestCase):
         self.assertIsNone(decision.max_tokens)
         self.assertFalse(decision.max_tokens_applied)
 
-    def test_conciseness_instruction_preserves_citation_and_insufficient_context(self) -> None:
+    def test_conciseness_instruction_preserves_citation_and_insufficient_context(
+        self,
+    ) -> None:
         decision = decide_generation_budget(
             GenerationBudgetConfig(
                 enabled=True,

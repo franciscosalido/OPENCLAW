@@ -38,7 +38,10 @@ def test_latest_stable_ignores_known_prerelease_without_markers() -> None:
 
 
 def test_select_latest_stable_uses_known_prereleases_param() -> None:
-    assert select_latest_stable(("0.24.0", "0.30.0"), known_prereleases=frozenset()) == "0.30.0"
+    assert (
+        select_latest_stable(("0.24.0", "0.30.0"), known_prereleases=frozenset())
+        == "0.30.0"
+    )
 
 
 def test_ollama_known_prereleases_excludes_0_30_0() -> None:
@@ -55,12 +58,14 @@ def test_ollama_version_contract_file_pins_gate4_versions() -> None:
     assert 'target_version: "0.24.0"' in text
     assert 'qwen3_4b_ollama_model_id: "qwen3-embedding:4b"' in text
     assert 'default_embedding_baseline: "nomic-embed-text"' in text
-    assert 'known_prereleases:' in text
+    assert "known_prereleases:" in text
     assert '    - "0.30.0"' in text
 
 
 def test_readiness_accepts_official_ollama_qwen3_4b_tag() -> None:
-    assert readiness._has_any_model((QWEN3_4B_OLLAMA_MODEL_ID,), (QWEN3_4B_MODEL_ID, QWEN3_4B_OLLAMA_MODEL_ID))
+    assert readiness._has_any_model(
+        (QWEN3_4B_OLLAMA_MODEL_ID,), (QWEN3_4B_MODEL_ID, QWEN3_4B_OLLAMA_MODEL_ID)
+    )
 
 
 def test_allow_prerelease_requires_flag() -> None:
@@ -145,7 +150,9 @@ async def test_readiness_builds_safe_report_with_mocked_ollama() -> None:
         return httpx.Response(404)
 
     transport = httpx.MockTransport(handler)
-    async with httpx.AsyncClient(transport=transport, base_url="http://localhost:11434") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://localhost:11434"
+    ) as client:
         assert await readiness._show_model(client, QWEN3_4B_MODEL_ID) is True
         assert await readiness._embed_probe(client, NOMIC_MODEL_ID, None) is True
 

@@ -57,7 +57,9 @@ def _adr_machine_block() -> dict[str, object]:
     marker = "<!-- machine-readable: adr-d2p-qdrant-upgrade-v1 -->"
     assert marker in text
     after_marker = text.split(marker, maxsplit=1)[1]
-    json_block = after_marker.split("```json", maxsplit=1)[1].split("```", maxsplit=1)[0]
+    json_block = after_marker.split("```json", maxsplit=1)[1].split("```", maxsplit=1)[
+        0
+    ]
     parsed = json.loads(json_block)
     assert isinstance(parsed, dict)
     return parsed
@@ -111,9 +113,7 @@ def test_no_qdrant_latest_tag_anywhere() -> None:
 def test_no_qdrant_legacy_version_in_any_compose_file() -> None:
     for compose in (ROOT / "docker").glob("*.yml"):
         text = compose.read_text(encoding="utf-8")
-        assert "qdrant/qdrant:latest" not in text, (
-            f"{compose.name}: uses qdrant latest"
-        )
+        assert "qdrant/qdrant:latest" not in text, f"{compose.name}: uses qdrant latest"
         assert "v1.13" not in text or "# legacy" in text, (
             f"{compose.name}: references v1.13.x without justification"
         )
@@ -127,8 +127,12 @@ def test_server_and_client_versions_match_contract() -> None:
     assert image == contract["server_image"]
     assert str(contract["client_dependency"]).startswith("qdrant-client>=1.18")
     assert str(contract["server_target_version"]) in str(contract["server_image"])
-    assert str(contract["server_target_version"]).startswith(str(contract["version_family"]))
-    assert str(contract["client_target_version"]).startswith(str(contract["version_family"]))
+    assert str(contract["server_target_version"]).startswith(
+        str(contract["version_family"])
+    )
+    assert str(contract["client_target_version"]).startswith(
+        str(contract["version_family"])
+    )
 
 
 def test_qdrant_ports_6333_and_6334_exposed() -> None:

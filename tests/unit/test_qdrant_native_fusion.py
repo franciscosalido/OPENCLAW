@@ -38,7 +38,6 @@ from backend.rag.qdrant_native_fusion import (
     compute_overlap_at_k,
     compute_rank_delta_stats,
     default_retrieval_profile,
-    fusion_comparison_otel_attributes,
     get_retrieval_profile,
     make_query_hash,
     profile_to_python_rrf_weights,
@@ -437,11 +436,15 @@ async def test_native_adapter_weight_order_matches_prefetch_order() -> None:
 
 
 def test_overlap_at_k() -> None:
-    assert compute_overlap_at_k(("a", "b", "c"), ("b", "c", "d"), 3) == pytest.approx(2 / 3)
+    assert compute_overlap_at_k(("a", "b", "c"), ("b", "c", "d"), 3) == pytest.approx(
+        2 / 3
+    )
 
 
 def test_jaccard_at_k() -> None:
-    assert compute_jaccard_at_k(("a", "b", "c"), ("b", "c", "d"), 3) == pytest.approx(0.5)
+    assert compute_jaccard_at_k(("a", "b", "c"), ("b", "c", "d"), 3) == pytest.approx(
+        0.5
+    )
 
 
 def test_order_equal_true() -> None:
@@ -478,7 +481,9 @@ def test_same_set_different_order_records_tie_break_note() -> None:
 
 
 def test_rank_delta_stats() -> None:
-    mean_delta, max_delta = compute_rank_delta_stats(("a", "b", "c"), ("b", "a", "c"), 3)
+    mean_delta, max_delta = compute_rank_delta_stats(
+        ("a", "b", "c"), ("b", "a", "c"), 3
+    )
 
     assert mean_delta == pytest.approx(2 / 3)
     assert max_delta == 1

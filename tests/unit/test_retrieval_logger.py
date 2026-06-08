@@ -19,7 +19,6 @@ from backend.rag.hybrid_retriever import (
     SearchHit,
 )
 from backend.rag.retrieval_logger import (
-    ENV_DEFAULT,
     FORBIDDEN_LOG_KEYS,
     MAX_TOP_K_SCORES,
     RETRIEVAL_LOG_SCHEMA_VERSION,
@@ -484,7 +483,9 @@ def test_event_dict_keys_do_not_use_forbidden_log_keys() -> None:
     payload = event().to_dict()
 
     assert FORBIDDEN_LOG_KEYS.isdisjoint(payload.keys())
-    assert FORBIDDEN_LOG_KEYS.isdisjoint(cast(Mapping[str, object], payload["fusion"]).keys())
+    assert FORBIDDEN_LOG_KEYS.isdisjoint(
+        cast(Mapping[str, object], payload["fusion"]).keys()
+    )
     assert FORBIDDEN_LOG_KEYS.isdisjoint(
         cast(Mapping[str, object], payload["score_stats"]).keys()
     )

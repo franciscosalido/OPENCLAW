@@ -71,10 +71,14 @@ async def test_qdrant_cache_layer_roundtrip(cache_layer: CacheLayer) -> None:
         fingerprint=fingerprint,
     )
     hit = await cache_layer.lookup(query_vector=vector, fingerprint=fingerprint)
-    miss = await cache_layer.lookup(query_vector=vector, fingerprint=_fingerprint("dev2"))
+    miss = await cache_layer.lookup(
+        query_vector=vector, fingerprint=_fingerprint("dev2")
+    )
     dry = await cache_layer.invalidate_by_fingerprint(fingerprint, dry_run=True)
     deleted = await cache_layer.invalidate_by_fingerprint(fingerprint)
-    after_delete = await cache_layer.lookup(query_vector=vector, fingerprint=fingerprint)
+    after_delete = await cache_layer.lookup(
+        query_vector=vector, fingerprint=fingerprint
+    )
 
     assert entry is not None
     assert hit is not None

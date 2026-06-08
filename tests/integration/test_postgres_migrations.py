@@ -32,14 +32,18 @@ async def test_migrations_apply_once(postgres_client: PostgresClient) -> None:
     assert applied
 
 
-async def test_migrations_apply_twice_idempotent(postgres_client: PostgresClient) -> None:
+async def test_migrations_apply_twice_idempotent(
+    postgres_client: PostgresClient,
+) -> None:
     await run_migrations(postgres_client)
     applied = await run_migrations(postgres_client)
 
     assert applied == ()
 
 
-async def test_schema_migrations_records_checksums(postgres_client: PostgresClient) -> None:
+async def test_schema_migrations_records_checksums(
+    postgres_client: PostgresClient,
+) -> None:
     await run_migrations(postgres_client)
     rows = await postgres_client.pool.fetch(
         "SELECT version, checksum FROM schema_migrations ORDER BY version"

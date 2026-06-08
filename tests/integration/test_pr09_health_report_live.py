@@ -17,7 +17,15 @@ def test_pr09_health_report_live_outputs_files(tmp_path: Path) -> None:
     env = os.environ.copy()
     env["PYTHONPATH"] = str(Path.cwd())
     result = subprocess.run(
-        [sys.executable, "-m", "integration.health_report", "--json", str(json_path), "--markdown", str(md_path)],
+        [
+            sys.executable,
+            "-m",
+            "integration.health_report",
+            "--json",
+            str(json_path),
+            "--markdown",
+            str(md_path),
+        ],
         env=env,
         text=True,
         stdout=subprocess.PIPE,
