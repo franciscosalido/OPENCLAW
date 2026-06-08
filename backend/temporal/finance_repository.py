@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Any, cast
 from uuid import UUID
 
-import asyncpg  # type: ignore[import-untyped]
+import asyncpg  # type: ignore[import-untyped, unused-ignore]
 
 from backend.temporal.finance_models import (
     KronosForecast,

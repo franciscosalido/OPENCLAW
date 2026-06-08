@@ -153,6 +153,15 @@ class RagRunTrace:
     ollama_eval_duration_ms: float | None = None
 
     def __post_init__(self) -> None:
+        self._validate_required_fields()
+        self._validate_optional_scalar_fields()
+        self._validate_optional_bool_fields()
+        self._validate_run_context()
+        self._validate_ollama_metrics()
+        if self.guard_result is not None:
+            _summarize_guard_result(self.guard_result)
+
+    def _validate_required_fields(self) -> None:
         _validate_non_empty(self.query_id, "query_id")
         _validate_non_empty(self.timestamp_utc, "timestamp_utc")
         _validate_non_empty(self.collection_name, "collection_name")
@@ -169,6 +178,8 @@ class RagRunTrace:
             "generation_latency_ms",
         )
         _validate_non_negative_int(self.chunk_count, "chunk_count")
+
+    def _validate_optional_scalar_fields(self) -> None:
         if self.gateway_alias is not None:
             _validate_non_empty(self.gateway_alias, "gateway_alias")
         if self.total_latency_ms is not None:
@@ -221,6 +232,16 @@ class RagRunTrace:
                 self.generation_budget_max_tokens,
                 "generation_budget_max_tokens",
             )
+        if self.keep_alive_value is not None:
+            _validate_non_empty(self.keep_alive_value, "keep_alive_value")
+        if self.keep_alive_skipped_reason is not None:
+            _validate_allowed_value(
+                self.keep_alive_skipped_reason,
+                "keep_alive_skipped_reason",
+                {"disabled", "alias_not_in_scope", "no_keep_alive_value"},
+            )
+
+    def _validate_optional_bool_fields(self) -> None:
         for field_name in (
             "context_budget_enabled",
             "context_budget_applied",
@@ -233,16 +254,12 @@ class RagRunTrace:
             value = getattr(self, field_name)
             if value is not None and not isinstance(value, bool):
                 raise TypeError(f"{field_name} must be boolean when provided")
-        if self.keep_alive_value is not None:
-            _validate_non_empty(self.keep_alive_value, "keep_alive_value")
-        if self.keep_alive_skipped_reason is not None:
-            _validate_allowed_value(
-                self.keep_alive_skipped_reason,
-                "keep_alive_skipped_reason",
-                {"disabled", "alias_not_in_scope", "no_keep_alive_value"},
-            )
+
+    def _validate_run_context(self) -> None:
         if self.run_context is not None and self.run_context not in RUN_CONTEXTS:
             raise ValueError(f"run_context must be one of {sorted(RUN_CONTEXTS)}")
+
+    def _validate_ollama_metrics(self) -> None:
         if self.ollama_metrics_available and not any(
             value is not None
             for value in (
@@ -257,8 +274,6 @@ class RagRunTrace:
             raise ValueError(
                 "ollama_metrics_available cannot be true without metric fields"
             )
-        if self.guard_result is not None:
-            _summarize_guard_result(self.guard_result)
 
     def to_log_dict(self) -> dict[str, object]:
         """Return safe scalar metadata for structured logging."""

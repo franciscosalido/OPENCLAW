@@ -4,7 +4,7 @@ from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager
 from typing import Any
 
-import asyncpg  # type: ignore[import-untyped]
+import asyncpg  # type: ignore[import-untyped, unused-ignore]
 from fastmcp import FastMCP
 
 from backend.mcp.mcp_config import PostgresMcpConfig, load_postgres_mcp_config

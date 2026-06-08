@@ -158,6 +158,17 @@ async def test_create_session_snapshot_lets_repository_allocate_epoch() -> None:
     assert store.checkpointed == (["a"], "snapshot-1")
 
 
+async def test_create_delta_snapshot_requires_checkpoint_id() -> None:
+    service = SnapshotService(store=None, repository=None)
+
+    with pytest.raises(ValueError, match="since_checkpoint_id is required"):
+        await service.create_delta_snapshot(
+            agent_id="agent",
+            session_id=str(SESSION_ID),
+            since_checkpoint_id=" ",
+        )
+
+
 async def test_checkpoint_repository_allocates_epoch_with_db_lock() -> None:
     pool = FakePool()
     repository = WorkingMemoryCheckpointRepository(pool)

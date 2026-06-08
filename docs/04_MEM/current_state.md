@@ -4,8 +4,74 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Last updated:** 2026-06-07
-**Updated by:** Codex — RC Vibe sandbox bootstrap hardening
+**Last updated:** 2026-06-08
+**Updated by:** Codex — RC quality report hardening
+
+---
+
+## codex/rc-quality-report-hardening — Standard Quality Report RC
+
+Current branch: `codex/rc-quality-report-hardening`
+Base branch: local `main` at `08e524f`.
+
+Implemented:
+
+- Hardened the standard quality report findings from 2026-06-08:
+  - `asyncpg` imports now use `# type: ignore[import-untyped, unused-ignore]`
+    so mypy passes both when asyncpg is untyped and when an analyzer no longer
+    needs the ignore.
+  - Replaced Bandit B101 production asserts in
+    `backend/rag/hybrid_retriever.py` and
+    `backend/rag/ollama_embedding_bakeoff.py` with explicit runtime guards.
+  - Made `test_pr09_pg_dump_restore_verify_live` skip only when PostgreSQL is
+    genuinely unreachable from a sandbox, while still failing on pg_dump/server
+    version mismatch and script bugs.
+  - Added Vulture config in `pyproject.toml` for Protocol/API keyword names
+    that must remain stable (`vectors_config`, `with_payload`, Qwen3 encoder
+    keyword args).
+  - Added `.importlinter` with a first kept architecture contract:
+    Agent0 must not import Postgres/working-memory/temporal memory backends
+    directly.
+  - Reduced complexity in `backend/ingestion/report.py`,
+    `backend/rag/run_trace.py` and `backend/rag/qdrant_tuning.py`. The prior
+    rank-D blocks reported by Xenon/Radon are no longer present.
+  - `SnapshotService.create_delta_snapshot` now validates
+    `since_checkpoint_id` instead of accepting and ignoring a blank value.
+
+Research notes:
+
+- Mypy `warn-unused-ignores` reports ignores that no longer suppress an error;
+  combining `import-untyped` with `unused-ignore` is the portable compromise
+  for environments where `asyncpg` typing visibility differs.
+- Bandit B101 documents that `assert` statements are removed under optimized
+  Python bytecode; production guards now raise explicit exceptions instead.
+- Vulture supports `tool.vulture` configuration in `pyproject.toml`; this RC
+  keeps the report aligned with `min_confidence = 80`.
+- Import Linter forbidden contracts are suitable for enforcing the Agent0
+  memory-access boundary without introducing a broad unreviewed layer model.
+
+Validation:
+
+- `uv run pytest tests/unit/test_quality_tool_contracts.py tests/unit/test_pr09_pg_dump_live_contract.py tests/unit/test_wm_snapshot_service.py tests/unit/test_hybrid_retriever.py tests/unit/test_qwen3_4b_embedding_bakeoff.py tests/unit/test_rag_run_trace.py tests/unit/test_qdrant_tuning_profiles.py tests/unit/test_ingestion_pipeline.py -q`:
+  172 passed.
+- `uv run pytest tests/integration/test_pr09_pg_dump_restore_verify_live.py -q`:
+  passed in the local host environment.
+- `uv run mypy --strict .`: success, 416 files checked.
+- `uv run pyright`: 0 errors / 0 warnings.
+- `uvx bandit -q -r backend`: success, no findings.
+- `uvx vulture --config pyproject.toml`: success.
+- `uvx --from import-linter lint-imports`: Agent0 memory boundary contract
+  kept.
+- `uvx xenon --max-absolute D --max-modules B --max-average B backend`:
+  success, confirming no rank-D blocks remain.
+- `git diff --check`: clean.
+
+Known residual:
+
+- `uvx xenon --max-absolute B --max-modules B --max-average B backend` still
+  reports rank-C blocks across the historical backend. This RC removes the
+  rank-D offenders from the report and reduces targeted complexity, but does
+  not convert the entire backend to a strict B threshold in one broad refactor.
 
 ---
 
