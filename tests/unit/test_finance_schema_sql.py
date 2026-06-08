@@ -39,8 +39,13 @@ def test_entity_primary_keys_use_uuidv7() -> None:
 
 def test_hypertables_use_create_hypertable_by_range() -> None:
     sql = _sql()
-    assert "create_hypertable('market_bars', by_range('ts'), if_not_exists => TRUE)" in sql
-    assert "create_hypertable('market_features', by_range('ts'), if_not_exists => TRUE)" in sql
+    assert (
+        "create_hypertable('market_bars', by_range('ts'), if_not_exists => TRUE)" in sql
+    )
+    assert (
+        "create_hypertable('market_features', by_range('ts'), if_not_exists => TRUE)"
+        in sql
+    )
     assert (
         "create_hypertable('kronos_forecasts', by_range('forecast_ts'), "
         "if_not_exists => TRUE)"
@@ -50,7 +55,13 @@ def test_hypertables_use_create_hypertable_by_range() -> None:
 def test_schema_uses_temporal_and_jsonb_types() -> None:
     sql = _sql()
     assert sql.count("TIMESTAMPTZ") >= 15
-    for column in ("metadata JSONB", "params JSONB", "metrics JSONB", "quantiles JSONB", "quality_flags JSONB"):
+    for column in (
+        "metadata JSONB",
+        "params JSONB",
+        "metrics JSONB",
+        "quantiles JSONB",
+        "quality_flags JSONB",
+    ):
         assert column in sql
 
 

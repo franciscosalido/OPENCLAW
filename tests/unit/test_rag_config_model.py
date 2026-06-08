@@ -270,7 +270,9 @@ class RagConfigModelTests(unittest.TestCase):
             "portuguese",
         )
 
-    def test_tool_parameter_type_accepts_function_calling_json_schema_types(self) -> None:
+    def test_tool_parameter_type_accepts_function_calling_json_schema_types(
+        self,
+    ) -> None:
         data = _valid_config()
         tool_metadata = _section(data, "tool_metadata")
         parameters = tool_metadata["parameters"]
@@ -285,7 +287,9 @@ class RagConfigModelTests(unittest.TestCase):
         )
 
         config = _load_config(data)
-        observed_types = {parameter.type for parameter in config.tool_metadata.parameters}
+        observed_types = {
+            parameter.type for parameter in config.tool_metadata.parameters
+        }
 
         self.assertTrue({"boolean", "object", "array"}.issubset(observed_types))
 

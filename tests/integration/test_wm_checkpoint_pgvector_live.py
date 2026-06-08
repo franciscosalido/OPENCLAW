@@ -15,7 +15,9 @@ async def test_wm_checkpoint_pgvector_live_schema_applies() -> None:
     dsn = os.environ.get("TEST_POSTGRES_DSN") or os.environ.get("QUIMERA_POSTGRES_DSN")
     if not dsn:
         pytest.skip("set TEST_POSTGRES_DSN to run live pgvector checkpoint test")
-    sql = Path("infra/postgres/sql/020_working_memory_checkpoints.sql").read_text(encoding="utf-8")
+    sql = Path("infra/postgres/sql/020_working_memory_checkpoints.sql").read_text(
+        encoding="utf-8"
+    )
     conn = await asyncpg.connect(dsn=dsn)
     try:
         await conn.execute(sql)
@@ -30,4 +32,7 @@ async def test_wm_checkpoint_pgvector_live_schema_applies() -> None:
     finally:
         await conn.close()
 
-    assert {row["tablename"] for row in rows} == {"working_memory_snapshots", "working_memory_snapshot_points"}
+    assert {row["tablename"] for row in rows} == {
+        "working_memory_snapshots",
+        "working_memory_snapshot_points",
+    }

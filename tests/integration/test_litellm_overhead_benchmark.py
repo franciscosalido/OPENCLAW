@@ -14,7 +14,9 @@ def test_litellm_overhead_benchmark_opt_in() -> None:
     if os.environ.get("QUIMERA_LITELLM_BENCHMARK") != "1":
         pytest.skip("QUIMERA_LITELLM_BENCHMARK=1 is required")
 
-    report = run_live_benchmark(samples=int(os.environ.get("QUIMERA_LITELLM_BENCHMARK_SAMPLES", "5")))
+    report = run_live_benchmark(
+        samples=int(os.environ.get("QUIMERA_LITELLM_BENCHMARK_SAMPLES", "5"))
+    )
     if report["status"] == "diagnostic_warning":
         pytest.skip("LiteLLM/Ollama benchmark environment is not stable")
 

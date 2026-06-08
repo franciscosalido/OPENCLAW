@@ -12,7 +12,13 @@ def test_pg_stat_sql_uses_safe_showtext_false_and_config_checks() -> None:
     sql = SQL.read_text(encoding="utf-8")
 
     assert "pg_stat_statements(showtext := false)" in sql
-    for token in ("shared_preload_libraries", "compute_query_id", "pg_stat_statements.max", "pg_stat_statements.track", "track_io_timing"):
+    for token in (
+        "shared_preload_libraries",
+        "compute_query_id",
+        "pg_stat_statements.max",
+        "pg_stat_statements.track",
+        "track_io_timing",
+    ):
         assert token in sql
     assert "query text is intentionally omitted" in sql.lower()
 
@@ -28,7 +34,9 @@ def test_degraded_pg_stat_report_schema_omits_query_text() -> None:
 
 
 def test_redact_query_text_removes_literals() -> None:
-    redacted = redact_query_text("SELECT * FROM sessions WHERE agent_id = 'secret-agent' AND session_id = 'abc'")
+    redacted = redact_query_text(
+        "SELECT * FROM sessions WHERE agent_id = 'secret-agent' AND session_id = 'abc'"
+    )
 
     assert "secret-agent" not in redacted
     assert "abc" not in redacted

@@ -32,7 +32,9 @@ def test_validate_litellm_config_accepts_project_env_refs() -> None:
 
     assert cfg.litellm_settings.cache is True
     assert cfg.litellm_settings.cache_params is not None
-    assert cfg.litellm_settings.cache_params.qdrant_collection_name == "quimera_llm_cache"
+    assert (
+        cfg.litellm_settings.cache_params.qdrant_collection_name == "quimera_llm_cache"
+    )
     assert cfg.general_settings.master_key == "os.environ/LITELLM_MASTER_KEY"
     assert (
         cfg.litellm_settings.cache_params.qdrant_semantic_cache_vector_size
@@ -69,7 +71,9 @@ def test_stream_timeout_cannot_exceed_model_timeout(tmp_path: Path) -> None:
     bad_config = tmp_path / "bad_stream_timeout.yaml"
     bad_config.write_text(yaml.safe_dump(raw), encoding="utf-8")
 
-    with pytest.raises(ConfigValidationError, match="stream_timeout must be <= timeout"):
+    with pytest.raises(
+        ConfigValidationError, match="stream_timeout must be <= timeout"
+    ):
         validate_litellm_config(bad_config, env={"LITELLM_MASTER_KEY": "local-dev-key"})
 
 
@@ -95,7 +99,9 @@ def test_threshold_zero_fails(tmp_path: Path) -> None:
 
 def test_llm_cache_cannot_use_rag_cache_collection(tmp_path: Path) -> None:
     raw = yaml.safe_load(CONFIG.read_text(encoding="utf-8"))
-    raw["litellm_settings"]["cache_params"]["qdrant_collection_name"] = "quimera_query_cache"
+    raw["litellm_settings"]["cache_params"]["qdrant_collection_name"] = (
+        "quimera_query_cache"
+    )
     bad_config = tmp_path / "bad_cache_collision.yaml"
     bad_config.write_text(yaml.safe_dump(raw), encoding="utf-8")
 

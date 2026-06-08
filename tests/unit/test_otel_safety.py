@@ -31,7 +31,9 @@ def test_validate_blocks_secret_like_values() -> None:
 
 
 def test_validate_attributes_returns_sanitized_copy() -> None:
-    assert validate_attributes({"retrieval.cache_hit": True}) == {"retrieval.cache_hit": True}
+    assert validate_attributes({"retrieval.cache_hit": True}) == {
+        "retrieval.cache_hit": True
+    }
 
 
 def test_sanitize_error_message_redacts_dsn() -> None:
@@ -51,4 +53,3 @@ def test_redact_mapping_recurses_sensitive_keys() -> None:
 def test_assert_no_pii_keys_rejects_nested_payload() -> None:
     with pytest.raises(ValueError):
         assert_no_pii_keys({"quimera.stage": "ok", "quimera.payload": "bad"})
-

@@ -62,9 +62,7 @@ def _result(
         model_residency_enabled=keep_alive_applied,
         keep_alive_value="5m" if keep_alive_applied else None,
         keep_alive_applied=keep_alive_applied,
-        keep_alive_skipped_reason=(
-            None if keep_alive_applied else "disabled"
-        ),
+        keep_alive_skipped_reason=(None if keep_alive_applied else "disabled"),
         keep_alive_ineffective=baseline._keep_alive_ineffective(
             run_type=typed_run_type,
             keep_alive_applied=keep_alive_applied,
@@ -291,9 +289,7 @@ class RagLatencyBaselineTests(unittest.TestCase):
     def test_ollama_ps_parser_handles_present_absent_and_invalid(self) -> None:
         payload = {"models": [{"name": "qwen3:14b"}]}
 
-        self.assertTrue(
-            baseline._parse_ollama_ps_residency(payload, model="qwen3:14b")
-        )
+        self.assertTrue(baseline._parse_ollama_ps_residency(payload, model="qwen3:14b"))
         self.assertFalse(
             baseline._parse_ollama_ps_residency(payload, model="other:latest")
         )

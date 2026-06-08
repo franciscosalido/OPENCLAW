@@ -29,7 +29,9 @@ def _test_dsn() -> str | None:
 
 
 @pytest.fixture
-async def repo_client() -> AsyncGenerator[tuple[PostgresClient, FinanceRepository], None]:
+async def repo_client() -> AsyncGenerator[
+    tuple[PostgresClient, FinanceRepository], None
+]:
     dsn = _test_dsn()
     if not dsn:
         pytest.skip("TEST_POSTGRES_DSN or QUIMERA_POSTGRES_DSN is required")
@@ -37,7 +39,9 @@ async def repo_client() -> AsyncGenerator[tuple[PostgresClient, FinanceRepositor
     async with isolated_postgres_client(dsn, prefix="finance_repository") as client:
         async with client.pool.acquire() as conn:
             if not await is_timescale_available(conn):
-                pytest.skip("TimescaleDB extension is required for PR-02 integration tests")
+                pytest.skip(
+                    "TimescaleDB extension is required for PR-02 integration tests"
+                )
         await run_migrations(client)
         await _reset_roundtrip_state(client)
         yield client, FinanceRepository(client)
@@ -96,7 +100,14 @@ async def test_finance_repository_full_roundtrip(
     )
     await repository.upsert_market_bar(bar)
     assert await repository.upsert_market_bars([bar]) == 1
-    assert len(await repository.get_market_bars_window(instrument_id=instrument.instrument_id, timeframe="1d")) == 1
+    assert (
+        len(
+            await repository.get_market_bars_window(
+                instrument_id=instrument.instrument_id, timeframe="1d"
+            )
+        )
+        == 1
+    )
 
     feature = await repository.insert_market_feature(
         MarketFeature(
@@ -173,7 +184,9 @@ async def test_finance_repository_full_roundtrip(
             created_at=now,
         )
     )
-    fetched_manifest = await repository.get_qlib_projection_manifest(manifest.projection_id)
+    fetched_manifest = await repository.get_qlib_projection_manifest(
+        manifest.projection_id
+    )
     assert fetched_manifest == manifest
 
     await client.pool.execute(

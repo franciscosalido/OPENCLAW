@@ -24,7 +24,9 @@ class OllamaEmbedderObservabilityTests(unittest.IsolatedAsyncioTestCase):
             async with httpx.AsyncClient(
                 base_url="http://ollama.test",
                 transport=httpx.MockTransport(
-                    lambda _request: httpx.Response(200, json={"embeddings": [[0.1, 0.2]]})
+                    lambda _request: httpx.Response(
+                        200, json={"embeddings": [[0.1, 0.2]]}
+                    )
                 ),
             ) as client:
                 embedder = OllamaEmbedder(

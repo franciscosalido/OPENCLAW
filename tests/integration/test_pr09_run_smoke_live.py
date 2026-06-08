@@ -15,7 +15,14 @@ def test_pr09_run_smoke_quick_json_parseable() -> None:
     env = os.environ.copy()
     env["PYTHONPATH"] = str(Path.cwd())
     result = subprocess.run(
-        [sys.executable, "-m", "integration.smoke_summary", "--mode", "quick", "--json"],
+        [
+            sys.executable,
+            "-m",
+            "integration.smoke_summary",
+            "--mode",
+            "quick",
+            "--json",
+        ],
         env=env,
         text=True,
         stdout=subprocess.PIPE,

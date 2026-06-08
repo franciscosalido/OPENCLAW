@@ -68,7 +68,9 @@ class BootstrapCorpusTests(unittest.TestCase):
         self.assertEqual(report["mode"], "verify_only")
         store.assert_not_called()
 
-    def test_commit_writes_only_to_mapped_internal_collection_with_fake_store(self) -> None:
+    def test_commit_writes_only_to_mapped_internal_collection_with_fake_store(
+        self,
+    ) -> None:
         fake_store = FakeCommitStore()
 
         result = run_bootstrap(
@@ -86,7 +88,9 @@ class BootstrapCorpusTests(unittest.TestCase):
         )
         self.assertEqual(result.report["collection_name"], "openclaw_internal")
 
-    def test_commit_writes_only_to_mapped_financial_collection_with_fake_store(self) -> None:
+    def test_commit_writes_only_to_mapped_financial_collection_with_fake_store(
+        self,
+    ) -> None:
         fake_store = FakeCommitStore()
 
         result = run_bootstrap(
@@ -98,7 +102,9 @@ class BootstrapCorpusTests(unittest.TestCase):
         chunks, collection = fake_store.calls[0]
         self.assertEqual(collection, "openclaw_financial")
         self.assertTrue(chunks)
-        self.assertTrue(all(chunk.metadata["corpus"] == "financial" for chunk in chunks))
+        self.assertTrue(
+            all(chunk.metadata["corpus"] == "financial" for chunk in chunks)
+        )
         self.assertTrue(
             all(chunk.metadata["namespace"] == "openclaw_financial" for chunk in chunks)
         )

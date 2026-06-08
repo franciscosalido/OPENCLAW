@@ -104,9 +104,7 @@ class TestLiteLLMParamsValidator(unittest.TestCase):
     def test_https_localhost_rejected(self) -> None:
         """TLS termination proxy on localhost is also out of Gateway-0 scope."""
         with self.assertRaises(ValidationError):
-            LiteLLMParams(
-                model="local", api_base="https://localhost:11434", timeout=60
-            )
+            LiteLLMParams(model="local", api_base="https://localhost:11434", timeout=60)
 
 
 class TestGatewayConfigValidator(unittest.TestCase):
@@ -118,11 +116,7 @@ class TestGatewayConfigValidator(unittest.TestCase):
         self.assertEqual(config.alias_names, REQUIRED_ALIASES)
 
     def test_missing_single_alias_rejected(self) -> None:
-        aliases = [
-            _alias(name)
-            for name in REQUIRED_ALIASES
-            if name != "local_embed"
-        ]
+        aliases = [_alias(name) for name in REQUIRED_ALIASES if name != "local_embed"]
         with self.assertRaises(ValidationError) as ctx:
             GatewayConfig.model_validate({"model_list": aliases})
         self.assertIn("local_embed", str(ctx.exception))
@@ -183,9 +177,7 @@ class TestLoadGatewayConfigErrors(unittest.TestCase):
     def test_invalid_yaml_raises_gateway_config_error(self) -> None:
         import tempfile
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write("model_list: [\n  - broken yaml: [")
             tmp = f.name
         with self.assertRaises(GatewayConfigurationError) as ctx:
@@ -195,9 +187,7 @@ class TestLoadGatewayConfigErrors(unittest.TestCase):
     def test_non_mapping_yaml_raises_gateway_config_error(self) -> None:
         import tempfile
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write("- just\n- a list\n")
             tmp = f.name
         with self.assertRaises(GatewayConfigurationError) as ctx:
@@ -275,7 +265,9 @@ class TestActualGatewayConfig(unittest.TestCase):
             raise AssertionError("local_rag.litellm_params must be a mapping")
         extra_body = litellm_params.get("extra_body")
         if not isinstance(extra_body, dict):
-            raise AssertionError("local_rag.litellm_params.extra_body must be a mapping")
+            raise AssertionError(
+                "local_rag.litellm_params.extra_body must be a mapping"
+            )
 
         self.assertEqual(
             extra_body.get("think"),

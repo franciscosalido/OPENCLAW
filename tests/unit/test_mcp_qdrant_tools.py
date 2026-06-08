@@ -14,7 +14,9 @@ async def test_qdrant_mcp_tools_are_registered() -> None:
 
 async def test_qdrant_mcp_scroll_does_not_expose_vectors() -> None:
     server = create_qdrant_memory_server()
-    result = await server.call_tool("qdrant_scroll_safe", {"collection_name": "quimera_query_cache", "limit": 3})
+    result = await server.call_tool(
+        "qdrant_scroll_safe", {"collection_name": "quimera_query_cache", "limit": 3}
+    )
 
     assert result.structured_content is not None
     assert result.structured_content["data"]["vectors_exposed"] is False

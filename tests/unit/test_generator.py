@@ -238,7 +238,9 @@ class LocalGeneratorTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(ValueError):
                 await generator.chat([{"role": "tool", "content": "x"}])
             with self.assertRaises(ValueError):
-                await generator.chat([{"role": "user", "content": "x"}], temperature=3.0)
+                await generator.chat(
+                    [{"role": "user", "content": "x"}], temperature=3.0
+                )
 
 
 if __name__ == "__main__":

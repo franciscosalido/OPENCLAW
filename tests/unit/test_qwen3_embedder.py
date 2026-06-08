@@ -52,9 +52,7 @@ class RecordingEncoder:
         show_progress_bar: bool,
     ) -> list[list[float]]:
         texts = list(sentences)
-        self.calls.append(
-            (texts, batch_size, normalize_embeddings, show_progress_bar)
-        )
+        self.calls.append((texts, batch_size, normalize_embeddings, show_progress_bar))
         return [self._vector_for_text(text) for text in texts]
 
     def _vector_for_text(self, text: str) -> list[float]:
@@ -183,7 +181,9 @@ class Qwen3EmbedderTests(unittest.TestCase):
             with self.assertRaisesRegex(ImportError, "openclaw\\[qwen3\\]"):
                 Qwen3Embedder(_qwen3_profile())
 
-    def test_qwen3_adapter_is_not_imported_by_existing_rag_runtime_modules(self) -> None:
+    def test_qwen3_adapter_is_not_imported_by_existing_rag_runtime_modules(
+        self,
+    ) -> None:
         repo_root = Path(__file__).resolve().parents[2]
         rag_files = sorted((repo_root / "backend" / "rag").glob("*.py"))
         scanned = [

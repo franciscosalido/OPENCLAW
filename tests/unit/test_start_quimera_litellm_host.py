@@ -28,7 +28,7 @@ def test_start_quimera_probes_host_litellm_without_owning_process() -> None:
 
     assert "/health/readiness" in text
     assert "_detect_litellm_runtime()" in text
-    assert "bash \"${REPO_ROOT}/infra/litellm/start_litellm.sh\"" not in text
+    assert 'bash "${REPO_ROOT}/infra/litellm/start_litellm.sh"' not in text
 
 
 def test_start_quimera_stop_does_not_kill_litellm_processes() -> None:
@@ -48,8 +48,8 @@ def test_start_litellm_host_contract() -> None:
     assert "Refusing to reuse quimera-litellm Docker container" in text
     assert "LITELLM_MODE=PRODUCTION" in text
     assert "LITELLM_LOG=ERROR" in text
-    assert "--host \"${LITELLM_HOST}\"" in text
-    assert "--port \"${LITELLM_PORT}\"" in text
+    assert '--host "${LITELLM_HOST}"' in text
+    assert '--port "${LITELLM_PORT}"' in text
     assert "--num_workers 1" in text
     assert "--telemetry False" in text
     assert "/health/readiness" in text

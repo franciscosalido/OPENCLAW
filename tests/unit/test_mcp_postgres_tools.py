@@ -31,7 +31,9 @@ async def test_postgres_mcp_write_disabled_by_default() -> None:
 
 
 async def test_postgres_mcp_read_tools_mark_degraded_without_dsn() -> None:
-    server = create_postgres_memory_server(PostgresMcpConfig(dsn=None, write_enabled=False))
+    server = create_postgres_memory_server(
+        PostgresMcpConfig(dsn=None, write_enabled=False)
+    )
 
     result = await server.call_tool(
         "postgres_recent_turns_get",

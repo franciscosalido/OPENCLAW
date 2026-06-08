@@ -17,7 +17,9 @@ from backend.working_memory.config import WorkingMemorySettings
 
 async def test_working_memory_tools_validate_inputs_and_hide_vectors() -> None:
     session_id = str(uuid4())
-    settings = WorkingMemorySettings(vector_size=3, collection_name="quimera_working_memory_test_mcp")
+    settings = WorkingMemorySettings(
+        vector_size=3, collection_name="quimera_working_memory_test_mcp"
+    )
 
     response = await working_memory_upsert(
         agent_id="agent",
@@ -37,13 +39,26 @@ async def test_working_memory_tools_validate_inputs_and_hide_vectors() -> None:
 
 async def test_working_memory_query_limit_and_restore_cleanup_gates() -> None:
     session_id = str(uuid4())
-    settings = WorkingMemorySettings(vector_size=3, collection_name="quimera_working_memory_test_mcp")
+    settings = WorkingMemorySettings(
+        vector_size=3, collection_name="quimera_working_memory_test_mcp"
+    )
 
     with pytest.raises(ValueError, match="limit"):
-        await working_memory_query("agent", session_id, [0.1, 0.2, 0.3], limit=100, settings=settings, store=None)
+        await working_memory_query(
+            "agent",
+            session_id,
+            [0.1, 0.2, 0.3],
+            limit=100,
+            settings=settings,
+            store=None,
+        )
 
-    restore = await working_memory_restore("agent", session_id, settings=settings, restore_service=None)
-    cleanup = await working_memory_cleanup_expired(settings=settings, cleanup_service=None)
+    restore = await working_memory_restore(
+        "agent", session_id, settings=settings, restore_service=None
+    )
+    cleanup = await working_memory_cleanup_expired(
+        settings=settings, cleanup_service=None
+    )
 
     assert restore["ok"] is False
     assert "disabled" in str(restore["error"])

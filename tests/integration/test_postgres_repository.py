@@ -140,7 +140,9 @@ async def test_delete_session_cascades_turns_and_states(
     agent_id = f"test-agent-{uuid4().hex}"
     session = await repository.create_session(agent_id=agent_id)
     turn = await repository.append_turn(session.session_id, "user", "ola")
-    await repository.upsert_agent_state(agent_id, session.session_id, "plan", {"ok": True})
+    await repository.upsert_agent_state(
+        agent_id, session.session_id, "plan", {"ok": True}
+    )
     await repo_client.pool.execute(
         "DELETE FROM sessions WHERE session_id = $1", session.session_id
     )
@@ -263,7 +265,9 @@ async def test_sql_injection_payload_is_stored_not_executed(
     payload = "Robert'); DROP TABLE sessions;--"
     turn = await repository.append_turn(session.session_id, "user", payload)
     fetched = await repository.get_recent_turns(session.session_id)
-    table_exists = await repo_client.pool.fetchval("SELECT to_regclass('public.sessions')")
+    table_exists = await repo_client.pool.fetchval(
+        "SELECT to_regclass('public.sessions')"
+    )
 
     assert fetched[0].content == turn.content
     assert table_exists == "sessions"

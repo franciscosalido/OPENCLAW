@@ -99,7 +99,9 @@ async def test_litellm_runtime_aliases_respond() -> None:
             timeout_budget = config.resolve_timeout(alias)
             allowed_elapsed = timeout_budget + _SMOKE_OVERHEAD_SECONDS
             max_tokens = (
-                _MAX_TOKENS_THINKING if alias == reasoning_alias else _MAX_TOKENS_DEFAULT
+                _MAX_TOKENS_THINKING
+                if alias == reasoning_alias
+                else _MAX_TOKENS_DEFAULT
             )
             latencies: list[float] = []
             for attempt in range(1, repeat_count + 1):

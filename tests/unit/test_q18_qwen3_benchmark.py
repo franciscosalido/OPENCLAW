@@ -22,7 +22,6 @@ from evaluation.probe_embedding_model import (
     KNOWN_MODELS,
     ProbeResult,
     _ensure_localhost,
-    probe_embedding_model,
 )
 
 # ── runner profiles ───────────────────────────────────────────────────────────
@@ -51,7 +50,6 @@ from evaluation.compare_qdrant_113_vs_118 import (
     _QWEN3_SCENARIOS,
     build_summary,
     decide_qwen3_embedding,
-    decide_qdrant_118_upgrade,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -60,6 +58,7 @@ ROOT = Path(__file__).resolve().parents[2]
 # ──────────────────────────────────────────────────────────────────────────────
 # Probe: known models registry
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def test_qwen3_4b_default_dimensions_2560() -> None:
     assert KNOWN_MODELS["Qwen/Qwen3-Embedding-4B"]["expected_dimensions"] == 2560
@@ -109,6 +108,7 @@ def test_probe_localhost_guard_allows_loopback() -> None:
 # Runner profile specs
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def test_qwen3_profile_uses_expected_model_metadata() -> None:
     spec = PROFILE_SPECS["qdrant_118_qwen3_python_rrf"]
     assert spec.embedding_model == QWEN3_EMBEDDING_MODEL
@@ -134,15 +134,17 @@ def test_qwen3_and_nomic_use_distinct_collections() -> None:
 def test_all_qwen3_profiles_use_qwen3_collection() -> None:
     for name in QWEN3_PROFILES:
         spec = PROFILE_SPECS[name]
-        assert spec.default_collection == BENCHMARK_COLLECTION_QWEN3, \
+        assert spec.default_collection == BENCHMARK_COLLECTION_QWEN3, (
             f"Profile {name!r} should use Qwen3 collection but uses {spec.default_collection!r}"
+        )
 
 
 def test_all_nomic_profiles_use_nomic_collection() -> None:
     for name in NOMIC_PROFILES:
         spec = PROFILE_SPECS[name]
-        assert spec.default_collection == BENCHMARK_COLLECTION_NOMIC, \
+        assert spec.default_collection == BENCHMARK_COLLECTION_NOMIC, (
             f"Profile {name!r} should use Nomic collection but uses {spec.default_collection!r}"
+        )
 
 
 def test_embedding_dimension_mismatch_is_detectable() -> None:
@@ -181,6 +183,7 @@ def test_resolve_collection_rejects_production_name() -> None:
 # Aggregator: Qwen3 scenarios declared
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def test_qwen3_scenarios_are_declared() -> None:
     ids = {c.scenario.value for c in COMPARISONS}
     assert "qdrant_113_vs_118_qwen3_baseline" in ids
@@ -210,6 +213,7 @@ def test_nomic_and_qwen3_scenario_sets_are_disjoint() -> None:
 # Aggregator: Qwen3 embedding decision logic
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def test_decide_qwen3_returns_inconclusive_when_unavailable() -> None:
     decision = decide_qwen3_embedding([], qwen3_available=False)
     assert decision == BenchmarkDecision.QWEN3_INCONCLUSIVE_MISSING_BASELINE.value
@@ -227,50 +231,68 @@ def test_qdrant_upgrade_decision_not_affected_by_missing_qwen3() -> None:
     # The upgrade decision logic only looks at Nomic scenarios, so it
     # should still return INCONCLUSIVE due to missing Nomic evidence,
     # not because of Qwen3 scenarios.
-    assert summary.final_decision == BenchmarkDecision.INCONCLUSIVE_MISSING_EVIDENCE.value
+    assert (
+        summary.final_decision == BenchmarkDecision.INCONCLUSIVE_MISSING_EVIDENCE.value
+    )
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Aggregator: Qwen3 summary does not leak sensitive data
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def test_qwen3_summary_does_not_leak_query_payload_vectors() -> None:
     summary_path = ROOT / "evaluation/results/qdrant_118_qwen3_benchmark_summary.json"
     assert summary_path.exists(), "Qwen3 summary artifact must exist"
     text = summary_path.read_text(encoding="utf-8")
-    for forbidden in ('"query_text"', '"chunk_text"', '"dense_vector"', '"sparse_vector"',
-                      '"payload"', '"embedding"', '"vector"', '"prompt"', '"answer"'):
-        assert forbidden not in text.lower(), \
+    for forbidden in (
+        '"query_text"',
+        '"chunk_text"',
+        '"dense_vector"',
+        '"sparse_vector"',
+        '"payload"',
+        '"embedding"',
+        '"vector"',
+        '"prompt"',
+        '"answer"',
+    ):
+        assert forbidden not in text.lower(), (
             f"Qwen3 summary leaks forbidden token: {forbidden!r}"
+        )
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Qwen3 profiles: dimensions are correct
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def test_all_qwen3_profile_specs_use_2560_dimensions() -> None:
     for name in QWEN3_PROFILES:
         spec = PROFILE_SPECS[name]
-        assert spec.embedding_dimensions == 2560, \
+        assert spec.embedding_dimensions == 2560, (
             f"Qwen3 profile {name!r} should use 2560 dims, got {spec.embedding_dimensions}"
+        )
 
 
 def test_all_nomic_profile_specs_use_768_dimensions() -> None:
     for name in NOMIC_PROFILES:
         spec = PROFILE_SPECS[name]
-        assert spec.embedding_dimensions == 768, \
+        assert spec.embedding_dimensions == 768, (
             f"Nomic profile {name!r} should use 768 dims, got {spec.embedding_dimensions}"
+        )
 
 
 def test_query_instruction_recorded_for_qwen3() -> None:
     for name in QWEN3_PROFILES:
         spec = PROFILE_SPECS[name]
-        assert spec.query_instruction_used is True, \
+        assert spec.query_instruction_used is True, (
             f"Qwen3 profile {name!r} must have query_instruction_used=True"
+        )
 
 
 def test_nomic_profiles_do_not_use_query_instruction() -> None:
     for name in NOMIC_PROFILES:
         spec = PROFILE_SPECS[name]
-        assert spec.query_instruction_used is False, \
+        assert spec.query_instruction_used is False, (
             f"Nomic profile {name!r} must not use query instruction"
+        )

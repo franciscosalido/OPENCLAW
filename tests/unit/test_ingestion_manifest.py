@@ -6,7 +6,11 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from backend.ingestion.manifest import CorpusManifest, load_manifest, resolve_corpus_path
+from backend.ingestion.manifest import (
+    CorpusManifest,
+    load_manifest,
+    resolve_corpus_path,
+)
 
 
 def _document(**overrides: object) -> dict[str, object]:
@@ -45,7 +49,9 @@ class IngestionManifestTests(unittest.TestCase):
 
     def test_invalid_source_type_rejected(self) -> None:
         with self.assertRaises(ValidationError):
-            CorpusManifest.model_validate({"documents": [_document(source_type="html")]})
+            CorpusManifest.model_validate(
+                {"documents": [_document(source_type="html")]}
+            )
 
     def test_path_traversal_rejected(self) -> None:
         with self.assertRaises(ValidationError):
@@ -69,8 +75,12 @@ class IngestionManifestTests(unittest.TestCase):
             CorpusManifest.model_validate(
                 {
                     "documents": [
-                        _document(doc_id="doc_teste_a", origin_path="docs/doc_teste_a.md"),
-                        _document(doc_id="doc_teste_b", origin_path="docs/doc_teste_b.md"),
+                        _document(
+                            doc_id="doc_teste_a", origin_path="docs/doc_teste_a.md"
+                        ),
+                        _document(
+                            doc_id="doc_teste_b", origin_path="docs/doc_teste_b.md"
+                        ),
                     ],
                 },
             )
@@ -87,7 +97,9 @@ class IngestionManifestTests(unittest.TestCase):
     def test_resolve_path_stays_under_corpus_root(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             manifest_path = Path(tmpdir) / "manifest.yaml"
-            document = CorpusManifest.model_validate({"documents": [_document()]}).documents[0]
+            document = CorpusManifest.model_validate(
+                {"documents": [_document()]}
+            ).documents[0]
 
             resolved = resolve_corpus_path(manifest_path, document)
 

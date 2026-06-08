@@ -26,6 +26,8 @@ def test_benchmark_blocks_sensitive_keys() -> None:
 
 
 def test_benchmark_collection_name_must_be_synthetic() -> None:
-    assert validate_benchmark_collection_name("quimera_benchmark_session_context_abc123")
+    assert validate_benchmark_collection_name(
+        "quimera_benchmark_session_context_abc123"
+    )
     with pytest.raises(BenchmarkSafetyError):
         validate_benchmark_collection_name("quimera_knowledge")

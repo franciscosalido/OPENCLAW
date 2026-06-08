@@ -166,12 +166,16 @@ async def test_synthetic_rag_e2e_through_local_gateway() -> None:
         )
 
         assert result.chunks_used
-        assert any(chunk.doc_id == "fundo_ficticio_alfa" for chunk in result.chunks_used)
+        assert any(
+            chunk.doc_id == "fundo_ficticio_alfa" for chunk in result.chunks_used
+        )
         assert any(
             re.search(r"\[fundo_ficticio_alfa#\d+\]", message["content"])
             for message in result.messages
         )
-        assert any("Inclua citacoes" in message["content"] for message in result.messages)
+        assert any(
+            "Inclua citacoes" in message["content"] for message in result.messages
+        )
         assert len(result.answer) > 50, (
             f"Answer was too short. Got: {result.answer[:200]!r}"
         )

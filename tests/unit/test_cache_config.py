@@ -18,7 +18,9 @@ def test_cache_settings_defaults() -> None:
     assert settings.similarity_threshold == settings.threshold
 
 
-def test_cache_settings_reads_quimera_cache_env(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_cache_settings_reads_quimera_cache_env(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv("QUIMERA_CACHE_ENABLED", "0")
     monkeypatch.setenv("QUIMERA_CACHE_COLLECTION_NAME", "cache_test")
     monkeypatch.setenv("QUIMERA_CACHE_THRESHOLD", "0.7")
@@ -36,7 +38,9 @@ def test_cache_settings_reads_quimera_cache_env(monkeypatch: pytest.MonkeyPatch)
     assert settings.max_result_docs == 10
 
 
-def test_cache_settings_ignores_unprefixed_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_cache_settings_ignores_unprefixed_enabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv("ENABLED", "0")
 
     assert CacheSettings().enabled is True

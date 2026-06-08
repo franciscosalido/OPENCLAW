@@ -42,7 +42,9 @@ def test_litellm_qdrant_semantic_cache_runtime_policy(tmp_path: Path) -> None:
                 "QUIMERA_LITELLM_QDRANT_SEMANTIC_EXPERIMENTAL",
                 "0",
             ),
-            "QDRANT_API_BASE": os.environ.get("QDRANT_API_BASE", "http://127.0.0.1:6333"),
+            "QDRANT_API_BASE": os.environ.get(
+                "QDRANT_API_BASE", "http://127.0.0.1:6333"
+            ),
         },
     )
     rendered = yaml.safe_load(runtime.read_text(encoding="utf-8"))

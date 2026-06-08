@@ -15,7 +15,10 @@ class DualCorpusManifestTests(unittest.TestCase):
 
         self.assertGreaterEqual(len(manifest.documents), 5)
         self.assertTrue(
-            all(document.ingestion_policy == "internal" for document in manifest.documents)
+            all(
+                document.ingestion_policy == "internal"
+                for document in manifest.documents
+            )
         )
         self.assertTrue(
             all(document.financial_domain is None for document in manifest.documents)
@@ -26,10 +29,15 @@ class DualCorpusManifestTests(unittest.TestCase):
 
         self.assertEqual(len(manifest.documents), 9)
         self.assertTrue(
-            all(document.ingestion_policy == "financial" for document in manifest.documents)
+            all(
+                document.ingestion_policy == "financial"
+                for document in manifest.documents
+            )
         )
         self.assertTrue(
-            all(document.financial_domain is not None for document in manifest.documents)
+            all(
+                document.financial_domain is not None for document in manifest.documents
+            )
         )
 
     def test_financial_has_three_docs_per_domain(self) -> None:
@@ -41,14 +49,18 @@ class DualCorpusManifestTests(unittest.TestCase):
         self.assertEqual(counts["renda_fixa"], 3)
         self.assertEqual(counts["valuation"], 3)
 
-    def test_manifest_paths_resolve_inside_data_corpus_and_are_not_symlinks(self) -> None:
+    def test_manifest_paths_resolve_inside_data_corpus_and_are_not_symlinks(
+        self,
+    ) -> None:
         for corpus in ("internal", "financial"):
             manifest_path = manifest_path_for_corpus(corpus)
             manifest = load_manifest(manifest_path)
             for document in manifest.documents:
                 with self.subTest(corpus=corpus, doc_id=document.doc_id):
                     resolved = resolve_corpus_path(manifest_path, document)
-                    self.assertTrue(resolved.is_relative_to(Path("data/corpus").resolve()))
+                    self.assertTrue(
+                        resolved.is_relative_to(Path("data/corpus").resolve())
+                    )
                     self.assertFalse(resolved.is_symlink())
 
     def test_expected_hashes_are_pinned_and_match_files(self) -> None:

@@ -35,7 +35,12 @@ def test_hybrid_fixture_contract_is_safe_and_deterministic() -> None:
 
 
 def test_cleanup_rejects_real_collections() -> None:
-    for name in ("quimera_knowledge", "quimera_query_cache", "quimera_llm_cache", "other"):
+    for name in (
+        "quimera_knowledge",
+        "quimera_query_cache",
+        "quimera_llm_cache",
+        "other",
+    ):
         with pytest.raises(ValueError):
             assert_safe_cleanup_collection(name)
 

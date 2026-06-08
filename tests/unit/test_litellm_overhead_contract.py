@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from infra.litellm.overhead_benchmark import calculate_overhead_stats, run_live_benchmark, skipped_report
+from infra.litellm.overhead_benchmark import (
+    calculate_overhead_stats,
+    run_live_benchmark,
+    skipped_report,
+)
 
 
 def test_benchmark_is_opt_in() -> None:

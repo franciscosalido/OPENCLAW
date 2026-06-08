@@ -27,7 +27,9 @@ def _embedding_response() -> dict[str, object]:
 
 
 class GatewayEmbedObservabilityTests(unittest.IsolatedAsyncioTestCase):
-    async def test_gateway_embed_success_emits_started_and_finished_events(self) -> None:
+    async def test_gateway_embed_success_emits_started_and_finished_events(
+        self,
+    ) -> None:
         events: list[dict[str, object]] = []
 
         def sink(message: Any) -> None:

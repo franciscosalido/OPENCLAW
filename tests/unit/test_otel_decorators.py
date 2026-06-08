@@ -58,7 +58,9 @@ class FakeTracer:
         return FakeSpanContext(self.span, attributes)
 
 
-async def test_traced_llm_sets_model_context_and_latency(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_traced_llm_sets_model_context_and_latency(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     tracer = FakeTracer()
     monkeypatch.setattr(decorators, "get_tracer", lambda name: tracer)
     clear_quimera_context()
@@ -76,7 +78,9 @@ async def test_traced_llm_sets_model_context_and_latency(monkeypatch: pytest.Mon
     assert "latency.llm_ms" in tracer.span.attributes
 
 
-async def test_traced_retrieval_records_result_count_and_cache_hit(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_traced_retrieval_records_result_count_and_cache_hit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     tracer = FakeTracer()
     monkeypatch.setattr(decorators, "get_tracer", lambda name: tracer)
 
@@ -90,7 +94,9 @@ async def test_traced_retrieval_records_result_count_and_cache_hit(monkeypatch: 
     assert tracer.span.attributes["cache.hit"] is True
 
 
-async def test_decorator_records_exception_and_reraises(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_decorator_records_exception_and_reraises(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     tracer = FakeTracer()
     monkeypatch.setattr(decorators, "get_tracer", lambda name: tracer)
 
@@ -106,7 +112,9 @@ async def test_decorator_records_exception_and_reraises(monkeypatch: pytest.Monk
     assert tracer.span.status is not None
 
 
-async def test_traced_pg_sets_postgresql_semconv_attributes(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_traced_pg_sets_postgresql_semconv_attributes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     tracer = FakeTracer()
     monkeypatch.setattr(decorators, "get_tracer", lambda name: tracer)
 
@@ -147,7 +155,10 @@ def test_traced_mcp_tool_rejects_sensitive_or_free_text_tool_name() -> None:
 
 def test_decorator_rejects_sync_functions() -> None:
     with pytest.raises(TypeError, match="async functions only"):
+
         def sync_fn() -> None:
             return None
 
-        decorators.traced_embed(model="nomic-embed-text")(cast(Callable[[], Awaitable[None]], sync_fn))
+        decorators.traced_embed(model="nomic-embed-text")(
+            cast(Callable[[], Awaitable[None]], sync_fn)
+        )

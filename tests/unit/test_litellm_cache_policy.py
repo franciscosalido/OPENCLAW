@@ -12,7 +12,9 @@ from infra.litellm.render_config import render_runtime_config
 CONFIG = Path("infra/litellm/litellm_config.yaml")
 
 
-def test_renderer_falls_back_to_local_cache_without_experimental_flag(tmp_path: Path) -> None:
+def test_renderer_falls_back_to_local_cache_without_experimental_flag(
+    tmp_path: Path,
+) -> None:
     runtime = tmp_path / "runtime.yaml"
 
     result = render_runtime_config(
@@ -31,7 +33,9 @@ def test_renderer_falls_back_to_local_cache_without_experimental_flag(tmp_path: 
     assert rendered["litellm_settings"]["cache_params"]["type"] == "local"
 
 
-def test_renderer_keeps_qdrant_semantic_when_flag_and_qdrant_ready(tmp_path: Path) -> None:
+def test_renderer_keeps_qdrant_semantic_when_flag_and_qdrant_ready(
+    tmp_path: Path,
+) -> None:
     runtime = tmp_path / "runtime.yaml"
 
     result = render_runtime_config(
@@ -50,7 +54,9 @@ def test_renderer_keeps_qdrant_semantic_when_flag_and_qdrant_ready(tmp_path: Pat
     assert rendered["litellm_settings"]["cache_params"]["type"] == "qdrant-semantic"
 
 
-def test_renderer_rejects_qdrant_without_ready_backend_when_no_fallback(tmp_path: Path) -> None:
+def test_renderer_rejects_qdrant_without_ready_backend_when_no_fallback(
+    tmp_path: Path,
+) -> None:
     with pytest.raises(ConfigValidationError, match="Qdrant semantic cache requested"):
         render_runtime_config(
             source_path=CONFIG,
@@ -69,7 +75,9 @@ def test_renderer_preserves_unicode_in_runtime_yaml(tmp_path: Path) -> None:
     runtime = tmp_path / "runtime.yaml"
     raw = yaml.safe_load(CONFIG.read_text(encoding="utf-8"))
     raw["model_list"][0]["model_info"]["purpose"] = "síntese local"
-    source.write_text(yaml.safe_dump(raw, sort_keys=False, allow_unicode=True), encoding="utf-8")
+    source.write_text(
+        yaml.safe_dump(raw, sort_keys=False, allow_unicode=True), encoding="utf-8"
+    )
 
     render_runtime_config(
         source_path=source,

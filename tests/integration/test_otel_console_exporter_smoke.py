@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import pytest
 
-from backend.observability.tracer import force_flush_tracing, setup_tracing, shutdown_tracing
+from backend.observability.tracer import (
+    force_flush_tracing,
+    setup_tracing,
+    shutdown_tracing,
+)
 
 pytestmark = pytest.mark.integration
 

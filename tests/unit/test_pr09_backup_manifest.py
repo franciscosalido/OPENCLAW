@@ -5,7 +5,13 @@ import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from infra.postgres.backup_manifest import compute_sha256, create_manifest, prune_old_backups, sanitize_dsn, update_restore_verified
+from infra.postgres.backup_manifest import (
+    compute_sha256,
+    create_manifest,
+    prune_old_backups,
+    sanitize_dsn,
+    update_restore_verified,
+)
 
 
 def test_manifest_schema_hash_and_restore_update(tmp_path: Path) -> None:
@@ -25,7 +31,9 @@ def test_manifest_schema_hash_and_restore_update(tmp_path: Path) -> None:
     assert manifest["sha256"] == compute_sha256(dump)
     assert manifest["dump_size_bytes"] == dump.stat().st_size
     assert manifest["restore_verified"] is False
-    assert json.loads(manifest_path.read_text(encoding="utf-8"))["database"] == "quimera"
+    assert (
+        json.loads(manifest_path.read_text(encoding="utf-8"))["database"] == "quimera"
+    )
 
     updated = update_restore_verified(manifest_path)
     assert updated["restore_verified"] is True
@@ -33,8 +41,13 @@ def test_manifest_schema_hash_and_restore_update(tmp_path: Path) -> None:
 
 
 def test_sanitize_dsn_redacts_password() -> None:
-    assert sanitize_dsn("postgresql://user:secret@127.0.0.1:5432/quimera") == "postgresql://user:***@127.0.0.1:5432/quimera"
-    assert "secret" not in sanitize_dsn("postgresql://user:secret@127.0.0.1:5432/quimera")
+    assert (
+        sanitize_dsn("postgresql://user:secret@127.0.0.1:5432/quimera")
+        == "postgresql://user:***@127.0.0.1:5432/quimera"
+    )
+    assert "secret" not in sanitize_dsn(
+        "postgresql://user:secret@127.0.0.1:5432/quimera"
+    )
 
 
 def test_prune_old_backups_only_removes_safe_prefix(tmp_path: Path) -> None:

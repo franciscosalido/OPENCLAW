@@ -7,7 +7,12 @@ def test_latency_summary_marks_p95_unmeasured_when_stack_is_down() -> None:
     summary = build_latency_summary(
         total_ms=42.0,
         health={
-            "services": {"litellm": "fail", "ollama": "ok", "qdrant": "fail", "postgres": "fail"},
+            "services": {
+                "litellm": "fail",
+                "ollama": "ok",
+                "qdrant": "fail",
+                "postgres": "fail",
+            },
             "service_latencies_ms": {"ollama": 2.0, "qdrant": 3.0},
         },
     )
@@ -23,8 +28,18 @@ def test_latency_summary_warns_when_live_p95_exceeds_budget() -> None:
     summary = build_latency_summary(
         total_ms=900.0,
         health={
-            "services": {"litellm": "ok", "ollama": "ok", "qdrant": "ok", "postgres": "ok"},
-            "service_latencies_ms": {"litellm": 10.0, "ollama": 20.0, "qdrant": 30.0, "postgres": 40.0},
+            "services": {
+                "litellm": "ok",
+                "ollama": "ok",
+                "qdrant": "ok",
+                "postgres": "ok",
+            },
+            "service_latencies_ms": {
+                "litellm": 10.0,
+                "ollama": 20.0,
+                "qdrant": 30.0,
+                "postgres": 40.0,
+            },
         },
     )
 

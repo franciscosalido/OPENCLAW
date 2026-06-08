@@ -9,7 +9,6 @@ from typing import Any, cast
 
 import pytest
 
-import backend.rag.qdrant_tuning as tuning
 from backend.rag.qdrant_tuning import (
     BenchmarkReadiness,
     IndexTuningConfig,
@@ -96,7 +95,10 @@ def test_turboquant_is_experimental_and_requires_benchmark() -> None:
 
     assert profile.experimental is True
     assert profile.requires_benchmark is True
-    assert profile.benchmark_readiness is BenchmarkReadiness.EXPERIMENTAL_REQUIRES_BENCHMARK
+    assert (
+        profile.benchmark_readiness
+        is BenchmarkReadiness.EXPERIMENTAL_REQUIRES_BENCHMARK
+    )
     assert profile.index_config.quantization is not None
     assert profile.index_config.quantization.kind is QuantizationKind.TURBOQUANT
 
@@ -127,7 +129,13 @@ def test_profile_safe_dict_roundtrip_via_json() -> None:
 def test_to_safe_dict_has_no_forbidden_fields() -> None:
     serialized = json.dumps([profile.to_safe_dict() for profile in get_all_profiles()])
 
-    for forbidden in ("payload", "dense_vector", "sparse_vector", "embedding", "prompt"):
+    for forbidden in (
+        "payload",
+        "dense_vector",
+        "sparse_vector",
+        "embedding",
+        "prompt",
+    ):
         assert forbidden not in serialized
 
 
@@ -190,14 +198,18 @@ def test_build_qdrant_search_params_rescore() -> None:
 def test_to_qdrant_config_is_pure() -> None:
     profile = turboquant_experimental_profile()
 
-    assert build_qdrant_collection_params(profile) == build_qdrant_collection_params(profile)
+    assert build_qdrant_collection_params(profile) == build_qdrant_collection_params(
+        profile
+    )
     assert build_qdrant_search_params(profile) == build_qdrant_search_params(profile)
 
 
 def test_profiles_cover_search_params_space() -> None:
     profiles = get_all_profiles()
 
-    assert any(profile.query_config.quantization_rescore is True for profile in profiles)
+    assert any(
+        profile.query_config.quantization_rescore is True for profile in profiles
+    )
     assert any(profile.query_config.oversampling_factor == 2.0 for profile in profiles)
     assert all(profile.query_config.exact is False for profile in profiles)
 

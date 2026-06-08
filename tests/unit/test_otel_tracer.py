@@ -13,7 +13,9 @@ def test_is_otel_disabled_respects_env(monkeypatch: pytest.MonkeyPatch) -> None:
     assert tracer.is_otel_disabled() is True
 
 
-def test_batch_config_validates_export_batch_not_larger_than_queue(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_batch_config_validates_export_batch_not_larger_than_queue(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv("QUIMERA_OTEL_MAX_QUEUE_SIZE", "4")
     monkeypatch.setenv("QUIMERA_OTEL_MAX_EXPORT_BATCH_SIZE", "5")
 
@@ -48,4 +50,3 @@ def test_doctor_report_checks_litellm_callback_and_no_requests_import() -> None:
     checks = report["checks"]
     assert checks["backend_observability_imports_requests"] is False
     assert checks["opentelemetry_packages_importable"] is True
-

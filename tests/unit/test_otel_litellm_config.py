@@ -34,4 +34,3 @@ def test_ensure_litellm_otel_callback_present_is_explicit_edit(tmp_path: Path) -
     cfg = yaml.safe_load(path.read_text(encoding="utf-8"))
     assert cfg["litellm_settings"]["callbacks"] == ["otel"]
     assert cfg["callback_settings"]["otel"]["message_logging"] is False
-

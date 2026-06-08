@@ -98,7 +98,9 @@ class LocalRagPipelineSmokeTests(unittest.IsolatedAsyncioTestCase):
         self.assertGreater(len(result.answer), 50)
         self.assertIn("[selic_sintetica#0]", result.answer)
         self.assertIn("[rebalanceamento_sintetico#1]", result.answer)
-        self.assertEqual(result.citations, ["selic_sintetica#0", "rebalanceamento_sintetico#1"])
+        self.assertEqual(
+            result.citations, ["selic_sintetica#0", "rebalanceamento_sintetico#1"]
+        )
         self.assertEqual(len(result.chunks_used), 2)
         self.assertEqual(retriever.seen_question, "Qual o impacto sintetico da Selic?")
         self.assertEqual(retriever.seen_top_k, 2)

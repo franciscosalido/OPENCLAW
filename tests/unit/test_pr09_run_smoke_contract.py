@@ -14,7 +14,15 @@ def test_run_smoke_script_contract() -> None:
 
     assert SCRIPT.exists()
     assert "set -euo pipefail" in text
-    for flag in ("--quick", "--full", "--diagnostic", "--json", "--leave-running", "--no-build", "--timeout"):
+    for flag in (
+        "--quick",
+        "--full",
+        "--diagnostic",
+        "--json",
+        "--leave-running",
+        "--no-build",
+        "--timeout",
+    ):
         assert flag in text
     assert "docker compose" in text
     assert "--wait" in text
@@ -36,7 +44,14 @@ def test_start_quimera_does_not_reintroduce_smoke_subcommand() -> None:
 def test_run_smoke_exit_codes_documented() -> None:
     text = SCRIPT.read_text(encoding="utf-8")
 
-    for expected in ("0: ok", "1: fail", "2: degraded", "3: configuration error", "4: backup/restore", "5: latency regression"):
+    for expected in (
+        "0: ok",
+        "1: fail",
+        "2: degraded",
+        "3: configuration error",
+        "4: backup/restore",
+        "5: latency regression",
+    ):
         assert expected in text
 
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -31,7 +32,9 @@ class GoldenBaselineGateTests(unittest.TestCase):
             with self.assertRaises(compare_golden_runs.Gateway2GateError) as ctx:
                 compare_golden_runs.verify_gateway2_summary(path)
 
-        self.assertEqual(ctx.exception.exit_code, compare_golden_runs.EXIT_SCHEMA_SANITIZATION)
+        self.assertEqual(
+            ctx.exception.exit_code, compare_golden_runs.EXIT_SCHEMA_SANITIZATION
+        )
 
     def test_fixture_hash_mismatch_fails_with_exit_code_5(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -41,7 +44,9 @@ class GoldenBaselineGateTests(unittest.TestCase):
             candidate_summary["question_fixture_hash"] = "different_fixture_hash"
             for result in candidate_results:
                 result["question_fixture_hash"] = "different_fixture_hash"
-            baseline_path = _write_report(temp_path / "baseline", baseline_summary, results)
+            baseline_path = _write_report(
+                temp_path / "baseline", baseline_summary, results
+            )
             candidate_path = _write_report(
                 temp_path / "candidate",
                 candidate_summary,
@@ -61,7 +66,9 @@ class GoldenBaselineGateTests(unittest.TestCase):
             with self.assertRaises(compare_golden_runs.Gateway2GateError) as ctx:
                 compare_golden_runs.verify_gateway2_summary(path)
 
-        self.assertEqual(ctx.exception.exit_code, compare_golden_runs.EXIT_SCHEMA_SANITIZATION)
+        self.assertEqual(
+            ctx.exception.exit_code, compare_golden_runs.EXIT_SCHEMA_SANITIZATION
+        )
 
     def test_mixed_cold_warm_aggregate_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -72,7 +79,9 @@ class GoldenBaselineGateTests(unittest.TestCase):
             with self.assertRaises(compare_golden_runs.Gateway2GateError) as ctx:
                 compare_golden_runs.verify_gateway2_summary(path)
 
-        self.assertEqual(ctx.exception.exit_code, compare_golden_runs.EXIT_SCHEMA_SANITIZATION)
+        self.assertEqual(
+            ctx.exception.exit_code, compare_golden_runs.EXIT_SCHEMA_SANITIZATION
+        )
 
     def test_sanitization_prohibited_answer_key_fails(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -83,7 +92,9 @@ class GoldenBaselineGateTests(unittest.TestCase):
             with self.assertRaises(compare_golden_runs.Gateway2GateError) as ctx:
                 compare_golden_runs.verify_gateway2_summary(path)
 
-        self.assertEqual(ctx.exception.exit_code, compare_golden_runs.EXIT_SCHEMA_SANITIZATION)
+        self.assertEqual(
+            ctx.exception.exit_code, compare_golden_runs.EXIT_SCHEMA_SANITIZATION
+        )
 
     def test_citation_regression_fails_with_exit_code_3(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -91,10 +102,15 @@ class GoldenBaselineGateTests(unittest.TestCase):
             baseline_summary, results = _baseline_copy()
             candidate_summary, candidate_results = _baseline_copy()
             for result in candidate_results:
-                if result["alias"] == "local_rag" and result["run_type"] == "warm_model":
+                if (
+                    result["alias"] == "local_rag"
+                    and result["run_type"] == "warm_model"
+                ):
                     result["citation_present"] = False
                     break
-            baseline_path = _write_report(temp_path / "baseline", baseline_summary, results)
+            baseline_path = _write_report(
+                temp_path / "baseline", baseline_summary, results
+            )
             candidate_path = _write_report(
                 temp_path / "candidate",
                 candidate_summary,
@@ -111,9 +127,14 @@ class GoldenBaselineGateTests(unittest.TestCase):
             baseline_summary, results = _baseline_copy()
             candidate_summary, candidate_results = _baseline_copy()
             for result in candidate_results:
-                if result["alias"] == "local_rag" and result["run_type"] == "warm_model":
+                if (
+                    result["alias"] == "local_rag"
+                    and result["run_type"] == "warm_model"
+                ):
                     result["total_ms"] = _as_float(result["total_ms"]) * 1.5
-            baseline_path = _write_report(temp_path / "baseline", baseline_summary, results)
+            baseline_path = _write_report(
+                temp_path / "baseline", baseline_summary, results
+            )
             candidate_path = _write_report(
                 temp_path / "candidate",
                 candidate_summary,
@@ -130,9 +151,14 @@ class GoldenBaselineGateTests(unittest.TestCase):
             baseline_summary, results = _baseline_copy()
             candidate_summary, candidate_results = _baseline_copy()
             for result in candidate_results:
-                if result["alias"] == "local_rag" and result["run_type"] == "warm_model":
+                if (
+                    result["alias"] == "local_rag"
+                    and result["run_type"] == "warm_model"
+                ):
                     result["total_ms"] = _as_float(result["total_ms"]) * 0.95
-            baseline_path = _write_report(temp_path / "baseline", baseline_summary, results)
+            baseline_path = _write_report(
+                temp_path / "baseline", baseline_summary, results
+            )
             candidate_path = _write_report(
                 temp_path / "candidate",
                 candidate_summary,
@@ -151,7 +177,9 @@ class GoldenBaselineGateTests(unittest.TestCase):
             temp_path = Path(tmpdir)
             baseline_summary, results = _baseline_copy()
             candidate_summary, candidate_results = _baseline_copy()
-            baseline_path = _write_report(temp_path / "baseline", baseline_summary, results)
+            baseline_path = _write_report(
+                temp_path / "baseline", baseline_summary, results
+            )
             candidate_path = _write_report(
                 temp_path / "candidate",
                 candidate_summary,
@@ -180,9 +208,7 @@ class GoldenBaselineGateTests(unittest.TestCase):
         rag_rows = [row for row in report.results if row["alias"] == "local_rag"]
 
         self.assertTrue(rag_rows)
-        self.assertTrue(
-            all(row.get("metric_unavailable_reason") for row in rag_rows)
-        )
+        self.assertTrue(all(row.get("metric_unavailable_reason") for row in rag_rows))
 
     def test_thresholds_loaded_from_yaml(self) -> None:
         thresholds = compare_golden_runs.load_thresholds(THRESHOLDS)
@@ -198,7 +224,9 @@ class GoldenBaselineGateTests(unittest.TestCase):
             temp_path = Path(tmpdir)
             baseline_summary, results = _baseline_copy()
             candidate_summary, candidate_results = _baseline_copy()
-            baseline_path = _write_report(temp_path / "baseline", baseline_summary, results)
+            baseline_path = _write_report(
+                temp_path / "baseline", baseline_summary, results
+            )
             candidate_path = _write_report(
                 temp_path / "candidate",
                 candidate_summary,
@@ -210,18 +238,44 @@ class GoldenBaselineGateTests(unittest.TestCase):
 
         self.assertEqual(exit_code, compare_golden_runs.EXIT_OK)
 
-    def test_generated_reports_ignored_and_official_baseline_not_ignored(self) -> None:
-        gitignore = Path(".gitignore").read_text(encoding="utf-8")
+    def test_generated_report_dirs_are_ignored_and_baseline_files_are_tracked(
+        self,
+    ) -> None:
+        for report_path in (
+            "reports/golden/example.json",
+            "reports/gateway2/example.json",
+            "reports/ci/example.json",
+        ):
+            with self.subTest(report_path=report_path):
+                self.assertTrue(_git_path_is_ignored(report_path))
 
-        self.assertIn("reports/golden/", gitignore)
-        self.assertIn("reports/gateway2/", gitignore)
-        self.assertIn("reports/ci/", gitignore)
-        self.assertIn("!tests/golden/baseline/gateway2_baseline_summary.json", gitignore)
-        self.assertIn("!tests/golden/baseline/gateway2_baseline_results.jsonl", gitignore)
-        self.assertIn(
-            "!tests/golden/baseline/gateway2_regression_thresholds.yaml",
-            gitignore,
+        self.assertFalse(
+            _git_path_is_ignored(
+                "tests/golden/baseline/gateway2_baseline_summary.json",
+            )
         )
+        self.assertFalse(
+            _git_path_is_ignored(
+                "tests/golden/baseline/gateway2_baseline_results.jsonl",
+            )
+        )
+        self.assertFalse(
+            _git_path_is_ignored(
+                "tests/golden/baseline/gateway2_regression_thresholds.yaml",
+            )
+        )
+
+
+def _git_path_is_ignored(path: str) -> bool:
+    result = subprocess.run(
+        ["git", "check-ignore", "-q", "--no-index", path],
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    if result.returncode not in {0, 1}:
+        raise AssertionError(f"git check-ignore failed for {path}")
+    return result.returncode == 0
 
 
 def _baseline_copy() -> tuple[dict[str, object], list[dict[str, object]]]:

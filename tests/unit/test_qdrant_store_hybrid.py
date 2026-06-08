@@ -152,7 +152,9 @@ class HybridCollectionConfigTests(unittest.TestCase):
         config = HybridCollectionConfig()
         schema = config.to_qdrant_vectors_config()
         vectors = cast(dict[str, models.VectorParams], schema["vectors_config"])
-        sparse = cast(dict[str, models.SparseVectorParams], schema["sparse_vectors_config"])
+        sparse = cast(
+            dict[str, models.SparseVectorParams], schema["sparse_vectors_config"]
+        )
 
         self.assertEqual(set(vectors), {"dense"})
         self.assertEqual(vectors["dense"].size, 1024)
@@ -194,7 +196,9 @@ class HybridCollectionOperationTests(unittest.TestCase):
         created = client.created[0]
         self.assertEqual(created["collection_name"], HYBRID_COLLECTION_NAME)
         vectors = cast(dict[str, models.VectorParams], created["vectors_config"])
-        sparse = cast(dict[str, models.SparseVectorParams], created["sparse_vectors_config"])
+        sparse = cast(
+            dict[str, models.SparseVectorParams], created["sparse_vectors_config"]
+        )
         self.assertEqual(vectors["dense"].size, QWEN3_EMBEDDING_DIMENSIONS)
         self.assertIsNone(sparse["sparse"].modifier)
 
@@ -261,7 +265,9 @@ class HybridPointTests(unittest.TestCase):
         self.assertEqual(payload["embedding_model"], QWEN3_EMBEDDING_MODEL)
 
     def test_build_hybrid_point_rejects_wrong_dense_dimension(self) -> None:
-        with self.assertRaisesRegex(ValueError, "dense_vector has 1d, spec expects 1024d"):
+        with self.assertRaisesRegex(
+            ValueError, "dense_vector has 1d, spec expects 1024d"
+        ):
             build_hybrid_point(
                 point_id="point-1",
                 dense_vector=[0.1],

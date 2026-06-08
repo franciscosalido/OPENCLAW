@@ -23,7 +23,9 @@ def _test_dsn() -> str | None:
 
 
 @pytest.fixture
-async def repo_client() -> AsyncGenerator[tuple[PostgresClient, FinanceRepository], None]:
+async def repo_client() -> AsyncGenerator[
+    tuple[PostgresClient, FinanceRepository], None
+]:
     dsn = _test_dsn()
     if not dsn:
         pytest.skip("TEST_POSTGRES_DSN or QUIMERA_POSTGRES_DSN is required")

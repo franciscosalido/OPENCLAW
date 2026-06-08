@@ -17,6 +17,11 @@ def test_pr07_benchmark_real_mode_is_opt_in() -> None:
 
 
 def test_postgres_container_stopped_during_benchmark() -> None:
-    if os.getenv("QUIMERA_TEST_CAN_CONTROL_RUNTIME") != "1" or os.getenv("QUIMERA_BENCHMARK_REAL") != "1":
+    if (
+        os.getenv("QUIMERA_TEST_CAN_CONTROL_RUNTIME") != "1"
+        or os.getenv("QUIMERA_BENCHMARK_REAL") != "1"
+    ):
         pytest.skip("runtime control and real benchmark opt-in are required")
-    raise BenchmarkBackendUnavailable("postgres unavailable during controlled benchmark")
+    raise BenchmarkBackendUnavailable(
+        "postgres unavailable during controlled benchmark"
+    )

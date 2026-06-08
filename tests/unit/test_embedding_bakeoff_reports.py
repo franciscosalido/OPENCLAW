@@ -38,7 +38,9 @@ def test_csv_has_required_columns(tmp_path: Path) -> None:
 
 
 def test_svg_contains_nomic_qwen_quality_latency() -> None:
-    svg = render_bakeoff_svg(build_empty_bakeoff_summary(generated_at_utc="2026-05-28T00:00:00Z"))
+    svg = render_bakeoff_svg(
+        build_empty_bakeoff_summary(generated_at_utc="2026-05-28T00:00:00Z")
+    )
     assert "<svg" in svg
     assert "Qwen3-Embedding-4B" in svg
     assert "Nomic" in svg
@@ -57,7 +59,9 @@ def test_pkd_machine_readable_block_parseable() -> None:
     assert parsed["winner"] is None
 
 
-def test_outputs_do_not_contain_query_text_payload_vectors_embeddings(tmp_path: Path) -> None:
+def test_outputs_do_not_contain_query_text_payload_vectors_embeddings(
+    tmp_path: Path,
+) -> None:
     summary = build_empty_bakeoff_summary(generated_at_utc="2026-05-28T00:00:00Z")
     paths = {
         "summary": tmp_path / "summary.json",
@@ -69,7 +73,9 @@ def test_outputs_do_not_contain_query_text_payload_vectors_embeddings(tmp_path: 
     compare.write_rows_csv(summary, paths["rows"])
     compare.write_markdown_report(summary, paths["report"])
     compare.write_svg(summary, paths["svg"])
-    joined = "\n".join(path.read_text(encoding="utf-8").lower() for path in paths.values())
+    joined = "\n".join(
+        path.read_text(encoding="utf-8").lower() for path in paths.values()
+    )
     allowed_safety_flags = (
         "includes_query_text",
         "includes_document_text",
@@ -95,7 +101,9 @@ def test_outputs_do_not_contain_query_text_payload_vectors_embeddings(tmp_path: 
         assert forbidden not in joined
 
 
-def test_artifact_only_main_generates_outputs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_artifact_only_main_generates_outputs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.chdir(tmp_path)
     assert compare.main([]) == 0
     assert (tmp_path / compare.SUMMARY_PATH).exists()
@@ -152,7 +160,9 @@ async def _fake_q18_runner(**kwargs: object) -> dict[str, object]:
     return _fake_q18_artifact(profile_name)
 
 
-async def _fake_embedding_probe(scenario: EmbeddingBakeoffScenario) -> EmbeddingBakeoffMetrics:
+async def _fake_embedding_probe(
+    scenario: EmbeddingBakeoffScenario,
+) -> EmbeddingBakeoffMetrics:
     return EmbeddingBakeoffMetrics(
         embed_ms_p50=3.0,
         embed_ms_p95=3.0,

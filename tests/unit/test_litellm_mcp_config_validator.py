@@ -16,7 +16,9 @@ def test_litellm_accepts_loopback_mcp_servers() -> None:
 
     assert "quimera_postgres_memory" in cfg.mcp_servers
     assert cfg.mcp_servers["quimera_postgres_memory"].url == "http://127.0.0.1:8811/mcp"
-    assert cfg.mcp_servers["quimera_qdrant_memory"].available_on_public_internet is False
+    assert (
+        cfg.mcp_servers["quimera_qdrant_memory"].available_on_public_internet is False
+    )
     assert cfg.mcp_servers["quimera_working_memory"].url == "http://127.0.0.1:8813/mcp"
 
 

@@ -113,7 +113,9 @@ def retrieval(
     )
 
 
-def runs_and_metrics() -> tuple[EvaluationRun, EvaluationRun, list[QueryMetrics], list[QueryMetrics]]:
+def runs_and_metrics() -> tuple[
+    EvaluationRun, EvaluationRun, list[QueryMetrics], list[QueryMetrics]
+]:
     queries = (
         q("q1", qrels={"doc-a": 2, "doc-b": 0}),
         q("q2", category=QueryCategory.MACRO, qrels={"doc-c": 2, "doc-d": 1}),
@@ -139,9 +141,21 @@ def runs_and_metrics() -> tuple[EvaluationRun, EvaluationRun, list[QueryMetrics]
         rrf_profile_name="default",
     )
     dense = [
-        metric_for(queries[0], RetrievalMode.DENSE_ONLY, retrieval(("doc-b", "doc-x"), latency=8.0)),
-        metric_for(queries[1], RetrievalMode.DENSE_ONLY, retrieval(("doc-x", "doc-y"), latency=9.0)),
-        metric_for(queries[2], RetrievalMode.DENSE_ONLY, retrieval(("doc-x", "doc-y"), latency=10.0)),
+        metric_for(
+            queries[0],
+            RetrievalMode.DENSE_ONLY,
+            retrieval(("doc-b", "doc-x"), latency=8.0),
+        ),
+        metric_for(
+            queries[1],
+            RetrievalMode.DENSE_ONLY,
+            retrieval(("doc-x", "doc-y"), latency=9.0),
+        ),
+        metric_for(
+            queries[2],
+            RetrievalMode.DENSE_ONLY,
+            retrieval(("doc-x", "doc-y"), latency=10.0),
+        ),
     ]
     hybrid = [
         metric_for(
@@ -157,7 +171,9 @@ def runs_and_metrics() -> tuple[EvaluationRun, EvaluationRun, list[QueryMetrics]
         metric_for(
             queries[2],
             RetrievalMode.HYBRID,
-            retrieval(("doc-e", "doc-x"), latency=14.0, personality="sparse_only_rescue"),
+            retrieval(
+                ("doc-e", "doc-x"), latency=14.0, personality="sparse_only_rescue"
+            ),
         ),
     ]
     return dense_run, hybrid_run, dense, hybrid
@@ -175,7 +191,9 @@ def metric_for(
         rank_1_doc_id=result.rank_1_doc_id,
         hit_doc_ids=result.hit_doc_ids,
         hit_result_ids=result.hit_result_ids,
-        relevant_doc_ids=tuple(doc_id for doc_id, grade in query.qrels.items() if grade > 0),
+        relevant_doc_ids=tuple(
+            doc_id for doc_id, grade in query.qrels.items() if grade > 0
+        ),
         precision_at_5=precision_at_k(result.hit_doc_ids, query.qrels, 5),
         recall_at_10=recall_at_k(result.hit_doc_ids, query.qrels, 10),
         mrr=reciprocal_rank(result.hit_doc_ids, query.qrels),
@@ -257,11 +275,17 @@ def test_percentiles_bootstrap_and_delta_pair_are_deterministic() -> None:
 
 def test_eval_query_validation_and_adversarial_empty_qrels() -> None:
     with pytest.raises(ValueError, match="query_id cannot be empty"):
-        EvalQuery(query_id=" ", text="hello", category=QueryCategory.LEXICAL, qrels={"a": 1})
+        EvalQuery(
+            query_id=" ", text="hello", category=QueryCategory.LEXICAL, qrels={"a": 1}
+        )
     with pytest.raises(ValueError, match="text cannot contain null bytes"):
-        EvalQuery(query_id="q", text="a\x00b", category=QueryCategory.LEXICAL, qrels={"a": 1})
+        EvalQuery(
+            query_id="q", text="a\x00b", category=QueryCategory.LEXICAL, qrels={"a": 1}
+        )
     with pytest.raises(ValueError, match="qrel grade"):
-        EvalQuery(query_id="q", text="hello", category=QueryCategory.LEXICAL, qrels={"a": 3})
+        EvalQuery(
+            query_id="q", text="hello", category=QueryCategory.LEXICAL, qrels={"a": 3}
+        )
     with pytest.raises(ValueError, match="non-adversarial"):
         EvalQuery(query_id="q", text="hello", category=QueryCategory.LEXICAL, qrels={})
 
@@ -372,7 +396,9 @@ async def test_run_mode_computes_metrics_and_calls_cooldown() -> None:
     assert sleeper.calls == [0.05]
 
 
-def test_paired_query_metrics_guard_allows_order_mismatch_but_rejects_coverage() -> None:
+def test_paired_query_metrics_guard_allows_order_mismatch_but_rejects_coverage() -> (
+    None
+):
     _dense_run, _hybrid_run, dense, hybrid = runs_and_metrics()
     assert_paired_query_metrics(dense, hybrid)
     assert_paired_query_metrics(dense, list(reversed(hybrid)))
@@ -433,8 +459,14 @@ def test_category_latency_personality_and_summary_verdict() -> None:
         generated_at_iso="2026-05-21T00:00:00+00:00",
     )
 
-    assert summary.aggregate_metrics_by_mode["hybrid"]["recall_at_10"] >= summary.aggregate_metrics_by_mode["dense_only"]["recall_at_10"]
-    assert summary.latency_summary["hybrid"]["p95_ms"] >= summary.latency_summary["dense_only"]["p95_ms"]
+    assert (
+        summary.aggregate_metrics_by_mode["hybrid"]["recall_at_10"]
+        >= summary.aggregate_metrics_by_mode["dense_only"]["recall_at_10"]
+    )
+    assert (
+        summary.latency_summary["hybrid"]["p95_ms"]
+        >= summary.latency_summary["dense_only"]["p95_ms"]
+    )
     assert summary.retrieval_personality_counts["lexical_boost"] == 1
     assert category_breakdown(dense, hybrid)["lexical"]["wins"] == 1.0
     assert decide_hybrid_promotion(summary).verdict in {
@@ -484,14 +516,26 @@ def test_verdict_cases_hybrid_dense_no_significant_and_inconclusive() -> None:
 def test_verdict_latency_p95_blocks_hybrid_promotion() -> None:
     dense_run, hybrid_run, _dense, _hybrid = runs_and_metrics()
     dense = [
-        manual_metric("q1", mode=RetrievalMode.DENSE_ONLY, ndcg=0.0, recall=0.0, latency=10.0),
-        manual_metric("q2", mode=RetrievalMode.DENSE_ONLY, ndcg=0.0, recall=0.0, latency=10.0),
-        manual_metric("q3", mode=RetrievalMode.DENSE_ONLY, ndcg=0.0, recall=0.0, latency=10.0),
+        manual_metric(
+            "q1", mode=RetrievalMode.DENSE_ONLY, ndcg=0.0, recall=0.0, latency=10.0
+        ),
+        manual_metric(
+            "q2", mode=RetrievalMode.DENSE_ONLY, ndcg=0.0, recall=0.0, latency=10.0
+        ),
+        manual_metric(
+            "q3", mode=RetrievalMode.DENSE_ONLY, ndcg=0.0, recall=0.0, latency=10.0
+        ),
     ]
     hybrid = [
-        manual_metric("q1", mode=RetrievalMode.HYBRID, ndcg=1.0, recall=1.0, latency=100.0),
-        manual_metric("q2", mode=RetrievalMode.HYBRID, ndcg=1.0, recall=1.0, latency=100.0),
-        manual_metric("q3", mode=RetrievalMode.HYBRID, ndcg=1.0, recall=1.0, latency=100.0),
+        manual_metric(
+            "q1", mode=RetrievalMode.HYBRID, ndcg=1.0, recall=1.0, latency=100.0
+        ),
+        manual_metric(
+            "q2", mode=RetrievalMode.HYBRID, ndcg=1.0, recall=1.0, latency=100.0
+        ),
+        manual_metric(
+            "q3", mode=RetrievalMode.HYBRID, ndcg=1.0, recall=1.0, latency=100.0
+        ),
     ]
 
     summary = build_summary(
@@ -529,16 +573,32 @@ def test_verdict_dense_win_rate_blocks_hybrid_promotion() -> None:
         rrf_profile_name="default",
     )
     dense = [
-        manual_metric("q1", mode=RetrievalMode.DENSE_ONLY, ndcg=0.0, recall=0.0, latency=10.0),
-        manual_metric("q2", mode=RetrievalMode.DENSE_ONLY, ndcg=0.0, recall=0.0, latency=10.0),
-        manual_metric("q3", mode=RetrievalMode.DENSE_ONLY, ndcg=0.9, recall=0.9, latency=10.0),
-        manual_metric("q4", mode=RetrievalMode.DENSE_ONLY, ndcg=0.9, recall=0.9, latency=10.0),
+        manual_metric(
+            "q1", mode=RetrievalMode.DENSE_ONLY, ndcg=0.0, recall=0.0, latency=10.0
+        ),
+        manual_metric(
+            "q2", mode=RetrievalMode.DENSE_ONLY, ndcg=0.0, recall=0.0, latency=10.0
+        ),
+        manual_metric(
+            "q3", mode=RetrievalMode.DENSE_ONLY, ndcg=0.9, recall=0.9, latency=10.0
+        ),
+        manual_metric(
+            "q4", mode=RetrievalMode.DENSE_ONLY, ndcg=0.9, recall=0.9, latency=10.0
+        ),
     ]
     hybrid = [
-        manual_metric("q1", mode=RetrievalMode.HYBRID, ndcg=1.0, recall=1.0, latency=12.0),
-        manual_metric("q2", mode=RetrievalMode.HYBRID, ndcg=1.0, recall=1.0, latency=12.0),
-        manual_metric("q3", mode=RetrievalMode.HYBRID, ndcg=0.8, recall=0.8, latency=12.0),
-        manual_metric("q4", mode=RetrievalMode.HYBRID, ndcg=0.8, recall=0.8, latency=12.0),
+        manual_metric(
+            "q1", mode=RetrievalMode.HYBRID, ndcg=1.0, recall=1.0, latency=12.0
+        ),
+        manual_metric(
+            "q2", mode=RetrievalMode.HYBRID, ndcg=1.0, recall=1.0, latency=12.0
+        ),
+        manual_metric(
+            "q3", mode=RetrievalMode.HYBRID, ndcg=0.8, recall=0.8, latency=12.0
+        ),
+        manual_metric(
+            "q4", mode=RetrievalMode.HYBRID, ndcg=0.8, recall=0.8, latency=12.0
+        ),
     ]
 
     summary = build_summary(
@@ -602,12 +662,16 @@ def test_json_markdown_svg_and_terminal_outputs_are_safe(tmp_path: Path) -> None
             *build_query_rows(
                 run=dense_run,
                 metrics=dense,
-                qdrant_snapshot=QdrantConfigSnapshot(collection_name="quimera_knowledge_v2"),
+                qdrant_snapshot=QdrantConfigSnapshot(
+                    collection_name="quimera_knowledge_v2"
+                ),
             ),
             *build_query_rows(
                 run=hybrid_run,
                 metrics=hybrid,
-                qdrant_snapshot=QdrantConfigSnapshot(collection_name="quimera_knowledge_v2"),
+                qdrant_snapshot=QdrantConfigSnapshot(
+                    collection_name="quimera_knowledge_v2"
+                ),
             ),
         ],
         summary=summary,
@@ -642,14 +706,26 @@ def test_json_markdown_svg_and_terminal_outputs_are_safe(tmp_path: Path) -> None
 def test_svg_zero_metric_values_and_negative_delta_render() -> None:
     dense_run, hybrid_run, _dense, _hybrid = runs_and_metrics()
     dense = [
-        manual_metric("q1", mode=RetrievalMode.DENSE_ONLY, ndcg=1.0, recall=1.0, latency=10.0),
-        manual_metric("q2", mode=RetrievalMode.DENSE_ONLY, ndcg=0.0, recall=0.0, latency=10.0),
-        manual_metric("q3", mode=RetrievalMode.DENSE_ONLY, ndcg=0.0, recall=0.0, latency=10.0),
+        manual_metric(
+            "q1", mode=RetrievalMode.DENSE_ONLY, ndcg=1.0, recall=1.0, latency=10.0
+        ),
+        manual_metric(
+            "q2", mode=RetrievalMode.DENSE_ONLY, ndcg=0.0, recall=0.0, latency=10.0
+        ),
+        manual_metric(
+            "q3", mode=RetrievalMode.DENSE_ONLY, ndcg=0.0, recall=0.0, latency=10.0
+        ),
     ]
     hybrid = [
-        manual_metric("q1", mode=RetrievalMode.HYBRID, ndcg=0.0, recall=0.0, latency=12.0),
-        manual_metric("q2", mode=RetrievalMode.HYBRID, ndcg=0.0, recall=0.0, latency=12.0),
-        manual_metric("q3", mode=RetrievalMode.HYBRID, ndcg=1.0, recall=1.0, latency=12.0),
+        manual_metric(
+            "q1", mode=RetrievalMode.HYBRID, ndcg=0.0, recall=0.0, latency=12.0
+        ),
+        manual_metric(
+            "q2", mode=RetrievalMode.HYBRID, ndcg=0.0, recall=0.0, latency=12.0
+        ),
+        manual_metric(
+            "q3", mode=RetrievalMode.HYBRID, ndcg=1.0, recall=1.0, latency=12.0
+        ),
     ]
 
     summary = build_summary(
@@ -698,7 +774,9 @@ async def test_static_runner_returns_empty_for_unknown_query() -> None:
     assert result.retrieval_personality == "empty"
 
 
-def test_main_dry_run_writes_outputs(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_main_dry_run_writes_outputs(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     exit_code = asyncio.run(
         comparator.main(
             [
@@ -721,7 +799,9 @@ def test_main_dry_run_writes_outputs(tmp_path: Path, capsys: pytest.CaptureFixtu
     assert (tmp_path / "dense_vs_hybrid_charts.svg").exists()
 
 
-def test_main_live_mode_is_explicitly_not_wired(capsys: pytest.CaptureFixture[str]) -> None:
+def test_main_live_mode_is_explicitly_not_wired(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     exit_code = asyncio.run(comparator.main(["--run-live"]))
     captured = capsys.readouterr()
 
@@ -729,7 +809,9 @@ def test_main_live_mode_is_explicitly_not_wired(capsys: pytest.CaptureFixture[st
     assert "live mode is not wired" in captured.err
 
 
-def test_include_debug_text_is_explicitly_rejected(capsys: pytest.CaptureFixture[str]) -> None:
+def test_include_debug_text_is_explicitly_rejected(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     exit_code = asyncio.run(comparator.main(["--include-debug-text"]))
     captured = capsys.readouterr()
 
@@ -740,7 +822,15 @@ def test_include_debug_text_is_explicitly_rejected(capsys: pytest.CaptureFixture
 def test_script_static_imports_do_not_use_heavy_or_live_dependencies() -> None:
     source = Path(comparator.__file__).read_text(encoding="utf-8")
     tree = ast.parse(source)
-    forbidden = {"qdrant_client", "numpy", "pandas", "scipy", "seaborn", "plotly", "matplotlib"}
+    forbidden = {
+        "qdrant_client",
+        "numpy",
+        "pandas",
+        "scipy",
+        "seaborn",
+        "plotly",
+        "matplotlib",
+    }
     imported_roots: set[str] = set()
     call_names: set[str] = set()
 

@@ -42,7 +42,9 @@ class FakeCollectionClient:
 
 
 async def test_collection_config_uses_named_in_memory_cosine_vector() -> None:
-    settings = WorkingMemorySettings(vector_size=4, collection_name="quimera_working_memory_test_contract")
+    settings = WorkingMemorySettings(
+        vector_size=4, collection_name="quimera_working_memory_test_contract"
+    )
     client = FakeCollectionClient()
     store = WorkingMemoryQdrantStore(client, settings)
 

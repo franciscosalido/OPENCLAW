@@ -17,7 +17,9 @@ class FakeStore:
         self.restored: list[WorkingMemoryPoint] = []
         self.deleted_scope: tuple[str, str] | None = None
 
-    async def restore_points_from_snapshot(self, points: list[WorkingMemoryPoint]) -> int:
+    async def restore_points_from_snapshot(
+        self, points: list[WorkingMemoryPoint]
+    ) -> int:
         self.restored.extend(points)
         return len(points)
 
@@ -27,13 +29,22 @@ class FakeStore:
 
 
 class FakeRepository:
-    def __init__(self, points: list[WorkingMemoryPoint], *, checksum_ok: bool = True) -> None:
+    def __init__(
+        self, points: list[WorkingMemoryPoint], *, checksum_ok: bool = True
+    ) -> None:
         self.points = points
         self.checksum_ok = checksum_ok
         self.validated: str | None = None
 
-    async def get_latest_snapshot(self, *, agent_id: str, session_id: str) -> dict[str, object] | None:
-        return {"snapshot_id": "snap-1", "checksum": "ok", "agent_id": agent_id, "session_id": session_id}
+    async def get_latest_snapshot(
+        self, *, agent_id: str, session_id: str
+    ) -> dict[str, object] | None:
+        return {
+            "snapshot_id": "snap-1",
+            "checksum": "ok",
+            "agent_id": agent_id,
+            "session_id": session_id,
+        }
 
     async def load_snapshot_points(self, snapshot_id: str) -> list[WorkingMemoryPoint]:
         return self.points
@@ -71,7 +82,9 @@ async def test_restore_merge_default_and_checksum() -> None:
     repo = FakeRepository([point])
     service = RestoreService(store=store, repository=repo, replace_enabled=False)
 
-    result = await service.restore_latest_snapshot(agent_id=point.agent_id, session_id=str(point.session_id))
+    result = await service.restore_latest_snapshot(
+        agent_id=point.agent_id, session_id=str(point.session_id)
+    )
 
     assert result.restored_count == 1
     assert result.checksum_ok is True
@@ -81,18 +94,32 @@ async def test_restore_merge_default_and_checksum() -> None:
 
 async def test_restore_replace_is_gated() -> None:
     point = _point()
-    service = RestoreService(store=FakeStore(), repository=FakeRepository([point]), replace_enabled=False)
+    service = RestoreService(
+        store=FakeStore(), repository=FakeRepository([point]), replace_enabled=False
+    )
 
     with pytest.raises(ValueError, match="disabled"):
-        await service.restore_snapshot("snap-1", agent_id=point.agent_id, session_id=str(point.session_id), replace=True)
+        await service.restore_snapshot(
+            "snap-1",
+            agent_id=point.agent_id,
+            session_id=str(point.session_id),
+            replace=True,
+        )
 
 
 async def test_restore_replace_deletes_only_agent_session_scope() -> None:
     point = _point()
     store = FakeStore()
-    service = RestoreService(store=store, repository=FakeRepository([point]), replace_enabled=True)
+    service = RestoreService(
+        store=store, repository=FakeRepository([point]), replace_enabled=True
+    )
 
-    await service.restore_snapshot("snap-1", agent_id=point.agent_id, session_id=str(point.session_id), replace=True)
+    await service.restore_snapshot(
+        "snap-1",
+        agent_id=point.agent_id,
+        session_id=str(point.session_id),
+        replace=True,
+    )
 
     assert store.deleted_scope == (point.agent_id, str(point.session_id))
 
@@ -106,7 +133,9 @@ async def test_restore_can_abort_on_checksum_mismatch() -> None:
         abort_on_checksum_fail=True,
     )
 
-    result = await service.restore_snapshot("snap-1", agent_id=point.agent_id, session_id=str(point.session_id))
+    result = await service.restore_snapshot(
+        "snap-1", agent_id=point.agent_id, session_id=str(point.session_id)
+    )
 
     assert result.status == "fail"
     assert result.checksum_ok is False
@@ -118,9 +147,13 @@ async def test_restore_can_abort_on_checksum_mismatch() -> None:
 async def test_restore_warns_but_continues_on_checksum_mismatch_by_default() -> None:
     point = _point()
     store = FakeStore()
-    service = RestoreService(store=store, repository=FakeRepository([point], checksum_ok=False))
+    service = RestoreService(
+        store=store, repository=FakeRepository([point], checksum_ok=False)
+    )
 
-    result = await service.restore_snapshot("snap-1", agent_id=point.agent_id, session_id=str(point.session_id))
+    result = await service.restore_snapshot(
+        "snap-1", agent_id=point.agent_id, session_id=str(point.session_id)
+    )
 
     assert result.status == "warn"
     assert result.checksum_ok is False

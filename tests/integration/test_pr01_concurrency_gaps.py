@@ -32,7 +32,9 @@ async def repository() -> AsyncGenerator[PostgresMemoryRepository, None]:
         await client.close()
 
 
-async def test_concurrent_agent_state_upsert_same_key_real(repository: PostgresMemoryRepository) -> None:
+async def test_concurrent_agent_state_upsert_same_key_real(
+    repository: PostgresMemoryRepository,
+) -> None:
     agent_id = f"agent-{uuid4().hex}"
     session = await repository.create_session(agent_id=agent_id)
     state_tasks: list[Awaitable[AgentState]] = [
@@ -45,7 +47,9 @@ async def test_concurrent_agent_state_upsert_same_key_real(repository: PostgresM
     assert len({result.state_id for result in results}) == 1
 
 
-async def test_concurrent_turn_append_real(repository: PostgresMemoryRepository) -> None:
+async def test_concurrent_turn_append_real(
+    repository: PostgresMemoryRepository,
+) -> None:
     session = await repository.create_session(agent_id=f"agent-{uuid4().hex}")
     turn_tasks: list[Awaitable[Turn]] = [
         repository.append_turn(session.session_id, "user", f"msg {i}")

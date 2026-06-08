@@ -14,7 +14,9 @@ async def test_required_memory_indexes_exist_in_real_db() -> None:
         pytest.skip("TEST_POSTGRES_DSN or QUIMERA_POSTGRES_DSN is required")
     conn = await asyncpg.connect(dsn=dsn)
     try:
-        rows = await conn.fetch("SELECT indexname FROM pg_indexes WHERE schemaname='public'")
+        rows = await conn.fetch(
+            "SELECT indexname FROM pg_indexes WHERE schemaname='public'"
+        )
     finally:
         await conn.close()
     names = {row["indexname"] for row in rows}

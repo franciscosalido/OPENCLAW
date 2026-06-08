@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from integration.agentic0_contracts import Agentic0SmokeConfig, SMOKE_SCHEMA_VERSION, skipped_result
+from integration.agentic0_contracts import (
+    Agentic0SmokeConfig,
+    SMOKE_SCHEMA_VERSION,
+    skipped_result,
+)
 
 
 def test_agentic0_config_defaults_are_local_and_safe() -> None:

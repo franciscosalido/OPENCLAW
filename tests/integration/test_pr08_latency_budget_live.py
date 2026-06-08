@@ -13,7 +13,10 @@ async def test_pr08_latency_budget_is_measured_without_hard_gate() -> None:
     assert result.latency.total_ms >= 0
     assert result.latency.mcp_ms >= 0
     assert result.latency.llm_ms >= 0
-    assert result.latency.measurement_mode in {"live_healthcheck_probe", "degraded_no_live_stack"}
+    assert result.latency.measurement_mode in {
+        "live_healthcheck_probe",
+        "degraded_no_live_stack",
+    }
     if result.latency.measurement_mode == "live_healthcheck_probe":
         assert result.latency.sample_count > 0
         assert result.latency.p95_ms is not None

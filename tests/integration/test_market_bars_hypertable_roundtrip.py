@@ -24,7 +24,9 @@ def _test_dsn() -> str | None:
 
 
 @pytest.fixture
-async def repo_client() -> AsyncGenerator[tuple[PostgresClient, FinanceRepository], None]:
+async def repo_client() -> AsyncGenerator[
+    tuple[PostgresClient, FinanceRepository], None
+]:
     dsn = _test_dsn()
     if not dsn:
         pytest.skip("TEST_POSTGRES_DSN or QUIMERA_POSTGRES_DSN is required")
@@ -107,7 +109,9 @@ async def test_market_bars_window_roundtrip_and_upsert(
     assert fetched[0].quality_flags["nested"] == {"i": 0}
 
 
-async def test_same_symbol_different_exchange_is_allowed(repository: FinanceRepository) -> None:
+async def test_same_symbol_different_exchange_is_allowed(
+    repository: FinanceRepository,
+) -> None:
     symbol = f"AAPL-{uuid4().hex[:8]}"
     first = await repository.create_market_instrument(
         symbol=symbol,

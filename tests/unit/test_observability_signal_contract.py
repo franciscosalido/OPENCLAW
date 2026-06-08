@@ -26,7 +26,6 @@ from backend.gateway.observability_contract import (
 from backend.gateway.routing_policy import (
     FallbackReason,
     RemoteEscalationPolicy,
-    RouteBlockReason,
     RoutingDecisionLogger,
     build_token_economy_record,
     decide_route,
@@ -151,7 +150,9 @@ class ObservabilitySignalContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(data["chunk_count"], 3)
         self.assertNotIn("payload", json.dumps(data))
 
-    async def test_fallback_event_is_allowlisted_and_correlated_with_result(self) -> None:
+    async def test_fallback_event_is_allowlisted_and_correlated_with_result(
+        self,
+    ) -> None:
         events: list[dict[str, object]] = []
 
         class BoundLogger:
@@ -251,7 +252,9 @@ class ObservabilitySignalContractTests(unittest.IsolatedAsyncioTestCase):
             policy=RemoteEscalationPolicy(),
         )
         with tempfile.TemporaryDirectory() as temp_dir:
-            logger = RoutingDecisionLogger(Path(temp_dir) / "decisions", rotate_daily=False)
+            logger = RoutingDecisionLogger(
+                Path(temp_dir) / "decisions", rotate_daily=False
+            )
             path = logger.append(decision)
             assert path is not None
             rows = path.read_text(encoding="utf-8").splitlines()
@@ -282,7 +285,9 @@ class ObservabilitySignalContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertGreaterEqual(cast(int, data["estimated_remote_tokens_avoided"]), 0)
         self.assertNotIn(SENSITIVE_SENTINEL, json.dumps(data))
 
-    async def test_estimated_remote_tokens_avoided_exists_across_runner_paths(self) -> None:
+    async def test_estimated_remote_tokens_avoided_exists_across_runner_paths(
+        self,
+    ) -> None:
         async def chat_ok(
             question: str,
             *,

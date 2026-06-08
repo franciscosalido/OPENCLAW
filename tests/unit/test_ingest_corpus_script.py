@@ -44,9 +44,13 @@ class IngestCorpusScriptTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             report_path = Path(tmpdir) / "report.json"
             with (
-                patch("backend.rag.qdrant_store.QdrantVectorStore.ensure_collection") as ensure,
+                patch(
+                    "backend.rag.qdrant_store.QdrantVectorStore.ensure_collection"
+                ) as ensure,
                 patch("backend.rag.qdrant_store.QdrantVectorStore.upsert") as upsert,
-                patch("backend.rag.qdrant_store.QdrantVectorStore.delete_document") as delete,
+                patch(
+                    "backend.rag.qdrant_store.QdrantVectorStore.delete_document"
+                ) as delete,
             ):
                 exit_code = ingest_corpus.main(
                     [
@@ -57,7 +61,9 @@ class IngestCorpusScriptTests(unittest.TestCase):
                     ],
                 )
 
-            data = cast(dict[str, Any], json.loads(report_path.read_text(encoding="utf-8")))
+            data = cast(
+                dict[str, Any], json.loads(report_path.read_text(encoding="utf-8"))
+            )
 
         self.assertEqual(exit_code, 0)
         self.assertEqual(data["mode"], "verify_only")
@@ -83,7 +89,9 @@ class IngestCorpusScriptTests(unittest.TestCase):
                     str(report_path),
                 ],
             )
-            data = cast(dict[str, Any], json.loads(report_path.read_text(encoding="utf-8")))
+            data = cast(
+                dict[str, Any], json.loads(report_path.read_text(encoding="utf-8"))
+            )
 
         self.assertEqual(exit_code, 0)
         self.assertEqual(data["mode"], "commit")
@@ -92,7 +100,9 @@ class IngestCorpusScriptTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             (root / "docs").mkdir()
-            (root / "docs" / "pending.md").write_text("conteudo sintetico", encoding="utf-8")
+            (root / "docs" / "pending.md").write_text(
+                "conteudo sintetico", encoding="utf-8"
+            )
             manifest = _pending_manifest(root)
 
             with self.assertRaises(ValueError):
@@ -109,7 +119,9 @@ class IngestCorpusScriptTests(unittest.TestCase):
                     str(report_path),
                 ],
             )
-            data = cast(dict[str, Any], json.loads(report_path.read_text(encoding="utf-8")))
+            data = cast(
+                dict[str, Any], json.loads(report_path.read_text(encoding="utf-8"))
+            )
 
         forbidden = {
             "text",

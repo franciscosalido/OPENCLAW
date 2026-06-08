@@ -35,7 +35,15 @@ def test_working_memory_contract_doc_exists_and_blocks_hot_source_of_truth() -> 
 def test_working_memory_checkpoint_sql_contract() -> None:
     sql = SQL.read_text(encoding="utf-8")
 
-    for token in ("working_memory_checkpoints", "agent_id", "session_id", "embedding_model", "checksum", "ttl_seconds", "expires_at"):
+    for token in (
+        "working_memory_checkpoints",
+        "agent_id",
+        "session_id",
+        "embedding_model",
+        "checksum",
+        "ttl_seconds",
+        "expires_at",
+    ):
         assert token in sql
     assert "CREATE TABLE IF NOT EXISTS" in sql
     assert "UNIQUE(agent_id, session_id, topic, embedding_model, checksum)" in sql
@@ -43,4 +51,6 @@ def test_working_memory_checkpoint_sql_contract() -> None:
     assert "prompt" not in sql.lower()
     assert "answer" not in sql.lower()
     assert "chunk_text" not in sql.lower()
-    assert "CREATE INDEX IF NOT EXISTS idx_working_memory_agent_session_created_at" in sql
+    assert (
+        "CREATE INDEX IF NOT EXISTS idx_working_memory_agent_session_created_at" in sql
+    )

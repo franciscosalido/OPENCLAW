@@ -113,7 +113,9 @@ class EmbeddingContractConfigTests(unittest.TestCase):
         self.assertEqual(embedding["embedding_dimensions"], 768)
         self.assertEqual(embedding["embedding_version"], "local-ollama-current")
 
-    def test_rag_config_records_controlled_gateway_migration_with_rollback(self) -> None:
+    def test_rag_config_records_controlled_gateway_migration_with_rollback(
+        self,
+    ) -> None:
         raw = _load_yaml(RAG_CONFIG)
         embedding = raw["rag"]["embedding"]
 

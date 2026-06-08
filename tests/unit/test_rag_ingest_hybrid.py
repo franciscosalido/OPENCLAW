@@ -85,7 +85,9 @@ class FakeUpsertClient:
         self.calls.append((collection_name, list(points)))
 
 
-def doc(doc_id: str = "doc-a", text: str = "abc def ghi", source: str = "unit") -> Document:
+def doc(
+    doc_id: str = "doc-a", text: str = "abc def ghi", source: str = "unit"
+) -> Document:
     return Document(doc_id=doc_id, text=text, source=source)
 
 
@@ -99,7 +101,9 @@ def chunk(chunk_id: str = "chunk-a", text: str = "abc") -> Chunk:
     )
 
 
-def sparse(indices: tuple[int, ...] = (1, 3), values: tuple[float, ...] = (1.0, 0.5)) -> SparseVector:
+def sparse(
+    indices: tuple[int, ...] = (1, 3), values: tuple[float, ...] = (1.0, 0.5)
+) -> SparseVector:
     return SparseVector(indices=indices, values=values)
 
 
@@ -132,7 +136,9 @@ def test_make_chunk_id_changes_when_text_changes() -> None:
 
 
 def test_make_chunk_id_strips_doc_id_before_hashing() -> None:
-    assert ingest.make_chunk_id("doc-a ", 0, "t") == ingest.make_chunk_id("doc-a", 0, "t")
+    assert ingest.make_chunk_id("doc-a ", 0, "t") == ingest.make_chunk_id(
+        "doc-a", 0, "t"
+    )
 
 
 def test_document_rejects_whitespace_only_fields() -> None:
@@ -222,7 +228,9 @@ def test_prepare_hybrid_points_rejects_dense_dimension_mismatch() -> None:
 
 
 @pytest.mark.parametrize("bad_value", [float("nan"), float("inf")])
-def test_prepare_hybrid_points_rejects_non_finite_dense_values(bad_value: float) -> None:
+def test_prepare_hybrid_points_rejects_non_finite_dense_values(
+    bad_value: float,
+) -> None:
     with pytest.raises(ValueError, match="dense value must be finite"):
         ingest.prepare_hybrid_points(
             chunks=[chunk()],
@@ -295,7 +303,15 @@ def test_prepare_hybrid_points_allows_empty_sparse_when_explicit() -> None:
 
 def test_prepare_hybrid_points_payload_excludes_text_and_vectors() -> None:
     point = prepare_one_point()
-    forbidden = {"text", "chunk_text", "dense_vector", "sparse_vector", "embedding", "prompt", "answer"}
+    forbidden = {
+        "text",
+        "chunk_text",
+        "dense_vector",
+        "sparse_vector",
+        "embedding",
+        "prompt",
+        "answer",
+    }
     assert forbidden.isdisjoint(point.payload)
 
 
@@ -323,7 +339,10 @@ def test_assert_collection_rejects_legacy_collection() -> None:
 
 
 def test_assert_collection_allows_hybrid_collection() -> None:
-    assert ingest.assert_collection_is_safe_for_ingest(HYBRID_COLLECTION_NAME) == HYBRID_COLLECTION_NAME
+    assert (
+        ingest.assert_collection_is_safe_for_ingest(HYBRID_COLLECTION_NAME)
+        == HYBRID_COLLECTION_NAME
+    )
 
 
 def test_batched_splits_points_deterministically() -> None:
@@ -483,8 +502,12 @@ async def test_run_ingest_is_deterministic_for_same_input() -> None:
         batch_size=2,
         clock=FakeClock(),
     )
-    first_ids = [point.point_id for _collection, batch in first_client.calls for point in batch]
-    second_ids = [point.point_id for _collection, batch in second_client.calls for point in batch]
+    first_ids = [
+        point.point_id for _collection, batch in first_client.calls for point in batch
+    ]
+    second_ids = [
+        point.point_id for _collection, batch in second_client.calls for point in batch
+    ]
     assert first.points_prepared == second.points_prepared == 2
     assert first_ids == second_ids
 
@@ -544,21 +567,27 @@ def test_main_execute_is_blocked_in_pr09(capsys: pytest.CaptureFixture[str]) -> 
     assert "hybrid ingest failed" in captured.err
 
 
-def test_main_nonexistent_corpus_path_returns_error(capsys: pytest.CaptureFixture[str]) -> None:
+def test_main_nonexistent_corpus_path_returns_error(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     exit_code = ingest.main(["--corpus-path", "/definitely/not/here.txt"])
     captured = capsys.readouterr()
     assert exit_code == 2
     assert "hybrid ingest failed" in captured.err
 
 
-def test_main_invalid_batch_size_returns_error(capsys: pytest.CaptureFixture[str]) -> None:
+def test_main_invalid_batch_size_returns_error(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     exit_code = ingest.main(["--synthetic", "--batch-size", "0"])
     captured = capsys.readouterr()
     assert exit_code == 2
     assert "hybrid ingest failed" in captured.err
 
 
-def test_main_invalid_max_documents_returns_error(capsys: pytest.CaptureFixture[str]) -> None:
+def test_main_invalid_max_documents_returns_error(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     exit_code = ingest.main(["--synthetic", "--max-documents", "0"])
     captured = capsys.readouterr()
     assert exit_code == 2

@@ -42,7 +42,10 @@ def test_qlib_projection_invalid_format_is_rejected() -> None:
         _manifest(format="duckdb")
 
 
-@pytest.mark.parametrize("field", ["projection_name", "projection_version", "source_query_hash", "transform_hash"])
+@pytest.mark.parametrize(
+    "field",
+    ["projection_name", "projection_version", "source_query_hash", "transform_hash"],
+)
 def test_qlib_projection_required_strings(field: str) -> None:
     with pytest.raises(ValueError, match=field):
         _manifest(**{field: " "})

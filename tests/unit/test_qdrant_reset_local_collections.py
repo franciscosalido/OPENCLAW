@@ -31,7 +31,9 @@ class FakeResetClient:
         if collection_name in self.delete_failures:
             raise RuntimeError("fake delete failure with sensitive details")
         self.deleted.append(collection_name)
-        self.collections = [name for name in self.collections if name != collection_name]
+        self.collections = [
+            name for name in self.collections if name != collection_name
+        ]
 
     async def create_benchmark_collection(self, collection_name: str) -> None:
         self.created.append(collection_name)
@@ -75,7 +77,11 @@ def test_ensure_localhost_rejects_0_0_0_0_private_ip_domain_and_cloud_url(
 def test_ensure_env_flag_requires_exact_value() -> None:
     reset.ensure_env_flag(_env_enabled())
 
-    for env in ({}, {reset.LOCAL_RESET_ENV_VAR: "true"}, {reset.LOCAL_RESET_ENV_VAR: "0"}):
+    for env in (
+        {},
+        {reset.LOCAL_RESET_ENV_VAR: "true"},
+        {reset.LOCAL_RESET_ENV_VAR: "0"},
+    ):
         with pytest.raises(reset.ResetRefused):
             reset.ensure_env_flag(env)
 
@@ -190,7 +196,11 @@ def test_plan_reset_uses_only_existing_allowed_collections() -> None:
 def test_plan_reset_sorts_deterministically() -> None:
     plan = reset.plan_reset(
         host="localhost",
-        existing_collections=["quimera_knowledge_v2", "q18_benchmark_b", "q18_benchmark_a"],
+        existing_collections=[
+            "quimera_knowledge_v2",
+            "q18_benchmark_b",
+            "q18_benchmark_a",
+        ],
         dry_run=True,
         confirmed=False,
         recreate_benchmark=False,
@@ -634,7 +644,7 @@ def test_script_does_not_delete_by_substring() -> None:
 def test_script_has_no_wildcard_delete() -> None:
     source = SCRIPT_PATH.read_text(encoding="utf-8")
 
-    assert "delete_collection(\"*\")" not in source
+    assert 'delete_collection("*")' not in source
     assert "delete_collection('*')" not in source
 
 
@@ -681,7 +691,9 @@ def test_script_does_not_import_qdrant_client_at_module_level() -> None:
 
     for node in tree.body:
         if isinstance(node, ast.Import):
-            assert all(alias.name.split(".")[0] != "qdrant_client" for alias in node.names)
+            assert all(
+                alias.name.split(".")[0] != "qdrant_client" for alias in node.names
+            )
         elif isinstance(node, ast.ImportFrom) and node.module is not None:
             assert node.module.split(".")[0] != "qdrant_client"
 

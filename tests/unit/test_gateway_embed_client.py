@@ -88,7 +88,9 @@ class GatewayEmbedClientTests(unittest.IsolatedAsyncioTestCase):
             vectors = await gateway.embed_batch(["texto um", "texto dois"])
 
         self.assertEqual(len(vectors), 2)
-        self.assertTrue(all(len(vector) == DEFAULT_EMBEDDING_DIMENSIONS for vector in vectors))
+        self.assertTrue(
+            all(len(vector) == DEFAULT_EMBEDDING_DIMENSIONS for vector in vectors)
+        )
         self.assertEqual(
             seen_payloads,
             [
@@ -329,7 +331,9 @@ class GatewayEmbedClientTests(unittest.IsolatedAsyncioTestCase):
         seen_timeouts: list[dict[str, float]] = []
 
         def handler(request: httpx.Request) -> httpx.Response:
-            seen_timeouts.append(cast("dict[str, float]", request.extensions["timeout"]))
+            seen_timeouts.append(
+                cast("dict[str, float]", request.extensions["timeout"])
+            )
             return httpx.Response(200, json=_embedding_response())
 
         async with httpx.AsyncClient(
