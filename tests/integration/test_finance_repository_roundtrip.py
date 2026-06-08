@@ -39,7 +39,14 @@ async def repo_client() -> AsyncGenerator[tuple[PostgresClient, FinanceRepositor
             if not await is_timescale_available(conn):
                 pytest.skip("TimescaleDB extension is required for PR-02 integration tests")
         await run_migrations(client)
+        await _reset_roundtrip_state(client)
         yield client, FinanceRepository(client)
+
+
+async def _reset_roundtrip_state(client: PostgresClient) -> None:
+    # This test runs in an isolated database; CASCADE is intentionally scoped to
+    # disposable test state and keeps repeated live attempts deterministic.
+    await client.pool.execute("TRUNCATE TABLE qlib_projection_manifests CASCADE")
 
 
 async def test_finance_repository_full_roundtrip(

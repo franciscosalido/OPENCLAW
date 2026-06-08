@@ -142,6 +142,13 @@ class GatewayFinalBaselineTests(unittest.TestCase):
             with self.subTest(guard=guard):
                 self.assertIn(guard, path.read_text(encoding="utf-8"))
 
+    def test_vibe_sandbox_enables_quimera_e2e_umbrella_flag(self) -> None:
+        dockerfile = REPO_ROOT / "Dockerfile.openclaw-sandbox"
+        agent0_e2e = REPO_ROOT / "tests/e2e/test_agent0_e2e.py"
+
+        self.assertIn("ENV QUIMERA_E2E=true", dockerfile.read_text(encoding="utf-8"))
+        self.assertIn("QUIMERA_E2E", agent0_e2e.read_text(encoding="utf-8"))
+
     def test_trace_and_event_serialization_exclude_forbidden_keys(self) -> None:
         trace = RagRunTrace(
             query_id="query-id",
