@@ -1,9 +1,9 @@
 FROM python:3.14-slim
 
-# Install uv, minimal build tools, and PostgreSQL 18 client tools.
+# Install uv, minimal build tools, Node.js for Pyright, and PostgreSQL 18 client tools.
 # pg_dump must be at least as new as the PostgreSQL server it dumps.
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends ca-certificates curl gnupg gcc python3-dev && \
+    apt-get install -y --no-install-recommends ca-certificates curl gnupg gcc nodejs python3-dev && \
     install -d /usr/share/postgresql-common/pgdg && \
     curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
       -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc && \
@@ -23,9 +23,11 @@ COPY pyproject.toml uv.lock ./
 # Minimal stub so uv sync does not complain about a missing package source
 RUN mkdir -p backend && touch backend/__init__.py
 
-# Sync all deps (including dev) — skip installing the project itself
-RUN uv sync --frozen && \
-    mv .venv /opt/openclaw-venv && \
+# Sync all deps (including dev) directly into the runtime venv and warm
+# Pyright before JSON checks. Do not move a venv after creation: console
+# scripts can keep absolute shebangs pointing at the original path.
+RUN UV_PROJECT_ENVIRONMENT=/opt/openclaw-venv uv sync --frozen && \
+    /opt/openclaw-venv/bin/pyright --version >/dev/null && \
     rm -rf /tmp/setup
 
 ENV VIRTUAL_ENV=/opt/openclaw-venv

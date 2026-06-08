@@ -5,7 +5,76 @@
 > meaningful sessions.
 
 **Last updated:** 2026-06-07
-**Updated by:** Codex — RC Vibe dedicated test style cleanup
+**Updated by:** Codex — RC Vibe sandbox bootstrap hardening
+
+---
+
+## codex/rc-vibe-sandbox-bootstrap — Vibe Sandbox Operational Bootstrap RC-02
+
+Current branch: `codex/rc-vibe-sandbox-bootstrap`
+Base branch: local `main` at `6823c02`.
+
+Implemented:
+
+- Added `scripts/vibe_sandbox_bootstrap.sh`, an idempotent runtime bootstrap
+  for Vibe containers. It runs after the repository is mounted and installs
+  OpenClaw editable with `uv pip install --no-deps --editable .`, falling back
+  to `python -m pip install --no-deps --editable .`, then verifies
+  `backend` imports.
+- Added `scripts/vibe_semgrep_scan.sh`, which runs Semgrep outside the project
+  virtualenv. Docker `semgrep/semgrep:latest` is preferred; `uvx semgrep` is
+  the fallback. This avoids downgrading or constraining the project's
+  OpenTelemetry dependencies.
+- Added `scripts/vibe_pyright_json.sh`, which warms Pyright with
+  `pyright --version >/dev/null` before running `pyright --outputjson`, so
+  first-run bootstrap/progress text does not pollute stdout JSON.
+- Updated `Dockerfile.openclaw-sandbox` to install `nodejs`, create the
+  virtualenv directly at `/opt/openclaw-venv`, and warm Pyright during image
+  build with `/opt/openclaw-venv/bin/pyright --version >/dev/null`.
+- Added unit contracts covering the editable install bootstrap, isolated
+  Semgrep policy, Pyright JSON warmup and sandbox Dockerfile Node/Pyright
+  prewarm.
+
+Research notes:
+
+- Current Semgrep documentation recommends the latest Semgrep for current
+  features/fixes and supports running Semgrep via Docker, `pipx` or `uv` for
+  isolated versions. This RC uses Docker/`uvx` instead of adding Semgrep to the
+  project dependency graph.
+- Current Semgrep CI examples use the official `semgrep/semgrep` image and
+  `semgrep scan --config auto`.
+- Pyright JSON output should be produced only by the JSON command; the wrapper
+  performs any first-run warmup before `--outputjson`.
+
+Scope intentionally not changed:
+
+- No OpenTelemetry dependency changed.
+- No Semgrep dependency added to `pyproject.toml` or `uv.lock`.
+- No `.env`, `.env.*`, secrets, service runtime state or data touched.
+- Existing generated PR-08/PR-09 artifacts remain unstaged.
+
+Validation:
+
+- `bash -n scripts/vibe_sandbox_bootstrap.sh scripts/vibe_semgrep_scan.sh scripts/vibe_pyright_json.sh`
+  passed.
+- `uv run pytest tests/unit/test_vibe_sandbox_operational_contract.py tests/unit/test_pr09_backup_scripts_static.py tests/unit/test_gateway_final_baseline.py`
+  passed: 16 tests.
+- `uv run mypy --strict tests/unit/test_vibe_sandbox_operational_contract.py`
+  passed.
+- `uv run pyright tests/unit/test_vibe_sandbox_operational_contract.py`
+  passed: 0 errors.
+- `VIRTUAL_ENV="$PWD/.venv" scripts/vibe_sandbox_bootstrap.sh "$PWD"`
+  passed and installed `openclaw` editable from the mounted checkout.
+- `QUIMERA_SEMGREP_USE_DOCKER=0 scripts/vibe_semgrep_scan.sh --version`
+  passed with isolated Semgrep `1.165.0`.
+- `scripts/vibe_pyright_json.sh tests/unit/test_vibe_sandbox_operational_contract.py`
+  emitted parseable JSON with zero errors.
+- `docker build -f Dockerfile.openclaw-sandbox -t openclaw-sandbox-vibe-bootstrap-check .`
+  passed.
+- Container smoke passed: `pg_dump` reports PostgreSQL 18.4, Node.js is
+  present, `npm` is absent, Pyright runs from `/opt/openclaw-venv`, editable
+  bootstrap succeeds after `/workspace` mount, and Pyright JSON output parses
+  cleanly.
 
 ---
 
