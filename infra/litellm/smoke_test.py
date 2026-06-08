@@ -42,11 +42,15 @@ class SmokeSummary:
         )
 
 
-async def _get_json(client: httpx.AsyncClient, url: str, headers: dict[str, str] | None = None) -> SmokeResult:
+async def _get_json(
+    client: httpx.AsyncClient, url: str, headers: dict[str, str] | None = None
+) -> SmokeResult:
     try:
         result = await client.get(url, headers=headers)
     except httpx.HTTPError as exc:
-        return SmokeResult(name=url.rsplit("/", 1)[-1], ok=False, message=exc.__class__.__name__)
+        return SmokeResult(
+            name=url.rsplit("/", 1)[-1], ok=False, message=exc.__class__.__name__
+        )
     return SmokeResult(
         name=url.rsplit("/", 1)[-1],
         ok=result.status_code < 400,
@@ -85,7 +89,9 @@ async def smoke_qdrant_ready(base_url: str) -> SmokeResult:
         for endpoint in ("/readyz", "/healthz"):
             result = await _get_json(client, f"{base}{endpoint}")
             if result.ok:
-                return SmokeResult(name=endpoint.strip("/"), ok=True, status_code=result.status_code)
+                return SmokeResult(
+                    name=endpoint.strip("/"), ok=True, status_code=result.status_code
+                )
         return result
 
 
@@ -97,26 +103,34 @@ async def smoke_chat_opt_in(base_url: str, master_key: str | None) -> SmokeResul
         "messages": [{"role": "user", "content": "ping"}],
         "max_tokens": 8,
     }
-    async with httpx.AsyncClient(timeout=httpx.Timeout(connect=1.0, read=130.0, write=2.0, pool=1.0)) as client:
+    async with httpx.AsyncClient(
+        timeout=httpx.Timeout(connect=1.0, read=130.0, write=2.0, pool=1.0)
+    ) as client:
         result = await client.post(
             f"{base}/v1/chat/completions",
             headers={**headers, "Content-Type": "application/json"},
             json=payload,
         )
-    return SmokeResult(name="chat", ok=result.status_code < 400, status_code=result.status_code)
+    return SmokeResult(
+        name="chat", ok=result.status_code < 400, status_code=result.status_code
+    )
 
 
 async def smoke_embedding_opt_in(base_url: str, master_key: str | None) -> SmokeResult:
     base = base_url.rstrip("/")
     headers = {"Authorization": f"Bearer {master_key}"} if master_key else {}
     payload: dict[str, Any] = {"model": "quimera_embed", "input": "ping"}
-    async with httpx.AsyncClient(timeout=httpx.Timeout(connect=1.0, read=20.0, write=2.0, pool=1.0)) as client:
+    async with httpx.AsyncClient(
+        timeout=httpx.Timeout(connect=1.0, read=20.0, write=2.0, pool=1.0)
+    ) as client:
         result = await client.post(
             f"{base}/v1/embeddings",
             headers={**headers, "Content-Type": "application/json"},
             json=payload,
         )
-    return SmokeResult(name="embedding", ok=result.status_code < 400, status_code=result.status_code)
+    return SmokeResult(
+        name="embedding", ok=result.status_code < 400, status_code=result.status_code
+    )
 
 
 def run_smoke(
@@ -142,7 +156,9 @@ def run_smoke(
             chat_ok = (await smoke_chat_opt_in(base_url, api_key)).ok
         if test_embed:
             embed_ok = (await smoke_embedding_opt_in(base_url, api_key)).ok
-        return SmokeSummary(readiness, liveliness, models, ollama, qdrant, chat_ok, embed_ok)
+        return SmokeSummary(
+            readiness, liveliness, models, ollama, qdrant, chat_ok, embed_ok
+        )
 
     return asyncio.run(_run())
 
@@ -153,7 +169,10 @@ def main() -> int:
         os.environ.get("QUIMERA_LLM_API_KEY") or os.environ.get("LITELLM_MASTER_KEY"),
         test_chat=os.environ.get("QUIMERA_LITELLM_TEST_CHAT") == "1",
         test_embed=os.environ.get("QUIMERA_LITELLM_TEST_EMBED") == "1",
-        ollama_base_url=os.environ.get("OLLAMA_BASE_URL", os.environ.get("OLLAMA_API_BASE", "http://127.0.0.1:11434")),
+        ollama_base_url=os.environ.get(
+            "OLLAMA_BASE_URL",
+            os.environ.get("OLLAMA_API_BASE", "http://127.0.0.1:11434"),
+        ),
         qdrant_base_url=os.environ.get("QDRANT_API_BASE", "http://127.0.0.1:6333"),
     )
     sys.stdout.write(f"readiness={result.readiness.ok}\n")

@@ -11,7 +11,14 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
 
-from backend.observability.decorators import traced_cache, traced_embed, traced_pg, traced_rerank, traced_retrieval, traced_rrf
+from backend.observability.decorators import (
+    traced_cache,
+    traced_embed,
+    traced_pg,
+    traced_rerank,
+    traced_retrieval,
+    traced_rrf,
+)
 from backend.rag.fusion import RRFFusion, ranked_result_from_position
 from evaluation.benchmark_models import (
     DECISIONS,
@@ -54,8 +61,16 @@ async def benchmark_cache_lookup_probe() -> None:
 @traced_rrf(backend="python_rrf")
 async def benchmark_rrf_probe() -> int:
     fusion = RRFFusion()
-    dense = [ranked_result_from_position(result_id="d1", doc_id="doc-a", zero_based_position=0)]
-    sparse = [ranked_result_from_position(result_id="s1", doc_id="doc-a", zero_based_position=0)]
+    dense = [
+        ranked_result_from_position(
+            result_id="d1", doc_id="doc-a", zero_based_position=0
+        )
+    ]
+    sparse = [
+        ranked_result_from_position(
+            result_id="s1", doc_id="doc-a", zero_based_position=0
+        )
+    ]
     return len(fusion.fuse(dense_results=dense, sparse_results=sparse))
 
 
@@ -108,10 +123,15 @@ def build_fake_scenarios(samples: int) -> list[BenchmarkScenario]:
     ]
 
 
-def build_rows(scenarios: list[BenchmarkScenario], *, git_commit: str, generated_at: str) -> list[BenchmarkRow]:
+def build_rows(
+    scenarios: list[BenchmarkScenario], *, git_commit: str, generated_at: str
+) -> list[BenchmarkRow]:
     rows: list[BenchmarkRow] = []
     for scenario in scenarios:
-        for backend, stats in (("postgres", scenario.postgres), ("qdrant", scenario.qdrant)):
+        for backend, stats in (
+            ("postgres", scenario.postgres),
+            ("qdrant", scenario.qdrant),
+        ):
             rows.append(
                 BenchmarkRow(
                     scenario=scenario.scenario,
@@ -152,7 +172,14 @@ def build_summary(samples: int, *, real_mode: bool = False) -> dict[str, object]
         "scenarios": [to_jsonable_scenario(scenario) for scenario in scenarios],
         "decisions": DECISIONS,
         "otel_attributes": {
-            "observed_span_names": ["embeddings", "retrieval qdrant", "retrieval rrf", "cache lookup", "pg READ turns", "pg WRITE turns"],
+            "observed_span_names": [
+                "embeddings",
+                "retrieval qdrant",
+                "retrieval rrf",
+                "cache lookup",
+                "pg READ turns",
+                "pg WRITE turns",
+            ],
             "observed_safe_attributes": {
                 "gen_ai.operation.name": "retrieval",
                 "cache.backend": "qdrant",
@@ -161,19 +188,27 @@ def build_summary(samples: int, *, real_mode: bool = False) -> dict[str, object]
             },
             "forbidden_attributes_seen": [],
         },
-        "warnings": [] if not real_mode else ["real benchmark execution is intentionally synthetic-data only"],
+        "warnings": []
+        if not real_mode
+        else ["real benchmark execution is intentionally synthetic-data only"],
     }
 
 
 def write_outputs(summary: dict[str, object], csv_path: Path, json_path: Path) -> None:
     json_path.parent.mkdir(parents=True, exist_ok=True)
     csv_path.parent.mkdir(parents=True, exist_ok=True)
-    json_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    json_path.write_text(
+        json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     scenario_rows = cast(list[dict[str, object]], summary["scenarios"])
     raw_samples = scenario_rows[0]["samples"] if scenario_rows else 0
     samples = raw_samples if isinstance(raw_samples, int) else 0
     scenarios = build_fake_scenarios(samples)
-    rows = build_rows(scenarios, git_commit=str(summary["git_commit"]), generated_at=str(summary["generated_at"]))
+    rows = build_rows(
+        scenarios,
+        git_commit=str(summary["git_commit"]),
+        generated_at=str(summary["generated_at"]),
+    )
     with csv_path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(
             handle,
@@ -194,7 +229,9 @@ def write_outputs(summary: dict[str, object], csv_path: Path, json_path: Path) -
             writer.writerow(asdict(row))
 
 
-def run(samples: int, *, output_json: Path = SUMMARY_PATH, output_csv: Path = ROWS_PATH) -> dict[str, object]:
+def run(
+    samples: int, *, output_json: Path = SUMMARY_PATH, output_csv: Path = ROWS_PATH
+) -> dict[str, object]:
     real_mode = os.getenv("QUIMERA_BENCHMARK_REAL") == "1"
     require_cache_disabled()
     summary = build_summary(samples, real_mode=real_mode)

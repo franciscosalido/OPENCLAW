@@ -2,6 +2,12 @@
 
 Status: Draft
 
+Historical SDD note: this PR-level command contract was superseded by the
+current host-only root wrapper contract (`./start_quimera.sh --start`,
+`./start_quimera.sh --status`, `./start_quimera.sh --stop`) and by the
+dedicated scripts in `infra/litellm/`. Do not use this historical file to
+require reintroducing removed `start_quimera.sh` subcommands.
+
 Superseded operational hardening: see
 `docs/specs/rag-01b/pr-05b-litellm-host-audit.md` for audit reports, version
 fingerprint, opt-in overhead benchmark and RC-01..RC-24 host boundary checks.

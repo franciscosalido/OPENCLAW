@@ -12,7 +12,7 @@ cp .env.local.example .env.local
 ```
 
 Docker Compose manages only Postgres and Qdrant. LiteLLM is a local host
-Python process controlled by `scripts/start_quimera.sh` or
+Python process controlled by `./start_quimera.sh` or
 `infra/litellm/start_litellm.sh`.
 
 `LITELLM_MASTER_KEY` is required by the host LiteLLM process. The Compose file
@@ -29,7 +29,7 @@ Never commit real secrets.
 
 ## Volumes
 
-`scripts/start_quimera.sh stop` uses `docker compose down` without `-v`, so
+`./start_quimera.sh --stop` uses `docker compose down` without `-v`, so
 named volumes are preserved. This is intentional for local memory durability.
 
 Full reset of corrupted local volumes is manual and operator-owned. Stop the
@@ -41,7 +41,7 @@ backup/restore verification or when the human operator explicitly accepts data
 loss for that local dev volume.
 
 ```bash
-./scripts/start_quimera.sh stop --release-models
+./start_quimera.sh --stop
 docker volume rm quimera-local_postgres_data
 docker volume rm quimera-local_qdrant_data
 ```

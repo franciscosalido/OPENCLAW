@@ -8,7 +8,9 @@ from typing import Any, TypedDict
 DENSE_VECTOR_NAME = "text-dense"
 SPARSE_VECTOR_NAME = "text-sparse"
 COLLECTION_PREFIX = "quimera_pr08_hybrid_smoke_"
-PROTECTED_COLLECTIONS = frozenset({"quimera_knowledge", "quimera_query_cache", "quimera_llm_cache"})
+PROTECTED_COLLECTIONS = frozenset(
+    {"quimera_knowledge", "quimera_query_cache", "quimera_llm_cache"}
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,16 +45,57 @@ class HybridContractSummary(TypedDict):
 
 
 SYNTHETIC_DOCS: tuple[SyntheticHybridDocument, ...] = (
-    SyntheticHybridDocument("doc-solar", "Alpha Solar", "solar panels and battery storage", ("solar", "battery")),
-    SyntheticHybridDocument("doc-steel", "Alpha Steel", "steel production and industrial alloys", ("steel", "alloy")),
-    SyntheticHybridDocument("doc-memory", "Quimera Memory", "Postgres sessions and agent state", ("postgres", "session")),
-    SyntheticHybridDocument("doc-qdrant", "Quimera Vectors", "Qdrant hybrid dense sparse retrieval", ("qdrant", "hybrid")),
-    SyntheticHybridDocument("doc-mcp", "MCP Tools", "local MCP tools over Streamable HTTP", ("mcp", "tool")),
-    SyntheticHybridDocument("doc-otel", "OTel Safety", "safe trace identifiers and metadata", ("otel", "trace")),
-    SyntheticHybridDocument("doc-litellm", "LiteLLM Gateway", "host gateway for OpenAI compatible model calls", ("litellm", "gateway")),
-    SyntheticHybridDocument("doc-ollama", "Ollama Runtime", "local qwen model runtime", ("ollama", "qwen")),
-    SyntheticHybridDocument("doc-timescale", "Temporal Memory", "Timescale temporal events", ("timescale", "temporal")),
-    SyntheticHybridDocument("doc-agentic0", "Agentic0", "deterministic smoke agent", ("agentic0", "smoke")),
+    SyntheticHybridDocument(
+        "doc-solar",
+        "Alpha Solar",
+        "solar panels and battery storage",
+        ("solar", "battery"),
+    ),
+    SyntheticHybridDocument(
+        "doc-steel",
+        "Alpha Steel",
+        "steel production and industrial alloys",
+        ("steel", "alloy"),
+    ),
+    SyntheticHybridDocument(
+        "doc-memory",
+        "Quimera Memory",
+        "Postgres sessions and agent state",
+        ("postgres", "session"),
+    ),
+    SyntheticHybridDocument(
+        "doc-qdrant",
+        "Quimera Vectors",
+        "Qdrant hybrid dense sparse retrieval",
+        ("qdrant", "hybrid"),
+    ),
+    SyntheticHybridDocument(
+        "doc-mcp", "MCP Tools", "local MCP tools over Streamable HTTP", ("mcp", "tool")
+    ),
+    SyntheticHybridDocument(
+        "doc-otel",
+        "OTel Safety",
+        "safe trace identifiers and metadata",
+        ("otel", "trace"),
+    ),
+    SyntheticHybridDocument(
+        "doc-litellm",
+        "LiteLLM Gateway",
+        "host gateway for OpenAI compatible model calls",
+        ("litellm", "gateway"),
+    ),
+    SyntheticHybridDocument(
+        "doc-ollama", "Ollama Runtime", "local qwen model runtime", ("ollama", "qwen")
+    ),
+    SyntheticHybridDocument(
+        "doc-timescale",
+        "Temporal Memory",
+        "Timescale temporal events",
+        ("timescale", "temporal"),
+    ),
+    SyntheticHybridDocument(
+        "doc-agentic0", "Agentic0", "deterministic smoke agent", ("agentic0", "smoke")
+    ),
 )
 
 
@@ -80,14 +123,20 @@ def synthetic_hybrid_rrf(query: str) -> list[HybridSearchResult]:
     scores: dict[str, float] = {}
     for ranked in (dense, sparse):
         for index, result in enumerate(ranked):
-            scores[result.doc_id] = scores.get(result.doc_id, 0.0) + 1.0 / (60.0 + index + 1)
+            scores[result.doc_id] = scores.get(result.doc_id, 0.0) + 1.0 / (
+                60.0 + index + 1
+            )
     return [
         HybridSearchResult(doc_id=doc_id, score=score, source="hybrid")
-        for doc_id, score in sorted(scores.items(), key=lambda item: item[1], reverse=True)
+        for doc_id, score in sorted(
+            scores.items(), key=lambda item: item[1], reverse=True
+        )
     ]
 
 
-def compute_recall_at_k(results: list[HybridSearchResult], expected_doc_ids: set[str], *, k: int = 5) -> float:
+def compute_recall_at_k(
+    results: list[HybridSearchResult], expected_doc_ids: set[str], *, k: int = 5
+) -> float:
     if not expected_doc_ids:
         return 0.0
     seen = {result.doc_id for result in results[:k]}
@@ -123,7 +172,11 @@ async def ensure_hybrid_collection(client: Any, name: str) -> None:
 
     await client.create_collection(
         collection_name=name,
-        vectors_config={DENSE_VECTOR_NAME: models.VectorParams(size=4, distance=models.Distance.COSINE)},
+        vectors_config={
+            DENSE_VECTOR_NAME: models.VectorParams(
+                size=4, distance=models.Distance.COSINE
+            )
+        },
         sparse_vectors_config={SPARSE_VECTOR_NAME: models.SparseVectorParams()},
     )
 
@@ -133,12 +186,18 @@ async def cleanup_test_collection(client: Any, name: str) -> None:
     await client.delete_collection(collection_name=name)
 
 
-def _rank(query: str, *, source: str, lexical_weight: float) -> list[HybridSearchResult]:
+def _rank(
+    query: str, *, source: str, lexical_weight: float
+) -> list[HybridSearchResult]:
     query_terms = set(query.lower().split())
     results: list[HybridSearchResult] = []
     for doc in SYNTHETIC_DOCS:
         overlap = len(query_terms & set(doc.expected_keywords))
-        semantic_bonus = 0.2 if "quimera" in doc.title.lower() or "agentic0" in doc.title.lower() else 0.0
+        semantic_bonus = (
+            0.2
+            if "quimera" in doc.title.lower() or "agentic0" in doc.title.lower()
+            else 0.0
+        )
         score = overlap * lexical_weight + semantic_bonus
         if score > 0:
             results.append(HybridSearchResult(doc.doc_id, round(score, 6), source))

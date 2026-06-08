@@ -35,7 +35,9 @@ def _qdrant_url(cache_params: dict[str, Any], env: Mapping[str, str]) -> str:
     return value
 
 
-def _write_safe_event(repo_root: Path, *, status: str, cache_backend: str, fallback_active: bool) -> None:
+def _write_safe_event(
+    repo_root: Path, *, status: str, cache_backend: str, fallback_active: bool
+) -> None:
     event_dir = repo_root / ".runtime" / "events"
     event_dir.mkdir(parents=True, exist_ok=True)
     event = {
@@ -74,7 +76,9 @@ def render_runtime_config(
 
     if cache_backend == "qdrant-semantic":
         qdrant_url = _qdrant_url(cache_params, env_map)
-        experimental = env_map.get("QUIMERA_LITELLM_QDRANT_SEMANTIC_EXPERIMENTAL") == "1"
+        experimental = (
+            env_map.get("QUIMERA_LITELLM_QDRANT_SEMANTIC_EXPERIMENTAL") == "1"
+        )
         fallback = env_map.get("QUIMERA_LITELLM_CACHE_FALLBACK", "local")
         is_ready = experimental and (qdrant_smoke or smoke_test_qdrant_sync)(qdrant_url)
         if experimental and is_ready:
@@ -100,12 +104,18 @@ def render_runtime_config(
     runtime_text = yaml.safe_dump(rendered, sort_keys=False, allow_unicode=True)
     master_key = env_map.get("LITELLM_MASTER_KEY")
     if master_key and master_key in runtime_text:
-        raise ConfigValidationError("runtime config would contain literal LITELLM_MASTER_KEY")
+        raise ConfigValidationError(
+            "runtime config would contain literal LITELLM_MASTER_KEY"
+        )
     runtime_path.write_text(
         runtime_text,
         encoding="utf-8",
     )
-    repo_root = source_path.resolve().parents[2] if len(source_path.resolve().parents) >= 3 else Path.cwd()
+    repo_root = (
+        source_path.resolve().parents[2]
+        if len(source_path.resolve().parents) >= 3
+        else Path.cwd()
+    )
     _write_safe_event(
         repo_root,
         status="ok",
@@ -122,7 +132,9 @@ def render_runtime_config(
 
 def main(argv: list[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
-    source = Path(os.environ.get("QUIMERA_LITELLM_CONFIG", "infra/litellm/litellm_config.yaml"))
+    source = Path(
+        os.environ.get("QUIMERA_LITELLM_CONFIG", "infra/litellm/litellm_config.yaml")
+    )
     runtime = Path(
         os.environ.get(
             "QUIMERA_LITELLM_RUNTIME_CONFIG",
@@ -142,7 +154,9 @@ def main(argv: list[str] | None = None) -> int:
             sys.stderr.write(f"unknown argument: {arg}\n")
             return 2
     try:
-        result = render_runtime_config(source_path=source, runtime_path=runtime, strict=strict)
+        result = render_runtime_config(
+            source_path=source, runtime_path=runtime, strict=strict
+        )
     except ConfigValidationError as exc:
         sys.stderr.write(f"render=failed\nmessage={exc}\n")
         return 1

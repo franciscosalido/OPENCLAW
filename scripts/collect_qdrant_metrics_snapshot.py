@@ -98,7 +98,9 @@ def _assert_safe_payload(payload: Mapping[str, object]) -> None:
 def _parse_labels(raw: str | None) -> dict[str, str]:
     if raw is None:
         return {}
-    return {match.group("key"): match.group("value") for match in _LABEL_RE.finditer(raw)}
+    return {
+        match.group("key"): match.group("value") for match in _LABEL_RE.finditer(raw)
+    }
 
 
 def _parse_metric_lines(metrics_text: str) -> list[tuple[str, dict[str, str], float]]:
@@ -113,7 +115,9 @@ def _parse_metric_lines(metrics_text: str) -> list[tuple[str, dict[str, str], fl
         value = float(match.group("value"))
         if not math.isfinite(value):
             continue
-        parsed.append((match.group("name"), _parse_labels(match.group("labels")), value))
+        parsed.append(
+            (match.group("name"), _parse_labels(match.group("labels")), value)
+        )
     return parsed
 
 
@@ -138,8 +142,12 @@ def parse_metrics_snapshot(
         collection=clean_collection,
         qdrant_server_version=server_version,
         memory_resident_bytes=_resident_memory_from_metrics(metrics),
-        collection_vectors=_collection_metric_sum(metrics, "collection_vectors", clean_collection),
-        collection_points=_collection_metric_sum(metrics, "collection_points", clean_collection),
+        collection_vectors=_collection_metric_sum(
+            metrics, "collection_vectors", clean_collection
+        ),
+        collection_points=_collection_metric_sum(
+            metrics, "collection_points", clean_collection
+        ),
         metrics_endpoint="/metrics?per_collection=true",
         telemetry_endpoint="/telemetry",
         notes=(
@@ -240,14 +248,18 @@ def write_snapshot(snapshot: QdrantMetricsSnapshot, output: Path) -> None:
 
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(
-        json.dumps(snapshot.to_safe_dict(), indent=2, ensure_ascii=False, sort_keys=True)
+        json.dumps(
+            snapshot.to_safe_dict(), indent=2, ensure_ascii=False, sort_keys=True
+        )
         + "\n",
         encoding="utf-8",
     )
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Collect a safe Qdrant metrics snapshot.")
+    parser = argparse.ArgumentParser(
+        description="Collect a safe Qdrant metrics snapshot."
+    )
     parser.add_argument("--host", default=DEFAULT_HOST)
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     parser.add_argument("--collection", default=DEFAULT_COLLECTION)
@@ -269,7 +281,9 @@ async def async_main(argv: Sequence[str] | None = None) -> int:
     if args.output is not None:
         write_snapshot(snapshot, args.output)
     sys.stdout.write(
-        json.dumps(snapshot.to_safe_dict(), indent=2, ensure_ascii=False, sort_keys=True)
+        json.dumps(
+            snapshot.to_safe_dict(), indent=2, ensure_ascii=False, sort_keys=True
+        )
     )
     sys.stdout.write("\n")
     return 0

@@ -19,12 +19,11 @@ import hashlib
 import json
 import math
 import os
-import re
 import sys
 import time
 import urllib.request
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from types import MappingProxyType
@@ -303,6 +302,7 @@ def _assert_safe(mapping: Mapping[str, object]) -> dict[str, object]:
 
 # ─── corpus / query loading ───────────────────────────────────────────────────
 
+
 def _load_yaml_safe(path: Path) -> object:
     import yaml
 
@@ -335,6 +335,7 @@ def _load_expected_results(root: Path) -> dict[str, dict[str, int]]:
 
 # ─── synthetic corpus builder ─────────────────────────────────────────────────
 
+
 @dataclass(frozen=True, slots=True)
 class SyntheticDoc:
     doc_id: str
@@ -364,6 +365,7 @@ def build_synthetic_corpus(
 
 
 # ─── embedding helpers ────────────────────────────────────────────────────────
+
 
 def _embed_sync(
     texts: list[str],
@@ -455,6 +457,7 @@ def _query_terms_from_entry(entry: dict[str, object]) -> list[str]:
 
 # ─── Qdrant collection management ────────────────────────────────────────────
 
+
 async def _collection_exists(client: AsyncQdrantClient, name: str) -> bool:
     colls = await client.get_collections()
     return any(c.name == name for c in colls.collections)
@@ -510,6 +513,7 @@ async def _create_collection(
 
 # ─── ingest helpers ───────────────────────────────────────────────────────────
 
+
 async def _ingest_corpus(
     client: AsyncQdrantClient,
     collection: str,
@@ -539,6 +543,7 @@ async def _ingest_corpus(
 
 # ─── search helpers ───────────────────────────────────────────────────────────
 
+
 def _python_rrf(
     dense_hits: list[tuple[str, float]],
     sparse_hits: list[tuple[str, float]],
@@ -552,7 +557,9 @@ def _python_rrf(
     return [doc_id for doc_id, _ in sorted(scores.items(), key=lambda x: -x[1])]
 
 
-def _scored_to_pairs(results: Any, id_to_doc: dict[int, str]) -> list[tuple[str, float]]:
+def _scored_to_pairs(
+    results: Any, id_to_doc: dict[int, str]
+) -> list[tuple[str, float]]:
     out = []
     for r in results.points:
         pid = int(r.id)
@@ -636,9 +643,13 @@ async def _search_native_rrf(
         results = await client.query_points(
             collection_name=collection,
             prefetch=[
-                models.Prefetch(query=dense_vec, using=DENSE_VECTOR_NAME, limit=limit * 2),
                 models.Prefetch(
-                    query=models.SparseVector(indices=sparse_indices, values=sparse_values),
+                    query=dense_vec, using=DENSE_VECTOR_NAME, limit=limit * 2
+                ),
+                models.Prefetch(
+                    query=models.SparseVector(
+                        indices=sparse_indices, values=sparse_values
+                    ),
                     using=SPARSE_VECTOR_NAME,
                     limit=limit * 2,
                 ),
@@ -656,6 +667,7 @@ async def _search_native_rrf(
 
 
 # ─── metric computation ───────────────────────────────────────────────────────
+
 
 def _precision_at_k(ranked: list[str], relevant: set[str], k: int) -> float:
     hits = sum(1 for doc in ranked[:k] if doc in relevant)
@@ -681,7 +693,7 @@ def _dcg(ranked: list[str], grades: dict[str, int], k: int) -> float:
     for i, doc in enumerate(ranked[:k]):
         rel = grades.get(doc, 0)
         if rel > 0:
-            total += (2 ** rel - 1) / math.log2(i + 2)
+            total += (2**rel - 1) / math.log2(i + 2)
     return total
 
 
@@ -697,6 +709,7 @@ def _ndcg_at_k(ranked: list[str], grades: dict[str, int], k: int) -> float:
 
 # ─── p-tiles ─────────────────────────────────────────────────────────────────
 
+
 def _percentile(values: list[float], pct: float) -> float:
     if not values:
         return 0.0
@@ -708,6 +721,7 @@ def _percentile(values: list[float], pct: float) -> float:
 
 
 # ─── Qdrant version probe ─────────────────────────────────────────────────────
+
 
 def _probe_server_version(host: str, port: int) -> str | None:
     try:
@@ -751,8 +765,12 @@ def _probe_collection_bytes(host: str, port: int, collection: str) -> int | None
 
 # ─── corpus hash ──────────────────────────────────────────────────────────────
 
+
 def _corpus_hash(corpus: list[SyntheticDoc]) -> str:
-    content = "|".join(f"{d.doc_id}:{','.join(d.terms)}" for d in sorted(corpus, key=lambda x: x.doc_id))
+    content = "|".join(
+        f"{d.doc_id}:{','.join(d.terms)}"
+        for d in sorted(corpus, key=lambda x: x.doc_id)
+    )
     return hashlib.sha256(content.encode("utf-8")).hexdigest()[:16]
 
 
@@ -767,6 +785,7 @@ def _stable_run_id(profile_name: str, ts: str) -> str:
 
 # ─── main benchmark logic ─────────────────────────────────────────────────────
 
+
 async def run_benchmark(
     *,
     profile_name: str,
@@ -778,6 +797,7 @@ async def run_benchmark(
 ) -> dict[str, object]:
     spec = PROFILE_SPECS[profile_name]
     import importlib.metadata
+
     client_version = importlib.metadata.version("qdrant-client")
     server_version = _probe_server_version(host, port)
 
@@ -799,12 +819,16 @@ async def run_benchmark(
     corpus = build_synthetic_corpus(queries, expected)
 
     if not corpus:
-        raise RuntimeError("empty synthetic corpus — check benchmark_queries.yaml and expected_results.yaml")
+        raise RuntimeError(
+            "empty synthetic corpus — check benchmark_queries.yaml and expected_results.yaml"
+        )
 
     # Embed corpus texts (documents — no instruction for Qwen3)
     doc_texts = [" ".join(doc.terms) for doc in corpus]
     t_embed_start = time.perf_counter()
-    dense_embeddings = _embed_sync(doc_texts, model=embedding_model, dimensions=embedding_dims)
+    dense_embeddings = _embed_sync(
+        doc_texts, model=embedding_model, dimensions=embedding_dims
+    )
     t_embed_end = time.perf_counter()
     embed_ms = (t_embed_end - t_embed_start) * 1000 / max(len(doc_texts), 1)
 
@@ -826,7 +850,13 @@ async def run_benchmark(
             await client.delete_collection(collection)
             exists = False
         if not exists:
-            await _create_collection(client, collection, spec.quantization, spec.on_disk_vectors, embedding_dims)
+            await _create_collection(
+                client,
+                collection,
+                spec.quantization,
+                spec.on_disk_vectors,
+                embedding_dims,
+            )
             await _ingest_corpus(client, collection, corpus, dense_embeddings)
         else:
             # Re-ingest to be safe (upsert is idempotent)
@@ -838,13 +868,19 @@ async def run_benchmark(
     # Build query vectors — Qwen3 profiles use an instruction prefix on the query side
     if query_instruction_used:
         query_texts = [
-            _apply_query_instruction(_query_terms_from_entry(q), QWEN3_QUERY_INSTRUCTION)
+            _apply_query_instruction(
+                _query_terms_from_entry(q), QWEN3_QUERY_INSTRUCTION
+            )
             for q in queries
         ]
     else:
         query_texts = [" ".join(_query_terms_from_entry(q)) for q in queries]
 
-    query_embeddings = _embed_sync(query_texts, model=embedding_model, dimensions=embedding_dims) if query_texts else []
+    query_embeddings = (
+        _embed_sync(query_texts, model=embedding_model, dimensions=embedding_dims)
+        if query_texts
+        else []
+    )
 
     total_ms_list: list[float] = []
     p_at_5_list: list[float] = []
@@ -873,17 +909,40 @@ async def run_benchmark(
             )
         elif spec.fusion_backend == "qdrant_rrf":
             ranked_native, _, _, _, _, total_ms_native = await _search_native_rrf(
-                client, collection, q_dense_norm, q_sparse_idx, q_sparse_val, 10, id_to_doc
+                client,
+                collection,
+                q_dense_norm,
+                q_sparse_idx,
+                q_sparse_val,
+                10,
+                id_to_doc,
             )
             # Also compute python rrf for overlap comparison
-            ranked_python, _, s_dense_ms, s_sparse_ms, fus_ms, _ = await _search_python_rrf(
-                client, collection, q_dense_norm, q_sparse_idx, q_sparse_val, 10, id_to_doc
+            (
+                ranked_python,
+                _,
+                s_dense_ms,
+                s_sparse_ms,
+                fus_ms,
+                _,
+            ) = await _search_python_rrf(
+                client,
+                collection,
+                q_dense_norm,
+                q_sparse_idx,
+                q_sparse_val,
+                10,
+                id_to_doc,
             )
             ranked = ranked_native if ranked_native else ranked_python
             total_ms = total_ms_native if ranked_native else 0.0
             # Overlap
             native_rrf_total += 1
-            overlap = len(set(ranked_native[:10]) & set(ranked_python[:10])) / 10.0 if ranked_native else 0.0
+            overlap = (
+                len(set(ranked_native[:10]) & set(ranked_python[:10])) / 10.0
+                if ranked_native
+                else 0.0
+            )
             if overlap >= 0.9:
                 native_rrf_overlap_count += 1
             if ranked_python and ranked_native and ranked_python[0] != ranked_native[0]:
@@ -892,8 +951,21 @@ async def run_benchmark(
             search_sparse_ms_list.append(s_sparse_ms)
             fusion_ms_list.append(fus_ms)
         else:
-            ranked, _, s_dense_ms, s_sparse_ms, fus_ms, total_ms = await _search_python_rrf(
-                client, collection, q_dense_norm, q_sparse_idx, q_sparse_val, 10, id_to_doc
+            (
+                ranked,
+                _,
+                s_dense_ms,
+                s_sparse_ms,
+                fus_ms,
+                total_ms,
+            ) = await _search_python_rrf(
+                client,
+                collection,
+                q_dense_norm,
+                q_sparse_idx,
+                q_sparse_val,
+                10,
+                id_to_doc,
             )
             search_dense_ms_list.append(s_dense_ms)
             search_sparse_ms_list.append(s_sparse_ms)
@@ -957,9 +1029,15 @@ async def run_benchmark(
                 "p95_ms": p95,
                 "embed_dense_ms_p50": embed_ms,
                 "embed_sparse_ms_p50": 0.0,
-                "search_dense_ms_p50": _percentile(search_dense_ms_list, 50) if search_dense_ms_list else None,
-                "search_sparse_ms_p50": _percentile(search_sparse_ms_list, 50) if search_sparse_ms_list else None,
-                "fusion_ms_p50": _percentile(fusion_ms_list, 50) if fusion_ms_list else None,
+                "search_dense_ms_p50": _percentile(search_dense_ms_list, 50)
+                if search_dense_ms_list
+                else None,
+                "search_sparse_ms_p50": _percentile(search_sparse_ms_list, 50)
+                if search_sparse_ms_list
+                else None,
+                "fusion_ms_p50": _percentile(fusion_ms_list, 50)
+                if fusion_ms_list
+                else None,
                 "total_ms_p50": p50,
                 "total_ms_p95": p95,
             },
@@ -1002,6 +1080,7 @@ async def run_benchmark(
 
 
 # ─── CLI ─────────────────────────────────────────────────────────────────────
+
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -1088,10 +1167,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         wrapper = {"runs": [artifact], "schema_version": ARTIFACT_SCHEMA_VERSION}
         text = json.dumps(wrapper, ensure_ascii=False, indent=2, sort_keys=True)
         out_path.write_text(text + "\n", encoding="utf-8")
-        sys.stdout.write(json.dumps(artifact, ensure_ascii=False, sort_keys=True) + "\n")
+        sys.stdout.write(
+            json.dumps(artifact, ensure_ascii=False, sort_keys=True) + "\n"
+        )
         return 0
     except Exception as exc:
-        sys.stderr.write(f"q18 benchmark profile run failed: {type(exc).__name__}: {exc}\n")
+        sys.stderr.write(
+            f"q18 benchmark profile run failed: {type(exc).__name__}: {exc}\n"
+        )
         return 2
 
 

@@ -3,13 +3,48 @@ from __future__ import annotations
 import json
 import os
 import unittest
+from collections.abc import Sequence
+from typing import cast
 from unittest.mock import patch
 
 import httpx
 
-from backend.gateway.client import DEFAULT_LLM_BASE_URL
+from backend.gateway.client import (
+    DEFAULT_LLM_BASE_URL,
+    GatewayChatClient,
+    GatewayRuntimeConfig,
+)
 from backend.gateway.errors import GatewayAuthenticationError, GatewayResponseError
 from backend.rag.generator import LocalGenerator
+
+
+class FakeGatewayClient:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+        self.closed = False
+
+    async def chat_completion(
+        self,
+        messages: Sequence[dict[str, str]],
+        *,
+        model: str,
+        temperature: float,
+        max_tokens: int,
+        keep_alive: str | None = None,
+    ) -> str:
+        self.calls.append(
+            {
+                "messages": list(messages),
+                "model": model,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+                "keep_alive": keep_alive,
+            }
+        )
+        return "Resposta fake."
+
+    async def aclose(self) -> None:
+        self.closed = True
 
 
 class LocalGeneratorTests(unittest.IsolatedAsyncioTestCase):
@@ -116,6 +151,28 @@ class LocalGeneratorTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(answer, "Resposta curta.")
         self.assertEqual(seen_payloads[0]["extra_body"], {"keep_alive": "5m"})
+
+    async def test_injected_gateway_client_does_not_require_environment(
+        self,
+    ) -> None:
+        fake_gateway = FakeGatewayClient()
+
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch.object(
+                GatewayRuntimeConfig,
+                "from_env",
+                side_effect=AssertionError("from_env should not be called"),
+            ),
+        ):
+            generator = LocalGenerator(
+                gateway_client=cast(GatewayChatClient, fake_gateway),
+                model="local_chat",
+            )
+            answer = await generator.chat([{"role": "user", "content": "pergunta"}])
+
+        self.assertEqual(answer, "Resposta fake.")
+        self.assertEqual(fake_gateway.calls[0]["model"], "local_chat")
 
     async def test_chat_strips_thinking_blocks_when_disabled(self) -> None:
         async with httpx.AsyncClient(

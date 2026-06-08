@@ -37,7 +37,10 @@ async def ask_local(
     effective_model = model or (
         DEFAULT_LLM_REASONING_MODEL if thinking_mode else DEFAULT_LLM_RAG_MODEL
     )
-    async with OllamaEmbedder() as embedder, LocalGenerator(model=effective_model) as generator:
+    async with (
+        OllamaEmbedder() as embedder,
+        LocalGenerator(model=effective_model) as generator,
+    ):
         store = QdrantVectorStore()
         try:
             retriever = Retriever(

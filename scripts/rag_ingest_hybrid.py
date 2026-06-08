@@ -122,7 +122,11 @@ class Chunk:
     def __post_init__(self) -> None:
         object.__setattr__(self, "doc_id", _validate_text(self.doc_id, "doc_id"))
         object.__setattr__(self, "chunk_id", _validate_text(self.chunk_id, "chunk_id"))
-        object.__setattr__(self, "chunk_index", _validate_non_negative_int(self.chunk_index, "chunk_index"))
+        object.__setattr__(
+            self,
+            "chunk_index",
+            _validate_non_negative_int(self.chunk_index, "chunk_index"),
+        )
         object.__setattr__(self, "text", _validate_text(self.text, "text"))
         object.__setattr__(self, "source", _validate_text(self.source, "source"))
 
@@ -134,7 +138,9 @@ class SparseVector:
 
     def __post_init__(self) -> None:
         indices = tuple(_validate_sparse_index(index) for index in self.indices)
-        values = tuple(_validate_finite_number(value, "sparse value") for value in self.values)
+        values = tuple(
+            _validate_finite_number(value, "sparse value") for value in self.values
+        )
         if len(indices) != len(values):
             raise ValueError("sparse indices and values must have the same length")
         object.__setattr__(self, "indices", indices)
@@ -154,7 +160,10 @@ class HybridIngestPoint:
         object.__setattr__(
             self,
             "dense_vector",
-            tuple(_validate_finite_number(value, "dense value") for value in self.dense_vector),
+            tuple(
+                _validate_finite_number(value, "dense value")
+                for value in self.dense_vector
+            ),
         )
         sparse = SparseVector(indices=self.sparse_indices, values=self.sparse_values)
         object.__setattr__(self, "sparse_indices", sparse.indices)
@@ -195,7 +204,11 @@ class HybridIngestSummary:
     batch_size: int
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "collection_name", _validate_text(self.collection_name, "collection_name"))
+        object.__setattr__(
+            self,
+            "collection_name",
+            _validate_text(self.collection_name, "collection_name"),
+        )
         for field_name in (
             "documents_count",
             "chunks_count",
@@ -203,9 +216,17 @@ class HybridIngestSummary:
             "points_sent",
             "batches_sent",
         ):
-            object.__setattr__(self, field_name, _validate_non_negative_int(getattr(self, field_name), field_name))
+            object.__setattr__(
+                self,
+                field_name,
+                _validate_non_negative_int(getattr(self, field_name), field_name),
+            )
         for field_name in ("dense_ms", "sparse_ms", "upload_ms", "total_ms"):
-            object.__setattr__(self, field_name, _validate_non_negative_float(getattr(self, field_name), field_name))
+            object.__setattr__(
+                self,
+                field_name,
+                _validate_non_negative_float(getattr(self, field_name), field_name),
+            )
         metadata = validate_embedding_metadata(
             embedding_model=self.embedding_model,
             embedding_provider=self.embedding_provider,
@@ -398,8 +419,12 @@ def generate_synthetic_corpus() -> list[Document]:
     ]
 
 
-def load_corpus_from_path(path: Path, *, max_documents: int | None = None) -> list[Document]:
-    clean_max_documents = _validate_optional_positive_int(max_documents, "max_documents")
+def load_corpus_from_path(
+    path: Path, *, max_documents: int | None = None
+) -> list[Document]:
+    clean_max_documents = _validate_optional_positive_int(
+        max_documents, "max_documents"
+    )
     if not path.exists():
         raise FileNotFoundError(f"corpus path does not exist: {path}")
 
@@ -410,7 +435,9 @@ def load_corpus_from_path(path: Path, *, max_documents: int | None = None) -> li
         files = [path]
         base = path.parent
     else:
-        files = sorted(candidate for candidate in path.rglob("*.txt") if candidate.is_file())
+        files = sorted(
+            candidate for candidate in path.rglob("*.txt") if candidate.is_file()
+        )
         base = path
 
     if clean_max_documents is not None:
@@ -454,22 +481,30 @@ def validate_embedding_metadata(
     return EmbeddingMetadata(
         embedding_model=_validate_text(embedding_model, "embedding_model"),
         embedding_provider=_validate_text(embedding_provider, "embedding_provider"),
-        embedding_dimensions=_validate_positive_int(embedding_dimensions, "embedding_dimensions"),
+        embedding_dimensions=_validate_positive_int(
+            embedding_dimensions, "embedding_dimensions"
+        ),
         embedding_version=_validate_text(embedding_version, "embedding_version"),
         dense_vector_name=clean_dense,
         sparse_vector_name=clean_sparse,
     )
 
 
-def validate_dense_vector(vector: Sequence[float], *, embedding_dimensions: int) -> tuple[float, ...]:
+def validate_dense_vector(
+    vector: Sequence[float], *, embedding_dimensions: int
+) -> tuple[float, ...]:
     expected = _validate_positive_int(embedding_dimensions, "embedding_dimensions")
     clean = tuple(_validate_finite_number(value, "dense value") for value in vector)
     if len(clean) != expected:
-        raise ValueError(f"dense vector has {len(clean)} dimensions; expected {expected}")
+        raise ValueError(
+            f"dense vector has {len(clean)} dimensions; expected {expected}"
+        )
     return clean
 
 
-def validate_sparse_vector(vector: SparseVector, *, allow_empty_sparse: bool = False) -> SparseVector:
+def validate_sparse_vector(
+    vector: SparseVector, *, allow_empty_sparse: bool = False
+) -> SparseVector:
     clean = SparseVector(indices=vector.indices, values=vector.values)
     if not allow_empty_sparse and not clean.indices:
         raise ValueError("sparse vector cannot be empty")
@@ -517,7 +552,9 @@ def prepare_hybrid_points(
     allow_empty_sparse: bool = False,
 ) -> list[HybridIngestPoint]:
     if len(chunks) != len(dense_vectors) or len(chunks) != len(sparse_vectors):
-        raise ValueError("chunks, dense_vectors, and sparse_vectors must have the same length")
+        raise ValueError(
+            "chunks, dense_vectors, and sparse_vectors must have the same length"
+        )
 
     metadata = validate_embedding_metadata(
         embedding_model=embedding_model,
@@ -530,9 +567,15 @@ def prepare_hybrid_points(
     dimensions = metadata.embedding_dimensions
 
     points: list[HybridIngestPoint] = []
-    for chunk, dense_vector, sparse_vector in zip(chunks, dense_vectors, sparse_vectors, strict=True):
-        clean_dense = validate_dense_vector(dense_vector, embedding_dimensions=dimensions)
-        clean_sparse = validate_sparse_vector(sparse_vector, allow_empty_sparse=allow_empty_sparse)
+    for chunk, dense_vector, sparse_vector in zip(
+        chunks, dense_vectors, sparse_vectors, strict=True
+    ):
+        clean_dense = validate_dense_vector(
+            dense_vector, embedding_dimensions=dimensions
+        )
+        clean_sparse = validate_sparse_vector(
+            sparse_vector, allow_empty_sparse=allow_empty_sparse
+        )
         payload = build_payload(
             chunk=chunk,
             embedding_model=metadata.embedding_model,
@@ -591,7 +634,9 @@ def batched(items: Sequence[T], batch_size: int) -> Iterator[list[T]]:
 def assert_collection_is_safe_for_ingest(collection_name: str) -> str:
     clean = _validate_text(collection_name, "collection_name")
     if clean in PROTECTED_COLLECTIONS:
-        raise HybridIngestError(f"collection {clean!r} is protected and cannot be used for hybrid ingest")
+        raise HybridIngestError(
+            f"collection {clean!r} is protected and cannot be used for hybrid ingest"
+        )
     return clean
 
 
@@ -723,7 +768,9 @@ def _elapsed_ms(start: float, end: float) -> float:
 class _DeterministicDenseEmbedder:
     async def embed(self, text: str) -> Sequence[float]:
         digest = hashlib.sha256(text.encode("utf-8")).digest()
-        base = [((digest[index % len(digest)] / 255.0) * 2.0) - 1.0 for index in range(16)]
+        base = [
+            ((digest[index % len(digest)] / 255.0) * 2.0) - 1.0 for index in range(16)
+        ]
         repeats = (DEFAULT_EMBEDDING_DIMENSIONS + len(base) - 1) // len(base)
         return (base * repeats)[:DEFAULT_EMBEDDING_DIMENSIONS]
 
@@ -755,7 +802,9 @@ class _DryRunUpsertClient:
 
 
 def _build_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Prepare hybrid dense+sparse ingest points.")
+    parser = argparse.ArgumentParser(
+        description="Prepare hybrid dense+sparse ingest points."
+    )
     parser.add_argument("--corpus-path", type=Path)
     parser.add_argument("--collection", default=HYBRID_COLLECTION_NAME)
     parser.add_argument("--batch-size", type=int, default=DEFAULT_BATCH_SIZE)
@@ -765,7 +814,9 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--embedding-model", default=DEFAULT_EMBEDDING_MODEL)
     parser.add_argument("--embedding-provider", default=DEFAULT_EMBEDDING_PROVIDER)
-    parser.add_argument("--embedding-dimensions", type=int, default=DEFAULT_EMBEDDING_DIMENSIONS)
+    parser.add_argument(
+        "--embedding-dimensions", type=int, default=DEFAULT_EMBEDDING_DIMENSIONS
+    )
     parser.add_argument("--embedding-version", default=DEFAULT_EMBEDDING_VERSION)
     parser.add_argument("--synthetic", action="store_true")
     return parser
@@ -777,7 +828,9 @@ def _load_documents_for_cli(args: argparse.Namespace) -> list[Document]:
     if args.synthetic:
         documents = generate_synthetic_corpus()
         if args.max_documents is not None:
-            documents = documents[: _validate_positive_int(args.max_documents, "max_documents")]
+            documents = documents[
+                : _validate_positive_int(args.max_documents, "max_documents")
+            ]
         return documents
     raise HybridIngestError("provide --synthetic or --corpus-path")
 
@@ -791,7 +844,9 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     try:
         if args.execute:
-            raise HybridIngestError("execute mode is not wired to a real upsert client in PR-09")
+            raise HybridIngestError(
+                "execute mode is not wired to a real upsert client in PR-09"
+            )
         documents = _load_documents_for_cli(args)
         summary = asyncio.run(
             run_ingest(
@@ -809,7 +864,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                 embedding_version=args.embedding_version,
             )
         )
-        sys.stdout.write(json.dumps(summary.to_safe_dict(), indent=2, ensure_ascii=False))
+        sys.stdout.write(
+            json.dumps(summary.to_safe_dict(), indent=2, ensure_ascii=False)
+        )
         sys.stdout.write("\n")
         return 0
     except Exception as exc:

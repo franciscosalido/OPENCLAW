@@ -46,9 +46,7 @@ _SYNTHETIC_QUESTION = (
     "Qual é o impacto do aumento da taxa Selic sobre a rentabilidade "
     "de títulos prefixados em carteiras de renda fixa?"
 )
-_QUESTION_HASH_8 = hashlib.sha256(
-    _SYNTHETIC_QUESTION.encode("utf-8")
-).hexdigest()[:8]
+_QUESTION_HASH_8 = hashlib.sha256(_SYNTHETIC_QUESTION.encode("utf-8")).hexdigest()[:8]
 
 DEFAULT_OUTPUT_DIR = Path("reports/g2_latency_baseline")
 DEFAULT_LITELLM_CONFIG_PATH = Path("config/litellm_config.yaml")
@@ -85,11 +83,27 @@ SEGMENT_KEYS = (
 )
 FORBIDDEN_KEYS = frozenset(
     {
-        "prompt", "question", "answer", "chunks", "chunk_text",
-        "vectors", "embeddings", "payload", "qdrant_payload",
-        "api_key", "authorization", "headers", "secret", "password",
-        "raw_response", "raw_exception", "exception_message", "traceback",
-        "raw_user_input", "model_weights_path", "weights_path",
+        "prompt",
+        "question",
+        "answer",
+        "chunks",
+        "chunk_text",
+        "vectors",
+        "embeddings",
+        "payload",
+        "qdrant_payload",
+        "api_key",
+        "authorization",
+        "headers",
+        "secret",
+        "password",
+        "raw_response",
+        "raw_exception",
+        "exception_message",
+        "traceback",
+        "raw_user_input",
+        "model_weights_path",
+        "weights_path",
     }
 )
 
@@ -192,7 +206,6 @@ def _build_pipeline() -> LocalRagPipeline:
     """Build a LocalRagPipeline from environment and config."""
     from backend.gateway.embed_client import GatewayEmbedClient
     from backend.rag.qdrant_store import QdrantVectorStore
-    from backend.rag.retriever import Retriever
 
     embed_client = GatewayEmbedClient()
     store = QdrantVectorStore()
@@ -211,7 +224,6 @@ def _build_pipeline() -> LocalRagPipeline:
 def _build_degraded_pipeline() -> LocalRagPipeline:
     """Build a pipeline with a fake store that raises on search."""
     from backend.gateway.embed_client import GatewayEmbedClient
-    from backend.rag.retriever import Retriever
 
     class _FakeUnavailableStore:
         async def search(
@@ -323,9 +335,7 @@ async def _run_once(
             model_load_observed=model_load_observed,
             error_category=error_category,
         ),
-        model_was_resident_before_run=(
-            residency_check.model_was_resident_before_run
-        ),
+        model_was_resident_before_run=(residency_check.model_was_resident_before_run),
         resident_check_unavailable_reason=(
             residency_check.resident_check_unavailable_reason
         ),
@@ -336,9 +346,7 @@ async def _run_once(
         model_residency_enabled=_bool_or_none(trace.get("model_residency_enabled")),
         keep_alive_value=_str_or_none(trace.get("keep_alive_value")),
         keep_alive_applied=keep_alive_applied,
-        keep_alive_skipped_reason=_str_or_none(
-            trace.get("keep_alive_skipped_reason")
-        ),
+        keep_alive_skipped_reason=_str_or_none(trace.get("keep_alive_skipped_reason")),
         keep_alive_ineffective=_keep_alive_ineffective(
             run_type=run_type,
             keep_alive_applied=keep_alive_applied,
@@ -504,10 +512,13 @@ async def check_ollama_model_residency(
     client: httpx.AsyncClient | None = None,
 ) -> ModelResidencyCheck:
     """Check Ollama ``/api/ps`` without logging raw responses or local paths."""
-    effective_base_url = (base_url or os.environ.get(
-        "OLLAMA_API_BASE",
-        DEFAULT_OLLAMA_API_BASE,
-    )).rstrip("/")
+    effective_base_url = (
+        base_url
+        or os.environ.get(
+            "OLLAMA_API_BASE",
+            DEFAULT_OLLAMA_API_BASE,
+        )
+    ).rstrip("/")
     if not _is_local_url(effective_base_url):
         return ModelResidencyCheck(
             model_was_resident_before_run=None,
@@ -783,9 +794,7 @@ def _print_summary(results: list[BaselineRunResult]) -> None:
 
     # Answer the 4 merge-criterion questions
     contexts = {r.run_type for r in results}
-    all_ok_or_degraded = all(
-        r.ok or r.run_type == "degraded_qdrant" for r in results
-    )
+    all_ok_or_degraded = all(r.ok or r.run_type == "degraded_qdrant" for r in results)
     segments_present = all(
         r.segment_ms.get("generation_ms") is not None
         and r.segment_ms.get("retrieval_ms") is not None
@@ -800,7 +809,7 @@ def _print_summary(results: list[BaselineRunResult]) -> None:
     print(f"  2. generation_ms visible?      {'YES' if segments_present else 'NO'}")
     print(f"  3. retrieval_ms visible?       {'YES' if segments_present else 'NO'}")
     print(f"  4. cold/warm/degraded distinct?{'YES' if distinguishable else 'NO'}")
-    print(f"  5. no forbidden keys?          YES (validated before write)")
+    print("  5. no forbidden keys?          YES (validated before write)")
     print("-" * 60)
 
 

@@ -204,8 +204,7 @@ async def main_async(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
     if os.environ.get(GUARD_ENV) != "1":
         sys.stdout.write(
-            "RAG alias comparison is opt-in. "
-            "Set RUN_RAG_ALIAS_COMPARISON=1 to run.\n",
+            "RAG alias comparison is opt-in. Set RUN_RAG_ALIAS_COMPARISON=1 to run.\n",
         )
         return 2
     jsonl_path, summary_path = await run_comparison(
@@ -444,7 +443,9 @@ def _results_by_alias(
 ) -> dict[str, dict[str, dict[str, object]]]:
     grouped: dict[str, dict[str, list[AliasComparisonResult]]] = {}
     for result in results:
-        grouped.setdefault(result.alias, {}).setdefault(result.run_type, []).append(result)
+        grouped.setdefault(result.alias, {}).setdefault(result.run_type, []).append(
+            result
+        )
     output: dict[str, dict[str, dict[str, object]]] = {}
     for alias, by_run_type in grouped.items():
         output[alias] = {}
@@ -511,9 +512,8 @@ def _citation_regression(
 def _material_latency_improvement(delta: Mapping[str, object]) -> bool:
     total = delta.get("total_ms_delta_pct")
     generation = delta.get("generation_ms_delta_pct")
-    return (
-        (isinstance(total, (int, float)) and total >= 30.0)
-        or (isinstance(generation, (int, float)) and generation >= 30.0)
+    return (isinstance(total, (int, float)) and total >= 30.0) or (
+        isinstance(generation, (int, float)) and generation >= 30.0
     )
 
 
@@ -522,7 +522,9 @@ def _mean_for_alias(
     alias: str,
     field_name: str,
 ) -> float | None:
-    return _mean_metric([result for result in results if result.alias == alias], field_name)
+    return _mean_metric(
+        [result for result in results if result.alias == alias], field_name
+    )
 
 
 def _mean_metric(
@@ -579,9 +581,8 @@ def _validate_semantic_alias(alias: str) -> str:
 
 
 def _is_local_api_base(api_base: str) -> bool:
-    return (
-        api_base.startswith("http://localhost:")
-        or api_base.startswith("http://127.0.0.1:")
+    return api_base.startswith("http://localhost:") or api_base.startswith(
+        "http://127.0.0.1:"
     )
 
 

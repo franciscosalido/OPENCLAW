@@ -18,7 +18,7 @@ import random
 import sys
 from collections import Counter
 from collections.abc import Awaitable, Callable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
@@ -245,7 +245,9 @@ class RetrievalLikeResult:
     retrieval_personality: str
 
     def __post_init__(self) -> None:
-        clean_doc_ids = tuple(_validate_text(doc_id, "doc_id") for doc_id in self.hit_doc_ids)
+        clean_doc_ids = tuple(
+            _validate_text(doc_id, "doc_id") for doc_id in self.hit_doc_ids
+        )
         clean_result_ids = tuple(
             _validate_text(result_id, "result_id") for result_id in self.hit_result_ids
         )
@@ -596,7 +598,7 @@ def dcg_at_k(hit_doc_ids: Sequence[str], qrels: Mapping[str, int], k: int) -> fl
     total = 0.0
     for index, doc_id in enumerate(hit_doc_ids[:clean_k], start=1):
         rel = qrels.get(doc_id, 0)
-        gain = (2.0**float(rel)) - 1.0
+        gain = (2.0 ** float(rel)) - 1.0
         total += gain / math.log2(float(index) + 1.0)
     return total
 
@@ -607,7 +609,9 @@ def ndcg_at_k(hit_doc_ids: Sequence[str], qrels: Mapping[str, int], k: int) -> f
     clean_k = _validate_positive_int(k, "k")
     ideal_doc_ids = tuple(
         doc_id
-        for doc_id, _grade in sorted(qrels.items(), key=lambda item: item[1], reverse=True)
+        for doc_id, _grade in sorted(
+            qrels.items(), key=lambda item: item[1], reverse=True
+        )
     )
     ideal = dcg_at_k(ideal_doc_ids, qrels, clean_k)
     if ideal <= 0.0:
@@ -662,7 +666,9 @@ def bootstrap_ci(
     means: list[float] = []
     sample_size = len(clean_values)
     for _ in range(clean_resamples):
-        sample = [clean_values[rng.randrange(sample_size)] for _index in range(sample_size)]
+        sample = [
+            clean_values[rng.randrange(sample_size)] for _index in range(sample_size)
+        ]
         means.append(_mean(sample))
     alpha = (1.0 - clean_confidence) / 2.0
     return (
@@ -742,7 +748,9 @@ async def run_mode(
     results: list[QueryMetrics] = []
     for index, query in enumerate(queries):
         retrieval = await runner.retrieve(query)
-        results.append(_metrics_from_retrieval(query=query, mode=clean_mode, result=retrieval))
+        results.append(
+            _metrics_from_retrieval(query=query, mode=clean_mode, result=retrieval)
+        )
         if clean_cooldown > 0.0 and index < len(queries) - 1:
             await sleeper(clean_cooldown / 1000.0)
     return results
@@ -757,7 +765,9 @@ def assert_paired_query_metrics(
     dense_ids = tuple(sorted(_metrics_by_query_id(dense_metrics)))
     hybrid_ids = tuple(sorted(_metrics_by_query_id(hybrid_metrics)))
     if dense_ids != hybrid_ids:
-        raise ValueError("dense and hybrid metrics must have identical query_id coverage")
+        raise ValueError(
+            "dense and hybrid metrics must have identical query_id coverage"
+        )
 
 
 def assert_runs_comparable(dense_run: EvaluationRun, hybrid_run: EvaluationRun) -> None:
@@ -856,7 +866,9 @@ def build_query_rows(
                 query_id=metric.query_id,
                 query_category=metric.category.value,
                 mode=metric.mode.value,
-                rank_1_doc_id="" if metric.rank_1_doc_id is None else metric.rank_1_doc_id,
+                rank_1_doc_id=""
+                if metric.rank_1_doc_id is None
+                else metric.rank_1_doc_id,
                 precision_at_5=metric.precision_at_5,
                 recall_at_10=metric.recall_at_10,
                 mrr=metric.mrr,
@@ -873,10 +885,14 @@ def build_query_rows(
                 retrieval_personality=metric.retrieval_personality,
                 search_top_k=run.search_top_k,
                 return_top_k=run.return_top_k,
-                rrf_profile="" if run.rrf_profile_name is None else run.rrf_profile_name,
+                rrf_profile=""
+                if run.rrf_profile_name is None
+                else run.rrf_profile_name,
                 qdrant_server_version=qdrant_snapshot.qdrant_server_version or "",
                 qdrant_client_version=qdrant_snapshot.qdrant_client_version or "",
-                ef_search="" if qdrant_snapshot.ef_search is None else str(qdrant_snapshot.ef_search),
+                ef_search=""
+                if qdrant_snapshot.ef_search is None
+                else str(qdrant_snapshot.ef_search),
                 strict_mode=""
                 if qdrant_snapshot.strict_mode is None
                 else str(qdrant_snapshot.strict_mode).lower(),
@@ -902,7 +918,9 @@ def build_summary(
     active_thresholds = thresholds or HybridDecisionThresholds()
     assert_runs_comparable(dense_run, hybrid_run)
     assert_paired_query_metrics(dense_metrics, hybrid_metrics)
-    generated_at = generated_at_iso or datetime.now(UTC).replace(microsecond=0).isoformat()
+    generated_at = (
+        generated_at_iso or datetime.now(UTC).replace(microsecond=0).isoformat()
+    )
     aggregate = {
         RetrievalMode.DENSE_ONLY.value: aggregate_metrics(dense_metrics),
         RetrievalMode.HYBRID.value: aggregate_metrics(hybrid_metrics),
@@ -983,7 +1001,9 @@ def category_breakdown(
         grouped.setdefault(dense.category.value, []).append((dense, hybrid))
     breakdown: dict[str, dict[str, float]] = {}
     for category, pairs in sorted(grouped.items()):
-        recall_deltas = [hybrid.recall_at_10 - dense.recall_at_10 for dense, hybrid in pairs]
+        recall_deltas = [
+            hybrid.recall_at_10 - dense.recall_at_10 for dense, hybrid in pairs
+        ]
         ndcg_deltas = [hybrid.ndcg_at_5 - dense.ndcg_at_5 for dense, hybrid in pairs]
         wins = sum(1 for dense, hybrid in pairs if hybrid.ndcg_at_5 > dense.ndcg_at_5)
         losses = sum(1 for dense, hybrid in pairs if hybrid.ndcg_at_5 < dense.ndcg_at_5)
@@ -1027,8 +1047,14 @@ def top_query_deltas(
                 "hybrid_rank_1_doc_id": hybrid.rank_1_doc_id,
             }
         )
-    gains = tuple(sorted(rows, key=lambda row: _row_float(row, "delta_ndcg_at_5"), reverse=True)[:5])
-    regressions = tuple(sorted(rows, key=lambda row: _row_float(row, "delta_ndcg_at_5"))[:5])
+    gains = tuple(
+        sorted(rows, key=lambda row: _row_float(row, "delta_ndcg_at_5"), reverse=True)[
+            :5
+        ]
+    )
+    regressions = tuple(
+        sorted(rows, key=lambda row: _row_float(row, "delta_ndcg_at_5"))[:5]
+    )
     return gains, regressions
 
 
@@ -1057,9 +1083,13 @@ def decide_hybrid_promotion_from_parts(
     hybrid_p95 = latency_summary_by_mode[RetrievalMode.HYBRID.value]["p95_ms"]
     latency_multiplier = _safe_ratio(hybrid_p95, dense_p95)
     quality_deltas = [
-        delta for delta in deltas if delta.metric in {"precision_at_5", "recall_at_10", "mrr", "ndcg_at_5"}
+        delta
+        for delta in deltas
+        if delta.metric in {"precision_at_5", "recall_at_10", "mrr", "ndcg_at_5"}
     ]
-    hybrid_wins = tuple(delta.metric for delta in quality_deltas if delta.absolute_delta > EPSILON)
+    hybrid_wins = tuple(
+        delta.metric for delta in quality_deltas if delta.absolute_delta > EPSILON
+    )
     dense_metric_wins = tuple(
         delta.metric for delta in quality_deltas if delta.absolute_delta < -EPSILON
     )
@@ -1081,7 +1111,10 @@ def decide_hybrid_promotion_from_parts(
             note="hybrid quality gain clears thresholds with acceptable latency overhead",
         )
 
-    if recall_delta < -thresholds.min_recall10_abs_gain or ndcg_delta < -thresholds.min_ndcg5_abs_gain:
+    if (
+        recall_delta < -thresholds.min_recall10_abs_gain
+        or ndcg_delta < -thresholds.min_ndcg5_abs_gain
+    ):
         return ComparisonVerdict(
             verdict=Verdict.DENSE_WINS,
             winning_mode=RetrievalMode.DENSE_ONLY.value,
@@ -1254,10 +1287,14 @@ def render_svg_dashboard(summary: ComparisonSummary) -> str:
         '<text x="30" y="35" class="title">Dense vs Hybrid Visual Report</text>',
         _svg_quality_chart(dense, hybrid, metrics, x=30, y=70),
         _svg_latency_chart(latency_dense, latency_hybrid, x=620, y=70),
-        _svg_delta_waterfall(summary.top_5_hybrid_gains, summary.top_5_hybrid_regressions, x=30, y=350),
+        _svg_delta_waterfall(
+            summary.top_5_hybrid_gains, summary.top_5_hybrid_regressions, x=30, y=350
+        ),
         _svg_category_table(summary.category_breakdown, x=620, y=350),
         _svg_personality_bar(summary.retrieval_personality_counts, x=30, y=720),
-        _svg_quality_vs_delta_scatter(summary.top_5_hybrid_gains, summary.top_5_hybrid_regressions, x=620, y=720),
+        _svg_quality_vs_delta_scatter(
+            summary.top_5_hybrid_gains, summary.top_5_hybrid_regressions, x=620, y=720
+        ),
         "</svg>",
     ]
     return "\n".join(parts)
@@ -1285,9 +1322,12 @@ def format_terminal_summary(summary: ComparisonSummary) -> str:
         [
             "",
             f"Latency p95 ms   dense={_fmt_float(dense_p95)} hybrid={_fmt_float(hybrid_p95)} multiplier={_fmt_float(_safe_ratio(hybrid_p95, dense_p95))}",
-            "Top gains: " + ", ".join(str(row["query_id"]) for row in summary.top_5_hybrid_gains[:5]),
+            "Top gains: "
+            + ", ".join(str(row["query_id"]) for row in summary.top_5_hybrid_gains[:5]),
             "Top regressions: "
-            + ", ".join(str(row["query_id"]) for row in summary.top_5_hybrid_regressions[:5]),
+            + ", ".join(
+                str(row["query_id"]) for row in summary.top_5_hybrid_regressions[:5]
+            ),
         ]
     )
     return "\n".join(lines) + "\n"
@@ -1341,7 +1381,10 @@ def load_eval_queries(path: Path | None) -> tuple[EvalQuery, ...]:
                 query_id=_require_str(raw.get("query_id"), "query_id"),
                 text=_require_str(raw.get("text"), "text"),
                 category=QueryCategory(_require_str(raw.get("category"), "category")),
-                qrels={_require_str(key, "qrel doc_id"): _require_int(value, "qrel grade") for key, value in raw_qrels.items()},
+                qrels={
+                    _require_str(key, "qrel doc_id"): _require_int(value, "qrel grade")
+                    for key, value in raw_qrels.items()
+                },
                 tags=tuple(_require_str(tag, "tag") for tag in raw_tags),
             )
         )
@@ -1402,19 +1445,25 @@ def default_static_runners() -> tuple[StaticRetrieverRunner, StaticRetrieverRunn
             "q_fii_01": RetrievalLikeResult(
                 hit_doc_ids=("smoke-tesouro-selic", "smoke-marcacao-prefixado-ipca"),
                 hit_result_ids=("selic-1", "duration-1"),
-                phase_latencies=PhaseLatencies(embed_dense_ms=4.0, search_dense_ms=5.0, total_ms=9.0),
+                phase_latencies=PhaseLatencies(
+                    embed_dense_ms=4.0, search_dense_ms=5.0, total_ms=9.0
+                ),
                 retrieval_personality="dense_only_baseline",
             ),
             "q_selic_01": RetrievalLikeResult(
                 hit_doc_ids=("smoke-tesouro-selic", "smoke-fii-mxrf11"),
                 hit_result_ids=("selic-1", "fii-1"),
-                phase_latencies=PhaseLatencies(embed_dense_ms=4.0, search_dense_ms=6.0, total_ms=10.0),
+                phase_latencies=PhaseLatencies(
+                    embed_dense_ms=4.0, search_dense_ms=6.0, total_ms=10.0
+                ),
                 retrieval_personality="dense_only_baseline",
             ),
             "q_duration_01": RetrievalLikeResult(
                 hit_doc_ids=("smoke-fii-mxrf11", "smoke-tesouro-selic"),
                 hit_result_ids=("fii-1", "selic-1"),
-                phase_latencies=PhaseLatencies(embed_dense_ms=4.0, search_dense_ms=5.0, total_ms=9.0),
+                phase_latencies=PhaseLatencies(
+                    embed_dense_ms=4.0, search_dense_ms=5.0, total_ms=9.0
+                ),
                 retrieval_personality="dense_only_baseline",
             ),
         }
@@ -1484,7 +1533,9 @@ async def compare_dense_vs_hybrid(
     """Run paired dense and hybrid retrieval and build report payloads."""
 
     clean_collection = _validate_text(collection_name, "collection_name")
-    clean_timestamp = timestamp_iso or datetime.now(UTC).replace(microsecond=0).isoformat()
+    clean_timestamp = (
+        timestamp_iso or datetime.now(UTC).replace(microsecond=0).isoformat()
+    )
     query_tuple = tuple(queries)
     dense_run = build_evaluation_run(
         mode=RetrievalMode.DENSE_ONLY,
@@ -1532,8 +1583,12 @@ async def compare_dense_vs_hybrid(
         generated_at_iso=clean_timestamp,
     )
     rows = [
-        *build_query_rows(run=dense_run, metrics=dense_metrics, qdrant_snapshot=snapshot),
-        *build_query_rows(run=hybrid_run, metrics=hybrid_metrics, qdrant_snapshot=snapshot),
+        *build_query_rows(
+            run=dense_run, metrics=dense_metrics, qdrant_snapshot=snapshot
+        ),
+        *build_query_rows(
+            run=hybrid_run, metrics=hybrid_metrics, qdrant_snapshot=snapshot
+        ),
     ]
     return rows, summary
 
@@ -1544,10 +1599,14 @@ async def main(argv: Sequence[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
     if bool(args.include_debug_text):
-        sys.stderr.write("debug text output is not supported by PR-11 default artifacts\n")
+        sys.stderr.write(
+            "debug text output is not supported by PR-11 default artifacts\n"
+        )
         return 2
     if bool(args.run_live):
-        sys.stderr.write("live mode is not wired in PR-11; use injected runners in integration code\n")
+        sys.stderr.write(
+            "live mode is not wired in PR-11; use injected runners in integration code\n"
+        )
         return 2
 
     queries = load_eval_queries(None if args.queries is None else Path(args.queries))
@@ -1729,7 +1788,9 @@ def _svg_quality_chart(
         bars.append(
             f'<text x="{group_x}" y="{y + 250}" class="small">{html.escape(metric)}</text>'
         )
-    bars.append(f'<text x="{x + 20}" y="{y + 285}" class="small">blue=dense green=hybrid</text>')
+    bars.append(
+        f'<text x="{x + 20}" y="{y + 285}" class="small">blue=dense green=hybrid</text>'
+    )
     return "\n".join(bars)
 
 
@@ -1740,18 +1801,29 @@ def _svg_latency_chart(
     x: int,
     y: int,
 ) -> str:
-    max_value = max(dense["p50_ms"], dense["p95_ms"], hybrid["p50_ms"], hybrid["p95_ms"], 1.0)
+    max_value = max(
+        dense["p50_ms"], dense["p95_ms"], hybrid["p50_ms"], hybrid["p95_ms"], 1.0
+    )
     rows = [f'<text x="{x}" y="{y}" class="title">Latency p50/p95</text>']
-    labels = (("p50", dense["p50_ms"], hybrid["p50_ms"]), ("p95", dense["p95_ms"], hybrid["p95_ms"]))
+    labels = (
+        ("p50", dense["p50_ms"], hybrid["p50_ms"]),
+        ("p95", dense["p95_ms"], hybrid["p95_ms"]),
+    )
     for index, (label, dense_value, hybrid_value) in enumerate(labels):
         row_y = y + 50 + index * 90
         dense_w = int((dense_value / max_value) * 300.0)
         hybrid_w = int((hybrid_value / max_value) * 300.0)
         rows.append(f'<text x="{x}" y="{row_y}" class="small">{label}</text>')
-        rows.append(f'<rect class="dense" x="{x + 60}" y="{row_y - 18}" width="{dense_w}" height="18"/>')
-        rows.append(f'<rect class="hybrid" x="{x + 60}" y="{row_y + 8}" width="{hybrid_w}" height="18"/>')
+        rows.append(
+            f'<rect class="dense" x="{x + 60}" y="{row_y - 18}" width="{dense_w}" height="18"/>'
+        )
+        rows.append(
+            f'<rect class="hybrid" x="{x + 60}" y="{row_y + 8}" width="{hybrid_w}" height="18"/>'
+        )
     multiplier = _safe_ratio(hybrid["p95_ms"], dense["p95_ms"])
-    rows.append(f'<text x="{x}" y="{y + 235}" class="small">p95 multiplier: {_fmt_float(multiplier)}</text>')
+    rows.append(
+        f'<text x="{x}" y="{y + 235}" class="small">p95 multiplier: {_fmt_float(multiplier)}</text>'
+    )
     return "\n".join(rows)
 
 
@@ -1765,15 +1837,21 @@ def _svg_delta_waterfall(
     rows = [f'<text x="{x}" y="{y}" class="title">Per-query NDCG@5 Delta</text>']
     merged = list(gains[:3]) + list(regressions[:3])
     zero_x = x + 240
-    rows.append(f'<line x1="{zero_x}" y1="{y + 25}" x2="{zero_x}" y2="{y + 225}" class="axis"/>')
+    rows.append(
+        f'<line x1="{zero_x}" y1="{y + 25}" x2="{zero_x}" y2="{y + 225}" class="axis"/>'
+    )
     for index, row in enumerate(merged):
         delta = _row_float(row, "delta_ndcg_at_5")
         bar_w = int(abs(delta) * 160.0)
         row_y = y + 50 + index * 28
         color = "pos" if delta >= 0.0 else "neg"
         bar_x = zero_x if delta >= 0.0 else zero_x - bar_w
-        rows.append(f'<text x="{x}" y="{row_y + 13}" class="small">{html.escape(str(row["query_id"]))}</text>')
-        rows.append(f'<rect class="{color}" x="{bar_x}" y="{row_y}" width="{bar_w}" height="16"/>')
+        rows.append(
+            f'<text x="{x}" y="{row_y + 13}" class="small">{html.escape(str(row["query_id"]))}</text>'
+        )
+        rows.append(
+            f'<rect class="{color}" x="{bar_x}" y="{row_y}" width="{bar_w}" height="16"/>'
+        )
     return "\n".join(rows)
 
 
@@ -1784,7 +1862,9 @@ def _svg_category_table(
     y: int,
 ) -> str:
     rows = [f'<text x="{x}" y="{y}" class="title">Category Breakdown</text>']
-    rows.append(f'<text x="{x}" y="{y + 30}" class="small">category | delta recall@10 | delta ndcg@5 | W/L/T</text>')
+    rows.append(
+        f'<text x="{x}" y="{y + 30}" class="small">category | delta recall@10 | delta ndcg@5 | W/L/T</text>'
+    )
     for index, (category, values) in enumerate(sorted(breakdown.items())):
         row_y = y + 58 + index * 24
         label = (
@@ -1792,7 +1872,9 @@ def _svg_category_table(
             f"{_fmt_signed(values['delta_ndcg_at_5'])} | "
             f"{int(values['wins'])}/{int(values['losses'])}/{int(values['ties'])}"
         )
-        rows.append(f'<text x="{x}" y="{row_y}" class="small">{html.escape(label)}</text>')
+        rows.append(
+            f'<text x="{x}" y="{row_y}" class="small">{html.escape(label)}</text>'
+        )
     return "\n".join(rows)
 
 
@@ -1825,27 +1907,39 @@ def _svg_quality_vs_delta_scatter(
     x: int,
     y: int,
 ) -> str:
-    rows = [f'<text x="{x}" y="{y}" class="title">Quality Gain vs Latency Overhead</text>']
-    rows.append(f'<rect x="{x}" y="{y + 25}" width="420" height="180" fill="none" stroke="#333"/>')
-    rows.append(f'<text x="{x + 10}" y="{y + 55}" class="small">points are query ids, ordered by NDCG delta</text>')
+    rows = [
+        f'<text x="{x}" y="{y}" class="title">Quality Gain vs Latency Overhead</text>'
+    ]
+    rows.append(
+        f'<rect x="{x}" y="{y + 25}" width="420" height="180" fill="none" stroke="#333"/>'
+    )
+    rows.append(
+        f'<text x="{x + 10}" y="{y + 55}" class="small">points are query ids, ordered by NDCG delta</text>'
+    )
     merged = list(gains[:3]) + list(regressions[:3])
     for index, row in enumerate(merged):
         px = x + 40 + index * 55
         py = y + 125 - int(_row_float(row, "delta_ndcg_at_5") * 55.0)
         rows.append(f'<circle cx="{px}" cy="{py}" r="5" fill="#27AE60"/>')
-        rows.append(f'<text x="{px + 8}" y="{py + 4}" class="small">{html.escape(str(row["query_id"]))}</text>')
+        rows.append(
+            f'<text x="{px + 8}" y="{py + 4}" class="small">{html.escape(str(row["query_id"]))}</text>'
+        )
     return "\n".join(rows)
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Compare dense-only and hybrid retrieval.")
+    parser = argparse.ArgumentParser(
+        description="Compare dense-only and hybrid retrieval."
+    )
     parser.add_argument("--collection", default="quimera_knowledge_v2")
     parser.add_argument("--queries", default=None)
     parser.add_argument("--output-dir", default=str(DEFAULT_RESULTS_DIR))
     parser.add_argument("--search-top-k", type=int, default=DEFAULT_SEARCH_TOP_K)
     parser.add_argument("--return-top-k", type=int, default=DEFAULT_RETURN_TOP_K)
     parser.add_argument("--cooldown-ms", type=float, default=0.0)
-    parser.add_argument("--bootstrap-resamples", type=int, default=DEFAULT_BOOTSTRAP_RESAMPLES)
+    parser.add_argument(
+        "--bootstrap-resamples", type=int, default=DEFAULT_BOOTSTRAP_RESAMPLES
+    )
     parser.add_argument("--bootstrap-seed", type=int, default=DEFAULT_BOOTSTRAP_SEED)
     parser.add_argument("--include-debug-text", action="store_true")
     parser.add_argument("--run-live", "--execute", action="store_true", dest="run_live")
@@ -1965,7 +2059,9 @@ def _safe_ratio(numerator: float, denominator: float) -> float:
     return clean_numerator / clean_denominator
 
 
-def _nested_mapping_to_dict(values: Mapping[str, Mapping[str, float]]) -> dict[str, dict[str, float]]:
+def _nested_mapping_to_dict(
+    values: Mapping[str, Mapping[str, float]],
+) -> dict[str, dict[str, float]]:
     return {key: dict(value) for key, value in values.items()}
 
 

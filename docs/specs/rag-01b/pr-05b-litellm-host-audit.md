@@ -2,6 +2,12 @@
 
 Status: Draft
 
+Historical SDD note: the PR-05B host-audit contract was superseded by the
+current host-only root wrapper contract (`./start_quimera.sh --start`,
+`./start_quimera.sh --status`, `./start_quimera.sh --stop`) and by the
+dedicated scripts in `infra/litellm/`. Do not use this historical file to
+require reintroducing removed `start_quimera.sh` subcommands.
+
 ## Objetivo
 
 Auditar e endurecer o LiteLLM como gateway local do host no QUIMERA/OpenClaw,

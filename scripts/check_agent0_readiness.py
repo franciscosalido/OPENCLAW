@@ -191,7 +191,9 @@ def _check_manifests() -> list[ReadinessCheck]:
                 )
             )
         except Exception:
-            checks.append(ReadinessCheck(f"{corpus}_manifest", False, "manifest_invalid"))
+            checks.append(
+                ReadinessCheck(f"{corpus}_manifest", False, "manifest_invalid")
+            )
     return checks
 
 
@@ -237,11 +239,21 @@ def _check_ollama_models(http_get: Callable[..., httpx.Response]) -> ReadinessCh
         models = raw.get("models")
         if not isinstance(models, list):
             return ReadinessCheck("ollama_models", False, "models_missing")
-        names = {str(model.get("name", "")) for model in models if isinstance(model, Mapping)}
+        names = {
+            str(model.get("name", "")) for model in models if isinstance(model, Mapping)
+        }
         base_names = {name.split(":")[0] for name in names}
-        chat_ok = REQUIRED_CHAT_MODEL in names or REQUIRED_CHAT_MODEL.split(":")[0] in base_names
-        embed_ok = REQUIRED_EMBED_MODEL in names or REQUIRED_EMBED_MODEL.split(":")[0] in base_names
-        return _check_bool("ollama_models", chat_ok and embed_ok, "models_present", "models_missing")
+        chat_ok = (
+            REQUIRED_CHAT_MODEL in names
+            or REQUIRED_CHAT_MODEL.split(":")[0] in base_names
+        )
+        embed_ok = (
+            REQUIRED_EMBED_MODEL in names
+            or REQUIRED_EMBED_MODEL.split(":")[0] in base_names
+        )
+        return _check_bool(
+            "ollama_models", chat_ok and embed_ok, "models_present", "models_missing"
+        )
     except Exception:
         return ReadinessCheck("ollama_models", False, "unreachable")
 

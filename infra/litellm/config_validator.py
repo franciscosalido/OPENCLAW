@@ -11,7 +11,14 @@ from urllib.parse import urlparse
 
 import httpx
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 
 
 REMOTE_PROVIDER_PREFIXES = (
@@ -214,22 +221,34 @@ class CacheParams(BaseModel):
     @model_validator(mode="after")
     def qdrant_semantic_policy(self) -> "CacheParams":
         if self.type not in {"qdrant-semantic", "local", "in-memory"}:
-            raise ValueError("cache backend must be qdrant-semantic, local, or in-memory")
+            raise ValueError(
+                "cache backend must be qdrant-semantic, local, or in-memory"
+            )
         if self.type != "qdrant-semantic":
             return self
         if self.qdrant_collection_name != CANONICAL_LLM_CACHE_COLLECTION:
-            raise ValueError(f"qdrant semantic cache must use {CANONICAL_LLM_CACHE_COLLECTION}")
+            raise ValueError(
+                f"qdrant semantic cache must use {CANONICAL_LLM_CACHE_COLLECTION}"
+            )
         if self.qdrant_collection_name == CANONICAL_RAG_CACHE_COLLECTION:
             raise ValueError("LLM cache collection must differ from retrieval cache")
-        if self.qdrant_semantic_cache_embedding_model not in {"nomic-embed-text", "quimera_embed"}:
-            raise ValueError("semantic cache embedding model must be a local embedding alias")
+        if self.qdrant_semantic_cache_embedding_model not in {
+            "nomic-embed-text",
+            "quimera_embed",
+        }:
+            raise ValueError(
+                "semantic cache embedding model must be a local embedding alias"
+            )
         if self.qdrant_semantic_cache_vector_size is None:
             raise ValueError("semantic cache vector size is required")
         if self.qdrant_semantic_cache_vector_size < MINIMUM_EMBED_DIM:
             raise ValueError(
                 f"semantic cache vector size must be >= {MINIMUM_EMBED_DIM}"
             )
-        if self.similarity_threshold is None or not 0.0 < self.similarity_threshold <= 1.0:
+        if (
+            self.similarity_threshold is None
+            or not 0.0 < self.similarity_threshold <= 1.0
+        ):
             raise ValueError("similarity_threshold must be between 0 and 1")
         return self
 
@@ -339,9 +358,16 @@ class Agentic0ToolPolicy(BaseModel):
             raise ValueError("Agentic0 allowed_tools cannot contain destructive tools")
         if not AGENTIC0_ALLOWED_TOOLS.issubset(tools):
             missing = sorted(AGENTIC0_ALLOWED_TOOLS - tools)
-            raise ValueError(f"Agentic0 allowed_tools missing required tools: {missing}")
-        if any(tool not in AGENTIC0_OPTIONAL_WRITE_TOOLS for tool in self.optional_write_tools):
-            raise ValueError("Agentic0 optional write tools must be explicitly approved")
+            raise ValueError(
+                f"Agentic0 allowed_tools missing required tools: {missing}"
+            )
+        if any(
+            tool not in AGENTIC0_OPTIONAL_WRITE_TOOLS
+            for tool in self.optional_write_tools
+        ):
+            raise ValueError(
+                "Agentic0 optional write tools must be explicitly approved"
+            )
         if self.destructive_tools_allowed:
             raise ValueError("Agentic0 destructive tools must remain disabled")
         return self
@@ -376,14 +402,22 @@ class ConfigRoot(BaseModel):
     def mcp_servers_are_local_first(self) -> "ConfigRoot":
         for name in self.mcp_servers:
             if not MCP_NAME_RE.fullmatch(name):
-                raise ValueError("MCP server names must be lowercase LiteLLM-safe snake_case identifiers")
+                raise ValueError(
+                    "MCP server names must be lowercase LiteLLM-safe snake_case identifiers"
+                )
         return self
 
     @model_validator(mode="after")
     def canonical_timeouts_present(self) -> "ConfigRoot":
         for entry in self.model_list:
             params = entry.litellm_params
-            if entry.model_name in {"local_chat", "local_think", "local_rag", "qwen3-local", "qwen3:14b"}:
+            if entry.model_name in {
+                "local_chat",
+                "local_think",
+                "local_rag",
+                "qwen3-local",
+                "qwen3:14b",
+            }:
                 if params.timeout != CHAT_TIMEOUT_SECONDS:
                     raise ValueError("chat model timeout must be 120 seconds")
                 if params.stream_timeout != CHAT_STREAM_TIMEOUT_SECONDS:
@@ -429,20 +463,29 @@ def validate_no_literal_secrets(raw_text: str) -> None:
         stripped = line.strip()
         if stripped.startswith("#"):
             continue
-        if "master_key:" in stripped and "os.environ/LITELLM_MASTER_KEY" not in stripped:
+        if (
+            "master_key:" in stripped
+            and "os.environ/LITELLM_MASTER_KEY" not in stripped
+        ):
             raise ConfigValidationError("literal secret found in LiteLLM master_key")
         if "api_key:" in stripped and "os.environ/" not in stripped:
             raise ConfigValidationError("literal api_key found in LiteLLM config")
         if "sk-" in stripped:
-            raise ConfigValidationError("literal API key marker found in LiteLLM config")
+            raise ConfigValidationError(
+                "literal API key marker found in LiteLLM config"
+            )
         for marker in REMOTE_KEY_MARKERS:
             if marker in stripped:
-                raise ConfigValidationError(f"remote provider key marker is forbidden: {marker}")
+                raise ConfigValidationError(
+                    f"remote provider key marker is forbidden: {marker}"
+                )
 
 
 def assert_host_local_qdrant_url(url: str) -> None:
     if not _is_loopback_http(url, expected_port=6333):
-        raise ConfigValidationError("Qdrant URL must be local loopback HTTP on port 6333")
+        raise ConfigValidationError(
+            "Qdrant URL must be local loopback HTTP on port 6333"
+        )
 
 
 def validate_no_cache_collision(config: ConfigRoot) -> None:
@@ -450,7 +493,9 @@ def validate_no_cache_collision(config: ConfigRoot) -> None:
     if not cache_params or not cache_params.qdrant_collection_name:
         return
     if cache_params.qdrant_collection_name == CANONICAL_RAG_CACHE_COLLECTION:
-        raise ConfigValidationError("LiteLLM cache collection must not collide with RAG cache")
+        raise ConfigValidationError(
+            "LiteLLM cache collection must not collide with RAG cache"
+        )
 
 
 def validate_host_only_runtime(config: ConfigRoot, env: Mapping[str, str]) -> None:
@@ -480,9 +525,17 @@ def validate_no_forbidden_docker_litellm_paths(repo_root: Path) -> None:
         else:
             continue
         for candidate in candidates:
-            if candidate.is_dir() or candidate.suffix in {".pyc", ".png", ".jpg", ".jpeg"}:
+            if candidate.is_dir() or candidate.suffix in {
+                ".pyc",
+                ".png",
+                ".jpg",
+                ".jpeg",
+            }:
                 continue
-            if any(part in {".venv", "__pycache__", "generated"} for part in candidate.parts):
+            if any(
+                part in {".venv", "__pycache__", "generated"}
+                for part in candidate.parts
+            ):
                 continue
             try:
                 text = candidate.read_text(encoding="utf-8")
@@ -490,7 +543,9 @@ def validate_no_forbidden_docker_litellm_paths(repo_root: Path) -> None:
                 continue
             lowered = text.lower()
             if any(token in lowered for token in forbidden):
-                raise ConfigValidationError(f"forbidden Docker LiteLLM reference in {candidate}")
+                raise ConfigValidationError(
+                    f"forbidden Docker LiteLLM reference in {candidate}"
+                )
 
 
 def validate_semantic_cache_policy(
@@ -537,17 +592,23 @@ def validate_provider_safety(config: ConfigRoot, env: Mapping[str, str]) -> None
             raise ConfigValidationError("model must resolve to local Ollama provider")
         resolved_api_base = _env_value(params.api_base, env)
         if not is_local_url(resolved_api_base, allowed_ports={11434}):
-            raise ConfigValidationError("Ollama API base must resolve to local loopback")
+            raise ConfigValidationError(
+                "Ollama API base must resolve to local loopback"
+            )
 
     cache_params = config.litellm_settings.cache_params
     if cache_params and cache_params.type == "qdrant-semantic":
-        qdrant_url = _env_value(cache_params.qdrant_api_base or "os.environ/QDRANT_API_BASE", env)
+        qdrant_url = _env_value(
+            cache_params.qdrant_api_base or "os.environ/QDRANT_API_BASE", env
+        )
         if qdrant_url.startswith("os.environ/"):
             qdrant_url = "http://127.0.0.1:6333"
         assert_host_local_qdrant_url(qdrant_url)
 
 
-def validate_litellm_config(path: Path, env: Mapping[str, str] | None = None) -> ConfigRoot:
+def validate_litellm_config(
+    path: Path, env: Mapping[str, str] | None = None
+) -> ConfigRoot:
     env_map = os.environ if env is None else env
     raw_text = path.read_text(encoding="utf-8")
     validate_no_literal_secrets(raw_text)
@@ -569,7 +630,9 @@ def validate_config(
 ) -> ConfigRoot:
     config = validate_litellm_config(path, env=env)
     if strict:
-        warnings = validate_semantic_cache_policy(config, os.environ if env is None else env)
+        warnings = validate_semantic_cache_policy(
+            config, os.environ if env is None else env
+        )
         hard_warnings = [warning for warning in warnings if warning.rule_id == "RC-11"]
         if hard_warnings:
             raise ConfigValidationError(hard_warnings[0].message)

@@ -14,7 +14,7 @@ import sys
 import time
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Protocol
 
 from loguru import logger
 
@@ -266,7 +266,9 @@ async def run_agent(
                     )
                     error_category = "fallback_alias_failed"
                     if debug:
-                        error_category = f"{error_category}:{chat_exc.__class__.__name__}"
+                        error_category = (
+                            f"{error_category}:{chat_exc.__class__.__name__}"
+                        )
                     return AgentRunResult(
                         answer="Local Agent-0 execution failed.",
                         route=decision.route.value,
@@ -383,10 +385,14 @@ def render_result(result: AgentRunResult, *, output: str, show_metadata: bool) -
         return result.answer
     metadata = result.to_json_dict()
     metadata.pop("answer", None)
-    return result.answer + "\n\nmetadata=" + json.dumps(
-        metadata,
-        ensure_ascii=False,
-        sort_keys=True,
+    return (
+        result.answer
+        + "\n\nmetadata="
+        + json.dumps(
+            metadata,
+            ensure_ascii=False,
+            sort_keys=True,
+        )
     )
 
 

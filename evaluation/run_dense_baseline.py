@@ -21,7 +21,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Protocol, cast
+from typing import Protocol, cast
 from uuid import uuid4
 
 import yaml
@@ -207,7 +207,10 @@ class BackendDenseRetriever:
         collection_name: str = DEFAULT_COLLECTION_NAME,
         top_k: int = DEFAULT_TOP_K,
     ) -> None:
-        from backend.rag.embedder_factory import create_rag_embedder, load_rag_embedding_config
+        from backend.rag.embedder_factory import (
+            create_rag_embedder,
+            load_rag_embedding_config,
+        )
         from backend.rag.qdrant_store import QdrantVectorStore
         from backend.rag.retriever import DEFAULT_SCORE_THRESHOLD, Retriever
 
@@ -389,9 +392,13 @@ def load_expected_results(path: Path) -> dict[str, dict[str, float]]:
             if not isinstance(doc_id, str):
                 raise ValueError(f"doc_id for {query_id} must be a string")
             if isinstance(grade, bool) or not isinstance(grade, (int, float)):
-                raise ValueError(f"relevance grade for {query_id}/{doc_id} must be numeric")
+                raise ValueError(
+                    f"relevance grade for {query_id}/{doc_id} must be numeric"
+                )
             if float(grade) < 0.0:
-                raise ValueError(f"relevance grade for {query_id}/{doc_id} cannot be negative")
+                raise ValueError(
+                    f"relevance grade for {query_id}/{doc_id} cannot be negative"
+                )
             parsed[query_id][doc_id] = float(grade)
     return parsed
 
@@ -673,7 +680,9 @@ def _write_csv(path: Path, rows: Sequence[Mapping[str, object]]) -> None:
                     "cold_start": str(bool(row.get("cold_start"))),
                     "latency_ms": str(row.get("latency_ms", "")),
                     "retrieved_ids": "|".join(_string_list(row.get("retrieved_ids"))),
-                    "scores": "|".join(str(score) for score in _float_list(row.get("scores"))),
+                    "scores": "|".join(
+                        str(score) for score in _float_list(row.get("scores"))
+                    ),
                     "precision_at_5": str(_float_metric(metrics, "precision_at_5")),
                     "recall_at_10": str(_float_metric(metrics, "recall_at_10")),
                     "reciprocal_rank": str(_float_metric(metrics, "reciprocal_rank")),

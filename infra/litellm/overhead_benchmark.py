@@ -61,7 +61,9 @@ def calculate_overhead_stats(values_ms: Iterable[float]) -> OverheadStats:
     )
 
 
-def skipped_report(reason: str = "QUIMERA_LITELLM_BENCHMARK is not 1") -> dict[str, Any]:
+def skipped_report(
+    reason: str = "QUIMERA_LITELLM_BENCHMARK is not 1",
+) -> dict[str, Any]:
     return {
         "schema_version": BENCHMARK_SCHEMA_VERSION,
         "status": "SKIPPED_VALID",
@@ -71,7 +73,9 @@ def skipped_report(reason: str = "QUIMERA_LITELLM_BENCHMARK is not 1") -> dict[s
     }
 
 
-def _post_json(client: httpx.Client, url: str, payload: dict[str, Any], headers: dict[str, str]) -> float:
+def _post_json(
+    client: httpx.Client, url: str, payload: dict[str, Any], headers: dict[str, str]
+) -> float:
     started = time.perf_counter()
     result = client.post(url, json=payload, headers=headers)
     duration_ms = (time.perf_counter() - started) * 1000.0
@@ -89,7 +93,9 @@ def run_live_benchmark(
     if env_map.get("QUIMERA_LITELLM_BENCHMARK") != "1":
         return skipped_report()
 
-    ollama_base = env_map.get("OLLAMA_BASE_URL", env_map.get("OLLAMA_API_BASE", "http://127.0.0.1:11434")).rstrip("/")
+    ollama_base = env_map.get(
+        "OLLAMA_BASE_URL", env_map.get("OLLAMA_API_BASE", "http://127.0.0.1:11434")
+    ).rstrip("/")
     litellm_base = env_map.get("LITELLM_BASE_URL", "http://127.0.0.1:4000").rstrip("/")
     api_key = env_map.get("QUIMERA_LLM_API_KEY") or env_map.get("LITELLM_MASTER_KEY")
     headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
@@ -113,7 +119,9 @@ def run_live_benchmark(
     try:
         with httpx.Client(timeout=timeout) as client:
             for _ in range(samples):
-                direct_ms = _post_json(client, f"{ollama_base}/api/chat", ollama_payload, {})
+                direct_ms = _post_json(
+                    client, f"{ollama_base}/api/chat", ollama_payload, {}
+                )
                 gateway_ms = _post_json(
                     client,
                     f"{litellm_base}/v1/chat/completions",
@@ -142,9 +150,15 @@ def run_live_benchmark(
 
 def main() -> int:
     report = run_live_benchmark()
-    output = Path(os.environ.get("QUIMERA_LITELLM_OVERHEAD_REPORT", ".runtime/reports/litellm_overhead.json"))
+    output = Path(
+        os.environ.get(
+            "QUIMERA_LITELLM_OVERHEAD_REPORT", ".runtime/reports/litellm_overhead.json"
+        )
+    )
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    output.write_text(
+        json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     sys.stdout.write(json.dumps(report, sort_keys=True) + "\n")
     return 0
 

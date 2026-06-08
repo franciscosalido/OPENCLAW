@@ -27,7 +27,9 @@ FORBIDDEN_FIELD_PARTS: frozenset[str] = frozenset(
     }
 )
 SAFE_ID_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,160}$")
-ALLOWED_AUDIT_FLAG_KEYS = frozenset({"vectors_seen", "raw_chunks_seen", "secrets_seen", "forbidden_fields_seen"})
+ALLOWED_AUDIT_FLAG_KEYS = frozenset(
+    {"vectors_seen", "raw_chunks_seen", "secrets_seen", "forbidden_fields_seen"}
+)
 
 
 def find_forbidden_fields(value: object) -> list[str]:

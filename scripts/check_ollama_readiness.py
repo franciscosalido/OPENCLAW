@@ -72,7 +72,9 @@ async def _show_model(client: httpx.AsyncClient, model: str) -> bool:
         return False
 
 
-async def _embed_probe(client: httpx.AsyncClient, model: str, dimensions: int | None) -> bool:
+async def _embed_probe(
+    client: httpx.AsyncClient, model: str, dimensions: int | None
+) -> bool:
     payload = build_embed_payload(
         model=model,
         inputs=("probe",),
@@ -107,7 +109,9 @@ def _model_names(tags: dict[str, object] | None) -> tuple[str, ...]:
 
 def _has_model(names: Sequence[str], target: str) -> bool:
     base = target.split(":", maxsplit=1)[0]
-    return any(name == target or name.split(":", maxsplit=1)[0] == base for name in names)
+    return any(
+        name == target or name.split(":", maxsplit=1)[0] == base for name in names
+    )
 
 
 def _has_any_model(names: Sequence[str], targets: Sequence[str]) -> bool:
@@ -126,7 +130,9 @@ async def build_readiness(
     clean_host = _ensure_localhost(host)
     base_url = f"http://{clean_host}:{port}"
     cli_version = _ollama_cli_version()
-    notes: list[str] = [f"version contract last verified: {OLLAMA_VERSION_CONTRACT_LAST_VERIFIED}"]
+    notes: list[str] = [
+        f"version contract last verified: {OLLAMA_VERSION_CONTRACT_LAST_VERIFIED}"
+    ]
     async with httpx.AsyncClient(base_url=base_url, timeout=timeout_s) as client:
         version_payload = await _get_json(client, "/api/version")
         tags_payload = await _get_json(client, "/api/tags")
@@ -140,18 +146,27 @@ async def build_readiness(
         qwen_targets = (QWEN3_4B_MODEL_ID, QWEN3_4B_OLLAMA_MODEL_ID)
         qwen_by_tag = _has_any_model(running_models, qwen_targets)
         nomic_by_tag = _has_model(running_models, NOMIC_MODEL_ID)
-        qwen_by_show = any([await _show_model(client, target) for target in qwen_targets])
+        qwen_by_show = any(
+            [await _show_model(client, target) for target in qwen_targets]
+        )
         nomic_by_show = await _show_model(client, NOMIC_MODEL_ID)
         embed_endpoint_ok = False
         if allow_embed_probe:
             embed_endpoint_ok = await _embed_probe(client, NOMIC_MODEL_ID, None)
         else:
-            notes.append("embed probe skipped; pass --allow-embed-probe to test /api/embed")
+            notes.append(
+                "embed probe skipped; pass --allow-embed-probe to test /api/embed"
+            )
 
     qwen_available = qwen_by_tag or qwen_by_show
     nomic_available = nomic_by_tag or nomic_by_show
     api_version_ok = ollama_version is not None
-    ready = bool(api_version_ok and nomic_available and qwen_available and (embed_endpoint_ok or not allow_embed_probe))
+    ready = bool(
+        api_version_ok
+        and nomic_available
+        and qwen_available
+        and (embed_endpoint_ok or not allow_embed_probe)
+    )
     return OllamaReadiness(
         schema_version=OLLAMA_READINESS_SCHEMA_VERSION,
         ollama_available=ollama_version is not None,
@@ -181,7 +196,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--port", type=int, default=11434)
     parser.add_argument("--target-version", default=OLLAMA_LATEST_STABLE_KNOWN)
     parser.add_argument("--allow-embed-probe", action="store_true")
-    parser.add_argument("--probe-dimensions", type=int, default=QWEN3_4B_DEFAULT_DIMENSIONS)
+    parser.add_argument(
+        "--probe-dimensions", type=int, default=QWEN3_4B_DEFAULT_DIMENSIONS
+    )
     parser.add_argument("--timeout-s", type=float, default=5.0)
     return parser
 
@@ -200,7 +217,9 @@ async def async_main(argv: Sequence[str] | None = None) -> int:
     except ValueError as exc:
         sys.stderr.write(f"ollama readiness failed: {exc}\n")
         return 2
-    sys.stdout.write(json.dumps(report.to_safe_dict(), indent=2, sort_keys=True, ensure_ascii=False))
+    sys.stdout.write(
+        json.dumps(report.to_safe_dict(), indent=2, sort_keys=True, ensure_ascii=False)
+    )
     sys.stdout.write("\n")
     return 0 if report.ready_for_bakeoff else 1
 

@@ -54,6 +54,13 @@ class LocalGenerator:
         if self.max_tokens <= 0:
             raise ValueError("max_tokens must be greater than zero")
 
+        if self.gateway_client is not None:
+            if not self.model.strip():
+                raise ValueError("model cannot be empty")
+            self.model = self.model.strip()
+            self.base_url = self.base_url.rstrip("/")
+            return
+
         env_config = GatewayRuntimeConfig.from_env()
         effective_model = (
             env_config.default_model

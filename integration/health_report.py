@@ -38,7 +38,9 @@ def build_health_report() -> dict[str, Any]:
         "backup": backup,
         "pg_stat_statements": pg_stat.get("pg_stat_statements", {}),
         "latency": latency,
-        "baseline_comparison": compare_latency_baseline(latency, baseline, mode="quick"),
+        "baseline_comparison": compare_latency_baseline(
+            latency, baseline, mode="quick"
+        ),
         "warnings": [*health.get("warnings", []), *pg_stat.get("warnings", [])],
     }
 
@@ -58,17 +60,38 @@ def render_markdown(report: dict[str, Any]) -> str:
             lines.append(f"- `{name}`: `{status}`")
     lines.extend(["", "## Top Queries", ""])
     for query in report.get("top_queries", []):
-        lines.append(f"- queryid `{query.get('queryid')}` mean `{query.get('mean_exec_time_ms')}` ms")
+        lines.append(
+            f"- queryid `{query.get('queryid')}` mean `{query.get('mean_exec_time_ms')}` ms"
+        )
     if not report.get("top_queries"):
         lines.append("- none")
-    lines.extend(["", "## Backup", "", f"- latest: `{report.get('backup', {}).get('latest_manifest')}`", f"- restore_verified: `{report.get('backup', {}).get('restore_verified')}`"])
-    lines.extend(["", "## Baseline", "", f"- regressions: `{len(report.get('baseline_comparison', {}).get('regressions', []))}`"])
+    lines.extend(
+        [
+            "",
+            "## Backup",
+            "",
+            f"- latest: `{report.get('backup', {}).get('latest_manifest')}`",
+            f"- restore_verified: `{report.get('backup', {}).get('restore_verified')}`",
+        ]
+    )
+    lines.extend(
+        [
+            "",
+            "## Baseline",
+            "",
+            f"- regressions: `{len(report.get('baseline_comparison', {}).get('regressions', []))}`",
+        ]
+    )
     return "\n".join(lines) + "\n"
 
 
 def _latest_backup_status() -> dict[str, Any]:
     backup_dir = Path(".runtime/backups/postgres")
-    manifests = sorted(backup_dir.glob("quimera_pg18_*.manifest.json")) if backup_dir.exists() else []
+    manifests = (
+        sorted(backup_dir.glob("quimera_pg18_*.manifest.json"))
+        if backup_dir.exists()
+        else []
+    )
     if not manifests:
         return {"latest_manifest": None, "restore_verified": None}
     latest = manifests[-1]
@@ -76,7 +99,10 @@ def _latest_backup_status() -> dict[str, Any]:
         data = json.loads(latest.read_text(encoding="utf-8"))
     except ValueError:
         return {"latest_manifest": str(latest), "restore_verified": False}
-    return {"latest_manifest": str(latest), "restore_verified": data.get("restore_verified")}
+    return {
+        "latest_manifest": str(latest),
+        "restore_verified": data.get("restore_verified"),
+    }
 
 
 def _latency_from_health(health: dict[str, Any]) -> dict[str, float]:
@@ -96,7 +122,11 @@ def _load_baseline() -> dict[str, float]:
         data = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {"regression_multiplier": 2.0}
-    return {key: float(value) for key, value in data.items() if isinstance(value, int | float)}
+    return {
+        key: float(value)
+        for key, value in data.items()
+        if isinstance(value, int | float)
+    }
 
 
 def main() -> int:

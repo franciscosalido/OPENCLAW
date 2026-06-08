@@ -17,11 +17,17 @@ def _latency_ms(start: float) -> float:
     return round((time.perf_counter() - start) * 1000, 3)
 
 
-def _http_check(url: str, *, timeout: float = 2.0) -> tuple[bool, float, dict[str, object] | None]:
+def _http_check(
+    url: str, *, timeout: float = 2.0
+) -> tuple[bool, float, dict[str, object] | None]:
     start = time.perf_counter()
     try:
         response = httpx.get(url, timeout=timeout)
-        data = response.json() if response.headers.get("content-type", "").startswith("application/json") else None
+        data = (
+            response.json()
+            if response.headers.get("content-type", "").startswith("application/json")
+            else None
+        )
         return response.status_code < 400, _latency_ms(start), data
     except (httpx.HTTPError, ValueError):
         return False, _latency_ms(start), None
@@ -31,7 +37,18 @@ def _postgres_status() -> ServiceReport:
     start = time.perf_counter()
     try:
         result = subprocess.run(
-            ["docker", "exec", "quimera-postgres-memory", "pg_isready", "-U", "quimera", "-d", "quimera", "-h", "127.0.0.1"],
+            [
+                "docker",
+                "exec",
+                "quimera-postgres-memory",
+                "pg_isready",
+                "-U",
+                "quimera",
+                "-d",
+                "quimera",
+                "-h",
+                "127.0.0.1",
+            ],
             text=True,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
@@ -60,7 +77,14 @@ def _postgres_status() -> ServiceReport:
 def _litellm_docker_container_running() -> bool:
     try:
         result = subprocess.run(
-            ["docker", "ps", "--filter", "name=^/quimera-litellm$", "--format", "{{.Names}}"],
+            [
+                "docker",
+                "ps",
+                "--filter",
+                "name=^/quimera-litellm$",
+                "--format",
+                "{{.Names}}",
+            ],
             text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
@@ -78,7 +102,9 @@ def build_status_report() -> dict[str, object]:
         qdrant_ok, qdrant_ms, _ = _http_check("http://127.0.0.1:6333/healthz")
     litellm_ok, litellm_ms, _ = _http_check("http://127.0.0.1:4000/health/readiness")
     litellm_docker_running = _litellm_docker_container_running()
-    ollama_ok, ollama_ms, ollama_data = _http_check("http://127.0.0.1:11434/api/version")
+    ollama_ok, ollama_ms, ollama_data = _http_check(
+        "http://127.0.0.1:11434/api/version"
+    )
     postgres = _postgres_status()
     qdrant: ServiceReport = {
         "status": "ok" if qdrant_ok else "fail",
@@ -126,7 +152,11 @@ def build_status_report() -> dict[str, object]:
         "generated_at": datetime.now(UTC).isoformat(),
         "overall": overall,
         "services": services,
-        "warnings": ["quimera-litellm Docker container is running; LiteLLM must be host-only"] if litellm_docker_running else [],
+        "warnings": [
+            "quimera-litellm Docker container is running; LiteLLM must be host-only"
+        ]
+        if litellm_docker_running
+        else [],
     }
 
 
@@ -135,8 +165,16 @@ def build_acceptance_report() -> dict[str, object]:
     adr_path = "docs/ADR/ADR-003-memory-backend-decision.md"
     try:
         summary = json.loads(open(summary_path, encoding="utf-8").read())
-        benchmark = "pass" if summary.get("schema_version") == "rag-01b-session-benchmark-v1" else "fail"
-        otel = "observed" if summary.get("otel_attributes", {}).get("observed_span_names") else "missing"
+        benchmark = (
+            "pass"
+            if summary.get("schema_version") == "rag-01b-session-benchmark-v1"
+            else "fail"
+        )
+        otel = (
+            "observed"
+            if summary.get("otel_attributes", {}).get("observed_span_names")
+            else "missing"
+        )
     except (OSError, ValueError):
         benchmark = "skipped"
         otel = "missing"
@@ -145,7 +183,11 @@ def build_acceptance_report() -> dict[str, object]:
         adr_status = "accepted" if "Status: Accepted" in adr else "draft"
     except OSError:
         adr_status = "missing"
-    overall = "ok" if benchmark == "pass" and adr_status == "accepted" and otel == "observed" else "degraded"
+    overall = (
+        "ok"
+        if benchmark == "pass" and adr_status == "accepted" and otel == "observed"
+        else "degraded"
+    )
     return {
         "schema_version": "rag01b-acceptance-v1",
         "overall": overall,
@@ -165,7 +207,9 @@ def main() -> int:
     parser.add_argument("command", choices=["status", "rag01b-acceptance"])
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
-    report = build_status_report() if args.command == "status" else build_acceptance_report()
+    report = (
+        build_status_report() if args.command == "status" else build_acceptance_report()
+    )
     if args.json:
         print(json.dumps(report, sort_keys=True))
     else:

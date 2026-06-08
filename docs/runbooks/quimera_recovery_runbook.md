@@ -3,7 +3,8 @@
 1. Verify health:
 
 ```bash
-./scripts/start_quimera.sh status --json
+./start_quimera.sh --status
+uv run python scripts/quimera_status.py status --json
 ```
 
 2. Run the quick operational gate:
@@ -33,13 +34,14 @@ python -m infra.postgres.pg_stat_report --json
 6. Restart services without deleting volumes:
 
 ```bash
-./scripts/start_quimera.sh restart
+./start_quimera.sh --stop
+./start_quimera.sh --start
 ```
 
 7. Confirm Agentic0:
 
 ```bash
-./scripts/start_quimera.sh agentic0-smoke --json
+uv run python -m integration.run_agentic0_smoke_test --allow-degraded
 ```
 
 8. Confirm working memory checkpoint contract:

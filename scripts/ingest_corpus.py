@@ -54,7 +54,9 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(raw_args)
 
-    if args.commit and not any(argument.startswith("--manifest") for argument in raw_args):
+    if args.commit and not any(
+        argument.startswith("--manifest") for argument in raw_args
+    ):
         parser.error("--commit requires an explicit --manifest")
     if args.collection is not None and not args.commit:
         parser.error("--collection is only valid with --commit")
