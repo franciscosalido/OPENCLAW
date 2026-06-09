@@ -43,16 +43,16 @@ find_litellm_bin() {
     printf '%s\n' "${LITELLM_BIN}"
     return 0
   fi
-  if command -v litellm >/dev/null 2>&1; then
-    command -v litellm
-    return 0
-  fi
-  if [[ -x "${SCRIPT_DIR}/.venv/bin/litellm" ]]; then
-    printf '%s\n' "${SCRIPT_DIR}/.venv/bin/litellm"
+  if [[ -x "${REPO_ROOT}/.venv/bin/litellm" ]]; then
+    printf '%s\n' "${REPO_ROOT}/.venv/bin/litellm"
     return 0
   fi
   if command -v uv >/dev/null 2>&1; then
     printf 'uv run litellm\n'
+    return 0
+  fi
+  if command -v litellm >/dev/null 2>&1; then
+    command -v litellm
     return 0
   fi
   return 1

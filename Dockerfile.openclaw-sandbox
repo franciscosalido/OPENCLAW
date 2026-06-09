@@ -1,5 +1,9 @@
-FROM python:3.14-slim
+FROM python:3.12.13-slim
 
+# Official Vibe sandbox runtime: Python 3.12, matching pyproject.toml,
+# mypy, pyright, and CI contracts. Do not retag this image as py312 if the
+# base image moves to another Python major/minor.
+#
 # Install uv, minimal build tools, Node.js for Pyright, and PostgreSQL 18 client tools.
 # pg_dump must be at least as new as the PostgreSQL server it dumps.
 RUN apt-get update && \
