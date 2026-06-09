@@ -43,7 +43,9 @@ class Agentic0SmokeConfig:
     write_smoke_enabled: bool = False
 
     def __post_init__(self) -> None:
-        if not self.litellm_base_url.startswith(("http://127.0.0.1:", "http://localhost:")):
+        if not self.litellm_base_url.startswith(
+            ("http://127.0.0.1:", "http://localhost:")
+        ):
             raise ValueError("litellm_base_url must be local-only")
         if self.timeout_seconds <= 0:
             raise ValueError("timeout_seconds must be positive")
@@ -51,12 +53,18 @@ class Agentic0SmokeConfig:
             raise ValueError("allowed_tools cannot be empty")
         if "*" in self.allowed_tools:
             raise ValueError("allowed_tools cannot contain wildcard")
-        if any("delete" in tool or "recreate" in tool or "admin" in tool for tool in self.allowed_tools):
+        if any(
+            "delete" in tool or "recreate" in tool or "admin" in tool
+            for tool in self.allowed_tools
+        ):
             raise ValueError("allowed_tools cannot contain destructive tools")
 
     @classmethod
     def with_write_smoke(cls) -> Agentic0SmokeConfig:
-        return cls(allowed_tools=DEFAULT_ALLOWED_TOOLS + (WRITE_TOOL,), write_smoke_enabled=True)
+        return cls(
+            allowed_tools=DEFAULT_ALLOWED_TOOLS + (WRITE_TOOL,),
+            write_smoke_enabled=True,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -185,7 +193,12 @@ def skipped_result(config: Agentic0SmokeConfig, *, reason: str) -> Agentic0Smoke
         postgres_memory=PostgresMemorySummary(False, False),
         llm=LLMCallSummary(config.litellm_model, False),
         final_answer_ok=False,
-        latency=LatencySummary(0.0, measurement_mode="not_measured", sample_count=0, p95_warning="not_measured_stack_unavailable"),
+        latency=LatencySummary(
+            0.0,
+            measurement_mode="not_measured",
+            sample_count=0,
+            p95_warning="not_measured_stack_unavailable",
+        ),
         safety=SafetySummary(),
         trace_ids=[],
         warnings=[reason],

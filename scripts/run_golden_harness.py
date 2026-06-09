@@ -76,9 +76,7 @@ class GoldenResult:
             "used_rag": self.used_rag,
             "latency_ms": self.latency_ms,
             "decision_id": self.decision_id,
-            "estimated_remote_tokens_avoided": (
-                self.estimated_remote_tokens_avoided
-            ),
+            "estimated_remote_tokens_avoided": (self.estimated_remote_tokens_avoided),
             "answer_length_chars": self.answer_length_chars,
             "quality_score": self.quality_score,
             "skipped": self.skipped,
@@ -242,9 +240,7 @@ async def _live_result(question: GoldenQuestion) -> GoldenResult:
         error_category=result.error_category,
         fallback_applied=result.fallback_applied,
         fallback_reason=(
-            result.fallback_reason.value
-            if result.fallback_reason is not None
-            else None
+            result.fallback_reason.value if result.fallback_reason is not None else None
         ),
         quality_score=None,
     )
@@ -284,9 +280,7 @@ def build_summary(
     failed = sum(1 for result in results if result.error_category is not None)
     skipped = sum(1 for result in results if result.skipped)
     passed = len(results) - failed - skipped
-    aliases = sorted(
-        {result.alias for result in results if result.alias is not None}
-    )
+    aliases = sorted({result.alias for result in results if result.alias is not None})
     return {
         "run_id": run_id,
         "timestamp_utc": timestamp_utc,

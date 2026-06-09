@@ -26,12 +26,18 @@ class Agentic0Client:
     auth_token: str | None = None
 
     def headers(self) -> dict[str, str]:
-        key = self.auth_token or os.getenv("QUIMERA_LLM_API_KEY") or os.getenv("LITELLM_MASTER_KEY")
+        key = (
+            self.auth_token
+            or os.getenv("QUIMERA_LLM_API_KEY")
+            or os.getenv("LITELLM_MASTER_KEY")
+        )
         return {"Author" + "ization": f"Bearer {key}"} if key else {}
 
     async def list_models(self) -> set[str]:
         async with httpx.AsyncClient(timeout=self.config.timeout_seconds) as client:
-            reply = await client.get(f"{self.config.litellm_base_url}/v1/models", headers=self.headers())
+            reply = await client.get(
+                f"{self.config.litellm_base_url}/v1/models", headers=self.headers()
+            )
         if reply.status_code in {401, 403}:
             raise Agentic0ClientError("auth_failure")
         if reply.status_code >= 400:
@@ -40,13 +46,22 @@ class Agentic0Client:
         data = payload.get("data") if isinstance(payload, dict) else None
         if not isinstance(data, list):
             return set()
-        return {item["id"] for item in data if isinstance(item, dict) and isinstance(item.get("id"), str)}
+        return {
+            item["id"]
+            for item in data
+            if isinstance(item, dict) and isinstance(item.get("id"), str)
+        }
 
-    async def synthesize_smoke_marker(self, *, run_id: str, doc_ids: list[str], state_keys: list[str]) -> bool:
+    async def synthesize_smoke_marker(
+        self, *, run_id: str, doc_ids: list[str], state_keys: list[str]
+    ) -> bool:
         body: dict[str, Any] = {
             "model": self.config.litellm_model,
             "messages": [
-                {"role": "system", "content": "Return only PR08_SMOKE_OK for a healthy local integration smoke."},
+                {
+                    "role": "system",
+                    "content": "Return only PR08_SMOKE_OK for a healthy local integration smoke.",
+                },
                 {
                     "role": "user",
                     "content": f"run={run_id}; docs={','.join(doc_ids[:3])}; states={','.join(state_keys[:3])}",

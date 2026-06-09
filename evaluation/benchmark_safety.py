@@ -45,7 +45,9 @@ def litellm_cache_bypass_headers() -> dict[str, str]:
 def assert_no_forbidden_keys(mapping: Mapping[str, object]) -> None:
     for key, value in mapping.items():
         lowered = key.lower()
-        if lowered in FORBIDDEN_BENCHMARK_KEYS or any(token in lowered for token in FORBIDDEN_BENCHMARK_KEYS):
+        if lowered in FORBIDDEN_BENCHMARK_KEYS or any(
+            token in lowered for token in FORBIDDEN_BENCHMARK_KEYS
+        ):
             raise BenchmarkSafetyError(f"forbidden benchmark key: {key}")
         if isinstance(value, Mapping):
             assert_no_forbidden_keys(value)
@@ -53,5 +55,7 @@ def assert_no_forbidden_keys(mapping: Mapping[str, object]) -> None:
 
 def validate_benchmark_collection_name(name: str) -> str:
     if not re.fullmatch(r"quimera_benchmark_session_context_[a-z0-9_]+", name):
-        raise BenchmarkSafetyError("benchmark collection name must use the PR-07 synthetic prefix")
+        raise BenchmarkSafetyError(
+            "benchmark collection name must use the PR-07 synthetic prefix"
+        )
     return name

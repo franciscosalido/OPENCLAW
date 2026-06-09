@@ -39,7 +39,9 @@ def redact_query_text(query: str) -> str:
     return _LITERAL_RE.sub("?", query)
 
 
-async def build_report(*, include_query_text: bool = False, strict: bool = False) -> dict[str, Any]:
+async def build_report(
+    *, include_query_text: bool = False, strict: bool = False
+) -> dict[str, Any]:
     dsn = os.getenv("QUIMERA_POSTGRES_DSN") or os.getenv("TEST_POSTGRES_DSN")
     if not dsn:
         return build_degraded_report(warning="postgres DSN not configured")
@@ -51,16 +53,22 @@ async def build_report(*, include_query_text: bool = False, strict: bool = False
             raise RuntimeError(warning) from exc
         return build_degraded_report(warning=warning)
     try:
-        return await _report_from_connection(conn, include_query_text=include_query_text)
+        return await _report_from_connection(
+            conn, include_query_text=include_query_text
+        )
     finally:
         await conn.close()
 
 
-async def _report_from_connection(conn: asyncpg.Connection, *, include_query_text: bool) -> dict[str, Any]:
+async def _report_from_connection(
+    conn: asyncpg.Connection, *, include_query_text: bool
+) -> dict[str, Any]:
     available_row = await conn.fetchrow(
         "SELECT default_version, installed_version FROM pg_available_extensions WHERE name = 'pg_stat_statements'"
     )
-    installed_row = await conn.fetchrow("SELECT extversion FROM pg_extension WHERE extname = 'pg_stat_statements'")
+    installed_row = await conn.fetchrow(
+        "SELECT extversion FROM pg_extension WHERE extname = 'pg_stat_statements'"
+    )
     settings = await _settings(conn)
     warnings: list[str] = []
     if settings["track"] != "all":
@@ -114,7 +122,10 @@ async def _report_from_connection(conn: asyncpg.Connection, *, include_query_tex
 async def _settings(conn: asyncpg.Connection) -> dict[str, Any]:
     async def setting(name: str) -> str:
         try:
-            return str(await conn.fetchval("SELECT current_setting($1, true)", name) or "unknown")
+            return str(
+                await conn.fetchval("SELECT current_setting($1, true)", name)
+                or "unknown"
+            )
         except asyncpg.PostgresError:
             return "unknown"
 
@@ -138,18 +149,28 @@ def main() -> int:
     parser.add_argument("--include-query-text", action="store_true")
     args = parser.parse_args()
     try:
-        report = asyncio.run(build_report(include_query_text=args.include_query_text, strict=args.strict))
+        report = asyncio.run(
+            build_report(include_query_text=args.include_query_text, strict=args.strict)
+        )
     except RuntimeError as exc:
-        print(json.dumps(build_degraded_report(warning=sanitize_dsn(str(exc))), sort_keys=True))
+        print(
+            json.dumps(
+                build_degraded_report(warning=sanitize_dsn(str(exc))), sort_keys=True
+            )
+        )
         return 1 if args.strict else 0
     if args.json:
         print(json.dumps(report, sort_keys=True))
     else:
-        print(f"pg_stat_report: installed={report['pg_stat_statements']['installed']} top_queries={len(report['top_queries'])}")
+        print(
+            f"pg_stat_report: installed={report['pg_stat_statements']['installed']} top_queries={len(report['top_queries'])}"
+        )
     if args.output:
         output = Path(args.output)
         output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        output.write_text(
+            json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
     return 0
 
 

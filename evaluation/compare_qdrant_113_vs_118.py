@@ -70,7 +70,9 @@ class ComparisonScenario(str, Enum):
     # Qwen3 embedding scenarios
     QDRANT_113_VS_118_QWEN3_BASELINE = "qdrant_113_vs_118_qwen3_baseline"
     QDRANT_118_QWEN3_BASELINE_VS_BALANCED = "qdrant_118_qwen3_baseline_vs_balanced"
-    QDRANT_118_QWEN3_PYTHON_RRF_VS_NATIVE_RRF = "qdrant_118_qwen3_python_rrf_vs_native_rrf"
+    QDRANT_118_QWEN3_PYTHON_RRF_VS_NATIVE_RRF = (
+        "qdrant_118_qwen3_python_rrf_vs_native_rrf"
+    )
     QDRANT_118_QWEN3_NO_QUANT_VS_TURBOQUANT = "qdrant_118_qwen3_no_quant_vs_turboquant"
     QDRANT_118_QWEN3_DENSE_ONLY_VS_HYBRID = "qdrant_118_qwen3_dense_only_vs_hybrid"
     QDRANT_118_NOMIC_VS_QWEN3_EMBEDDING = "qdrant_118_nomic_vs_qwen3_embedding"
@@ -155,7 +157,10 @@ COMPARISONS: tuple[ComparisonSpec, ...] = (
         profile_a="qdrant_118_no_quantization",
         profile_b="qdrant_118_turboquant_experimental",
         purpose="quantization",
-        required_artifacts=("qdrant_118_no_quantization", "qdrant_118_turboquant_experimental"),
+        required_artifacts=(
+            "qdrant_118_no_quantization",
+            "qdrant_118_turboquant_experimental",
+        ),
         decision_question="Does TurboQuant reduce memory or latency while preserving recall and NDCG?",
     ),
     ComparisonSpec(
@@ -172,7 +177,10 @@ COMPARISONS: tuple[ComparisonSpec, ...] = (
         profile_a="qdrant_113_qwen3_historical_baseline",
         profile_b="qdrant_118_qwen3_baseline_ram",
         purpose="version_upgrade_qwen3",
-        required_artifacts=("qdrant_113_qwen3_baseline", "qdrant_118_qwen3_baseline_ram"),
+        required_artifacts=(
+            "qdrant_113_qwen3_baseline",
+            "qdrant_118_qwen3_baseline_ram",
+        ),
         decision_question="Does Qdrant 1.18 preserve quality and latency versus 1.13.x when using Qwen3 embedding?",
     ),
     ComparisonSpec(
@@ -180,7 +188,10 @@ COMPARISONS: tuple[ComparisonSpec, ...] = (
         profile_a="qdrant_118_qwen3_baseline_ram",
         profile_b="qdrant_118_qwen3_balanced_local",
         purpose="profile_default_qwen3",
-        required_artifacts=("qdrant_118_qwen3_baseline_ram", "qdrant_118_qwen3_balanced_local"),
+        required_artifacts=(
+            "qdrant_118_qwen3_baseline_ram",
+            "qdrant_118_qwen3_balanced_local",
+        ),
         decision_question="Should qwen3_balanced_local become the default Qwen3 benchmark profile?",
     ),
     ComparisonSpec(
@@ -188,7 +199,10 @@ COMPARISONS: tuple[ComparisonSpec, ...] = (
         profile_a="qdrant_118_qwen3_python_rrf",
         profile_b="qdrant_118_qwen3_native_rrf",
         purpose="fusion_backend_qwen3",
-        required_artifacts=("qdrant_118_qwen3_python_rrf", "qdrant_118_qwen3_native_rrf"),
+        required_artifacts=(
+            "qdrant_118_qwen3_python_rrf",
+            "qdrant_118_qwen3_native_rrf",
+        ),
         decision_question="Can native RRF replace Python RRF without regressions when using Qwen3 embedding?",
     ),
     ComparisonSpec(
@@ -196,7 +210,10 @@ COMPARISONS: tuple[ComparisonSpec, ...] = (
         profile_a="qdrant_118_qwen3_no_quantization",
         profile_b="qdrant_118_qwen3_turboquant_experimental",
         purpose="quantization_qwen3",
-        required_artifacts=("qdrant_118_qwen3_no_quantization", "qdrant_118_qwen3_turboquant_experimental"),
+        required_artifacts=(
+            "qdrant_118_qwen3_no_quantization",
+            "qdrant_118_qwen3_turboquant_experimental",
+        ),
         decision_question="Does TurboQuant preserve Qwen3 recall and NDCG while reducing storage?",
     ),
     ComparisonSpec(
@@ -323,14 +340,18 @@ class ResourceSnapshot:
             object.__setattr__(
                 self,
                 "collection_size_bytes",
-                _validate_non_negative_int(self.collection_size_bytes, "collection_size_bytes"),
+                _validate_non_negative_int(
+                    self.collection_size_bytes, "collection_size_bytes"
+                ),
             )
         object.__setattr__(
             self,
             "vector_storage",
             MappingProxyType(_assert_safe_mapping(dict(self.vector_storage))),
         )
-        object.__setattr__(self, "quantization", _validate_text(self.quantization, "quantization"))
+        object.__setattr__(
+            self, "quantization", _validate_text(self.quantization, "quantization")
+        )
         for field_name in ("on_disk_vectors", "on_disk_hnsw"):
             value = getattr(self, field_name)
             if value is not None and not isinstance(value, bool):
@@ -390,12 +411,21 @@ class QdrantBenchmarkRun:
                 "qdrant_version",
                 _validate_text(self.qdrant_version, "qdrant_version"),
             )
-        object.__setattr__(self, "profile_name", _validate_text(self.profile_name, "profile_name"))
-        if self.fusion_backend not in {"python_rrf", "qdrant_rrf", "qdrant_weighted_rrf", "none"}:
+        object.__setattr__(
+            self, "profile_name", _validate_text(self.profile_name, "profile_name")
+        )
+        if self.fusion_backend not in {
+            "python_rrf",
+            "qdrant_rrf",
+            "qdrant_weighted_rrf",
+            "none",
+        }:
             raise ValueError("unsupported fusion_backend")
         if self.retrieval_mode not in {"dense_only", "hybrid"}:
             raise ValueError("unsupported retrieval_mode")
-        object.__setattr__(self, "quantization", _validate_text(self.quantization, "quantization"))
+        object.__setattr__(
+            self, "quantization", _validate_text(self.quantization, "quantization")
+        )
         for field_name in ("corpus_hash", "query_set_hash"):
             value = getattr(self, field_name)
             if value is not None:
@@ -455,10 +485,18 @@ class BenchmarkScenarioResult:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "scenario", _validate_text(self.scenario, "scenario"))
-        object.__setattr__(self, "profile_a", _validate_text(self.profile_a, "profile_a"))
-        object.__setattr__(self, "profile_b", _validate_text(self.profile_b, "profile_b"))
-        object.__setattr__(self, "deltas", MappingProxyType(_assert_safe_mapping(dict(self.deltas))))
-        object.__setattr__(self, "decision_hint", _validate_text(self.decision_hint, "decision_hint"))
+        object.__setattr__(
+            self, "profile_a", _validate_text(self.profile_a, "profile_a")
+        )
+        object.__setattr__(
+            self, "profile_b", _validate_text(self.profile_b, "profile_b")
+        )
+        object.__setattr__(
+            self, "deltas", MappingProxyType(_assert_safe_mapping(dict(self.deltas)))
+        )
+        object.__setattr__(
+            self, "decision_hint", _validate_text(self.decision_hint, "decision_hint")
+        )
         if not isinstance(self.evidence_complete, bool):
             raise TypeError("evidence_complete must be a bool")
 
@@ -510,17 +548,32 @@ class Qdrant118BenchmarkSummary:
     def __post_init__(self) -> None:
         if self.schema_version != SUMMARY_SCHEMA_VERSION:
             raise ValueError("unsupported summary schema_version")
-        object.__setattr__(self, "generated_at_utc", _validate_text(self.generated_at_utc, "generated_at_utc"))
-        for field_name in ("artifact_only", "live_benchmark_executed", "baseline_113_present", "python_rrf_default"):
+        object.__setattr__(
+            self,
+            "generated_at_utc",
+            _validate_text(self.generated_at_utc, "generated_at_utc"),
+        )
+        for field_name in (
+            "artifact_only",
+            "live_benchmark_executed",
+            "baseline_113_present",
+            "python_rrf_default",
+        ):
             if not isinstance(getattr(self, field_name), bool):
                 raise TypeError(f"{field_name} must be a bool")
         if self.recommended_default_profile is not None:
             object.__setattr__(
                 self,
                 "recommended_default_profile",
-                _validate_text(self.recommended_default_profile, "recommended_default_profile"),
+                _validate_text(
+                    self.recommended_default_profile, "recommended_default_profile"
+                ),
             )
-        object.__setattr__(self, "final_decision", _validate_text(self.final_decision, "final_decision"))
+        object.__setattr__(
+            self,
+            "final_decision",
+            _validate_text(self.final_decision, "final_decision"),
+        )
         object.__setattr__(
             self,
             "native_rrf_decision",
@@ -577,13 +630,28 @@ def compute_deltas(
     """Compute quality, latency and resource deltas between two runs."""
 
     metrics: tuple[tuple[str, float | None, float | None, str], ...] = (
-        ("precision_at_5", run_a.quality.precision_at_5, run_b.quality.precision_at_5, "higher"),
-        ("recall_at_10", run_a.quality.recall_at_10, run_b.quality.recall_at_10, "higher"),
+        (
+            "precision_at_5",
+            run_a.quality.precision_at_5,
+            run_b.quality.precision_at_5,
+            "higher",
+        ),
+        (
+            "recall_at_10",
+            run_a.quality.recall_at_10,
+            run_b.quality.recall_at_10,
+            "higher",
+        ),
         ("mrr", run_a.quality.mrr, run_b.quality.mrr, "higher"),
         ("ndcg_at_5", run_a.quality.ndcg_at_5, run_b.quality.ndcg_at_5, "higher"),
         ("total_ms_p50", _latency_p50(run_a), _latency_p50(run_b), "lower"),
         ("total_ms_p95", _latency_p95(run_a), _latency_p95(run_b), "lower"),
-        ("peak_ram_mb", run_a.resources.peak_ram_mb, run_b.resources.peak_ram_mb, "lower"),
+        (
+            "peak_ram_mb",
+            run_a.resources.peak_ram_mb,
+            run_b.resources.peak_ram_mb,
+            "lower",
+        ),
         (
             "collection_size_bytes",
             _optional_int_to_float(run_a.resources.collection_size_bytes),
@@ -596,7 +664,9 @@ def compute_deltas(
     )
 
 
-def latency_p95_multiplier(run_a: QdrantBenchmarkRun, run_b: QdrantBenchmarkRun) -> float | None:
+def latency_p95_multiplier(
+    run_a: QdrantBenchmarkRun, run_b: QdrantBenchmarkRun
+) -> float | None:
     """Return run_b p95 divided by run_a p95, if both are available."""
 
     a = _latency_p95(run_a)
@@ -606,7 +676,9 @@ def latency_p95_multiplier(run_a: QdrantBenchmarkRun, run_b: QdrantBenchmarkRun)
     return b / a
 
 
-def memory_reduction_pct(run_a: QdrantBenchmarkRun, run_b: QdrantBenchmarkRun) -> float | None:
+def memory_reduction_pct(
+    run_a: QdrantBenchmarkRun, run_b: QdrantBenchmarkRun
+) -> float | None:
     """Return positive percent reduction when run_b uses less peak RAM."""
 
     a = run_a.resources.peak_ram_mb
@@ -679,14 +751,25 @@ def decide_qdrant_118_upgrade(
     """
     # Filter to the Nomic baseline scenarios only
     nomic_scenarios = [s for s in scenarios if s.scenario in _NOMIC_BASELINE_SCENARIOS]
-    if not nomic_scenarios or not all(result.evidence_complete for result in nomic_scenarios):
+    if not nomic_scenarios or not all(
+        result.evidence_complete for result in nomic_scenarios
+    ):
         return BenchmarkDecision.INCONCLUSIVE_MISSING_EVIDENCE.value
     if not baseline_113_present:
         return BenchmarkDecision.INCONCLUSIVE_MISSING_EVIDENCE.value
-    if any(result.decision_hint == BenchmarkDecision.DEFER_DUE_TO_REGRESSION.value for result in nomic_scenarios):
+    if any(
+        result.decision_hint == BenchmarkDecision.DEFER_DUE_TO_REGRESSION.value
+        for result in nomic_scenarios
+    ):
         return BenchmarkDecision.DEFER_DUE_TO_REGRESSION.value
-    balanced = _scenario_by_id(nomic_scenarios, ComparisonScenario.QDRANT_118_BASELINE_VS_BALANCED)
-    if balanced is not None and balanced.decision_hint == BenchmarkDecision.ACCEPT_QDRANT_118_BALANCED_PROFILE.value:
+    balanced = _scenario_by_id(
+        nomic_scenarios, ComparisonScenario.QDRANT_118_BASELINE_VS_BALANCED
+    )
+    if (
+        balanced is not None
+        and balanced.decision_hint
+        == BenchmarkDecision.ACCEPT_QDRANT_118_BALANCED_PROFILE.value
+    ):
         return BenchmarkDecision.ACCEPT_QDRANT_118_BALANCED_PROFILE.value
     return BenchmarkDecision.ACCEPT_QDRANT_118_BASELINE.value
 
@@ -700,11 +783,18 @@ def decide_qwen3_embedding(
     if not qwen3_available:
         return BenchmarkDecision.QWEN3_INCONCLUSIVE_MISSING_BASELINE.value
     qwen3_scenarios = [s for s in scenarios if s.scenario in _QWEN3_SCENARIOS]
-    if not qwen3_scenarios or not all(result.evidence_complete for result in qwen3_scenarios):
+    if not qwen3_scenarios or not all(
+        result.evidence_complete for result in qwen3_scenarios
+    ):
         return BenchmarkDecision.QWEN3_INCONCLUSIVE_MISSING_BASELINE.value
-    if any(result.decision_hint == BenchmarkDecision.DEFER_DUE_TO_REGRESSION.value for result in qwen3_scenarios):
+    if any(
+        result.decision_hint == BenchmarkDecision.DEFER_DUE_TO_REGRESSION.value
+        for result in qwen3_scenarios
+    ):
         return BenchmarkDecision.DEFER_QWEN3_DUE_TO_REGRESSION.value
-    nomic_vs_qwen3 = _scenario_by_id(qwen3_scenarios, ComparisonScenario.QDRANT_118_NOMIC_VS_QWEN3_EMBEDDING)
+    nomic_vs_qwen3 = _scenario_by_id(
+        qwen3_scenarios, ComparisonScenario.QDRANT_118_NOMIC_VS_QWEN3_EMBEDDING
+    )
     if nomic_vs_qwen3 is None or not nomic_vs_qwen3.evidence_complete:
         return BenchmarkDecision.QWEN3_INCONCLUSIVE_MISSING_BASELINE.value
     # If Qwen3 shows regression vs Nomic, keep Nomic temporarily
@@ -757,7 +847,9 @@ def build_benchmark_span_attributes(
     )
 
 
-def build_comparison_span_attributes(result: BenchmarkScenarioResult) -> dict[str, object]:
+def build_comparison_span_attributes(
+    result: BenchmarkScenarioResult,
+) -> dict[str, object]:
     """Return OpenTelemetry-compatible comparison span attributes."""
 
     return _assert_safe_mapping(
@@ -783,7 +875,9 @@ def load_benchmark_runs(path: Path | None) -> tuple[QdrantBenchmarkRun, ...]:
         raw_runs = data
     else:
         raise ValueError("benchmark artifact must be a list or contain runs")
-    return tuple(_run_from_mapping(item) for item in raw_runs if isinstance(item, Mapping))
+    return tuple(
+        _run_from_mapping(item) for item in raw_runs if isinstance(item, Mapping)
+    )
 
 
 def load_historical_baseline(path: Path | None) -> QdrantBenchmarkRun | None:
@@ -809,8 +903,13 @@ def build_summary(
     if historical_baseline is not None:
         clean_runs.append(historical_baseline)
     runs_by_profile = {run.profile_name: run for run in clean_runs}
-    scenarios = tuple(make_scenario_result(spec, runs_by_profile) for spec in COMPARISONS)
-    baseline_113_present = historical_baseline is not None or "qdrant_113_historical_baseline" in runs_by_profile
+    scenarios = tuple(
+        make_scenario_result(spec, runs_by_profile) for spec in COMPARISONS
+    )
+    baseline_113_present = (
+        historical_baseline is not None
+        or "qdrant_113_historical_baseline" in runs_by_profile
+    )
     final_decision = decide_qdrant_118_upgrade(
         scenarios,
         baseline_113_present=baseline_113_present,
@@ -829,7 +928,8 @@ def build_summary(
         scenarios=scenarios,
         final_decision=final_decision,
         recommended_default_profile=default_profile,
-        python_rrf_default=native_decision != BenchmarkDecision.PROMOTE_QDRANT_NATIVE_RRF.value,
+        python_rrf_default=native_decision
+        != BenchmarkDecision.PROMOTE_QDRANT_NATIVE_RRF.value,
         native_rrf_decision=native_decision,
         turboquant_decision=TURBOQUANT_EXPERIMENTAL_DECISION,
     )
@@ -900,7 +1000,9 @@ def write_json(summary: Qdrant118BenchmarkSummary, path: Path) -> None:
     """Write the executive JSON summary."""
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    text = json.dumps(summary.to_safe_dict(), ensure_ascii=False, indent=2, sort_keys=True)
+    text = json.dumps(
+        summary.to_safe_dict(), ensure_ascii=False, indent=2, sort_keys=True
+    )
     _assert_safe_text(text)
     path.write_text(text + "\n", encoding="utf-8")
 
@@ -928,7 +1030,9 @@ def render_markdown_report(summary: Qdrant118BenchmarkSummary) -> str:
         f"| `{item.scenario}` | `{item.profile_a}` | `{item.profile_b}` | `{item.decision_hint}` | {str(item.evidence_complete).lower()} |"
         for item in summary.scenarios
     )
-    decision_block = json.dumps(machine_readable_decision(summary), indent=2, sort_keys=True)
+    decision_block = json.dumps(
+        machine_readable_decision(summary), indent=2, sort_keys=True
+    )
     return f"""# Qdrant 1.18 Upgrade Results
 
 ## Executive Summary
@@ -1026,7 +1130,9 @@ def render_adr(summary: Qdrant118BenchmarkSummary) -> str:
         status = "Proposed"
     elif summary.final_decision == BenchmarkDecision.DEFER_DUE_TO_REGRESSION.value:
         status = "Deferred"
-    decision_block = json.dumps(machine_readable_decision(summary), indent=2, sort_keys=True)
+    decision_block = json.dumps(
+        machine_readable_decision(summary), indent=2, sort_keys=True
+    )
     return f"""# ADR-0XX: Qdrant 1.18 Upgrade Decision
 
 Status: {status}
@@ -1171,10 +1277,15 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     args = parse_args(argv)
     try:
-        if args.execute_live_benchmark and os.getenv(LIVE_BENCHMARK_ENV) != LIVE_BENCHMARK_REQUIRED_VALUE:
+        if (
+            args.execute_live_benchmark
+            and os.getenv(LIVE_BENCHMARK_ENV) != LIVE_BENCHMARK_REQUIRED_VALUE
+        ):
             raise RuntimeError("live benchmark requires RUN_QDRANT_118_BENCHMARK=1")
         live_executed = bool(args.execute_live_benchmark)
-        artifacts = tuple(run for path in args.artifact for run in load_benchmark_runs(path))
+        artifacts = tuple(
+            run for path in args.artifact for run in load_benchmark_runs(path)
+        )
         historical = load_historical_baseline(args.historical_baseline)
         summary = build_summary(
             runs=artifacts,
@@ -1190,7 +1301,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         write_markdown_report(summary, args.doc_report)
         args.adr_path.parent.mkdir(parents=True, exist_ok=True)
         args.adr_path.write_text(render_adr(summary), encoding="utf-8")
-        sys.stdout.write(json.dumps(summary.to_safe_dict(), ensure_ascii=False, sort_keys=True) + "\n")
+        sys.stdout.write(
+            json.dumps(summary.to_safe_dict(), ensure_ascii=False, sort_keys=True)
+            + "\n"
+        )
         return 0
     except Exception as exc:
         sys.stderr.write(f"qdrant benchmark comparison failed: {type(exc).__name__}\n")
@@ -1206,9 +1320,15 @@ def _run_from_mapping(raw: Mapping[str, object]) -> QdrantBenchmarkRun:
         profile_config_raw if isinstance(profile_config_raw, Mapping) else {}
     )
     metadata_raw = raw.get("metadata")
-    metadata: Mapping[str, object] = metadata_raw if isinstance(metadata_raw, Mapping) else {}
+    metadata: Mapping[str, object] = (
+        metadata_raw if isinstance(metadata_raw, Mapping) else {}
+    )
     return QdrantBenchmarkRun(
-        run_id=str(raw.get("run_id", _stable_hash(json.dumps(raw, sort_keys=True, default=str)))),
+        run_id=str(
+            raw.get(
+                "run_id", _stable_hash(json.dumps(raw, sort_keys=True, default=str))
+            )
+        ),
         scenario=str(raw.get("scenario", "artifact")),
         qdrant_version=_optional_str(raw.get("qdrant_version")),
         profile_name=str(raw.get("profile_name", "")),
@@ -1219,7 +1339,9 @@ def _run_from_mapping(raw: Mapping[str, object]) -> QdrantBenchmarkRun:
         query_set_hash=_optional_str(raw.get("query_set_hash")),
         quality=_quality_from_mapping(quality if isinstance(quality, Mapping) else {}),
         latency=_latency_from_mapping(latency if isinstance(latency, Mapping) else {}),
-        resources=_resources_from_mapping(resources if isinstance(resources, Mapping) else {}),
+        resources=_resources_from_mapping(
+            resources if isinstance(resources, Mapping) else {}
+        ),
         profile_config=profile_config,
         metadata=metadata,
     )
@@ -1294,7 +1416,9 @@ def _decision_hint(
     return BenchmarkDecision.ACCEPT_QDRANT_118_BASELINE.value
 
 
-def _native_decision_from_runs(run_a: QdrantBenchmarkRun, run_b: QdrantBenchmarkRun) -> str:
+def _native_decision_from_runs(
+    run_a: QdrantBenchmarkRun, run_b: QdrantBenchmarkRun
+) -> str:
     overlap = _metadata_float(run_b, "overlap_at_10")
     tie_break_regressions = _metadata_float(run_b, "tie_break_regression_count")
     ndcg_delta = None
@@ -1313,7 +1437,9 @@ def _native_decision_from_runs(run_a: QdrantBenchmarkRun, run_b: QdrantBenchmark
 
 
 def _native_rrf_decision(scenarios: Sequence[BenchmarkScenarioResult]) -> str:
-    scenario = _scenario_by_id(scenarios, ComparisonScenario.QDRANT_118_PYTHON_RRF_VS_NATIVE_RRF)
+    scenario = _scenario_by_id(
+        scenarios, ComparisonScenario.QDRANT_118_PYTHON_RRF_VS_NATIVE_RRF
+    )
     if scenario is None:
         return BenchmarkDecision.KEEP_PYTHON_RRF_DEFAULT.value
     if scenario.decision_hint == BenchmarkDecision.PROMOTE_QDRANT_NATIVE_RRF.value:
@@ -1333,7 +1459,13 @@ def _scenario_by_id(
 
 def _delta_entry(a: float | None, b: float | None, direction: str) -> dict[str, object]:
     if a is None or b is None:
-        return {"a": a, "b": b, "absolute_delta": None, "relative_delta_pct": None, "winner": "incomplete"}
+        return {
+            "a": a,
+            "b": b,
+            "absolute_delta": None,
+            "relative_delta_pct": None,
+            "winner": "incomplete",
+        }
     absolute = b - a
     relative = None if a == 0.0 else (absolute / a) * 100.0
     if math.isclose(a, b, rel_tol=1e-12, abs_tol=1e-12):
@@ -1352,11 +1484,19 @@ def _delta_entry(a: float | None, b: float | None, direction: str) -> dict[str, 
 
 
 def _latency_p50(run: QdrantBenchmarkRun) -> float | None:
-    return run.latency.total_ms_p50 if run.latency.total_ms_p50 is not None else run.latency.p50_ms
+    return (
+        run.latency.total_ms_p50
+        if run.latency.total_ms_p50 is not None
+        else run.latency.p50_ms
+    )
 
 
 def _latency_p95(run: QdrantBenchmarkRun) -> float | None:
-    return run.latency.total_ms_p95 if run.latency.total_ms_p95 is not None else run.latency.p95_ms
+    return (
+        run.latency.total_ms_p95
+        if run.latency.total_ms_p95 is not None
+        else run.latency.p95_ms
+    )
 
 
 def _abs_delta(deltas: Mapping[str, object], metric: str) -> float | None:
@@ -1392,9 +1532,14 @@ def _csv_row(
         "total_ms_p50": _fmt(_latency_p50(run)),
         "total_ms_p95": _fmt(_latency_p95(run)),
         "peak_ram_mb": _fmt(run.resources.peak_ram_mb),
-        "collection_size_bytes": "" if run.resources.collection_size_bytes is None else run.resources.collection_size_bytes,
+        "collection_size_bytes": ""
+        if run.resources.collection_size_bytes is None
+        else run.resources.collection_size_bytes,
         "memory_report_available": str(run.resources.memory_report_available).lower(),
-        "evidence_complete": str(scenario.evidence_complete and summary.schema_version == SUMMARY_SCHEMA_VERSION).lower(),
+        "evidence_complete": str(
+            scenario.evidence_complete
+            and summary.schema_version == SUMMARY_SCHEMA_VERSION
+        ).lower(),
     }
 
 
@@ -1425,17 +1570,31 @@ def _svg_bar_section(
     values: Sequence[tuple[str, float | None]],
     color: str,
 ) -> str:
-    max_value = max((value for _label, value in values if value is not None), default=1.0)
+    max_value = max(
+        (value for _label, value in values if value is not None), default=1.0
+    )
     parts = [
         f'<text x="{x}" y="{y}" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#111827">{html.escape(title)}</text>'
     ]
     for index, (label, value) in enumerate(values[:5]):
         row_y = y + 28 + (index * 34)
-        width = 0 if value is None else int((value / max_value) * 260) if max_value > 0 else 0
+        width = (
+            0
+            if value is None
+            else int((value / max_value) * 260)
+            if max_value > 0
+            else 0
+        )
         shown = "TBD" if value is None else _fmt(value)
-        parts.append(f'<text x="{x}" y="{row_y + 14}" font-family="Arial, sans-serif" font-size="10" fill="#334155">{html.escape(label[:30])}</text>')
-        parts.append(f'<rect x="{x + 170}" y="{row_y}" width="{width}" height="16" fill="{color}" opacity="0.82"/>')
-        parts.append(f'<text x="{x + 438}" y="{row_y + 13}" font-family="Arial, sans-serif" font-size="11" fill="#334155">{html.escape(shown)}</text>')
+        parts.append(
+            f'<text x="{x}" y="{row_y + 14}" font-family="Arial, sans-serif" font-size="10" fill="#334155">{html.escape(label[:30])}</text>'
+        )
+        parts.append(
+            f'<rect x="{x + 170}" y="{row_y}" width="{width}" height="16" fill="{color}" opacity="0.82"/>'
+        )
+        parts.append(
+            f'<text x="{x + 438}" y="{row_y + 13}" font-family="Arial, sans-serif" font-size="11" fill="#334155">{html.escape(shown)}</text>'
+        )
     return "\n  ".join(parts)
 
 
@@ -1456,10 +1615,18 @@ def _svg_decision_matrix(
         row_y = y + 44 + (index * 34)
         winner = _scenario_winner(scenario)
         confidence = "complete" if scenario.evidence_complete else "TBD"
-        parts.append(f'<text x="{x}" y="{row_y + 13}" font-family="Arial, sans-serif" font-size="10" fill="#334155">{html.escape(scenario.scenario[:36])}</text>')
-        parts.append(f'<text x="{x + 190}" y="{row_y + 13}" font-family="Arial, sans-serif" font-size="10" fill="#0f172a">{html.escape(winner)}</text>')
-        parts.append(f'<text x="{x + 260}" y="{row_y + 13}" font-family="Arial, sans-serif" font-size="10" fill="#0f172a">{html.escape(confidence)}</text>')
-        parts.append(f'<text x="{x + 345}" y="{row_y + 13}" font-family="Arial, sans-serif" font-size="10" fill="#0f172a">{html.escape(scenario.decision_hint[:28])}</text>')
+        parts.append(
+            f'<text x="{x}" y="{row_y + 13}" font-family="Arial, sans-serif" font-size="10" fill="#334155">{html.escape(scenario.scenario[:36])}</text>'
+        )
+        parts.append(
+            f'<text x="{x + 190}" y="{row_y + 13}" font-family="Arial, sans-serif" font-size="10" fill="#0f172a">{html.escape(winner)}</text>'
+        )
+        parts.append(
+            f'<text x="{x + 260}" y="{row_y + 13}" font-family="Arial, sans-serif" font-size="10" fill="#0f172a">{html.escape(confidence)}</text>'
+        )
+        parts.append(
+            f'<text x="{x + 345}" y="{row_y + 13}" font-family="Arial, sans-serif" font-size="10" fill="#0f172a">{html.escape(scenario.decision_hint[:28])}</text>'
+        )
     return "\n  ".join(parts)
 
 
@@ -1485,7 +1652,9 @@ def _svg_fusion_panel(
     x: int,
     y: int,
 ) -> str:
-    fusion = _scenario_by_id(scenarios, ComparisonScenario.QDRANT_118_PYTHON_RRF_VS_NATIVE_RRF)
+    fusion = _scenario_by_id(
+        scenarios, ComparisonScenario.QDRANT_118_PYTHON_RRF_VS_NATIVE_RRF
+    )
     hint = "TBD" if fusion is None else fusion.decision_hint
     return (
         f'<text x="{x}" y="{y}" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#111827">Fusion comparison</text>'
@@ -1511,7 +1680,9 @@ def _validate_optional_metric(value: float | None, field_name: str) -> float | N
     return clean
 
 
-def _validate_optional_non_negative(value: float | None, field_name: str) -> float | None:
+def _validate_optional_non_negative(
+    value: float | None, field_name: str
+) -> float | None:
     if value is None:
         return None
     if isinstance(value, bool) or not isinstance(value, (int, float)):

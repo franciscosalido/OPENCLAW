@@ -18,14 +18,18 @@ MARKDOWN_PATH = Path("docs/rag/rag_01b_pr08_integration_report.md")
 def write_json_artifact(path: Path, payload: dict[str, Any]) -> None:
     assert_no_forbidden_fields(payload)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
 
 
 def write_smoke_artifacts(result: Agentic0SmokeResult) -> None:
     payload = smoke_summary_payload(result)
     write_json_artifact(SMOKE_SUMMARY_PATH, payload)
     latency = cast("dict[str, Any]", payload["latency"])
-    write_json_artifact(LATENCY_PATH, {"schema_version": "rag-01b-pr08-latency-v1", **latency})
+    write_json_artifact(
+        LATENCY_PATH, {"schema_version": "rag-01b-pr08-latency-v1", **latency}
+    )
     write_markdown_report(MARKDOWN_PATH, payload)
 
 
@@ -43,8 +47,16 @@ def smoke_summary_payload(result: Agentic0SmokeResult) -> dict[str, Any]:
         "hybridrag": payload["retrieval"],
         "postgres_memory": payload["postgres_memory"],
         "mcp": {
-            "postgres_tool_ok": any(call["server_name"] == "quimera_postgres_memory" and call["status"] in {"ok", "degraded"} for call in tool_calls),
-            "qdrant_tool_ok": any(call["server_name"] == "quimera_qdrant_memory" and call["status"] == "ok" for call in tool_calls),
+            "postgres_tool_ok": any(
+                call["server_name"] == "quimera_postgres_memory"
+                and call["status"] in {"ok", "degraded"}
+                for call in tool_calls
+            ),
+            "qdrant_tool_ok": any(
+                call["server_name"] == "quimera_qdrant_memory"
+                and call["status"] == "ok"
+                for call in tool_calls
+            ),
             "allowed_tools_enforced": True,
             "virtual_key_checked": False,
         },
@@ -105,6 +117,13 @@ def write_markdown_report(path: Path, payload: dict[str, Any]) -> None:
         lines.extend(f"- {warning}" for warning in warnings)
     else:
         lines.append("- none")
-    lines.extend(["", "## PR-09 Handoff", "", "- Multi-agent permissions, Kronos and autonomous tool-use hardening."])
+    lines.extend(
+        [
+            "",
+            "## PR-09 Handoff",
+            "",
+            "- Multi-agent permissions, Kronos and autonomous tool-use hardening.",
+        ]
+    )
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")

@@ -37,7 +37,9 @@ def summarize_span_attributes(spans: Sequence[object]) -> SpanAttributeSummary:
         if isinstance(attributes, Mapping):
             for key, value in attributes.items():
                 key_text = str(key)
-                if any(part in key_text.lower() for part in FORBIDDEN_OTEL_ATTRIBUTE_PARTS):
+                if any(
+                    part in key_text.lower() for part in FORBIDDEN_OTEL_ATTRIBUTE_PARTS
+                ):
                     forbidden.append(key_text)
                 else:
                     safe[key_text] = value

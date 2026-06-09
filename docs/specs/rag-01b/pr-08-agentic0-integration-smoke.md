@@ -2,6 +2,13 @@
 
 Status: Draft implementation
 
+Historical SDD note: the former `agentic0-smoke` `start_quimera.sh` subcommand
+reference was superseded by the current host-only root wrapper contract
+(`./start_quimera.sh --start`, `./start_quimera.sh --status`,
+`./start_quimera.sh --stop`) and by `integration.run_agentic0_smoke_test`.
+Do not use this historical file to require reintroducing removed
+`start_quimera.sh` subcommands.
+
 ## Objetivo
 
 O PR-08 fecha o sprint RAG-01B com um System Integration Gate local-first.

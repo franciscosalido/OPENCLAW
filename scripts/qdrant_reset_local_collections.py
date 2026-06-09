@@ -39,9 +39,7 @@ PREFIX_DELETE_ALLOWED = (
 DEFAULT_BENCHMARK_COLLECTION = "q18_benchmark_hybrid_local"
 BENCHMARK_COLLECTION_PREFIX = "q18_benchmark_"
 FORBIDDEN_REMOTE_HINTS = ("cloud", "prod", "production", "staging")
-DESTRUCTIVE_CONFIRMATION_FLAG = (
-    "--i-understand-this-deletes-local-qdrant-collections"
-)
+DESTRUCTIVE_CONFIRMATION_FLAG = "--i-understand-this-deletes-local-qdrant-collections"
 _SAFE_COLLECTION_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 
 
@@ -135,7 +133,9 @@ class QdrantResetClientAdapter:
         await self._client.delete_collection(collection_name=collection_name)
 
     async def create_benchmark_collection(self, collection_name: str) -> None:
-        raise ResetRefused("benchmark collection schema creation is reserved for Q18-04")
+        raise ResetRefused(
+            "benchmark collection schema creation is reserved for Q18-04"
+        )
 
     async def close(self) -> None:
         await self._client.close()
@@ -313,7 +313,9 @@ async def execute_reset_plan(
             await client.create_benchmark_collection(plan.benchmark_collection)
             recreated = (plan.benchmark_collection,)
     except Exception as exc:
-        raise ResetRefused(f"local reset operation failed: {type(exc).__name__}") from exc
+        raise ResetRefused(
+            f"local reset operation failed: {type(exc).__name__}"
+        ) from exc
 
     collections_after = await fetch_existing_collections(client)
     return ResetReport(
@@ -398,9 +400,13 @@ async def async_main(
     clean_port = _validate_port(args.port)
     clean_host = ensure_localhost(args.host)
     active_env = os.environ if env is None else env
-    active_client = client if client is not None else _build_client(
-        host=clean_host,
-        port=clean_port,
+    active_client = (
+        client
+        if client is not None
+        else _build_client(
+            host=clean_host,
+            port=clean_port,
+        )
     )
 
     try:

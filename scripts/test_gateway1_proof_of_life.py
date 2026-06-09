@@ -13,11 +13,10 @@ import json
 import os
 import sys
 import time
-from collections.abc import Awaitable, Callable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
 from uuid import uuid4
 
 import httpx
@@ -31,7 +30,9 @@ from scripts import run_local_agent
 
 # Smoke summaries must not include "answer" — that key belongs to runner output
 # only and should never surface in observability reports.
-PROHIBITED_SMOKE_SUMMARY_KEYS: frozenset[str] = PROHIBITED_SIGNAL_KEYS | frozenset({"answer"})
+PROHIBITED_SMOKE_SUMMARY_KEYS: frozenset[str] = PROHIBITED_SIGNAL_KEYS | frozenset(
+    {"answer"}
+)
 
 GUARD_ENV = "RUN_GATEWAY1_PROOF_OF_LIFE"
 DEFAULT_OUTPUT_DIR = Path("reports/gateway1_smoke")
@@ -129,9 +130,7 @@ class RunnerSmokeResult:
             "alias": self.alias,
             "used_rag": self.used_rag,
             "decision_id": self.decision_id,
-            "estimated_remote_tokens_avoided": (
-                self.estimated_remote_tokens_avoided
-            ),
+            "estimated_remote_tokens_avoided": (self.estimated_remote_tokens_avoided),
             "answer_length_chars": self.answer_length_chars,
             "error_category": self.error_category,
             "fallback_applied": self.fallback_applied,
@@ -207,7 +206,9 @@ async def run_proof_of_life(
 ) -> tuple[GatewayProofOfLifeSummary, Path | None]:
     """Run the Gateway-1 proof-of-life smoke and write a summary if possible."""
     run_id = uuid4().hex[:12]
-    criteria_met: dict[str, bool] = {criterion: False for criterion in MANDATORY_CRITERIA}
+    criteria_met: dict[str, bool] = {
+        criterion: False for criterion in MANDATORY_CRITERIA
+    }
     skipped: set[str] = set()
     probes: dict[str, ProbeResult] = {}
     runner_tests: dict[str, RunnerSmokeResult] = {}
@@ -251,8 +252,7 @@ async def run_proof_of_life(
         skipped.add("G1-06")
 
     rag_ready = all(
-        criteria_met[criterion]
-        for criterion in ("G1-02", "G1-03", "G1-04", "G1-05")
+        criteria_met[criterion] for criterion in ("G1-02", "G1-03", "G1-04", "G1-05")
     )
     if rag_ready:
         rag_smoke = await run_rag_smoke()
@@ -681,13 +681,13 @@ def _build_summary(
     criteria_met: Mapping[str, bool],
     skipped: set[str],
 ) -> GatewayProofOfLifeSummary:
-    passed = tuple(
-        criterion for criterion, ok in sorted(criteria_met.items()) if ok
-    )
+    passed = tuple(criterion for criterion, ok in sorted(criteria_met.items()) if ok)
     failed = tuple(
         criterion
         for criterion, mandatory in sorted(MANDATORY_CRITERIA.items())
-        if mandatory and not criteria_met.get(criterion, False) and criterion not in skipped
+        if mandatory
+        and not criteria_met.get(criterion, False)
+        and criterion not in skipped
     )
     overall_passed = not failed and all(
         criteria_met.get(criterion, False)
@@ -728,7 +728,9 @@ def _runner_result(
         answer_length_chars=len(result.answer),
         error_category=result.error_category,
         fallback_applied=result.fallback_applied,
-        fallback_reason=result.fallback_reason.value if result.fallback_reason else None,
+        fallback_reason=result.fallback_reason.value
+        if result.fallback_reason
+        else None,
         model_call_attempted=model_call_attempted,
     )
 

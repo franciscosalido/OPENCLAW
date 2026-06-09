@@ -89,7 +89,9 @@ def _client_version() -> str:
     return importlib.metadata.version("qdrant-client")
 
 
-def load_version_contract(path: Path = DEFAULT_VERSION_CONTRACT_PATH) -> QdrantVersionContract:
+def load_version_contract(
+    path: Path = DEFAULT_VERSION_CONTRACT_PATH,
+) -> QdrantVersionContract:
     """Load the local Qdrant version contract from YAML."""
 
     with path.open("r", encoding="utf-8") as contract_file:
@@ -326,7 +328,9 @@ async def async_main(argv: Sequence[str] | None = None) -> int:
         rest_ok=rest_ok,
         grpc_ok=grpc_ok,
     )
-    sys.stdout.write(json.dumps(report.to_dict(), indent=2, ensure_ascii=False, sort_keys=True))
+    sys.stdout.write(
+        json.dumps(report.to_dict(), indent=2, ensure_ascii=False, sort_keys=True)
+    )
     sys.stdout.write("\n")
     return 0 if report.ready else 2
 

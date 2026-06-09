@@ -169,7 +169,9 @@ def _spec_from_collection(collection_name: str) -> HybridCollectionSpec118:
     return default_hybrid_collection_spec_118()
 
 
-def _build_client(*, host: str, port: int, grpc_port: int) -> QdrantHybridSchemaClient118:
+def _build_client(
+    *, host: str, port: int, grpc_port: int
+) -> QdrantHybridSchemaClient118:
     from qdrant_client import AsyncQdrantClient
 
     return QdrantHybridSchemaClient118(

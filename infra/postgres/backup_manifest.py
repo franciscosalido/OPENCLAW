@@ -51,19 +51,27 @@ def create_manifest(
         "warnings": warnings or [],
     }
     manifest_path = _manifest_path_for_dump(dump_file)
-    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     _chmod_private(manifest_path)
     return manifest
 
 
-def update_restore_verified(manifest_path: Path, *, verified: bool = True) -> dict[str, Any]:
+def update_restore_verified(
+    manifest_path: Path, *, verified: bool = True
+) -> dict[str, Any]:
     raw_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if not isinstance(raw_manifest, dict):
         raise ValueError("manifest must be a JSON object")
     manifest: dict[str, Any] = raw_manifest
     manifest["restore_verified"] = verified
-    manifest["restore_verified_at"] = datetime.now(UTC).isoformat() if verified else None
-    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    manifest["restore_verified_at"] = (
+        datetime.now(UTC).isoformat() if verified else None
+    )
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     _chmod_private(manifest_path)
     return manifest
 
@@ -89,7 +97,9 @@ def prune_old_backups(directory: Path, retention_days: int) -> list[Path]:
 
 def _safe_backup_artifact(path: Path) -> bool:
     name = path.name
-    return name.startswith(SAFE_BACKUP_PREFIX) and (name.endswith(".dump") or name.endswith(MANIFEST_SUFFIX))
+    return name.startswith(SAFE_BACKUP_PREFIX) and (
+        name.endswith(".dump") or name.endswith(MANIFEST_SUFFIX)
+    )
 
 
 def _manifest_path_for_dump(dump_file: Path) -> Path:

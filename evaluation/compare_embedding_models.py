@@ -22,7 +22,6 @@ from backend.rag.ollama_embedding_bakeoff import (
     BAKEOFF_COLLECTION,
     EMBEDDING_BAKEOFF_SUMMARY_SCHEMA_VERSION,
     NOMIC_MODEL_ID,
-    QWEN3_4B_DEFAULT_DIMENSIONS,
     QWEN3_4B_OLLAMA_MODEL_ID,
     QWEN3_QUERY_INSTRUCTION,
     EmbeddingBakeoffMetrics,
@@ -57,13 +56,18 @@ Q18_SCENARIO_PROFILES: Mapping[str, str] = {
 }
 
 Q18Runner = Callable[..., Awaitable[Mapping[str, object]]]
-EmbeddingProbe = Callable[[EmbeddingBakeoffScenario], Awaitable[EmbeddingBakeoffMetrics]]
+EmbeddingProbe = Callable[
+    [EmbeddingBakeoffScenario], Awaitable[EmbeddingBakeoffMetrics]
+]
 
 
-def write_summary_json(summary: EmbeddingBakeoffSummary, path: Path = SUMMARY_PATH) -> None:
+def write_summary_json(
+    summary: EmbeddingBakeoffSummary, path: Path = SUMMARY_PATH
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
-        json.dumps(summary.to_safe_dict(), indent=2, sort_keys=True, ensure_ascii=False) + "\n",
+        json.dumps(summary.to_safe_dict(), indent=2, sort_keys=True, ensure_ascii=False)
+        + "\n",
         encoding="utf-8",
     )
 
@@ -113,7 +117,9 @@ def render_markdown_report(summary: EmbeddingBakeoffSummary) -> str:
         f"{run.scenario.dimensions} | {'yes' if run.evidence_complete else 'TBD'} |"
         for run in summary.scenarios
     )
-    machine = json.dumps(build_pkd_machine_block(winner=summary.winner), indent=2, sort_keys=True)
+    machine = json.dumps(
+        build_pkd_machine_block(winner=summary.winner), indent=2, sort_keys=True
+    )
     return f"""# Qwen3-Embedding-4B vs Nomic Bakeoff
 
 ## Executive Summary
@@ -152,7 +158,9 @@ vectors, embeddings, prompts or answers.
 """
 
 
-def write_markdown_report(summary: EmbeddingBakeoffSummary, path: Path = REPORT_PATH) -> None:
+def write_markdown_report(
+    summary: EmbeddingBakeoffSummary, path: Path = REPORT_PATH
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(render_markdown_report(summary), encoding="utf-8")
 
@@ -162,7 +170,9 @@ def write_svg(summary: EmbeddingBakeoffSummary, path: Path = CHARTS_PATH) -> Non
     path.write_text(render_bakeoff_svg(summary), encoding="utf-8")
 
 
-def generate_artifacts(*, collection: str = BAKEOFF_COLLECTION) -> EmbeddingBakeoffSummary:
+def generate_artifacts(
+    *, collection: str = BAKEOFF_COLLECTION
+) -> EmbeddingBakeoffSummary:
     if collection != BAKEOFF_COLLECTION:
         raise ValueError("embedding bakeoff uses only the dedicated bakeoff collection")
     summary = build_empty_bakeoff_summary()
@@ -212,10 +222,18 @@ async def run_live_bakeoff(
                 metrics=metrics,
                 evidence_complete=True,
             )
-    runs = tuple(run_by_id[scenario.scenario_id] for scenario in declared_bakeoff_scenarios())
+    runs = tuple(
+        run_by_id[scenario.scenario_id] for scenario in declared_bakeoff_scenarios()
+    )
     decision = _decide_from_runs(runs)
-    winner = "Qwen/Qwen3-Embedding-4B" if decision == EmbeddingCandidateDecision.PROMOTE_QWEN3_4B_DEFAULT else (
-        NOMIC_MODEL_ID if decision == EmbeddingCandidateDecision.KEEP_NOMIC_DEFAULT else None
+    winner = (
+        "Qwen/Qwen3-Embedding-4B"
+        if decision == EmbeddingCandidateDecision.PROMOTE_QWEN3_4B_DEFAULT
+        else (
+            NOMIC_MODEL_ID
+            if decision == EmbeddingCandidateDecision.KEEP_NOMIC_DEFAULT
+            else None
+        )
     )
     summary = EmbeddingBakeoffSummary(
         schema_version=EMBEDDING_BAKEOFF_SUMMARY_SCHEMA_VERSION,
@@ -262,11 +280,17 @@ def _run_from_q18_artifact(
         collection_size_bytes=_int_or_none(resources.get("collection_size_bytes")),
         embedding_dimensions=scenario.dimensions,
     )
-    return EmbeddingBakeoffRun(scenario=scenario, metrics=metrics, evidence_complete=True)
+    return EmbeddingBakeoffRun(
+        scenario=scenario, metrics=metrics, evidence_complete=True
+    )
 
 
-async def _run_embedding_scenario_probe(scenario: EmbeddingBakeoffScenario) -> EmbeddingBakeoffMetrics:
-    model = QWEN3_4B_OLLAMA_MODEL_ID if scenario.model != NOMIC_MODEL_ID else NOMIC_MODEL_ID
+async def _run_embedding_scenario_probe(
+    scenario: EmbeddingBakeoffScenario,
+) -> EmbeddingBakeoffMetrics:
+    model = (
+        QWEN3_4B_OLLAMA_MODEL_ID if scenario.model != NOMIC_MODEL_ID else NOMIC_MODEL_ID
+    )
     batch_size = 4 if scenario.batch_mode == "batched" else 1
     texts = tuple(f"probe-{idx}" for idx in range(batch_size))
     if scenario.scenario_id == "batch_vs_single_embed":
@@ -276,13 +300,18 @@ async def _run_embedding_scenario_probe(scenario: EmbeddingBakeoffScenario) -> E
         dimensions=scenario.dimensions if scenario.model != NOMIC_MODEL_ID else None,
         keep_alive="30m",
         batch_size=batch_size,
-        query_instruction=QWEN3_QUERY_INSTRUCTION if scenario.instruction_enabled else None,
+        query_instruction=QWEN3_QUERY_INSTRUCTION
+        if scenario.instruction_enabled
+        else None,
     )
     start = time.perf_counter()
-    result = await client.embed_queries(texts) if scenario.instruction_enabled else await client.embed_documents(texts)
+    result = (
+        await client.embed_queries(texts)
+        if scenario.instruction_enabled
+        else await client.embed_documents(texts)
+    )
     wall_ms = (time.perf_counter() - start) * 1000
     total_ms = _ns_to_ms(result.total_duration_ns) or wall_ms
-    load_ms = _ns_to_ms(result.load_duration_ns)
     return EmbeddingBakeoffMetrics(
         embed_ms_p50=round(total_ms, 3),
         embed_ms_p95=round(total_ms, 3),
@@ -302,7 +331,9 @@ async def _run_embedding_scenario_probe(scenario: EmbeddingBakeoffScenario) -> E
     )
 
 
-def _decide_from_runs(runs: Sequence[EmbeddingBakeoffRun]) -> EmbeddingCandidateDecision:
+def _decide_from_runs(
+    runs: Sequence[EmbeddingBakeoffRun],
+) -> EmbeddingCandidateDecision:
     by_id = {run.scenario.scenario_id: run for run in runs}
     nomic = by_id.get("nomic_hybrid_python_rrf")
     qwen = by_id.get("qwen3_4b_hybrid_python_rrf")
@@ -359,7 +390,9 @@ def _utc_now() -> str:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--collection", default=BAKEOFF_COLLECTION)
-    parser.add_argument("--execute", action="store_true", help="Run live bakeoff; requires env gate")
+    parser.add_argument(
+        "--execute", action="store_true", help="Run live bakeoff; requires env gate"
+    )
     parser.add_argument("--models", default="nomic,qwen3_4b")
     parser.add_argument("--qwen-dimensions", type=int, default=2560)
     parser.add_argument("--host", default="localhost")
@@ -372,7 +405,9 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.execute and os.environ.get(RUN_ENV) != "1":
-        sys.stderr.write(f"live bakeoff refused: set {RUN_ENV}=1 and rerun with --execute\n")
+        sys.stderr.write(
+            f"live bakeoff refused: set {RUN_ENV}=1 and rerun with --execute\n"
+        )
         return 2
     if args.execute:
         os.environ.setdefault(Q18_RUNNER_ENV, "1")
@@ -389,7 +424,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         except Exception as exc:
             sys.stderr.write(f"embedding bakeoff failed: {type(exc).__name__}\n")
             return 2
-        sys.stdout.write(json.dumps(summary.to_safe_dict(), indent=2, sort_keys=True, ensure_ascii=False))
+        sys.stdout.write(
+            json.dumps(
+                summary.to_safe_dict(), indent=2, sort_keys=True, ensure_ascii=False
+            )
+        )
         sys.stdout.write("\n")
         return 0
     try:
@@ -397,7 +436,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     except ValueError as exc:
         sys.stderr.write(f"embedding bakeoff failed: {exc}\n")
         return 2
-    sys.stdout.write(json.dumps(summary.to_safe_dict(), indent=2, sort_keys=True, ensure_ascii=False))
+    sys.stdout.write(
+        json.dumps(summary.to_safe_dict(), indent=2, sort_keys=True, ensure_ascii=False)
+    )
     sys.stdout.write("\n")
     return 0
 

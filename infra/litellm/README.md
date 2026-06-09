@@ -56,19 +56,15 @@ derives `LITELLM_LOCAL_CHAT_MODEL` and `LITELLM_LOCAL_EMBED_MODEL` from
 
 ## Start
 
-Recommended through the stack controller:
+Recommended through the root stack controller:
 
 ```bash
-./scripts/start_quimera.sh litellm-validate
-./scripts/start_quimera.sh litellm-render
-./scripts/start_quimera.sh litellm-start
-./scripts/start_quimera.sh litellm-smoke
-./scripts/start_quimera.sh litellm-audit
-./scripts/start_quimera.sh litellm-benchmark
+./start_quimera.sh --start
+./start_quimera.sh --status
 ```
 
-`scripts/start_quimera.sh start` also starts or reuses host LiteLLM after
-Postgres and Qdrant are ready.
+The root controller starts or reuses host LiteLLM after Postgres and Qdrant
+are ready.
 
 Docker Compose does not manage LiteLLM in Quimera. Compose owns Postgres and
 Qdrant only; LiteLLM remains a host Python process on `127.0.0.1:4000`.
@@ -85,9 +81,9 @@ The script refuses to bind to anything other than `127.0.0.1`.
 If the placeholder key from `.env.local.example` is still in use, the stack
 controller prints a warning. Rotate it for any shared runtime.
 
-`litellm-audit` writes safe local reports to `.runtime/reports/`. The audit
+`python audit.py` writes safe local reports to `.runtime/reports/`. The audit
 includes config contracts, endpoint probes, cache policy and version
-fingerprints. `litellm-benchmark` is opt-in; without
+fingerprints. `python overhead_benchmark.py` is opt-in; without
 `QUIMERA_LITELLM_BENCHMARK=1`, it returns `status=SKIPPED_VALID` with
 `skipped=true` and does not call a model.
 
@@ -148,7 +144,7 @@ future dedicated alias.
 ## Stop
 
 ```bash
-./scripts/start_quimera.sh litellm-stop
+./start_quimera.sh --stop
 ```
 
 The stop path reads only `.runtime/litellm.pid`, sends SIGTERM to that PID, and

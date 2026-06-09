@@ -5,7 +5,55 @@
 > meaningful sessions.
 
 **Last updated:** 2026-06-08
-**Updated by:** Codex — RC quality report hardening
+**Updated by:** Codex — RC adversarial report contract sync
+
+---
+
+## codex/rc-adversarial-report-contract-sync — Adversarial Report Contract Sync
+
+Current branch: `codex/rc-adversarial-report-contract-sync`
+Base branch: local `main` at `da758ee`.
+
+Implemented:
+
+- Added a unit contract proving `LocalGenerator(gateway_client=fake)` does not
+  read gateway environment settings and does not require
+  `QUIMERA_LLM_API_KEY`.
+- Updated `LocalGenerator.__post_init__` so an explicitly injected
+  `GatewayChatClient` is honored before calling `GatewayRuntimeConfig.from_env`.
+  Primitive local validations still run.
+- Resolved the current Ruff lint findings across evaluation, infra and scripts.
+- Applied the mechanical Ruff formatting required by `ruff format --check .`.
+  This touched the non-test files that were already outside the repository-wide
+  formatting contract; it did not intentionally refactor behavior.
+- Updated active LiteLLM/infra/recovery docs to use the current root wrapper:
+  `./start_quimera.sh --start`, `./start_quimera.sh --status` and
+  `./start_quimera.sh --stop`.
+- Marked historical RAG-01B specs that mention removed `start_quimera.sh`
+  subcommands as superseded, without reintroducing those subcommands.
+
+Scope intentionally not changed:
+
+- No `.env`, `.env.*`, secrets, service runtime data, Docker state, Qdrant,
+  Postgres or LiteLLM process state touched.
+- Generated `evaluation/results` output from the unit run was restored and not
+  kept in the diff.
+- Historical specs retain their original body for traceability; they only gain
+  superseded notes.
+
+Validation:
+
+- `uv run pytest tests/unit -q`: 1877 passed, 259 subtests passed.
+- `uvx ruff check .`: all checks passed.
+- `uvx ruff format --check .`: 416 files already formatted.
+- `uv run mypy --strict .`: success, 416 source files checked.
+- `uv run pyright`: 0 errors / 0 warnings.
+- `git diff --check`: clean.
+
+Known residual:
+
+- `pyright` reports that a newer Pyright release is available. This is an
+  environment notice only; the configured gate passed with zero findings.
 
 ---
 

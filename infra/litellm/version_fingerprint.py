@@ -66,7 +66,9 @@ def _default_command_runner(command: list[str], timeout: float) -> tuple[int, st
     return result.returncode, result.stdout.strip(), result.stderr.strip()
 
 
-def _default_http_getter(url: str, timeout: float) -> tuple[int | None, dict[str, Any] | str]:
+def _default_http_getter(
+    url: str, timeout: float
+) -> tuple[int | None, dict[str, Any] | str]:
     try:
         result = httpx.get(url, timeout=timeout)
     except httpx.HTTPError as exc:
@@ -90,9 +92,17 @@ def _safe_http_probe(
         return {"status": "warn", "status_code": status_code}
     if isinstance(body, dict):
         if "version" in body:
-            return {"status": "ok", "status_code": status_code, "version": str(body["version"])}
+            return {
+                "status": "ok",
+                "status_code": status_code,
+                "version": str(body["version"]),
+            }
         if "result" in body:
-            return {"status": "ok", "status_code": status_code, "result_shape": "mapping"}
+            return {
+                "status": "ok",
+                "status_code": status_code,
+                "result_shape": "mapping",
+            }
     return {"status": "ok", "status_code": status_code}
 
 
@@ -122,7 +132,9 @@ def build_version_fingerprint(
     command_runner: CommandRunner | None = None,
     http_getter: HttpGetter | None = None,
     config_path: Path = Path("infra/litellm/litellm_config.yaml"),
-    runtime_config_path: Path = Path("infra/litellm/generated/litellm_config.runtime.yaml"),
+    runtime_config_path: Path = Path(
+        "infra/litellm/generated/litellm_config.runtime.yaml"
+    ),
 ) -> Fingerprint:
     env_map = os.environ if env is None else env
     runner = command_runner or _default_command_runner
@@ -147,16 +159,28 @@ def build_version_fingerprint(
         values["docker_compose"] = stdout
     else:
         values["docker_compose"] = None
-        warnings.append({"component": "docker_compose", "message": stderr or "unavailable"})
+        warnings.append(
+            {"component": "docker_compose", "message": stderr or "unavailable"}
+        )
 
-    ollama_base = env_map.get("OLLAMA_BASE_URL", env_map.get("OLLAMA_API_BASE", "http://127.0.0.1:11434")).rstrip("/")
+    ollama_base = env_map.get(
+        "OLLAMA_BASE_URL", env_map.get("OLLAMA_API_BASE", "http://127.0.0.1:11434")
+    ).rstrip("/")
     qdrant_base = env_map.get("QDRANT_API_BASE", "http://127.0.0.1:6333").rstrip("/")
     litellm_base = env_map.get("LITELLM_BASE_URL", "http://127.0.0.1:4000").rstrip("/")
 
-    values["ollama"] = _safe_http_probe("ollama", f"{ollama_base}/api/version", getter, warnings)
-    values["qdrant_ready"] = _safe_http_probe("qdrant_ready", f"{qdrant_base}/readyz", getter, warnings)
-    values["qdrant_collections"] = _safe_http_probe("qdrant_collections", f"{qdrant_base}/collections", getter, warnings)
-    values["litellm_readiness"] = _safe_http_probe("litellm_readiness", f"{litellm_base}/health/readiness", getter, warnings)
+    values["ollama"] = _safe_http_probe(
+        "ollama", f"{ollama_base}/api/version", getter, warnings
+    )
+    values["qdrant_ready"] = _safe_http_probe(
+        "qdrant_ready", f"{qdrant_base}/readyz", getter, warnings
+    )
+    values["qdrant_collections"] = _safe_http_probe(
+        "qdrant_collections", f"{qdrant_base}/collections", getter, warnings
+    )
+    values["litellm_readiness"] = _safe_http_probe(
+        "litellm_readiness", f"{litellm_base}/health/readiness", getter, warnings
+    )
 
     dsn = env_map.get("TEST_POSTGRES_DSN") or env_map.get("QUIMERA_POSTGRES_DSN")
     if dsn:

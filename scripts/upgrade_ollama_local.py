@@ -56,7 +56,10 @@ def build_upgrade_plan(
     execute: bool,
     target_version: str,
     allow_prerelease: bool,
-    known_releases: Sequence[str] = (OLLAMA_LATEST_STABLE_KNOWN, *tuple(sorted(OLLAMA_KNOWN_PRERELEASES))),
+    known_releases: Sequence[str] = (
+        OLLAMA_LATEST_STABLE_KNOWN,
+        *tuple(sorted(OLLAMA_KNOWN_PRERELEASES)),
+    ),
 ) -> OllamaUpgradePlan:
     """Build a D2P upgrade plan without mutating the local machine."""
     selected = select_latest_stable(known_releases, allow_prerelease=allow_prerelease)
@@ -66,7 +69,9 @@ def build_upgrade_plan(
         "Pre-release versions require --allow-prerelease.",
     ]
     if execute:
-        notes.append("Execute mode records intent only; install through Ollama app/CLI package manager.")
+        notes.append(
+            "Execute mode records intent only; install through Ollama app/CLI package manager."
+        )
     return OllamaUpgradePlan(
         schema_version="ollama-local-upgrade-plan-v1",
         dry_run=not execute,
@@ -93,14 +98,18 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.target_version in OLLAMA_KNOWN_PRERELEASES and not args.allow_prerelease:
-        sys.stderr.write("ollama upgrade refused: pre-release target requires --allow-prerelease\n")
+        sys.stderr.write(
+            "ollama upgrade refused: pre-release target requires --allow-prerelease\n"
+        )
         return 2
     plan = build_upgrade_plan(
         execute=args.execute,
         target_version=args.target_version,
         allow_prerelease=args.allow_prerelease,
     )
-    sys.stdout.write(json.dumps(plan.to_safe_dict(), indent=2, sort_keys=True, ensure_ascii=False))
+    sys.stdout.write(
+        json.dumps(plan.to_safe_dict(), indent=2, sort_keys=True, ensure_ascii=False)
+    )
     sys.stdout.write("\n")
     return 0
 

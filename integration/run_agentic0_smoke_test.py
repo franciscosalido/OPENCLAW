@@ -26,7 +26,11 @@ from integration.agentic0_contracts import (
 )
 from integration.check_integration_health import build_integration_health_report
 from integration.hybrid_fixture import hybrid_contract_summary
-from integration.report_writer import HEALTH_PATH, write_json_artifact, write_smoke_artifacts
+from integration.report_writer import (
+    HEALTH_PATH,
+    write_json_artifact,
+    write_smoke_artifacts,
+)
 from integration.safety_scan import find_forbidden_fields
 
 P95_WARNING_THRESHOLD_MS = 500.0
@@ -41,13 +45,28 @@ async def run_smoke(*, allow_degraded: bool = False) -> Agentic0SmokeResult:
     health = build_integration_health_report()
     write_json_artifact(HEALTH_PATH, health)
     if health["overall"] == "fail" and not allow_degraded:
-        result = skipped_result(config, reason="integration health failed; rerun with --allow-degraded for diagnostic smoke")
+        result = skipped_result(
+            config,
+            reason="integration health failed; rerun with --allow-degraded for diagnostic smoke",
+        )
         write_smoke_artifacts(result)
         return result
     hybrid = hybrid_contract_summary(run_id)
     tool_calls = [
-        ToolCallSummary("quimera_postgres_memory", "postgres_agent_state_get", "degraded" if health["services"].get("postgres") != "ok" else "ok", 0.0, ("schema_version", "ok", "degraded", "data")),
-        ToolCallSummary("quimera_qdrant_memory", "qdrant_scroll_safe", "ok" if hybrid["hybrid_ok"] else "fail", 0.0, ("schema_version", "ok", "data")),
+        ToolCallSummary(
+            "quimera_postgres_memory",
+            "postgres_agent_state_get",
+            "degraded" if health["services"].get("postgres") != "ok" else "ok",
+            0.0,
+            ("schema_version", "ok", "degraded", "data"),
+        ),
+        ToolCallSummary(
+            "quimera_qdrant_memory",
+            "qdrant_scroll_safe",
+            "ok" if hybrid["hybrid_ok"] else "fail",
+            0.0,
+            ("schema_version", "ok", "data"),
+        ),
     ]
     llm_ok = False
     warnings = list(health.get("warnings", []))
@@ -71,7 +90,9 @@ async def run_smoke(*, allow_degraded: bool = False) -> Agentic0SmokeResult:
         "correlation_id": correlation_id,
     }
     forbidden = find_forbidden_fields(summary_payload)
-    status: Literal["pass", "fail", "skipped"] = "pass" if llm_ok and not forbidden and hybrid["hybrid_ok"] else "fail"
+    status: Literal["pass", "fail", "skipped"] = (
+        "pass" if llm_ok and not forbidden and hybrid["hybrid_ok"] else "fail"
+    )
     if health["overall"] == "fail" and allow_degraded:
         status = "skipped"
     services = cast("dict[str, str]", health["services"])
@@ -101,9 +122,14 @@ async def run_smoke(*, allow_degraded: bool = False) -> Agentic0SmokeResult:
     return result
 
 
-def build_latency_summary(*, total_ms: float, health: dict[str, object]) -> LatencySummary:
+def build_latency_summary(
+    *, total_ms: float, health: dict[str, object]
+) -> LatencySummary:
     services = cast("dict[str, str]", health.get("services", {}))
-    live_stack = all(services.get(name) == "ok" for name in ("litellm", "ollama", "qdrant", "postgres"))
+    live_stack = all(
+        services.get(name) == "ok"
+        for name in ("litellm", "ollama", "qdrant", "postgres")
+    )
     service_latencies = cast("dict[str, float]", health.get("service_latencies_ms", {}))
     if not live_stack:
         return LatencySummary(
@@ -111,7 +137,8 @@ def build_latency_summary(*, total_ms: float, health: dict[str, object]) -> Late
             measurement_mode="degraded_no_live_stack",
             sample_count=0,
             p95_warning="not_measured_stack_unavailable",
-            mcp_ms=service_latencies.get("qdrant", 0.0) + service_latencies.get("postgres", 0.0),
+            mcp_ms=service_latencies.get("qdrant", 0.0)
+            + service_latencies.get("postgres", 0.0),
             llm_ms=service_latencies.get("litellm", 0.0),
             pg_ms=service_latencies.get("postgres", 0.0),
             retrieval_ms=service_latencies.get("qdrant", 0.0),
@@ -127,7 +154,8 @@ def build_latency_summary(*, total_ms: float, health: dict[str, object]) -> Late
         p50_ms=p50,
         p95_ms=p95,
         p95_warning=warning,
-        mcp_ms=service_latencies.get("qdrant", 0.0) + service_latencies.get("postgres", 0.0),
+        mcp_ms=service_latencies.get("qdrant", 0.0)
+        + service_latencies.get("postgres", 0.0),
         llm_ms=service_latencies.get("litellm", 0.0),
         pg_ms=service_latencies.get("postgres", 0.0),
         retrieval_ms=service_latencies.get("qdrant", 0.0),

@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import sys
 import time
 import urllib.error
@@ -137,7 +136,9 @@ def _probe_ollama(
         return None, round(latency_ms, 1), type(exc).__name__
 
 
-def _probe_tei(model: str, host: str, port: int, timeout_s: float) -> tuple[int | None, float | None, str | None]:
+def _probe_tei(
+    model: str, host: str, port: int, timeout_s: float
+) -> tuple[int | None, float | None, str | None]:
     """Probe a TEI (text-embeddings-inference) compatible endpoint."""
     url = f"http://{host}:{port}/embed"
     body = json.dumps({"inputs": [PROBE_SAMPLE_TEXT]}).encode("utf-8")
@@ -219,7 +220,9 @@ def probe_embedding_model(
     elif provider == "tei":
         dims, latency_ms, error = _probe_tei(model, clean_host, port, timeout_s)
     elif provider == "openai-compatible":
-        dims, latency_ms, error = _probe_openai_compatible(model, clean_host, port, timeout_s, openai_path)
+        dims, latency_ms, error = _probe_openai_compatible(
+            model, clean_host, port, timeout_s, openai_path
+        )
     else:
         dims, latency_ms, error = None, None, f"unknown_provider:{provider}"
 
@@ -246,22 +249,45 @@ def _build_parser() -> argparse.ArgumentParser:
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--provider", default="ollama", choices=["ollama", "tei", "openai-compatible"],
-                        help="Embedding provider type (default: ollama)")
-    parser.add_argument("--model", default="Qwen/Qwen3-Embedding-4B",
-                        help="Model name to probe (default: Qwen/Qwen3-Embedding-4B)")
-    parser.add_argument("--host", default="localhost",
-                        help="Host (must be localhost / 127.0.0.1 / ::1)")
-    parser.add_argument("--port", type=int, default=11434,
-                        help="Port (default: 11434 for Ollama)")
-    parser.add_argument("--timeout-s", type=float, default=15.0,
-                        help="Probe timeout in seconds (default: 15)")
-    parser.add_argument("--openai-path", default="/v1/embeddings",
-                        help="Path for openai-compatible provider (default: /v1/embeddings)")
-    parser.add_argument("--dimensions", type=int, default=None,
-                        help="Optional Ollama /api/embed dimensions request")
-    parser.add_argument("--keep-alive", default=None,
-                        help="Optional Ollama keep_alive value for the probe")
+    parser.add_argument(
+        "--provider",
+        default="ollama",
+        choices=["ollama", "tei", "openai-compatible"],
+        help="Embedding provider type (default: ollama)",
+    )
+    parser.add_argument(
+        "--model",
+        default="Qwen/Qwen3-Embedding-4B",
+        help="Model name to probe (default: Qwen/Qwen3-Embedding-4B)",
+    )
+    parser.add_argument(
+        "--host", default="localhost", help="Host (must be localhost / 127.0.0.1 / ::1)"
+    )
+    parser.add_argument(
+        "--port", type=int, default=11434, help="Port (default: 11434 for Ollama)"
+    )
+    parser.add_argument(
+        "--timeout-s",
+        type=float,
+        default=15.0,
+        help="Probe timeout in seconds (default: 15)",
+    )
+    parser.add_argument(
+        "--openai-path",
+        default="/v1/embeddings",
+        help="Path for openai-compatible provider (default: /v1/embeddings)",
+    )
+    parser.add_argument(
+        "--dimensions",
+        type=int,
+        default=None,
+        help="Optional Ollama /api/embed dimensions request",
+    )
+    parser.add_argument(
+        "--keep-alive",
+        default=None,
+        help="Optional Ollama keep_alive value for the probe",
+    )
     return parser
 
 
@@ -283,7 +309,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         sys.stderr.write(f"probe failed: {exc}\n")
         return 2
 
-    sys.stdout.write(json.dumps(result.to_safe_dict(), indent=2, sort_keys=True, ensure_ascii=False))
+    sys.stdout.write(
+        json.dumps(result.to_safe_dict(), indent=2, sort_keys=True, ensure_ascii=False)
+    )
     sys.stdout.write("\n")
     return 0 if result.available else 1
 

@@ -2,6 +2,13 @@
 
 Status: Draft implementation
 
+Historical SDD note: the former `otel-doctor` subcommand reference was
+superseded by the current host-only root wrapper contract
+(`./start_quimera.sh --start`, `./start_quimera.sh --status`,
+`./start_quimera.sh --stop`) and by direct OTel validation modules/tests. Do
+not use this historical file to require reintroducing removed
+`start_quimera.sh` subcommands.
+
 ## Objective
 
 Create the base OpenTelemetry layer for Quimera/OpenClaw without instrumenting

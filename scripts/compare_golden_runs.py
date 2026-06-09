@@ -290,7 +290,9 @@ def _is_gateway2_summary(summary: Mapping[str, Any]) -> bool:
 
 
 def _load_jsonl(path: Path) -> Iterable[Mapping[str, Any]]:
-    for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+    for line_number, line in enumerate(
+        path.read_text(encoding="utf-8").splitlines(), 1
+    ):
         if not line.strip():
             continue
         raw = json.loads(line)
@@ -332,7 +334,9 @@ def _validate_gateway2_summary(summary: Mapping[str, Any]) -> None:
         )
     for alias, run_types in grouped.items():
         if not isinstance(alias, str) or not alias.strip():
-            raise Gateway2GateError("summary alias keys must be strings", EXIT_SCHEMA_SANITIZATION)
+            raise Gateway2GateError(
+                "summary alias keys must be strings", EXIT_SCHEMA_SANITIZATION
+            )
         if not isinstance(run_types, Mapping) or not run_types:
             raise Gateway2GateError(
                 "summary must group metrics by alias and run_type",
@@ -357,7 +361,9 @@ def _validate_gateway2_results(
     summary: Mapping[str, Any],
 ) -> None:
     if not results:
-        raise Gateway2GateError("results artifact must not be empty", EXIT_SCHEMA_SANITIZATION)
+        raise Gateway2GateError(
+            "results artifact must not be empty", EXIT_SCHEMA_SANITIZATION
+        )
     fixture_hash = _read_nonempty_str(summary, "question_fixture_hash")
     for result in results:
         _assert_sanitized(result)
@@ -374,7 +380,9 @@ def _validate_gateway2_results(
             )
         run_type = result.get("run_type")
         if run_type not in ALLOWED_RUN_TYPES:
-            raise Gateway2GateError("result run_type missing or invalid", EXIT_SCHEMA_SANITIZATION)
+            raise Gateway2GateError(
+                "result run_type missing or invalid", EXIT_SCHEMA_SANITIZATION
+            )
         for key in (
             "question_id",
             "alias",
@@ -416,7 +424,9 @@ def _validate_optional_metrics(result: Mapping[str, Any]) -> None:
                 )
             continue
         if not isinstance(value, int | float) or isinstance(value, bool):
-            raise Gateway2GateError(f"{key} must be numeric or null", EXIT_SCHEMA_SANITIZATION)
+            raise Gateway2GateError(
+                f"{key} must be numeric or null", EXIT_SCHEMA_SANITIZATION
+            )
 
 
 def _validate_report_compatibility(
@@ -427,8 +437,12 @@ def _validate_report_compatibility(
     if baseline.summary.get("question_fixture_hash") != candidate.summary.get(
         "question_fixture_hash"
     ):
-        raise Gateway2GateError("question fixture hash mismatch", EXIT_FIXTURE_CONFIG_MISMATCH)
-    if baseline.summary.get("thresholds_version") != thresholds.get("thresholds_version"):
+        raise Gateway2GateError(
+            "question fixture hash mismatch", EXIT_FIXTURE_CONFIG_MISMATCH
+        )
+    if baseline.summary.get("thresholds_version") != thresholds.get(
+        "thresholds_version"
+    ):
         raise Gateway2GateError(
             "baseline thresholds_version differs from thresholds config",
             EXIT_FIXTURE_CONFIG_MISMATCH,
@@ -457,7 +471,9 @@ def _validate_citation_gate(
             base.get("citation_present") is True
             and candidate_result.get("citation_present") is False
         ):
-            raise Gateway2GateError("citation regression detected", EXIT_CITATION_QUALITY)
+            raise Gateway2GateError(
+                "citation regression detected", EXIT_CITATION_QUALITY
+            )
 
 
 def _validate_quality_gate(
@@ -470,7 +486,9 @@ def _validate_quality_gate(
     required = quality.get("required", False)
     minimum = quality.get("minimum_score")
     if not isinstance(required, bool):
-        raise Gateway2GateError("quality.required must be boolean", EXIT_FIXTURE_CONFIG_MISMATCH)
+        raise Gateway2GateError(
+            "quality.required must be boolean", EXIT_FIXTURE_CONFIG_MISMATCH
+        )
     if minimum is None:
         return
     if not isinstance(minimum, int | float) or isinstance(minimum, bool):
@@ -482,10 +500,14 @@ def _validate_quality_gate(
         score = result.get("quality_score")
         if score is None:
             if required:
-                raise Gateway2GateError("quality score required but missing", EXIT_CITATION_QUALITY)
+                raise Gateway2GateError(
+                    "quality score required but missing", EXIT_CITATION_QUALITY
+                )
             continue
         if not isinstance(score, int | float) or isinstance(score, bool):
-            raise Gateway2GateError("quality_score must be numeric", EXIT_SCHEMA_SANITIZATION)
+            raise Gateway2GateError(
+                "quality_score must be numeric", EXIT_SCHEMA_SANITIZATION
+            )
         if score < float(minimum):
             raise Gateway2GateError("quality gate failed", EXIT_CITATION_QUALITY)
 
@@ -495,37 +517,56 @@ def _validate_latency_gate(
     candidate: Gateway2Report,
     thresholds: Mapping[str, Any],
 ) -> list[str]:
-    lines: list[str] = ["alias | run_type | baseline_total_ms | candidate_total_ms | delta_pct"]
+    lines: list[str] = [
+        "alias | run_type | baseline_total_ms | candidate_total_ms | delta_pct"
+    ]
     baseline_means = _mean_total_by_alias_run_type(baseline.results)
     candidate_means = _mean_total_by_alias_run_type(candidate.results)
     aliases = thresholds.get("aliases")
     if not isinstance(aliases, Mapping):
-        raise Gateway2GateError("threshold aliases mapping is required", EXIT_FIXTURE_CONFIG_MISMATCH)
+        raise Gateway2GateError(
+            "threshold aliases mapping is required", EXIT_FIXTURE_CONFIG_MISMATCH
+        )
     for alias, run_type_config in aliases.items():
         if not isinstance(alias, str) or not isinstance(run_type_config, Mapping):
-            raise Gateway2GateError("threshold alias entries must be mappings", EXIT_FIXTURE_CONFIG_MISMATCH)
+            raise Gateway2GateError(
+                "threshold alias entries must be mappings", EXIT_FIXTURE_CONFIG_MISMATCH
+            )
         for run_type, config in run_type_config.items():
             if run_type not in ALLOWED_RUN_TYPES or not isinstance(config, Mapping):
-                raise Gateway2GateError("invalid threshold run_type entry", EXIT_FIXTURE_CONFIG_MISMATCH)
+                raise Gateway2GateError(
+                    "invalid threshold run_type entry", EXIT_FIXTURE_CONFIG_MISMATCH
+                )
             if config.get("fallback_contract_only") is True:
                 continue
             warning_only = bool(config.get("warning_only", False))
             threshold_pct = config.get("latency_regression_pct")
             if threshold_pct is None:
                 continue
-            if not isinstance(threshold_pct, int | float) or isinstance(threshold_pct, bool):
-                raise Gateway2GateError("latency_regression_pct must be numeric", EXIT_FIXTURE_CONFIG_MISMATCH)
+            if not isinstance(threshold_pct, int | float) or isinstance(
+                threshold_pct, bool
+            ):
+                raise Gateway2GateError(
+                    "latency_regression_pct must be numeric",
+                    EXIT_FIXTURE_CONFIG_MISMATCH,
+                )
             key = (alias, run_type)
             if key not in baseline_means or key not in candidate_means:
                 if warning_only:
                     continue
-                raise Gateway2GateError("missing latency group for threshold", EXIT_INCOMPATIBLE)
+                raise Gateway2GateError(
+                    "missing latency group for threshold", EXIT_INCOMPATIBLE
+                )
             base = baseline_means[key]
             cand = candidate_means[key]
             delta_pct = _percent_delta(base, cand)
-            lines.append(f"{alias} | {run_type} | {base:.1f} | {cand:.1f} | {delta_pct:.1f}")
+            lines.append(
+                f"{alias} | {run_type} | {base:.1f} | {cand:.1f} | {delta_pct:.1f}"
+            )
             if not warning_only and delta_pct > float(threshold_pct):
-                raise Gateway2GateError("latency regression detected", EXIT_LATENCY_REGRESSION)
+                raise Gateway2GateError(
+                    "latency regression detected", EXIT_LATENCY_REGRESSION
+                )
     return lines
 
 
@@ -583,7 +624,9 @@ def _walk_items(data: object) -> Iterable[tuple[str, object]]:
 def _read_nonempty_str(data: Mapping[str, Any], key: str) -> str:
     value = data.get(key)
     if not isinstance(value, str) or not value.strip():
-        raise Gateway2GateError(f"{key} must be a non-empty string", EXIT_SCHEMA_SANITIZATION)
+        raise Gateway2GateError(
+            f"{key} must be a non-empty string", EXIT_SCHEMA_SANITIZATION
+        )
     return value.strip()
 
 

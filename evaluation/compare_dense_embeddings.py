@@ -459,12 +459,10 @@ def summarize_profile_run(
         )
 
     expected_ids_by_query = {
-        query.query_id: frozenset(query.expected_doc_ids)
-        for query in benchmark.queries
+        query.query_id: frozenset(query.expected_doc_ids) for query in benchmark.queries
     }
     precision_recall_inputs = [
-        (row.retrieved_ids, expected_ids_by_query[row.query_id])
-        for row in ok_rows
+        (row.retrieved_ids, expected_ids_by_query[row.query_id]) for row in ok_rows
     ]
     rr_scores = [row.mrr for row in ok_rows]
     ndcg_inputs = [row.relevance_scores for row in ok_rows]
@@ -536,8 +534,7 @@ def decide_promotion(
         recall_gain >= thresholds.min_recall10_relative_gain
         and ndcg_gain >= thresholds.min_ndcg5_relative_gain
         and query_p95_multiplier <= thresholds.max_query_p95_latency_multiplier
-        and embedding_p95_multiplier
-        <= thresholds.max_embedding_p95_latency_multiplier
+        and embedding_p95_multiplier <= thresholds.max_embedding_p95_latency_multiplier
     )
     if promote:
         accepted = qwen3.profile_id

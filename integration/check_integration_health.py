@@ -19,8 +19,16 @@ HealthStatus = Literal["ok", "degraded", "fail"]
 ServiceStatus = Literal["ok", "fail", "skipped", "unknown"]
 
 EXPECTED_MCP_SERVERS = {
-    "quimera_postgres_memory": ("postgres_memory_health", "postgres_recent_turns_get", "postgres_agent_state_get"),
-    "quimera_qdrant_memory": ("qdrant_memory_health", "qdrant_collection_list", "qdrant_scroll_safe"),
+    "quimera_postgres_memory": (
+        "postgres_memory_health",
+        "postgres_recent_turns_get",
+        "postgres_agent_state_get",
+    ),
+    "quimera_qdrant_memory": (
+        "qdrant_memory_health",
+        "qdrant_collection_list",
+        "qdrant_scroll_safe",
+    ),
     "quimera_working_memory": ("working_memory_health", "working_memory_points_query"),
 }
 
@@ -47,7 +55,9 @@ def build_integration_health_report() -> dict[str, Any]:
     if any(server["status"] != "ok" for server in mcp_servers.values()):
         warnings.append("one or more MCP servers missing from LiteLLM config")
     overall: HealthStatus = "ok"
-    if any(services[name] == "fail" for name in ("litellm", "ollama", "qdrant", "postgres")):
+    if any(
+        services[name] == "fail" for name in ("litellm", "ollama", "qdrant", "postgres")
+    ):
         overall = "fail"
     elif warnings:
         overall = "degraded"
@@ -75,7 +85,11 @@ def _service_statuses(base_status: dict[str, Any]) -> dict[str, ServiceStatus]:
             raw = raw_services.get(name, {})
             raw_status = raw.get("status") if isinstance(raw, dict) else "unknown"
             status = raw_status if isinstance(raw_status, str) else "unknown"
-            result[name] = cast(ServiceStatus, status) if status in {"ok", "fail", "skipped", "unknown"} else "unknown"
+            result[name] = (
+                cast(ServiceStatus, status)
+                if status in {"ok", "fail", "skipped", "unknown"}
+                else "unknown"
+            )
     return result
 
 
@@ -97,7 +111,9 @@ def _service_latencies(base_status: dict[str, Any]) -> dict[str, float]:
 def _litellm_models() -> dict[str, Any]:
     headers = _auth_headers()
     try:
-        response = httpx.get("http://127.0.0.1:4000/v1/models", headers=headers, timeout=2.0)
+        response = httpx.get(
+            "http://127.0.0.1:4000/v1/models", headers=headers, timeout=2.0
+        )
         if response.status_code >= 400:
             return {"status": "fail", "aliases": [], "required_aliases_present": False}
         payload = response.json()
