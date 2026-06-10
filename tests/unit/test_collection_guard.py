@@ -201,6 +201,20 @@ class CollectionGuardTests(unittest.TestCase):
                 active_alias="quimera_embed",
             )
 
+    def test_rejects_zero_and_negative_active_dimensions(self) -> None:
+        for active_dimensions in (0, -1):
+            with self.subTest(active_dimensions=active_dimensions):
+                with self.assertRaises(ValueError):
+                    check_collection_metadata(
+                        _client([_point(_payload())]),
+                        "collection",
+                        active_backend="gateway_litellm_current",
+                        active_model="nomic-embed-text",
+                        active_dimensions=active_dimensions,
+                        active_contract="openai_compatible_v1_embeddings",
+                        active_alias="quimera_embed",
+                    )
+
     def test_dimensions_mismatch_always_raises(self) -> None:
         with self.assertRaises(EmbeddingDimensionMismatchError):
             _check(

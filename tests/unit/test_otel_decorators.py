@@ -249,6 +249,7 @@ async def test_traced_pg_exception_span_sanitizes_status_and_event(
         await broken()
 
     span = _only_finished_span(exporter)
+    assert len(span.events) == 1
     event = span.events[0]
     assert span.status.status_code is StatusCode.ERROR
     assert span.status.description == "failed [REDACTED]"
@@ -257,6 +258,7 @@ async def test_traced_pg_exception_span_sanitizes_status_and_event(
     assert event.attributes["exception.type"] == "RuntimeError"
     assert event.attributes["exception.message"] == "failed [REDACTED]"
     assert "secret" not in repr(span.status)
+    assert "secret" not in repr(span.events)
     assert "secret" not in repr(event.attributes)
 
 
