@@ -49,7 +49,9 @@ def test_vibe_pyright_json_warms_runtime_before_outputjson() -> None:
 def test_openclaw_sandbox_prewarms_pyright_and_uses_nodejs() -> None:
     text = DOCKERFILE.read_text(encoding="utf-8")
 
-    assert "FROM python:3.12.13-slim" in text
+    assert "ARG PYTHON_IMAGE=python:3.12-slim@sha256:" in text
+    assert "FROM ${PYTHON_IMAGE}" in text
+    assert "sys.version_info[:2] == (3, 12)" in text
     assert "FROM python:3.14" not in text
     assert "nodejs" in text
     assert "nodejs npm" not in text
