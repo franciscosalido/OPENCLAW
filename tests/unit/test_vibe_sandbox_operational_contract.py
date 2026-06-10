@@ -86,8 +86,9 @@ def test_mutmut_config_copies_context_without_symlinked_mutants_dir() -> None:
     gitignore = GITIGNORE.read_text(encoding="utf-8")
 
     assert "[tool.mutmut]" in pyproject
-    assert 'paths_to_mutate = ["backend"]' in pyproject
-    assert "mutate_only_covered_lines = true" in pyproject
+    assert 'source_paths = ["backend"]' in pyproject
+    assert "paths_to_mutate" not in pyproject
+    assert "mutate_only_covered_lines = false" in pyproject
     for required in ('"config"', '"infra"', '"integration"', '"scripts"', '"tests"'):
         assert required in pyproject
     assert ".mutmut-cache/" in gitignore

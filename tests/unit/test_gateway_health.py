@@ -160,6 +160,19 @@ class TestCheckGatewayServices(unittest.TestCase):
                 check_gateway_services()
             self.assertEqual(ctx.exception.code, 1)
 
+    def test_exits_when_ollama_returns_invalid_json(self) -> None:
+        with patch(
+            "backend.gateway.health.httpx.get",
+            return_value=httpx.Response(
+                200,
+                content=b"<html>not-json</html>",
+                request=httpx.Request("GET", OLLAMA_TAGS_URL),
+            ),
+        ):
+            with self.assertRaises(SystemExit) as ctx:
+                check_gateway_services()
+            self.assertEqual(ctx.exception.code, 1)
+
 
 class TestCheckLiteLLMGateway(unittest.TestCase):
     def test_litellm_gateway_passes_when_aliases_available(self) -> None:
@@ -227,6 +240,31 @@ class TestCheckLiteLLMGateway(unittest.TestCase):
                 clear=False,
             ),
             patch("backend.gateway.health.httpx.get", return_value=response),
+        ):
+            with self.assertRaises(SystemExit) as ctx:
+                check_litellm_gateway()
+            self.assertEqual(ctx.exception.code, 1)
+
+    def test_litellm_gateway_exits_when_models_response_is_invalid_json(
+        self,
+    ) -> None:
+        with (
+            patch.dict(
+                "os.environ",
+                {
+                    "QUIMERA_LLM_API_KEY": "dev-key",
+                    "QUIMERA_LLM_BASE_URL": "http://127.0.0.1:4000/v1",
+                },
+                clear=False,
+            ),
+            patch(
+                "backend.gateway.health.httpx.get",
+                return_value=httpx.Response(
+                    200,
+                    content=b"<html>not-json</html>",
+                    request=httpx.Request("GET", "http://127.0.0.1:4000/v1/models"),
+                ),
+            ),
         ):
             with self.assertRaises(SystemExit) as ctx:
                 check_litellm_gateway()

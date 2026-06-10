@@ -148,7 +148,11 @@ def check_litellm_gateway() -> None:
         )
         sys.exit(1)
 
-    raw: object = response.json()
+    try:
+        raw: object = response.json()
+    except ValueError:
+        print("ERROR: LiteLLM /models response was not valid JSON.")
+        sys.exit(1)
     if not isinstance(raw, dict):
         print("ERROR: LiteLLM /models response was not a JSON object.")
         sys.exit(1)
@@ -200,7 +204,15 @@ def _fetch_ollama_tags() -> dict[str, Any]:
         )
         sys.exit(1)
 
-    raw: object = response.json()
+    try:
+        raw: object = response.json()
+    except ValueError:
+        logger.error("Ollama /api/tags response was not valid JSON")
+        print(
+            "ERROR: Invalid JSON response from Ollama /api/tags.\n"
+            "  Ensure you are running a supported Ollama version."
+        )
+        sys.exit(1)
     if not isinstance(raw, dict):
         logger.error("Unexpected Ollama /api/tags response shape")
         print(

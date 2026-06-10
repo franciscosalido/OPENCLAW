@@ -177,6 +177,30 @@ class CollectionGuardTests(unittest.TestCase):
             any("collection_metadata_absent" in msg for msg in self.log_messages)
         )
 
+    def test_metadata_with_bool_dimensions_is_incomplete(self) -> None:
+        result = _check(
+            _client([_point(_payload(embedding_dimensions=True))]),
+        )
+
+        self.assertEqual(result.sample.metadata_absent_count, 1)
+        self.assertEqual(result.sample.found_dimensions, frozenset())
+        self.assertFalse(result.metadata_complete)
+        self.assertTrue(
+            any("collection_metadata_absent" in msg for msg in self.log_messages)
+        )
+
+    def test_rejects_bool_active_dimensions(self) -> None:
+        with self.assertRaises(ValueError):
+            check_collection_metadata(
+                _client([_point(_payload())]),
+                "collection",
+                active_backend="gateway_litellm_current",
+                active_model="nomic-embed-text",
+                active_dimensions=True,
+                active_contract="openai_compatible_v1_embeddings",
+                active_alias="quimera_embed",
+            )
+
     def test_dimensions_mismatch_always_raises(self) -> None:
         with self.assertRaises(EmbeddingDimensionMismatchError):
             _check(

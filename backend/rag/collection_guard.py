@@ -140,7 +140,7 @@ def check_collection_metadata(
     clean_active_model = _validate_non_empty(active_model, "active_model")
     clean_active_contract = _validate_non_empty(active_contract, "active_contract")
     clean_active_alias = _validate_non_empty(active_alias, "active_alias")
-    if active_dimensions <= 0:
+    if isinstance(active_dimensions, bool) or active_dimensions <= 0:
         raise ValueError("active_dimensions must be greater than zero")
     if sample_size <= 0:
         raise ValueError("sample_size must be greater than zero")
@@ -330,7 +330,13 @@ def _payload_from_point(point: object) -> Mapping[str, Any]:
 
 
 def _has_required_metadata(payload: Mapping[str, Any]) -> bool:
-    return all(field in payload for field in REQUIRED_EMBEDDING_METADATA_FIELDS)
+    return (
+        _is_present_string(payload.get("embedding_backend"))
+        and _is_present_string(payload.get("embedding_model"))
+        and _is_present_int(payload.get("embedding_dimensions"))
+        and _is_present_string(payload.get("embedding_contract"))
+        and _is_present_string(payload.get("embedding_alias"))
+    )
 
 
 def _matches[T](found_values: frozenset[T], active_value: T) -> bool:
@@ -347,6 +353,14 @@ def _add_int(values: set[int], value: object) -> None:
         return
     if isinstance(value, int):
         values.add(value)
+
+
+def _is_present_string(value: object) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+
+def _is_present_int(value: object) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool)
 
 
 def _required_string(data: Mapping[str, Any], key: str) -> str:

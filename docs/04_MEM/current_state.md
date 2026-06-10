@@ -4,8 +4,57 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Last updated:** 2026-06-08
-**Updated by:** Codex — Vibe Deep sandbox hardening
+**Last updated:** 2026-06-09
+**Updated by:** Codex — TDD+M mutation hardening
+
+---
+
+## codex/tdd-m-real-mutation-hardening — TDD+M Real Mutation Hardening
+
+Current branch: `codex/tdd-m-real-mutation-hardening`
+Base branch: local `main` at `901463c`.
+
+Implemented:
+
+- Added real OpenTelemetry span tests for `backend.observability.decorators`
+  using `TracerProvider`, `SimpleSpanProcessor`, and `InMemorySpanExporter`
+  instead of relying only on fake spans.
+- Hardened exception telemetry so decorators disable OpenTelemetry automatic
+  exception recording and emit a sanitized exception event controlled by
+  QUIMERA.
+- Expanded DSN redaction so PostgreSQL DSNs are fully redacted in sanitized
+  error messages.
+- Hardened `backend.rag.collection_guard` so `bool` is not accepted as an
+  embedding dimension and metadata completeness checks validate value types,
+  not only key presence.
+- Hardened gateway health checks so invalid JSON responses from Ollama or
+  LiteLLM fail with controlled `SystemExit(1)` rather than uncaught parser
+  exceptions.
+- Updated `pyproject.toml` mutation config from deprecated
+  `paths_to_mutate` to `source_paths` and kept
+  `mutate_only_covered_lines = false` as an explicit anti-Goodhart policy.
+- Excluded generated `.mutmut-cache/` and `mutants/` directories from mypy and
+  pyright so generated mutation artifacts do not poison static analysis.
+- Added `docs/testing/tdd_m_professional_methodology.md` documenting the
+  QUIMERA Red/Green/Mutate/Refactor loop, survivor triage, and reviewer output.
+
+Validation:
+
+- `uv run pytest tests/unit/test_otel_decorators.py tests/unit/test_collection_guard.py tests/unit/test_gateway_health.py tests/unit/test_otel_safety.py tests/unit/test_vibe_sandbox_operational_contract.py -q`:
+  66 passed, 2 subtests passed.
+- `uv run pytest tests/unit -q`: 1895 passed, 259 subtests passed.
+- `uvx ruff check .`: all checks passed.
+- `uvx ruff format --check .`: 417 files already formatted.
+- `uv run mypy --strict .`: success, 417 source files checked.
+- `PYRIGHT_PYTHON_FORCE_VERSION=latest .venv/bin/pyright <changed python files>`:
+  0 errors / 0 warnings.
+
+Known residual:
+
+- A host `uvx mutmut run ...` attempt used an isolated Python 3.14 environment
+  and failed during pytest collection. Use `scripts/vibe_deep_run.sh
+  'mutmut run'` for authoritative mutation runs because the official Vibe
+  sandbox is Python 3.12 and joins the QUIMERA network.
 
 ---
 
@@ -34,8 +83,8 @@ Implemented:
   of the startup path. The directory was intentionally left on disk pending
   operator smoke confirmation.
 - Added safe `mutmut` configuration in `pyproject.toml`: mutate `backend/`,
-  copy required project context, avoid symlinked `mutants/`, and focus on
-  covered lines.
+  copy required project context, avoid symlinked `mutants/`, and keep
+  `mutate_only_covered_lines = false` so no-test regions remain visible.
 - Added `.gitignore` coverage for `.mutmut-cache/` and `mutants/`.
 - Updated `uv.lock`: `urllib3 2.6.3 -> 2.7.0` and `idna 3.13 -> 3.18`.
   `PyJWT` was already locked at `2.13.0`.
