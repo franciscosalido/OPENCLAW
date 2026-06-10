@@ -60,6 +60,19 @@ def _set_attrs(span: Any, attrs: Mapping[str, object]) -> None:
         span.set_attribute(key, value)
 
 
+def _record_sanitized_exception(span: Any, exc: Exception) -> None:
+    """Record exception telemetry without leaking raw exception messages."""
+
+    span.add_event(
+        "exception",
+        {
+            "exception.type": type(exc).__name__,
+            "exception.message": sanitize_error_message(str(exc)),
+            "exception.escaped": True,
+        },
+    )
+
+
 def _result_count(result: object) -> int | None:
     if isinstance(result, Mapping):
         raw = result.get("result_count")
@@ -120,12 +133,16 @@ def _trace_async(
         tracer = get_tracer("quimera.observability")
         attrs = {**get_quimera_context_attributes(), **dict(base_attrs)}
         with tracer.start_as_current_span(
-            span_name, attributes=validate_attributes(attrs)
+            span_name,
+            attributes=validate_attributes(attrs),
+            record_exception=False,
+            set_status_on_exception=False,
         ) as span:
             start_ns = time.perf_counter_ns()
             try:
                 result = await async_fn(*args, **kwargs)
             except Exception as exc:
+                sanitized_message = sanitize_error_message(str(exc))
                 _set_attrs(
                     span,
                     {
@@ -133,10 +150,8 @@ def _trace_async(
                         ERROR_TYPE: type(exc).__name__,
                     },
                 )
-                span.record_exception(exc)
-                span.set_status(
-                    Status(StatusCode.ERROR, sanitize_error_message(str(exc)))
-                )
+                _record_sanitized_exception(span, exc)
+                span.set_status(Status(StatusCode.ERROR, sanitized_message))
                 raise
             _set_attrs(span, {latency_attr: _duration_ms(start_ns)})
             if enrich_result is not None:

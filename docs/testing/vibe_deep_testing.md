@@ -45,8 +45,9 @@ through `host.docker.internal`.
 
 ## Mutation Testing
 
-`mutmut` is configured in `pyproject.toml` to mutate `backend/` only, copy the
-required project context, and avoid symlink-based `mutants/` directories.
+`mutmut` is configured in `pyproject.toml` to mutate `backend/` only through
+the current `source_paths` key, copy the required project context, and avoid
+symlink-based `mutants/` directories.
 
 Mutation score is a quality signal, not a substitute for service-aware testing.
 For QUIMERA, isolated mutation runs underestimate the stack because many tests
@@ -55,6 +56,10 @@ depend on Postgres, Qdrant, LiteLLM or Ollama. The preferred Deep run is:
 ```bash
 scripts/vibe_deep_run.sh 'mutmut run'
 ```
+
+Keep `mutate_only_covered_lines = false`. This is intentional: the Deep report
+must continue showing code paths with no executable tests instead of reporting
+a prettier score over covered lines only.
 
 The runner must not print DSNs or secrets. If the local Postgres password file
 exists, it is read inside the container only to build `TEST_POSTGRES_DSN`.

@@ -15,7 +15,7 @@ AttributeValue: TypeAlias = str | bool | int | float
 
 _ATTR_KEY_RE = re.compile(r"^[a-z][a-z0-9_]*(\.[a-z0-9_]+)*$")
 _SECRET_VALUE_RE = re.compile(
-    r"(?i)(bearer\s+[a-z0-9._-]+|(?<![a-z0-9])sk-[a-z0-9_-]+|password=|api[_-]?key=|token=|secret=|postgres(?:ql)?://[^@\s]+@)"
+    r"(?i)(bearer\s+[a-z0-9._-]+|(?<![a-z0-9])sk-[a-z0-9_-]+|password=|api[_-]?key=|token=|secret=|postgres(?:ql)?://[^\s]+)"
 )
 
 

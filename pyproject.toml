@@ -47,6 +47,10 @@ markers = [
 [tool.mypy]
 python_version = "3.12"
 strict = true
+exclude = [
+    "^\\.mutmut-cache/",
+    "^mutants/",
+]
 ignore_missing_imports = false
 warn_return_any = true
 warn_unused_configs = true
@@ -54,6 +58,10 @@ warn_unused_configs = true
 [tool.pyright]
 pythonVersion = "3.12"
 typeCheckingMode = "basic"
+exclude = [
+    ".mutmut-cache",
+    "mutants",
+]
 venvPath = "."
 venv = ".venv"
 
@@ -70,7 +78,7 @@ ignore_names = [
 ]
 
 [tool.mutmut]
-paths_to_mutate = ["backend"]
+source_paths = ["backend"]
 also_copy = [
     "config",
     "infra",
@@ -79,7 +87,7 @@ also_copy = [
     "tests",
     "pyproject.toml",
 ]
-mutate_only_covered_lines = true
+mutate_only_covered_lines = false
 pytest_add_cli_args = ["-p", "no:randomly", "--tb=no", "-q"]
 pytest_add_cli_args_test_selection = [
     "tests/unit",
