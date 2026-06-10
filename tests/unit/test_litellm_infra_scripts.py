@@ -165,6 +165,13 @@ class LiteLLMInfraScriptTests(unittest.TestCase):
         self.assertIn("!=1.82.7", text)
         self.assertIn("!=1.82.8", text)
 
+    def test_start_prefers_project_venv_or_uv_not_infra_venv(self) -> None:
+        text = START_SCRIPT.read_text(encoding="utf-8")
+
+        self.assertIn("${REPO_ROOT}/.venv/bin/litellm", text)
+        self.assertIn("uv run litellm", text)
+        self.assertNotIn("${SCRIPT_DIR}/.venv/bin/litellm", text)
+
     def test_litellm_config_has_retry_and_timeout_budget(self) -> None:
         config = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
         self.assertIsInstance(config, dict)

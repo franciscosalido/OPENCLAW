@@ -128,4 +128,4 @@ def test_working_memory_checkpoint_sql_creates_vector_extension() -> None:
     text = WM_CHECKPOINT_SQL_PATH.read_text(encoding="utf-8")
 
     assert text.startswith("CREATE EXTENSION IF NOT EXISTS vector;")
-    assert "memory_vector vector(768)" in text
+    assert "memory_vector VECTOR(768)" in text

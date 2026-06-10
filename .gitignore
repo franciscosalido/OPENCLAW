@@ -66,6 +66,8 @@ logs/*.jsonl
 .runtime/
 tests/golden/reports/
 reports/
+.mutmut-cache/
+mutants/
 !tests/golden/baseline/gateway2_baseline_summary.json
 !tests/golden/baseline/gateway2_baseline_results.jsonl
 !tests/golden/baseline/gateway2_baseline_scores.jsonl

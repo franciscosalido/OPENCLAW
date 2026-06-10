@@ -5,7 +5,85 @@
 > meaningful sessions.
 
 **Last updated:** 2026-06-08
-**Updated by:** Codex — RC adversarial report contract sync
+**Updated by:** Codex — Vibe Deep sandbox hardening
+
+---
+
+## codex/vibe-deep-sandbox-hardening — Vibe Deep Sandbox and Dynamic Test Hardening
+
+Current branch: `codex/vibe-deep-sandbox-hardening`
+Base branch: local `main` after local adversarial contract merge
+(`351fe5b`).
+
+Implemented:
+
+- Standardized the official Vibe sandbox Dockerfile on Python `3.12.13-slim`
+  while keeping `/opt/openclaw-venv` as the image-owned dependency runtime.
+- Added `scripts/vibe_deep_run.sh`, which rebuilds `vibe-sandbox:py312`,
+  mounts the current checkout at `/workspace`, installs OpenClaw editable, and
+  attaches to `QUIMERA_VIBE_DOCKER_NETWORK`, `quimera_network`, or
+  `quimera-local_default` so dynamic tests can reach the live QUIMERA stack.
+- Added `scripts/quarantine_venv_to_patio.sh`, a reversible virtualenv
+  quarantine helper. It moves only `.venv` paths into
+  `/Users/fas/projetos/_patio_venvs` and never deletes them.
+- Created `/Users/fas/projetos/_patio_venvs` and moved
+  `/Users/fas/projetos/vibe_code_sandbox/.venv` to
+  `/Users/fas/projetos/_patio_venvs/vibe_code_sandbox.venv.20260609T012125Z`.
+- Updated LiteLLM host startup to prefer the project root `.venv` and then
+  `uv run litellm`; the old `infra/litellm/.venv` fallback is no longer part
+  of the startup path. The directory was intentionally left on disk pending
+  operator smoke confirmation.
+- Added safe `mutmut` configuration in `pyproject.toml`: mutate `backend/`,
+  copy required project context, avoid symlinked `mutants/`, and focus on
+  covered lines.
+- Added `.gitignore` coverage for `.mutmut-cache/` and `mutants/`.
+- Updated `uv.lock`: `urllib3 2.6.3 -> 2.7.0` and `idna 3.13 -> 3.18`.
+  `PyJWT` was already locked at `2.13.0`.
+- Cleaned SQLFluff findings in `infra/postgres/sql/*.sql` while keeping
+  non-concurrent index creation explicitly documented for migration/init
+  context.
+- Added `docs/testing/vibe_deep_testing.md` documenting official sandbox,
+  dynamic stack access, mutation testing, venv patio and dependency audit
+  policy.
+- Added unit contracts for sandbox Python version, Vibe runner network/venv
+  behavior, mutmut safe copy config, venv patio behavior and dependency locks.
+
+Validation:
+
+- `uv run pytest tests/unit -q`: 1884 passed, 259 subtests passed.
+- `uvx ruff check .`: all checks passed.
+- `uvx ruff format --check .`: 417 files already formatted.
+- `uvx sqlfluff lint infra/postgres --dialect postgres`: all finished, no
+  violations.
+- `uv run mypy --strict .`: success, 417 source files checked.
+- `uv run pyright`: 0 errors / 0 warnings.
+- `uvx pip-audit --path .venv/lib/python3.12/site-packages`: no known
+  vulnerabilities found; only local `openclaw` is skipped as non-PyPI.
+- `docker build -f Dockerfile.openclaw-sandbox -t vibe-sandbox:py312 .`:
+  passed; image contains Python 3.12.13, PyJWT 2.13.0, urllib3 2.7.0,
+  idna 3.18 and qdrant-client 1.18.0.
+- `QUIMERA_VIBE_BUILD_IMAGE=0 scripts/vibe_deep_run.sh 'scripts/vibe_sandbox_bootstrap.sh /workspace && python -m pytest tests/integration/test_agentic0_e2e.py tests/e2e/test_agent0_e2e.py -q'`:
+  passed with 1 passed / 2 skipped. The skips are due to live Agent0 gateway
+  preconditions, not sandbox Python/venv/network failure.
+- `./run_smoke.sh --quick --json --allow-degraded`: completed with services
+  online but returned degraded due to existing latency baseline warning and
+  LiteLLM model introspection warning.
+
+Known residual:
+
+- Full `mutmut run` was not re-executed in this Codex turn because the previous
+  Deep run took about 75 minutes. The runner and config now support a dynamic
+  networked rerun without symlinked `mutants/`.
+- Direct `python -m infra.litellm.smoke_test` reported readiness/liveliness,
+  Ollama and Qdrant OK but `/v1/models` false when no LiteLLM key was exported
+  in the current shell. The runner passes `QUIMERA_LLM_API_KEY` and
+  `LITELLM_MASTER_KEY` through when the operator has them exported.
+
+Scope intentionally not changed:
+
+- No `.env`, `.env.*`, secrets, real data, Postgres/Qdrant volumes or
+  `infra/litellm/.venv` directory content was read, deleted or committed.
+- Generated PR-08/PR-09 smoke artifacts were restored and kept out of the diff.
 
 ---
 

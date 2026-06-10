@@ -46,7 +46,7 @@ def test_working_memory_checkpoint_sql_contract() -> None:
     ):
         assert token in sql
     assert "CREATE TABLE IF NOT EXISTS" in sql
-    assert "UNIQUE(agent_id, session_id, topic, embedding_model, checksum)" in sql
+    assert "UNIQUE (agent_id, session_id, topic, embedding_model, checksum)" in sql
     assert "vector" in sql
     assert "prompt" not in sql.lower()
     assert "answer" not in sql.lower()
