@@ -1,0 +1,29 @@
+# Reproducible build for the `openclaw-sandbox` image used by the code-sandbox
+# MCP (Claude Desktop config: DEFAULT_IMAGE=openclaw-sandbox).
+#
+# The MCP server launches its OWN ephemeral containers from this image, so there
+# is no long-running service to keep up — this file exists to build/tag the
+# image deterministically and, optionally, to open a one-off shell that matches
+# the sandbox exactly.
+#
+# Build:   docker compose -f docker/docker-compose.sandbox.yml build
+# Shell:   docker compose -f docker/docker-compose.sandbox.yml run --rm openclaw-sandbox bash
+#
+# (Modern Compose spec: no top-level `version:` field.)
+
+services:
+  openclaw-sandbox:
+    build:
+      # Context is the repo root so COPY pyproject.toml / uv.lock resolve.
+      context: ..
+      dockerfile: Dockerfile.openclaw-sandbox
+    image: openclaw-sandbox:latest
+    # Never reach out to a registry: this image is built locally only.
+    pull_policy: never
+    environment:
+      QUIMERA_E2E: "true"
+    working_dir: /workspace
+    volumes:
+      - ..:/workspace
+    # Idle by default if started with `up`; the MCP does not use this service.
+    command: ["sleep", "infinity"]

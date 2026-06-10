@@ -1,13 +1,34 @@
-FROM python:3.12.13-slim
+# syntax=docker/dockerfile:1
 
-# Official Vibe sandbox runtime: Python 3.12, matching pyproject.toml,
-# mypy, pyright, and CI contracts. Do not retag this image as py312 if the
-# base image moves to another Python major/minor.
+# OpenClaw / QUIMERA sandbox runtime — image consumed by the code-sandbox MCP
+# (Claude Desktop config: DEFAULT_IMAGE=openclaw-sandbox). It mirrors the real
+# project environment so tests / lint / type-checks run against the SAME stack
+# as local dev and CI:
+#   - Python 3.12 (pyproject `requires-python`, mypy/pyright `python_version`)
+#   - dependencies resolved from uv.lock into /opt/openclaw-venv
+#   - PostgreSQL 18 client (pg_dump must be >= the server it dumps)
+#   - Node.js (required by Pyright) and uv
 #
-# Install uv, minimal build tools, Node.js for Pyright, and PostgreSQL 18 client tools.
-# pg_dump must be at least as new as the PostgreSQL server it dumps.
+# Base is pinned by digest for reproducible builds. `python:3.12-slim` at this
+# digest is Python 3.12.13. Bump it deliberately; the build-time guards below
+# fail the build if the base ever drifts off the 3.12 series — exactly the
+# silent Python 3.14 regression that this image previously shipped.
+ARG PYTHON_IMAGE=python:3.12-slim@sha256:46cb7cc2877e60fbd5e21a9ae6115c30ace7a077b9f8772da879e4590c18c2e3
+FROM ${PYTHON_IMAGE}
+
+# Fail fast if the base image is not Python 3.12.x.
+RUN python -c "import sys; assert sys.version_info[:2] == (3, 12), f'Expected Python 3.12, got {sys.version}'; print('Base Python OK:', sys.version.split()[0])"
+
+# System toolchain: build deps, Node.js (Pyright runtime), PostgreSQL 18 client.
+# Combine update+install, keep package list one-per-line, clean apt cache.
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends ca-certificates curl gnupg gcc nodejs python3-dev && \
+    apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        gnupg \
+        gcc \
+        nodejs \
+        python3-dev && \
     install -d /usr/share/postgresql-common/pgdg && \
     curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
       -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc && \
@@ -17,29 +38,40 @@ RUN apt-get update && \
     apt-get update && \
     apt-get install -y --no-install-recommends postgresql-client-18 && \
     rm -rf /var/lib/apt/lists/* && \
-    pip install uv --no-cache-dir
+    pip install --no-cache-dir uv
 
-# Pre-install project dependencies into /opt/openclaw-venv
-# This path is NOT under /workspace so it survives the volume mount.
+# Resolve project dependencies into a venv OUTSIDE /workspace so the runtime
+# volume mount cannot shadow it. Copy only the lockfiles first to maximize
+# layer-cache reuse: this layer is rebuilt only when deps change.
 WORKDIR /tmp/setup
 COPY pyproject.toml uv.lock ./
 
-# Minimal stub so uv sync does not complain about a missing package source
+# Minimal stub so `uv sync` does not complain about a missing package source.
 RUN mkdir -p backend && touch backend/__init__.py
 
-# Sync all deps (including dev) directly into the runtime venv and warm
-# Pyright before JSON checks. Do not move a venv after creation: console
-# scripts can keep absolute shebangs pointing at the original path.
-RUN UV_PROJECT_ENVIRONMENT=/opt/openclaw-venv uv sync --frozen && \
+# Sync all deps (including dev) into the runtime venv and warm Pyright. A
+# BuildKit cache mount keeps uv's download cache across rebuilds. Do not move a
+# venv after creation: console scripts keep absolute shebangs to this path.
+RUN --mount=type=cache,target=/root/.cache/uv \
+    UV_PROJECT_ENVIRONMENT=/opt/openclaw-venv uv sync --frozen && \
     /opt/openclaw-venv/bin/pyright --version >/dev/null && \
     rm -rf /tmp/setup
 
 ENV VIRTUAL_ENV=/opt/openclaw-venv
 ENV PATH=/usr/lib/postgresql/18/bin:/opt/openclaw-venv/bin:$PATH
-# Project source arrives via volume mount at runtime
+# Project source arrives via volume mount at runtime.
 ENV PYTHONPATH=/workspace
 # The Vibe sandbox is an integration environment. E2E tests still self-skip
 # when required services, corpora, or local gateway credentials are unavailable.
 ENV QUIMERA_E2E=true
+
+# Final guard: the assembled venv (now first on PATH) must run on Python 3.12.
+RUN python --version && \
+    python -c "import sys; assert sys.version_info[:2] == (3, 12), sys.version"
+
+LABEL org.opencontainers.image.title="openclaw-sandbox" \
+      org.opencontainers.image.description="OpenClaw/QUIMERA sandbox runtime mirroring the project env (Python 3.12, uv.lock deps, PostgreSQL 18 client, Pyright)" \
+      org.opencontainers.image.source="https://github.com/franciscosalido/OPENCLAW" \
+      org.opencontainers.image.base.name="python:3.12-slim"
 
 WORKDIR /workspace

@@ -4,8 +4,60 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Last updated:** 2026-06-09
-**Updated by:** Codex — TDD+M mutation hardening
+**Last updated:** 2026-06-10
+**Updated by:** Codex — code-sandbox-mcp Python 3.12 local hardening
+
+---
+
+## codex/code-sandbox-mcp-python312 — code-sandbox-mcp Python 3.12 Runtime
+
+Current branch: `codex/code-sandbox-mcp-python312`
+Base branch: local `main` at `4a8141f`.
+
+Implemented:
+
+- Accepted `openclaw-sandbox:latest` as the local truth for the
+  code-sandbox-mcp runtime used by Claude Desktop.
+- Hardened `Dockerfile.openclaw-sandbox` so the sandbox image is pinned to
+  `python:3.12-slim` by digest and fails the build if Python drifts off the
+  3.12 series.
+- Kept project dependencies resolved from `uv.lock` into `/opt/openclaw-venv`,
+  outside `/workspace`, so the runtime survives repository volume mounts.
+- Kept PostgreSQL 18 client tools, Node.js/Pyright, `QUIMERA_E2E=true`, and
+  `PYTHONPATH=/workspace` in the sandbox runtime.
+- Added `docker/docker-compose.sandbox.yml` as the reproducible local build
+  recipe for `openclaw-sandbox:latest`.
+- Added `docs/04_MEM/CODE_SANDBOX_MCP_RUNBOOK.md` documenting the
+  code-sandbox-mcp `-no-update` fix, the stale Python 3.14 regression, and
+  post-build verification commands.
+- Removed Claude's stray `test_demo.py` scratch file from the local PR scope.
+
+Validation:
+
+- `docker compose -f docker/docker-compose.sandbox.yml config`: passed.
+- `docker compose -f docker/docker-compose.sandbox.yml build`: passed,
+  produced `openclaw-sandbox:latest`.
+- `docker run --rm openclaw-sandbox:latest python --version`:
+  `Python 3.12.13`.
+- `docker run --rm openclaw-sandbox:latest pg_dump --version`:
+  `pg_dump (PostgreSQL) 18.4`.
+- `docker run --rm openclaw-sandbox:latest node --version`: `v20.19.2`.
+- `docker run --rm openclaw-sandbox:latest pyright --version`: `pyright
+  1.1.409` with only the expected upstream notice that 1.1.410 exists.
+- `docker run --rm -v "$PWD:/workspace" openclaw-sandbox:latest python -c
+  "import backend; print(backend.__file__)"`: `/workspace/backend/__init__.py`.
+- `uv run pytest tests/unit/test_vibe_sandbox_operational_contract.py
+  tests/unit/test_pr09_backup_scripts_static.py -q`: 11 passed.
+- `uvx ruff check tests/unit/test_vibe_sandbox_operational_contract.py`:
+  passed.
+- `uvx ruff format --check tests/unit/test_vibe_sandbox_operational_contract.py`:
+  passed.
+- `git diff --check`: clean.
+
+Known residual:
+
+- Per ADR-011, this local merge is not official integration. GitHub remains the
+  source of truth after PR, CI, review, and GitHub merge.
 
 ---
 
