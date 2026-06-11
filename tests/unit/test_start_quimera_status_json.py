@@ -13,8 +13,10 @@ from scripts import quimera_status
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
-def _run_status_helper(command: str) -> subprocess.CompletedProcess[str]:
-    env = {**os.environ, "PYTHONPATH": str(REPO_ROOT)}
+def _run_status_helper(
+    command: str, *, env: dict[str, str] | None = None
+) -> subprocess.CompletedProcess[str]:
+    clean_env = {**os.environ, "PYTHONPATH": str(REPO_ROOT)} if env is None else env
     return subprocess.run(
         [
             sys.executable,
@@ -26,7 +28,7 @@ def _run_status_helper(command: str) -> subprocess.CompletedProcess[str]:
         capture_output=True,
         check=False,
         cwd=REPO_ROOT,
-        env=env,
+        env=clean_env,
     )
 
 
@@ -39,6 +41,33 @@ def test_start_quimera_status_json_is_parseable() -> None:
     assert "qdrant" in data["services"]
     assert "ollama" in data["services"]
     assert result.stdout.strip().startswith("{")
+
+
+def test_quimera_status_postgres_readiness_offline_contract() -> None:
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if key not in {"TEST_POSTGRES_DSN", "QUIMERA_POSTGRES_DSN"}
+    }
+    env["PYTHONPATH"] = str(REPO_ROOT)
+    result = _run_status_helper("status", env=env)
+
+    data = json.loads(result.stdout)
+    postgres = data["services"]["postgres"]
+    readiness = postgres["readiness"]
+
+    assert readiness["status"] == "skipped"
+    assert readiness["extensions"] == {
+        "timescaledb": "skipped",
+        "vector": "skipped",
+        "pgcrypto": "skipped",
+        "pg_trgm": "skipped",
+        "btree_gin": "skipped",
+        "pg_stat_statements": "skipped",
+    }
+    assert readiness["migration_head"] == "skipped"
+    assert readiness["write_test"] == "skipped"
+    assert readiness["readonly_role"] == "skipped"
 
 
 def test_rag01b_acceptance_json_is_parseable() -> None:

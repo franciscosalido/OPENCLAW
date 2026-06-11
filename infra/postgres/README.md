@@ -38,12 +38,35 @@ command line:
 - `pg_stat_statements.track=all`
 - `track_io_timing=on`
 
-The initdb bootstrap creates only extensions, not application tables:
+The initdb bootstrap creates only extensions and the FINLIB read-only role, not
+application tables:
 
 - `pgcrypto`
 - `timescaledb`
 - `vector`
 - `pg_stat_statements`
+- `quimera_readonly` (`NOLOGIN`) with read-only privileges on the local
+  `public` schema.
+
+`pg_stat_statements` also requires `shared_preload_libraries` in the server
+configuration; the compose command above provides it for the local stack.
+
+For already-initialized local volumes created before FL-PR01, run the read-only
+role bootstrap once with an admin connection:
+
+```bash
+docker exec -i quimera-postgres-memory \
+  psql -U quimera -d quimera < infra/postgres/initdb/002_readonly_role.sql
+```
+
+If the same existing volume was initialized before `pg_stat_statements` was
+installed in the `quimera` database, create the extension once after confirming
+the compose command includes `shared_preload_libraries=timescaledb,pg_stat_statements`:
+
+```bash
+docker exec -i quimera-postgres-memory \
+  psql -U quimera -d quimera -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;"
+```
 
 Create a local custom-format backup:
 

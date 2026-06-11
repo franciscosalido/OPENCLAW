@@ -4,8 +4,72 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Last updated:** 2026-06-10
-**Updated by:** Codex — code-sandbox-mcp Python 3.12 local hardening
+**Last updated:** 2026-06-11
+**Updated by:** Codex — FINLIB-0 FL-PR01 RC-02 hardening
+
+---
+
+## IN PROGRESS — FINLIB-0 FL-PR01 PostgreSQL Readiness
+
+Current branch: `feat/finlib-postgres-readiness`
+
+Goal:
+
+- Implement the first FINLIB gate for "PostgreSQL/TimescaleDB readiness +
+  migrations + schemas".
+
+Implemented in this branch:
+
+- Added migration `018_enable_library_extensions.sql` for `pg_trgm` and
+  `btree_gin`.
+- Added `scripts/check_postgres_readiness.py`, a JSON-only readiness gate for
+  PostgreSQL, required extensions, migration head, temp write probe and
+  read-only role presence.
+- Added `infra/postgres/initdb/002_readonly_role.sql` to provision
+  `quimera_readonly NOLOGIN` for fresh local volumes and documented the
+  one-time bootstrap for existing volumes.
+- RC-02 hardened existing-volume operations: documented one-time
+  `pg_stat_statements` extension creation, made default privileges explicit for
+  `FOR ROLE quimera`, added Bandit `nosec` annotations for intentional safe
+  exception/subprocess patterns, and improved the live readiness assertion
+  message.
+- Integrated safe Postgres readiness summary into `scripts/quimera_status.py`.
+- Added unit and live integration tests for the readiness contract.
+- Added `docs/specs/finlib-0/pr-01-postgres-readiness.md`.
+
+Gate rule:
+
+- FINLIB data agents remain blocked until the PostgreSQL/FINLIB readiness gate
+  exits `0`. The later consolidated `scripts/check_finlib_readiness.py` will
+  wrap this gate; FL-PR01 owns only the PostgreSQL readiness layer.
+
+---
+
+## PLANNING — FINLIB-0 Sprint Master Spec (no code changed)
+
+Authored by Claude (Fable) on 2026-06-10 after live repo inspection. This is
+the pre-agent phase item 1: "PostgreSQL/TimescaleDB readiness + migrations +
+schemas" for Brazilian financial asset libraries.
+
+- New spec: `docs/specs/finlib-0/SPRINT_FINLIB0_MASTER_SPEC.md`.
+- PR ladder FL-PR00..FL-PR10 (≤400 production lines each, SDD-first,
+  Red/Green/Mutate, Cowork adversarial review, GitHub-only merge per ADR-011).
+- Scope: readiness script `check_postgres_readiness.py`; migrations 018–028:
+  pg_trgm/btree_gin, ops layer (data_sources, ingestion_runs, watermarks,
+  data_quality_checks, outbox_events SKIP LOCKED), audit_agent_writes
+  (append-only), macro library (IPCA/IGP-M/Selic/CDI/PTAX USD-BRL),
+  Tesouro Direto MtM, CVM fund registry + informe diário, fixed income
+  (CDB/LCA/LCI/CRI/CRA) + debêntures, company fundamentals, continuous
+  aggregates + compression; `backend/finlib/` repositories with mandatory
+  audit append in-transaction.
+- Standing decisions to ratify in FL-PR00 (ADR-A..E): keep `public` schema
+  prefix convention (no namespaced schemas in V1); runner migrations dir is
+  the only schema source of truth vs `infra/postgres/sql`; derived indicators
+  (incl. OBV) go to `market_features`, never new tables; BRL/USD is a derived
+  view of PTAX, never stored; COE permanently out of scope.
+- Data agents (MarketLibrarySeeder, ResearchLibraryCurator, TreasuryMtM) are
+  the NEXT sprint and are gated on `check_finlib_readiness.py` exit 0.
+- No code, migration, config or runtime state was modified in this session.
 
 ---
 
