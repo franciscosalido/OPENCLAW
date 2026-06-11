@@ -37,6 +37,7 @@ def test_migration_files_exist_and_are_ordered() -> None:
         "016_create_qlib_projection_manifests",
         "017_enable_vector_extension",
         "018_enable_library_extensions",
+        "019_create_ops_sources_runs",
     ]
 
 
