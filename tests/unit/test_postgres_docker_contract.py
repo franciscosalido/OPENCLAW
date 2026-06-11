@@ -10,6 +10,7 @@ COMPOSE_PATH = Path("docker/docker-compose.postgres.yml")
 LOCAL_COMPOSE_PATH = Path("infra/docker/compose.quimera.local.yml")
 DOCKERFILE_PATH = Path("infra/postgres/Dockerfile")
 INITDB_EXTENSIONS_PATH = Path("infra/postgres/initdb/001_extensions.sql")
+INITDB_READONLY_ROLE_PATH = Path("infra/postgres/initdb/002_readonly_role.sql")
 WM_CHECKPOINT_SQL_PATH = Path("infra/postgres/sql/020_working_memory_checkpoints.sql")
 
 
@@ -122,6 +123,18 @@ def test_initdb_bootstrap_creates_required_extensions() -> None:
     assert "CREATE EXTENSION IF NOT EXISTS timescaledb;" in text
     assert "CREATE EXTENSION IF NOT EXISTS vector;" in text
     assert "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;" in text
+
+
+def test_initdb_bootstrap_creates_finlib_readonly_role() -> None:
+    text = INITDB_READONLY_ROLE_PATH.read_text(encoding="utf-8")
+
+    assert "CREATE ROLE quimera_readonly NOLOGIN;" in text
+    assert "IF NOT EXISTS" in text
+    assert "GRANT CONNECT ON DATABASE" in text
+    assert "GRANT USAGE ON SCHEMA public TO quimera_readonly;" in text
+    assert "GRANT SELECT ON ALL TABLES IN SCHEMA public TO quimera_readonly;" in text
+    assert "ALTER DEFAULT PRIVILEGES IN SCHEMA public" in text
+    assert "ALTER DEFAULT PRIVILEGES FOR ROLE quimera IN SCHEMA public" in text
 
 
 def test_working_memory_checkpoint_sql_creates_vector_extension() -> None:

@@ -1,13 +1,23 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
+import os
 import subprocess
 import time
 from datetime import UTC, datetime
 from typing import Literal
 
 import httpx
+from loguru import logger
+
+from scripts.check_postgres_readiness import (
+    REQUIRED_EXTENSIONS,
+    load_config,
+    readiness_ok,
+    run_readiness,
+)
 
 ServiceStatus = Literal["ok", "fail", "skipped", "loaded", "missing", "unknown"]
 ServiceReport = dict[str, object]
@@ -35,8 +45,11 @@ def _http_check(
 
 def _postgres_status() -> ServiceReport:
     start = time.perf_counter()
+    dsn_present = bool(
+        os.environ.get("TEST_POSTGRES_DSN") or os.environ.get("QUIMERA_POSTGRES_DSN")
+    )
     try:
-        result = subprocess.run(
+        result = subprocess.run(  # nosec B603 B607 - fixed docker probe args.
             [
                 "docker",
                 "exec",
@@ -60,23 +73,65 @@ def _postgres_status() -> ServiceReport:
         return {
             "status": "ok" if ok else "fail",
             "version": version,
-            "dsn_present": False,
+            "dsn_present": dsn_present,
             "check": "pg_isready",
+            "readiness": _postgres_readiness_summary()
+            if dsn_present
+            else _postgres_readiness_skipped(),
             "latency_ms": _latency_ms(start),
         }
     except (OSError, subprocess.TimeoutExpired):
         return {
             "status": "fail",
             "version": "unknown",
-            "dsn_present": False,
+            "dsn_present": dsn_present,
             "check": "pg_isready",
+            "readiness": _postgres_readiness_summary()
+            if dsn_present
+            else _postgres_readiness_skipped(),
             "latency_ms": _latency_ms(start),
         }
 
 
+def _postgres_readiness_skipped() -> ServiceReport:
+    return {
+        "status": "skipped",
+        "extensions": {extension: "skipped" for extension in REQUIRED_EXTENSIONS},
+        "migration_head": "skipped",
+        "write_test": "skipped",
+        "readonly_role": "skipped",
+    }
+
+
+def _postgres_readiness_summary() -> ServiceReport:
+    try:
+        asyncio.get_running_loop()
+        return _postgres_readiness_skipped()
+    except RuntimeError:
+        pass
+    try:
+        report = asyncio.run(run_readiness(load_config()))
+    except Exception as exc:
+        logger.warning(
+            "postgres_readiness_summary_failed error_type={}",
+            type(exc).__name__,
+        )
+        report = {}
+    return {
+        "status": "ok" if readiness_ok(report) else "fail",
+        "extensions": {
+            extension: report.get(extension, "fail")
+            for extension in REQUIRED_EXTENSIONS
+        },
+        "migration_head": report.get("migration_head", "fail"),
+        "write_test": report.get("write_test", "fail"),
+        "readonly_role": report.get("readonly_role", "fail"),
+    }
+
+
 def _litellm_docker_container_running() -> bool:
     try:
-        result = subprocess.run(
+        result = subprocess.run(  # nosec B603 B607 - fixed docker probe args.
             [
                 "docker",
                 "ps",
