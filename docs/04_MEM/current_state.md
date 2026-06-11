@@ -5,26 +5,29 @@
 > meaningful sessions.
 
 **Last updated:** 2026-06-11
-**Updated by:** Codex — FINLIB-0 FL-PR02 RC-01 reviewer nits
+**Updated by:** Codex — FINLIB-0 FL-PR02 whitespace integrity RC
 
 ---
 
-## IN PROGRESS — FINLIB-0 FL-PR02 RC-01 Reviewer Nits
+## IN PROGRESS — FINLIB-0 FL-PR02 Whitespace Integrity RC
 
-Current branch: `feat/finlib-ops-sources-runs-rc01`
+Current branch: `feat/finlib-ops-whitespace-rc01`
 
 Goal:
 
-- Address non-blocking reviewer nits from FL-PR02 without changing runtime
-  schema semantics.
+- Fix semantic-empty text bypasses in migration `019_create_ops_sources_runs.sql`
+  before publishing FL-PR02 remotely.
 
 Implemented in this branch:
 
-- Parametrized invalid `ops_ingestion_runs` live constraint cases with
-  descriptive pytest IDs for sharper future diagnostics.
-- Strengthened the static "no agent scope" migration guard while preserving
-  the legitimate `agent_id` column.
-- Added an explanatory SQLFluff RF04 comment for the `mode` domain column.
+- Replaced `length(btrim(...)) > 0` guards with PostgreSQL regex checks using
+  `~ '\S'` for `methodology_limitations`, `agent_id`,
+  `source_snapshot_hash` and `error_summary`.
+- Updated the `execute + completed` compound snapshot rule to require
+  `source_snapshot_hash IS NOT NULL AND source_snapshot_hash ~ '\S'`.
+- Added an operational maximum of 128 characters for `source_id`.
+- Added static and live integration coverage for tab, newline and carriage
+  return whitespace-only bypasses.
 
 ---
 

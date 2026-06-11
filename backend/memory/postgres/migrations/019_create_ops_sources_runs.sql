@@ -1,8 +1,8 @@
 CREATE TABLE IF NOT EXISTS ops_data_sources (
     source_id TEXT PRIMARY KEY
     CHECK (
-        length(btrim(source_id)) > 0
-        AND source_id ~ '^[a-z0-9_.:-]+$'
+        source_id ~ '^[a-z0-9_.:-]+$'
+        AND length(source_id) <= 128
     ),
     kind TEXT NOT NULL
     CHECK (
@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS ops_data_sources (
     base_url TEXT,
     license_note TEXT,
     methodology_limitations TEXT NOT NULL
-    CHECK (length(btrim(methodology_limitations)) > 0),
+    CHECK (methodology_limitations ~ '\S'),
     enabled BOOLEAN NOT NULL DEFAULT TRUE,
     metadata JSONB NOT NULL DEFAULT '{}'::JSONB
     CHECK (jsonb_typeof(metadata) = 'object'),
@@ -71,7 +71,7 @@ ON CONFLICT (source_id) DO UPDATE SET
 CREATE TABLE IF NOT EXISTS ops_ingestion_runs (
     run_id UUID PRIMARY KEY DEFAULT uuidv7(),
     source_id TEXT NOT NULL REFERENCES ops_data_sources (source_id),
-    agent_id TEXT NOT NULL CHECK (length(btrim(agent_id)) > 0),
+    agent_id TEXT NOT NULL CHECK (agent_id ~ '\S'),
     -- SQLFluff RF04: "mode" is a domain column name here, not a keyword alias.
     mode TEXT NOT NULL CHECK (mode IN ('dry_run', 'execute')), -- noqa: RF04
     status TEXT NOT NULL
@@ -87,10 +87,10 @@ CREATE TABLE IF NOT EXISTS ops_ingestion_runs (
     source_snapshot_hash TEXT
     CHECK (
         source_snapshot_hash IS NULL
-        OR length(btrim(source_snapshot_hash)) > 0
+        OR source_snapshot_hash ~ '\S'
     ),
     error_summary TEXT CHECK (
-        error_summary IS NULL OR length(btrim(error_summary)) > 0
+        error_summary IS NULL OR error_summary ~ '\S'
     ),
     trace_id UUID NOT NULL,
     metadata JSONB NOT NULL DEFAULT '{}'::JSONB
@@ -98,7 +98,7 @@ CREATE TABLE IF NOT EXISTS ops_ingestion_runs (
     CHECK (finished_at IS NULL OR finished_at >= started_at),
     CHECK (
         NOT (mode = 'execute' AND status = 'completed')
-        OR nullif(btrim(source_snapshot_hash), '') IS NOT NULL
+        OR (source_snapshot_hash IS NOT NULL AND source_snapshot_hash ~ '\S')
     )
 );
 

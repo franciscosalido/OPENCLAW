@@ -53,6 +53,7 @@ def test_ops_data_sources_contract() -> None:
     assert "metadata JSONB NOT NULL DEFAULT '{}'::JSONB" in sql
     assert "created_at TIMESTAMPTZ NOT NULL DEFAULT now()" in sql
     assert "source_id ~ '^[a-z0-9_.:-]+$'" in sql
+    assert "length(source_id) <= 128" in sql
     assert "jsonb_typeof(metadata) = 'object'" in lower_sql
 
 
@@ -81,7 +82,6 @@ def test_ops_ingestion_runs_contract() -> None:
 
 def test_ops_ingestion_runs_quality_constraints() -> None:
     sql = _compact_sql()
-    lower_sql = sql.lower()
 
     for counter in (
         "records_seen",
@@ -92,11 +92,27 @@ def test_ops_ingestion_runs_quality_constraints() -> None:
         assert f"{counter} INTEGER NOT NULL DEFAULT 0" in sql
         assert f"{counter} >= 0" in sql
     assert "finished_at IS NULL OR finished_at >= started_at" in sql
-    assert (
-        "source_snapshot_hash IS NULL OR length(btrim(source_snapshot_hash)) > 0" in sql
-    )
+    assert "source_snapshot_hash IS NULL OR source_snapshot_hash ~ '\\S'" in sql
     assert "NOT (mode = 'execute' AND status = 'completed')" in sql
-    assert "nullif(btrim(source_snapshot_hash), '') is not null" in lower_sql
+    assert (
+        "OR (source_snapshot_hash IS NOT NULL AND source_snapshot_hash ~ '\\S')" in sql
+    )
+
+
+def test_ops_text_constraints_use_non_whitespace_regex_not_btrim() -> None:
+    sql = _sql()
+    compact_sql = _compact_sql()
+
+    assert "length(btrim(source_id))" not in sql
+    assert "methodology_limitations ~ '\\S'" in sql
+    assert "agent_id TEXT NOT NULL CHECK (agent_id ~ '\\S')" in sql
+    assert "source_snapshot_hash IS NULL OR source_snapshot_hash ~ '\\S'" in compact_sql
+    assert "error_summary IS NULL OR error_summary ~ '\\S'" in compact_sql
+    assert "length(btrim(methodology_limitations))" not in sql
+    assert "length(btrim(agent_id))" not in sql
+    assert "length(btrim(source_snapshot_hash))" not in sql
+    assert "length(btrim(error_summary))" not in sql
+    assert "nullif(btrim(source_snapshot_hash), '')" not in sql
 
 
 def test_ops_ingestion_runs_indexes_are_focused() -> None:

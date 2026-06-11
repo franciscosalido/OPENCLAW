@@ -26,8 +26,10 @@ tabelas `ops_data_sources` e `ops_ingestion_runs`.
 - `metadata JSONB NOT NULL DEFAULT '{}'::jsonb`
 - `created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`
 
-`source_id` é slug-like e aceita minúsculas, números, `_`, `-`, `.`, `:`. A
-limitação metodológica é dado obrigatório para evitar conhecimento tribal.
+`source_id` é slug-like, aceita minúsculas, números, `_`, `-`, `.`, `:` e tem
+limite operacional de 128 caracteres. A limitação metodológica é dado
+obrigatório para evitar conhecimento tribal e precisa conter pelo menos um
+caractere não-whitespace.
 
 ### `ops_ingestion_runs`
 
@@ -46,7 +48,12 @@ limitação metodológica é dado obrigatório para evitar conhecimento tribal.
 - `metadata JSONB NOT NULL DEFAULT '{}'::jsonb`
 
 Para `mode='execute' AND status='completed'`, `source_snapshot_hash` é
-obrigatório e não pode ser vazio. `dry_run` pode existir sem snapshot hash.
+obrigatório e precisa conter pelo menos um caractere não-whitespace. `dry_run`
+pode existir sem snapshot hash.
+
+Campos textuais semanticamente obrigatórios usam regex PostgreSQL `~ '\S'` em
+vez de `btrim()` para rejeitar valores compostos apenas por espaço, tab,
+newline ou carriage return.
 
 ## Seed B3
 

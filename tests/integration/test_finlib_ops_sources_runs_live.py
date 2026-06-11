@@ -82,6 +82,27 @@ INVALID_INGESTION_RUN_STATEMENTS = (
     pytest.param(
         """
         INSERT INTO ops_ingestion_runs(source_id, agent_id, mode, status, trace_id)
+        VALUES('b3_cotacoes_historicas', E'\\t', 'dry_run', 'created', uuidv7())
+        """,
+        id="tab-agent-id",
+    ),
+    pytest.param(
+        """
+        INSERT INTO ops_ingestion_runs(source_id, agent_id, mode, status, trace_id)
+        VALUES('b3_cotacoes_historicas', E'\\n', 'dry_run', 'created', uuidv7())
+        """,
+        id="newline-agent-id",
+    ),
+    pytest.param(
+        """
+        INSERT INTO ops_ingestion_runs(source_id, agent_id, mode, status, trace_id)
+        VALUES('b3_cotacoes_historicas', E'\\r', 'dry_run', 'created', uuidv7())
+        """,
+        id="carriage-return-agent-id",
+    ),
+    pytest.param(
+        """
+        INSERT INTO ops_ingestion_runs(source_id, agent_id, mode, status, trace_id)
         VALUES('b3_cotacoes_historicas', 'agent', 'dry_run', 'created', NULL)
         """,
         id="null-trace-id",
@@ -94,6 +115,69 @@ INVALID_INGESTION_RUN_STATEMENTS = (
         VALUES('b3_cotacoes_historicas', 'agent', 'dry_run', 'created', uuidv7(), '[]'::jsonb)
         """,
         id="metadata-array",
+    ),
+    pytest.param(
+        """
+        INSERT INTO ops_ingestion_runs(
+            source_id, agent_id, mode, status, source_snapshot_hash, trace_id
+        )
+        VALUES('b3_cotacoes_historicas', 'agent', 'execute', 'completed', E'\\t', uuidv7())
+        """,
+        id="execute-completed-tab-snapshot",
+    ),
+    pytest.param(
+        """
+        INSERT INTO ops_ingestion_runs(
+            source_id, agent_id, mode, status, source_snapshot_hash, trace_id
+        )
+        VALUES('b3_cotacoes_historicas', 'agent', 'execute', 'completed', E'\\n', uuidv7())
+        """,
+        id="execute-completed-newline-snapshot",
+    ),
+    pytest.param(
+        """
+        INSERT INTO ops_ingestion_runs(
+            source_id, agent_id, mode, status, source_snapshot_hash, trace_id
+        )
+        VALUES('b3_cotacoes_historicas', 'agent', 'execute', 'completed', E'\\r', uuidv7())
+        """,
+        id="execute-completed-carriage-return-snapshot",
+    ),
+    pytest.param(
+        """
+        INSERT INTO ops_ingestion_runs(
+            source_id, agent_id, mode, status, source_snapshot_hash, trace_id
+        )
+        VALUES('b3_cotacoes_historicas', 'agent', 'dry_run', 'created', E'\\t', uuidv7())
+        """,
+        id="dry-run-tab-snapshot",
+    ),
+    pytest.param(
+        """
+        INSERT INTO ops_ingestion_runs(
+            source_id, agent_id, mode, status, trace_id, error_summary
+        )
+        VALUES('b3_cotacoes_historicas', 'agent', 'dry_run', 'failed', uuidv7(), E'\\t')
+        """,
+        id="tab-error-summary",
+    ),
+    pytest.param(
+        """
+        INSERT INTO ops_ingestion_runs(
+            source_id, agent_id, mode, status, trace_id, error_summary
+        )
+        VALUES('b3_cotacoes_historicas', 'agent', 'dry_run', 'failed', uuidv7(), E'\\n')
+        """,
+        id="newline-error-summary",
+    ),
+    pytest.param(
+        """
+        INSERT INTO ops_ingestion_runs(
+            source_id, agent_id, mode, status, trace_id, error_summary
+        )
+        VALUES('b3_cotacoes_historicas', 'agent', 'dry_run', 'failed', uuidv7(), E'\\r')
+        """,
+        id="carriage-return-error-summary",
     ),
 )
 
@@ -237,6 +321,44 @@ async def test_finlib_ops_sources_constraints_are_enforced(
             )
             VALUES('array_metadata', 'exchange', 'valid limitation', '[]'::jsonb)
             """
+        )
+    with pytest.raises(Exception):
+        await postgres_client.pool.execute(
+            """
+            INSERT INTO ops_data_sources(source_id, kind, methodology_limitations)
+            VALUES($1, 'exchange', 'valid limitation')
+            """,
+            "a" * 129,
+        )
+
+
+@pytest.mark.parametrize(
+    ("source_id", "methodology_limitations"),
+    (
+        pytest.param("tab_limit", "\t", id="tab-methodology-limitations"),
+        pytest.param("newline_limit", "\n", id="newline-methodology-limitations"),
+        pytest.param(
+            "carriage_return_limit",
+            "\r",
+            id="carriage-return-methodology-limitations",
+        ),
+    ),
+)
+async def test_finlib_ops_sources_reject_whitespace_only_methodology_limitations(
+    postgres_client: PostgresClient,
+    source_id: str,
+    methodology_limitations: str,
+) -> None:
+    await _migrate(postgres_client)
+
+    with pytest.raises(Exception):
+        await postgres_client.pool.execute(
+            """
+            INSERT INTO ops_data_sources(source_id, kind, methodology_limitations)
+            VALUES($1, 'exchange', $2)
+            """,
+            source_id,
+            methodology_limitations,
         )
 
 
