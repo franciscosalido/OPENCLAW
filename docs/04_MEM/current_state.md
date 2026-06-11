@@ -5,7 +5,37 @@
 > meaningful sessions.
 
 **Last updated:** 2026-06-11
-**Updated by:** Codex — FINLIB-0 FL-PR01 RC-02 hardening
+**Updated by:** Codex — FINLIB-0 FL-PR02 ops sources/runs
+
+---
+
+## IN PROGRESS — FINLIB-0 FL-PR02 Ops Sources and Runs
+
+Current branch: `feat/finlib-ops-sources-runs`
+
+Goal:
+
+- Add the first FINLIB operational tables for financial source registry and
+  ingestion run bookkeeping, without agents, repositories, watermarks, data
+  quality, outbox or audit tables.
+
+Implemented in this branch:
+
+- Added migration `019_create_ops_sources_runs.sql`.
+- Added `ops_data_sources` with required methodology limitations, JSONB object
+  metadata constraint and B3 historical quotes seed.
+- Added `ops_ingestion_runs` with `uuidv7()` run IDs, source FK, explicit
+  `dry_run`/`execute` modes, explicit statuses, non-negative counters,
+  mandatory trace id and completed execute snapshot-hash rule.
+- Added focused indexes on `(source_id, started_at DESC)`, `trace_id`, and
+  `(status, started_at DESC)`.
+- Added unit schema contract tests and isolated live integration tests.
+- Added `docs/specs/finlib-0/pr-02-ops-sources-runs.md`.
+
+Out of scope by design:
+
+- No `ops_ingestion_watermarks`, `ops_data_quality_checks`,
+  `ops_outbox_events`, `audit_agent_writes`, repositories or data agents.
 
 ---
 
