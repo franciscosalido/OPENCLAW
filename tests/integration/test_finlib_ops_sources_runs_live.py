@@ -13,6 +13,90 @@ from tests.integration.postgres_isolated_db import isolated_postgres_client
 
 pytestmark = pytest.mark.integration
 
+INVALID_INGESTION_RUN_STATEMENTS = (
+    pytest.param(
+        """
+        INSERT INTO ops_ingestion_runs(source_id, agent_id, mode, status, trace_id)
+        VALUES('missing_source', 'agent', 'dry_run', 'created', uuidv7())
+        """,
+        id="missing-source-fk",
+    ),
+    pytest.param(
+        """
+        INSERT INTO ops_ingestion_runs(source_id, agent_id, mode, status, trace_id)
+        VALUES('b3_cotacoes_historicas', 'agent', 'invalid', 'created', uuidv7())
+        """,
+        id="invalid-mode",
+    ),
+    pytest.param(
+        """
+        INSERT INTO ops_ingestion_runs(source_id, agent_id, mode, status, trace_id)
+        VALUES('b3_cotacoes_historicas', 'agent', 'dry_run', 'invalid', uuidv7())
+        """,
+        id="invalid-status",
+    ),
+    pytest.param(
+        """
+        INSERT INTO ops_ingestion_runs(
+            source_id, agent_id, mode, status, records_seen, trace_id
+        )
+        VALUES('b3_cotacoes_historicas', 'agent', 'dry_run', 'created', -1, uuidv7())
+        """,
+        id="negative-records-seen",
+    ),
+    pytest.param(
+        """
+        INSERT INTO ops_ingestion_runs(
+            source_id, agent_id, mode, status, started_at, finished_at, trace_id
+        )
+        VALUES(
+            'b3_cotacoes_historicas', 'agent', 'dry_run', 'completed',
+            '2026-01-02'::timestamptz, '2026-01-01'::timestamptz, uuidv7()
+        )
+        """,
+        id="finished-before-started",
+    ),
+    pytest.param(
+        """
+        INSERT INTO ops_ingestion_runs(source_id, agent_id, mode, status, trace_id)
+        VALUES('b3_cotacoes_historicas', 'agent', 'execute', 'completed', uuidv7())
+        """,
+        id="execute-completed-missing-snapshot",
+    ),
+    pytest.param(
+        """
+        INSERT INTO ops_ingestion_runs(
+            source_id, agent_id, mode, status, source_snapshot_hash, trace_id
+        )
+        VALUES('b3_cotacoes_historicas', 'agent', 'execute', 'completed', ' ', uuidv7())
+        """,
+        id="execute-completed-blank-snapshot",
+    ),
+    pytest.param(
+        """
+        INSERT INTO ops_ingestion_runs(source_id, agent_id, mode, status, trace_id)
+        VALUES('b3_cotacoes_historicas', '   ', 'dry_run', 'created', uuidv7())
+        """,
+        id="blank-agent-id",
+    ),
+    pytest.param(
+        """
+        INSERT INTO ops_ingestion_runs(source_id, agent_id, mode, status, trace_id)
+        VALUES('b3_cotacoes_historicas', 'agent', 'dry_run', 'created', NULL)
+        """,
+        id="null-trace-id",
+    ),
+    pytest.param(
+        """
+        INSERT INTO ops_ingestion_runs(
+            source_id, agent_id, mode, status, trace_id, metadata
+        )
+        VALUES('b3_cotacoes_historicas', 'agent', 'dry_run', 'created', uuidv7(), '[]'::jsonb)
+        """,
+        id="metadata-array",
+    ),
+)
+
 
 def _test_dsn() -> str | None:
     return os.environ.get("TEST_POSTGRES_DSN") or os.environ.get("QUIMERA_POSTGRES_DSN")
@@ -156,64 +240,12 @@ async def test_finlib_ops_sources_constraints_are_enforced(
         )
 
 
+@pytest.mark.parametrize("statement", INVALID_INGESTION_RUN_STATEMENTS)
 async def test_finlib_ops_ingestion_run_constraints_are_enforced(
     postgres_client: PostgresClient,
+    statement: str,
 ) -> None:
     await _migrate(postgres_client)
 
-    invalid_statements = (
-        """
-        INSERT INTO ops_ingestion_runs(source_id, agent_id, mode, status, trace_id)
-        VALUES('missing_source', 'agent', 'dry_run', 'created', uuidv7())
-        """,
-        """
-        INSERT INTO ops_ingestion_runs(source_id, agent_id, mode, status, trace_id)
-        VALUES('b3_cotacoes_historicas', 'agent', 'invalid', 'created', uuidv7())
-        """,
-        """
-        INSERT INTO ops_ingestion_runs(source_id, agent_id, mode, status, trace_id)
-        VALUES('b3_cotacoes_historicas', 'agent', 'dry_run', 'invalid', uuidv7())
-        """,
-        """
-        INSERT INTO ops_ingestion_runs(
-            source_id, agent_id, mode, status, records_seen, trace_id
-        )
-        VALUES('b3_cotacoes_historicas', 'agent', 'dry_run', 'created', -1, uuidv7())
-        """,
-        """
-        INSERT INTO ops_ingestion_runs(
-            source_id, agent_id, mode, status, started_at, finished_at, trace_id
-        )
-        VALUES(
-            'b3_cotacoes_historicas', 'agent', 'dry_run', 'completed',
-            '2026-01-02'::timestamptz, '2026-01-01'::timestamptz, uuidv7()
-        )
-        """,
-        """
-        INSERT INTO ops_ingestion_runs(source_id, agent_id, mode, status, trace_id)
-        VALUES('b3_cotacoes_historicas', 'agent', 'execute', 'completed', uuidv7())
-        """,
-        """
-        INSERT INTO ops_ingestion_runs(
-            source_id, agent_id, mode, status, source_snapshot_hash, trace_id
-        )
-        VALUES('b3_cotacoes_historicas', 'agent', 'execute', 'completed', ' ', uuidv7())
-        """,
-        """
-        INSERT INTO ops_ingestion_runs(source_id, agent_id, mode, status, trace_id)
-        VALUES('b3_cotacoes_historicas', '   ', 'dry_run', 'created', uuidv7())
-        """,
-        """
-        INSERT INTO ops_ingestion_runs(source_id, agent_id, mode, status, trace_id)
-        VALUES('b3_cotacoes_historicas', 'agent', 'dry_run', 'created', NULL)
-        """,
-        """
-        INSERT INTO ops_ingestion_runs(
-            source_id, agent_id, mode, status, trace_id, metadata
-        )
-        VALUES('b3_cotacoes_historicas', 'agent', 'dry_run', 'created', uuidv7(), '[]'::jsonb)
-        """,
-    )
-    for statement in invalid_statements:
-        with pytest.raises(Exception):
-            await postgres_client.pool.execute(statement)
+    with pytest.raises(Exception):
+        await postgres_client.pool.execute(statement)

@@ -5,7 +5,26 @@
 > meaningful sessions.
 
 **Last updated:** 2026-06-11
-**Updated by:** Codex — FINLIB-0 FL-PR02 ops sources/runs
+**Updated by:** Codex — FINLIB-0 FL-PR02 RC-01 reviewer nits
+
+---
+
+## IN PROGRESS — FINLIB-0 FL-PR02 RC-01 Reviewer Nits
+
+Current branch: `feat/finlib-ops-sources-runs-rc01`
+
+Goal:
+
+- Address non-blocking reviewer nits from FL-PR02 without changing runtime
+  schema semantics.
+
+Implemented in this branch:
+
+- Parametrized invalid `ops_ingestion_runs` live constraint cases with
+  descriptive pytest IDs for sharper future diagnostics.
+- Strengthened the static "no agent scope" migration guard while preserving
+  the legitimate `agent_id` column.
+- Added an explanatory SQLFluff RF04 comment for the `mode` domain column.
 
 ---
 
