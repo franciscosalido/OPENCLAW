@@ -72,6 +72,7 @@ CREATE TABLE IF NOT EXISTS ops_ingestion_runs (
     run_id UUID PRIMARY KEY DEFAULT uuidv7(),
     source_id TEXT NOT NULL REFERENCES ops_data_sources (source_id),
     agent_id TEXT NOT NULL CHECK (length(btrim(agent_id)) > 0),
+    -- SQLFluff RF04: "mode" is a domain column name here, not a keyword alias.
     mode TEXT NOT NULL CHECK (mode IN ('dry_run', 'execute')), -- noqa: RF04
     status TEXT NOT NULL
     CHECK (

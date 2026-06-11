@@ -28,6 +28,7 @@ def test_migration_is_non_destructive_and_stays_in_public_prefix_convention() ->
     assert "create table if not exists ops_data_quality_checks" not in sql
     assert "create table if not exists ops_outbox_events" not in sql
     assert "create table if not exists audit_agent_writes" not in sql
+    assert "agent" not in sql.replace("agent_id", "")
     assert "agent" not in "".join(
         line for line in sql.splitlines() if line.startswith("create table")
     )
