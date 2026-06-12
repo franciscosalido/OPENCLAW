@@ -80,6 +80,12 @@ def test_watermark_direct_update_regression_guard_exists() -> None:
     assert "OLD.watermark_ts IS NOT NULL AND NEW.watermark_ts IS NULL" in sql
 
 
+def test_watermark_value_is_documented_as_non_canonical() -> None:
+    sql = _sql()
+
+    assert "watermark_ts is the monotonic key" in sql
+
+
 def test_data_quality_checks_contract() -> None:
     sql = _compact_sql()
 
@@ -123,3 +129,15 @@ def test_outbox_partial_index_and_poll_contract() -> None:
     assert "FOR UPDATE SKIP LOCKED" in sql
     assert "next_attempt_at <= now()" in sql
     assert "ORDER BY created_at" in sql
+
+
+def test_transactional_index_noqa_has_explanatory_comment() -> None:
+    sql = _sql()
+
+    assert (
+        sql.count(
+            "CONCURRENTLY is prohibited inside the transactional migration runner."
+        )
+        == 6
+    )
+    assert sql.count("-- noqa: PG01") == 6

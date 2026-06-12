@@ -1,6 +1,7 @@
 CREATE TABLE IF NOT EXISTS ops_ingestion_watermarks (
     source_id TEXT NOT NULL REFERENCES ops_data_sources (source_id),
     dataset TEXT NOT NULL CHECK (dataset ~ '\S'),
+    -- Textual label for observability only; watermark_ts is the monotonic key.
     watermark_value TEXT NOT NULL CHECK (watermark_value ~ '\S'),
     watermark_ts TIMESTAMPTZ,
     source_snapshot_hash TEXT CHECK (
@@ -13,6 +14,8 @@ CREATE TABLE IF NOT EXISTS ops_ingestion_watermarks (
     PRIMARY KEY (source_id, dataset)
 );
 
+-- PostgreSQL supports CREATE OR REPLACE for trigger functions/triggers; this
+-- keeps the migration idempotent while preserving transactional execution.
 CREATE OR REPLACE FUNCTION prevent_ops_watermark_regression()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -56,10 +59,13 @@ CREATE TABLE IF NOT EXISTS ops_data_quality_checks (
     CHECK (jsonb_typeof(metadata) = 'object')
 );
 
+-- CONCURRENTLY is prohibited inside the transactional migration runner.
 CREATE INDEX IF NOT EXISTS idx_ops_data_quality_checks_run_id -- noqa: PG01
 ON ops_data_quality_checks (run_id);
+-- CONCURRENTLY is prohibited inside the transactional migration runner.
 CREATE INDEX IF NOT EXISTS idx_ops_data_quality_checks_severity_passed -- noqa: PG01,LT05
 ON ops_data_quality_checks (severity, passed);
+-- CONCURRENTLY is prohibited inside the transactional migration runner.
 CREATE INDEX IF NOT EXISTS idx_ops_data_quality_checks_created_at -- noqa: PG01
 ON ops_data_quality_checks (created_at DESC);
 
@@ -91,11 +97,14 @@ CREATE TABLE IF NOT EXISTS ops_outbox_events (
     )
 );
 
+-- CONCURRENTLY is prohibited inside the transactional migration runner.
 CREATE INDEX IF NOT EXISTS idx_ops_outbox_pending -- noqa: PG01
 ON ops_outbox_events (next_attempt_at, created_at)
 WHERE status = 'pending';
+-- CONCURRENTLY is prohibited inside the transactional migration runner.
 CREATE INDEX IF NOT EXISTS idx_ops_outbox_events_run_id -- noqa: PG01
 ON ops_outbox_events (run_id);
+-- CONCURRENTLY is prohibited inside the transactional migration runner.
 CREATE INDEX IF NOT EXISTS idx_ops_outbox_events_status_created_at -- noqa: PG01,LT05
 ON ops_outbox_events (status, created_at DESC);
 

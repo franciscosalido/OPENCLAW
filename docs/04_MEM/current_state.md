@@ -5,7 +5,29 @@
 > meaningful sessions.
 
 **Last updated:** 2026-06-11
-**Updated by:** Codex — FINLIB-0 FL-PR03 + Qdrant warning hardening
+**Updated by:** Codex — FINLIB-0 FL-PR03 RC-01
+
+---
+
+## IN PROGRESS — FINLIB-0 FL-PR03 RC-01 Review Hardening
+
+Current branch: `feat/finlib-watermarks-quality-outbox-rc01`
+
+Goal:
+
+- Close non-blocking reviewer findings for FL-PR03 without expanding scope
+  beyond watermarks, data-quality checks and outbox tables.
+
+Implemented in this branch:
+
+- Documented in DDL and spec that `watermark_ts` is the canonical monotonic
+  comparator and `watermark_value` is a descriptive label only.
+- Documented why FL-PR03 uses `CREATE OR REPLACE` for function/trigger
+  idempotency and why indexes deliberately avoid `CONCURRENTLY` under the
+  transactional migration runner.
+- Added live adversarial PostgreSQL coverage for missing
+  `aggregate_type`/`aggregate_id` in outbox events.
+- Added live adversarial PostgreSQL coverage for `attempts > max_attempts`.
 
 ---
 
