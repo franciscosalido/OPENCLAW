@@ -5,7 +5,71 @@
 > meaningful sessions.
 
 **Last updated:** 2026-06-11
-**Updated by:** Codex — Vibe pytest report/timeout plugin hardening
+**Updated by:** Codex — FINLIB-0 FL-PR03 + Qdrant warning hardening
+
+---
+
+## IN PROGRESS — Qdrant 1.18.x test warning hardening
+
+Current branch: `feat/finlib-watermarks-quality-outbox`
+
+Goal:
+
+- Keep Vibe/pytest output clean without changing the accepted Qdrant 1.18.x
+  compatibility policy.
+
+Implemented in this branch:
+
+- Accepted Cowork's root-cause finding: `qdrant-client >=1.17.1` runs
+  server-version probing in a daemon thread; in Docker, `localhost:6333` can
+  point to the container loopback, so the background probe warns even when
+  client `1.18.0` and server `1.18.2` are compatible by major/minor family.
+- Added pytest warning filtering in `pyproject.toml` and global Python warning
+  filtering in `tests/conftest.py` for only
+  `Failed to obtain server version` `UserWarning`.
+- Set `asyncio_default_fixture_loop_scope = "function"` to remove the pytest
+  asyncio deprecation warning.
+- Documented the temporary filter and removal rule in
+  `docs/testing/vibe_deep_testing.md`.
+
+Future cleanup:
+
+- When PyPI publishes `qdrant-client >=1.18.2`, run
+  `uv lock --upgrade-package qdrant-client`, remove both warning filters, and
+  rerun Vibe tests with `-W always`.
+
+---
+
+## IN PROGRESS — FINLIB-0 FL-PR03 Watermarks, Quality and Outbox
+
+Current branch: `feat/finlib-watermarks-quality-outbox`
+
+Goal:
+
+- Add operational idempotency, data-quality recording and a minimal Postgres
+  outbox for FINLIB-0 without data agents, repositories, audit tables or MCP
+  tools.
+
+Implemented in this branch:
+
+- Added migration `020_create_ops_watermarks_quality_outbox.sql`.
+- Added `ops_ingestion_watermarks` with `(source_id, dataset)` primary key,
+  JSONB object metadata, source/run FKs and direct-update trigger protection
+  against timestamp regression.
+- Added `ops_data_quality_checks` with severity limited to `info`, `warning`,
+  `error` and `critical`, JSONB object contracts and run FK.
+- Added `ops_outbox_events` with explicit status lifecycle, retry counters,
+  lock metadata constraints and partial pending poll index.
+- Documented and tested the official outbox poll contract using
+  `FOR UPDATE SKIP LOCKED`.
+- Added static schema tests and live isolated PostgreSQL tests for outbox
+  double-dispatch prevention, empty poll latency and watermark concurrency.
+
+Known workflow limitation:
+
+- Draft PR/Issue creation was not completed because `gh auth status` timed out
+  in the local keyring and local `main` is ahead of `origin/main`. Branch work
+  remains local until the GitHub base is published/ratified.
 
 ---
 

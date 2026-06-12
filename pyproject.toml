@@ -41,9 +41,17 @@ packages = ["backend"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 markers = [
     "smoke: end-to-end tests requiring Ollama + Qdrant",
     "integration: tests requiring local services such as Qdrant or PostgreSQL",
+]
+# Suprimir warning de verificação de versão do qdrant-client.
+# Contexto: qdrant-client 1.18.0 (PyPI latest) vs servidor 1.18.2 — versões compatíveis
+# (mesma série minor). O warning dispara por race condition em daemon thread (PR #1168).
+# Remover quando qdrant-client >= 1.18.2 estiver disponível no PyPI.
+filterwarnings = [
+    "ignore:Failed to obtain server version.*:UserWarning",
 ]
 
 [tool.mypy]

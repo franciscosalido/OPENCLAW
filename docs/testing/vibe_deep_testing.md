@@ -101,3 +101,40 @@ Current Deep hardening expectations:
 - urllib3 must be `>=2.7.0`.
 - Semgrep runs outside the project venv.
 - Reports and `mutants/` are generated artifacts and must remain untracked.
+
+## Qdrant Client Compatibility Warning
+
+Status: temporary compatibility filter.
+
+The Vibe sandbox currently locks `qdrant-client 1.18.0` while the local server
+target is `qdrant/qdrant:v1.18.2`. This is compatible under the QUIMERA Qdrant
+policy because client/server parity is accepted by `1.18.x` family and the
+client compatibility check compares the major/minor series.
+
+`qdrant-client >=1.17.1` moved server-version probing to a daemon thread. In a
+Docker test container, a client initialized with `localhost:6333` can probe the
+container loopback instead of the host or QUIMERA network service. That
+background probe fails and emits `UserWarning: Failed to obtain server version`
+even when the locked client and live server are compatible.
+
+The project suppresses only that known warning in two layers:
+
+- `pyproject.toml` under `tool.pytest.ini_options.filterwarnings`, for normal
+  pytest-controlled warning flow.
+- `tests/conftest.py` via `warnings.filterwarnings`, for daemon-thread warnings
+  emitted outside ordinary pytest capture.
+
+This is not a blanket Qdrant warning suppression. It targets only the server
+version probe warning. Real Qdrant test failures should still fail tests.
+
+Removal rule:
+
+1. When PyPI publishes `qdrant-client >=1.18.2`, run:
+
+   ```bash
+   uv lock --upgrade-package qdrant-client
+   ```
+
+2. Remove the Qdrant warning filters from `pyproject.toml` and
+   `tests/conftest.py`.
+3. Re-run Vibe smoke/deep tests with warnings enabled, including `-W always`.
