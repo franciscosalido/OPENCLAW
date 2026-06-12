@@ -30,3 +30,8 @@ def test_urllib3_lock_uses_patched_deep_report_version() -> None:
 
 def test_idna_lock_uses_patched_audit_version() -> None:
     assert _version_tuple(_locked_version("idna")) >= (3, 15)
+
+
+def test_vibe_pytest_plugins_are_locked_for_runner_cli_args() -> None:
+    assert _version_tuple(_locked_version("pytest-json-report")) >= (1, 5, 0)
+    assert _version_tuple(_locked_version("pytest-timeout")) >= (2, 4, 0)
