@@ -5,7 +5,70 @@
 > meaningful sessions.
 
 **Last updated:** 2026-06-11
-**Updated by:** Codex — FINLIB-0 FL-PR03 RC-01
+**Updated by:** Codex — FINLIB-0 FL-PR04 + 020 checksum correction
+
+---
+
+## IN PROGRESS — FINLIB-0 FL-PR04 Audit Agent Writes
+
+Current branch: `feat/finlib-audit-agent-writes`
+
+Goal:
+
+- Add append-only audit storage for future FINLIB data-agent/repository writes,
+  without implementing repositories, agents, MCP write tools or FL-PR05+
+  financial library tables.
+
+Implemented in this branch:
+
+- Added migration `021_create_audit_agent_writes.sql`.
+- Added exactly one table: `audit_agent_writes`.
+- Added mandatory `trace_id`, optional `run_id` FK to `ops_ingestion_runs`,
+  semantic non-whitespace guards for `agent_id`, `repository`, `target_table`
+  and `batch_hash`, safe JSONB-object `metadata`, `row_count >= 0`, and
+  operation domain `insert/update/upsert/bulk_insert/bulk_upsert`.
+- Explicitly excluded `delete` as an audit operation for this PR.
+- Added focused indexes on `trace_id`, partial `run_id`, `(agent_id,
+  created_at DESC)` and `(repository, target_table, created_at DESC)`.
+- Added `prevent_audit_agent_writes_mutation()` and
+  `trg_audit_agent_writes_append_only` to reject UPDATE/DELETE with an
+  append-only error.
+- Added `REVOKE UPDATE, DELETE ... FROM PUBLIC` as defense-in-depth and
+  documented that PostgreSQL owner capability means the trigger is the
+  authoritative guard in the current single-role setup.
+- Added SDD documentation for future repository transaction atomicity: domain
+  write and exactly one audit row per logical batch in the same transaction.
+- Added static unit tests and live isolated PostgreSQL tests for insert,
+  trigger append-only behavior, constraints, FK, metadata safety, ACL catalog
+  inspection and optional non-owner role enforcement when CREATE ROLE is
+  available.
+
+Workflow limitation:
+
+- GitHub Issue/Draft PR creation was attempted but blocked locally by GitHub
+  CLI keyring/API timeout. Branch remains local and unmerged into `main`.
+
+---
+
+## FIXED LOCALLY — FINLIB-0 Migration 020 Checksum Drift
+
+Context:
+
+- Adversarial review for FL-PR04 found a pre-existing checksum drift on
+  `020_create_ops_watermarks_quality_outbox.sql`.
+- The drift was caused by comments added after the migration had already been
+  applied to local PostgreSQL environments.
+
+Resolution:
+
+- Restored migration `020_create_ops_watermarks_quality_outbox.sql` to the
+  original applied content with SHA-256
+  `bb63d55faede65436f58e4b44c5d0ab6e5d3c352d6b150e81fcbcf03b7cbe99e`.
+- Moved the explanatory text about `CREATE OR REPLACE`, `watermark_value` and
+  non-concurrent indexes into
+  `docs/specs/finlib-0/pr-03-watermarks-quality-outbox.md`.
+- Updated unit tests so documentation assertions read the SDD, not the
+  immutable migration text.
 
 ---
 
@@ -20,11 +83,11 @@ Goal:
 
 Implemented in this branch:
 
-- Documented in DDL and spec that `watermark_ts` is the canonical monotonic
+- Documented in the SDD that `watermark_ts` is the canonical monotonic
   comparator and `watermark_value` is a descriptive label only.
-- Documented why FL-PR03 uses `CREATE OR REPLACE` for function/trigger
-  idempotency and why indexes deliberately avoid `CONCURRENTLY` under the
-  transactional migration runner.
+- Documented in the SDD why FL-PR03 uses `CREATE OR REPLACE` for
+  function/trigger idempotency and why indexes deliberately avoid
+  `CONCURRENTLY` under the transactional migration runner.
 - Added live adversarial PostgreSQL coverage for missing
   `aggregate_type`/`aggregate_id` in outbox events.
 - Added live adversarial PostgreSQL coverage for `attempts > max_attempts`.
