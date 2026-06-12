@@ -5,6 +5,7 @@ from pathlib import Path
 
 MIGRATIONS_DIR = Path("backend/memory/postgres/migrations")
 MIGRATION = MIGRATIONS_DIR / "020_create_ops_watermarks_quality_outbox.sql"
+SPEC = Path("docs/specs/finlib-0/pr-03-watermarks-quality-outbox.md")
 
 
 def _sql() -> str:
@@ -13,6 +14,10 @@ def _sql() -> str:
 
 def _compact_sql() -> str:
     return " ".join(_sql().split())
+
+
+def _spec() -> str:
+    return SPEC.read_text(encoding="utf-8")
 
 
 def test_migration_020_exists() -> None:
@@ -81,9 +86,10 @@ def test_watermark_direct_update_regression_guard_exists() -> None:
 
 
 def test_watermark_value_is_documented_as_non_canonical() -> None:
-    sql = _sql()
+    spec = _spec()
 
-    assert "watermark_ts is the monotonic key" in sql
+    assert "`watermark_ts` is the canonical monotonic comparator." in spec
+    assert "Consumers must not compare ingestion progress by" in spec
 
 
 def test_data_quality_checks_contract() -> None:
@@ -132,12 +138,14 @@ def test_outbox_partial_index_and_poll_contract() -> None:
 
 
 def test_transactional_index_noqa_has_explanatory_comment() -> None:
+    spec = _spec()
     sql = _sql()
 
+    assert "CREATE INDEX CONCURRENTLY" in spec
+    assert "is intentionally not used" in spec
     assert (
-        sql.count(
-            "CONCURRENTLY is prohibited inside the transactional migration runner."
-        )
-        == 6
+        "project migration runner applies migrations inside a single transaction"
+        in spec
     )
+    assert "CREATE OR REPLACE" in spec
     assert sql.count("-- noqa: PG01") == 6

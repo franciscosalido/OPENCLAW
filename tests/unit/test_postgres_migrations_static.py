@@ -39,6 +39,7 @@ def test_migration_files_exist_and_are_ordered() -> None:
         "018_enable_library_extensions",
         "019_create_ops_sources_runs",
         "020_create_ops_watermarks_quality_outbox",
+        "021_create_audit_agent_writes",
     ]
 
 

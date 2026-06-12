@@ -44,6 +44,11 @@ regression trigger. Consumers must not compare ingestion progress by
 If `watermark_ts` is null, ordering is intentionally conservative: null does
 not replace an existing timestamp through the official upsert.
 
+The migration uses `CREATE OR REPLACE` for the watermark trigger function and
+trigger because PostgreSQL supports that form for idempotent function/trigger
+definitions. This keeps the migration rerunnable without changing previously
+applied migration text.
+
 ### `ops_data_quality_checks`
 
 - `check_id UUID PRIMARY KEY DEFAULT uuidv7()`
@@ -104,6 +109,12 @@ CREATE INDEX IF NOT EXISTS idx_ops_outbox_pending
 ON ops_outbox_events (next_attempt_at, created_at)
 WHERE status = 'pending';
 ```
+
+`CREATE INDEX CONCURRENTLY` is intentionally not used in this migration because
+the project migration runner applies migrations inside a single transaction.
+PostgreSQL does not allow concurrent index creation inside a transaction block,
+so the migration uses regular `CREATE INDEX IF NOT EXISTS` plus SQLFluff
+suppression comments.
 
 Empty outbox poll target: under 5ms on isolated local PostgreSQL, measured as
 the best sample after warmup to avoid turning noise into a flaky benchmark.
