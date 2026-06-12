@@ -36,6 +36,11 @@ Watermark monotonicity is enforced in two layers:
   `watermark_ts` is greater than or equal to the stored value, or the stored
   value is null.
 
+`watermark_ts` is the canonical monotonic comparator. `watermark_value` is a
+human/operator-facing textual label and is intentionally not protected by the
+regression trigger. Consumers must not compare ingestion progress by
+`watermark_value`.
+
 If `watermark_ts` is null, ordering is intentionally conservative: null does
 not replace an existing timestamp through the official upsert.
 
@@ -74,6 +79,9 @@ Text fields must contain non-whitespace content. JSONB fields must be objects.
 
 Status values are exactly `pending`, `processing`, `completed`, `failed` and
 `cancelled`. Payload and metadata must be JSON objects.
+`aggregate_type` and `aggregate_id` are mandatory so every event can be traced
+back to the domain object that produced it. Retry counters are bounded by
+`attempts <= max_attempts` at the database layer.
 
 ## Outbox Poll Contract
 

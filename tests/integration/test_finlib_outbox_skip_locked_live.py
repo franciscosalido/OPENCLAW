@@ -7,6 +7,10 @@ from typing import Any, Protocol, cast
 from uuid import UUID
 
 import pytest
+from asyncpg.exceptions import (  # type: ignore[import-untyped]
+    CheckViolationError,
+    NotNullViolationError,
+)
 
 from backend.memory.postgres.client import PostgresClient
 from backend.memory.postgres.migrations import run_migrations
@@ -198,6 +202,44 @@ async def test_outbox_pending_partial_index_exists(
     assert "next_attempt_at" in indexdef
     assert "created_at" in indexdef
     assert "WHERE (status = 'pending'::text)" in indexdef
+
+
+async def test_outbox_requires_aggregate_identity_fields(
+    postgres_client: PostgresClient,
+) -> None:
+    await _migrate(postgres_client)
+
+    with pytest.raises(NotNullViolationError):
+        await postgres_client.pool.execute(
+            """
+            INSERT INTO ops_outbox_events(event_type, aggregate_id)
+            VALUES('finlib.test', 'missing-aggregate-type')
+            """
+        )
+
+    with pytest.raises(NotNullViolationError):
+        await postgres_client.pool.execute(
+            """
+            INSERT INTO ops_outbox_events(event_type, aggregate_type)
+            VALUES('finlib.test', 'ingestion_run')
+            """
+        )
+
+
+async def test_outbox_rejects_attempts_above_max_attempts(
+    postgres_client: PostgresClient,
+) -> None:
+    await _migrate(postgres_client)
+
+    with pytest.raises(CheckViolationError):
+        await postgres_client.pool.execute(
+            """
+            INSERT INTO ops_outbox_events(
+                event_type, aggregate_type, aggregate_id, attempts, max_attempts
+            )
+            VALUES('finlib.test', 'ingestion_run', 'bad-attempts', 4, 3)
+            """
+        )
 
 
 async def test_data_quality_checks_accept_expected_severities(
