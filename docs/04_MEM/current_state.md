@@ -5,7 +5,28 @@
 > meaningful sessions.
 
 **Last updated:** 2026-06-11
-**Updated by:** Codex — FINLIB-0 FL-PR02 whitespace integrity RC
+**Updated by:** Codex — Vibe pytest report/timeout plugin hardening
+
+---
+
+## IN PROGRESS — Vibe pytest report/timeout plugin hardening
+
+Current branch: `feat/vibe-pytest-report-timeout`
+
+Goal:
+
+- Ensure Vibe runners can pass pytest `--json-report` and `--timeout`
+  arguments inside the official Python 3.12 venv.
+
+Implemented in this branch:
+
+- Added `pytest-json-report` and `pytest-timeout` to the `dev` dependency
+  group and `uv.lock`, which is the dependency source consumed by
+  `Dockerfile.openclaw-sandbox`.
+- Added `requirements-vibe.txt` for external Vibe runners that install extra
+  pytest plugins from a requirements file.
+- Added unit contracts proving the Vibe requirements file, `pyproject.toml`
+  and `uv.lock` keep both plugins declared.
 
 ---
 

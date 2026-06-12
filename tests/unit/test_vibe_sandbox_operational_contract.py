@@ -6,6 +6,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DOCKERFILE = REPO_ROOT / "Dockerfile.openclaw-sandbox"
 PYPROJECT = REPO_ROOT / "pyproject.toml"
+REQUIREMENTS_VIBE = REPO_ROOT / "requirements-vibe.txt"
 BOOTSTRAP = REPO_ROOT / "scripts" / "vibe_sandbox_bootstrap.sh"
 SEMGREP = REPO_ROOT / "scripts" / "vibe_semgrep_scan.sh"
 PYRIGHT_JSON = REPO_ROOT / "scripts" / "vibe_pyright_json.sh"
@@ -59,6 +60,15 @@ def test_openclaw_sandbox_prewarms_pyright_and_uses_nodejs() -> None:
     assert "/opt/openclaw-venv/bin/pyright --version >/dev/null" in text
     assert "mv .venv /opt/openclaw-venv" not in text
     assert "postgresql-client-18" in text
+
+
+def test_vibe_pytest_plugins_are_declared_for_report_and_timeout_args() -> None:
+    requirements = REQUIREMENTS_VIBE.read_text(encoding="utf-8")
+    pyproject = PYPROJECT.read_text(encoding="utf-8")
+
+    for plugin in ("pytest-json-report", "pytest-timeout"):
+        assert plugin in requirements
+        assert plugin in pyproject
 
 
 def test_vibe_deep_runner_rebuilds_py312_image_and_joins_quimera_network() -> None:
