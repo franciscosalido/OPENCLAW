@@ -5,7 +5,56 @@
 > meaningful sessions.
 
 **Last updated:** 2026-06-12
-**Updated by:** Codex — FINLIB-0 FL-PR05 Macro Library
+**Updated by:** Codex — FINLIB-0 FL-PR06 Treasury Library
+
+---
+
+## IN PROGRESS — FINLIB-0 FL-PR06 Treasury Library
+
+Current branch: `feat/finlib-treasury-library`
+
+RC-01 reviewer hardening:
+
+- Documented the explicit price-correction policy in
+  `docs/specs/finlib-0/pr-06-treasury-library.md`: FL-PR06 has no
+  `revision` column, so a corrected `(bond_id, ts)` observation is rejected by
+  the primary key and must become a future repository-level audited policy or a
+  future revisioned migration.
+- Added live integration coverage proving negative rates are accepted when the
+  rate spread remains sane.
+- Expanded the test-local Tesouro CSV bond-type normalizer to cover all
+  treasury bond labels accepted by the schema.
+
+Goal:
+
+- Add the minimal Tesouro Direto mark-to-market library for FINLIB-0 without
+  implementing repositories, agents, MCP tools, runtime ingestion, Qdrant
+  changes, pgvector changes or FL-PR07+ financial tables.
+
+Implemented in this branch:
+
+- Added migration `023_create_treasury_bonds_prices.sql`.
+- Added exactly two tables: `treasury_bonds` and `treasury_prices`.
+- Seeded canonical source `tesouro_transparente` in `ops_data_sources` with
+  `kind='treasury'`, matching the enum introduced by FL-PR02.
+- Modeled `treasury_prices` as a TimescaleDB hypertable on `ts` with
+  `chunk_time_interval => INTERVAL '1 month'`.
+- Enforced `PRIMARY KEY (bond_id, ts)` and
+  `UNIQUE (lineage_hash, ts)` so all unique constraints on the hypertable
+  include the partitioning column.
+- Added data-quality constraints for non-negative prices/base value, spread
+  sanity, no all-null observation rows, mandatory provenance, object-only JSONB
+  fields and no operationally future-dated `ts`.
+- Documented the Tesouro CSV contract, normalized reference-date semantics,
+  source-kind choice and future repository/audit transaction contract.
+- Added static contract tests, CSV sample round-trip tests and live isolated
+  PostgreSQL integration tests for hypertable/idempotency/DQ semantics.
+
+Workflow note:
+
+- Draft PR creation was attempted before implementation, but `gh pr create`
+  could not proceed because the branch had not been pushed. No push or merge
+  was performed.
 
 ---
 
