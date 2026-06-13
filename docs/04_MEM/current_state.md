@@ -4,8 +4,103 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Last updated:** 2026-06-11
-**Updated by:** Codex — FINLIB-0 FL-PR04 + 020 checksum correction
+**Last updated:** 2026-06-12
+**Updated by:** Codex — FINLIB-0 FL-PR05 Macro Library
+
+---
+
+## FIXED LOCALLY — FINLIB-0 FL-PR05 RC-01 PTAX Evidence Notes
+
+Context:
+
+- Adversarial review flagged two minor findings before commit:
+  `vw_fx_brlusd` used `value <> 0` without an inline explanation, and
+  `ptax_usdbrl_venda` used provider code `1` while the review expected
+  `10814`.
+
+Resolution:
+
+- Added an inline SQL comment documenting that `value <> 0` prevents division
+  by zero in derived BRL/USD columns.
+- Researched BCB Dados Abertos and bounded BCData/SGS API responses.
+- Kept `ptax_usdbrl_venda.provider_code = "1"` because BCB Dados Abertos
+  identifies SGS `1` as daily USD/BRL venda, while a bounded API sanity check
+  for `10814` returned a non-FX value in the checked window.
+- Documented the evidence in `docs/specs/finlib-0/pr-05-macro-library.md`.
+- Added a unit contract locking the current planning-reference decision:
+  compra `10813`, venda `1`, venda not `10814`, still requiring live
+  verification before operational ingestion.
+
+Validation:
+
+- `uv run pytest tests/unit/test_macro_series_seed.py tests/unit/test_postgres_migrations_static.py -q`
+  passed: 24 passed.
+- `uvx sqlfluff lint backend/memory/postgres/migrations/022_create_macro_catalog_observations.sql --dialect postgres`
+  passed.
+- `uvx ruff check tests/unit/test_macro_series_seed.py` and
+  `uvx ruff format --check tests/unit/test_macro_series_seed.py` passed.
+- `uv run mypy --strict tests/unit/test_macro_series_seed.py` passed.
+
+---
+
+## IN PROGRESS — FINLIB-0 FL-PR05 Macro Library
+
+Current branch: `feat/finlib-macro-library`
+
+Goal:
+
+- Add the minimal Brazilian macroeconomic and FX library for FINLIB-0 without
+  implementing repositories, ingestion agents, MCP tools or FL-PR06+ tables.
+
+Implemented in this branch:
+
+- Added migration `022_create_macro_catalog_observations.sql`.
+- Added exactly two tables: `macro_series_catalog` and `macro_observations`.
+- Added exactly one view: `vw_fx_brlusd`.
+- Seeded canonical source `bcb_sgs` in `ops_data_sources` with explicit
+  methodology limitations and live-verification warning.
+- Seeded seven catalog series: IPCA, IGP-M, Selic meta, Selic diaria, CDI,
+  PTAX USD/BRL compra and PTAX USD/BRL venda.
+- Marked all SGS provider codes as `planning_reference` with
+  `requires_live_verification = true`; no provider code is treated as ground
+  truth in this PR.
+- Made `macro_observations` a TimescaleDB hypertable on `ref_ts` with
+  `chunk_time_interval => INTERVAL '3 months'`.
+- Enforced provenance with mandatory `source_id`, `run_id` and
+  `lineage_hash`; `source_id` references `ops_data_sources`, and `run_id`
+  references `ops_ingestion_runs`.
+- Modeled revisions as append-only rows via
+  `PRIMARY KEY (series_code, ref_ts, revision)`.
+- Modeled identical reingestion idempotency with
+  `UNIQUE (lineage_hash, ref_ts)`, because TimescaleDB unique constraints on
+  hypertables must include the partition column.
+- Kept BRL/USD out of storage; `vw_fx_brlusd` derives BRL/USD from latest
+  PTAX USD/BRL compra/venda revisions.
+- Documented the future repository contract: domain writes and exactly one
+  `audit_agent_writes` row per logical batch in the same transaction.
+
+Validation:
+
+- `uv run pytest tests/unit/test_macro_series_seed.py tests/unit/test_postgres_migrations_static.py -q`
+  passed: 23 passed.
+- `uv run pytest tests/unit -q` passed: 1955 passed, 261 subtests passed.
+- Local integration without DSN skipped safely: 19 skipped.
+- Vibe sandbox focused suite passed: 35 passed.
+- Vibe sandbox live hypertable suite passed: 14 passed.
+- Vibe sandbox live revision/view suite passed: 5 passed.
+- `uv run mypy --strict .` passed: no issues in 431 source files.
+- `uv run pyright backend/` passed: 0 errors, 0 warnings.
+- `uvx ruff check .`, `uvx ruff format --check .`,
+  `uvx sqlfluff lint backend/memory/postgres/migrations/022_create_macro_catalog_observations.sql --dialect postgres`,
+  and `git diff --check` passed.
+
+Workflow limitation:
+
+- Draft PR creation was attempted before implementation, but `gh pr create`
+  could not proceed because the branch was local/unpushed and the worktree had
+  local changes. No push or merge was performed.
+- Full SQLFluff over all historical migrations still reports pre-existing
+  style violations in migrations 000-016; migration 022 is SQLFluff-clean.
 
 ---
 

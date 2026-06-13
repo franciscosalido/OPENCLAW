@@ -1,0 +1,102 @@
+schema_version: 1
+source_policy:
+  provider_codes_are_ground_truth: false
+  requires_live_verification_before_ingestion: true
+  provider_api_pattern: "https://api.bcb.gov.br/dados/serie/bcdata.sgs.{codigo_serie}/dados?formato=json&dataInicial={dataInicial}&dataFinal={dataFinal}"
+  notes:
+    - "SGS provider codes are planning references until verified against the live BCB/SGS catalog/API."
+    - "Daily SGS JSON/CSV queries can require explicit date filters; ingestion must use bounded windows."
+lineage_hash_contract:
+  algorithm: sha256
+  canonical_fields:
+    - series_code
+    - ref_ts
+    - value
+    - source_id
+    - provider_code
+    - schema_version
+series:
+  - series_code: ipca
+    display_name: "IPCA"
+    provider: bcb_sgs
+    provider_code: "433"
+    provider_code_status: planning_reference
+    requires_live_verification: true
+    source_id: bcb_sgs
+    original_source: ibge
+    unit: percent
+    periodicity: monthly
+    value_type: rate_percent
+    methodology_note: "Candidate SGS code for IPCA; verify against the live BCB/SGS catalog/API before operational ingestion."
+  - series_code: igpm
+    display_name: "IGP-M"
+    provider: bcb_sgs
+    provider_code: "189"
+    provider_code_status: planning_reference
+    requires_live_verification: true
+    source_id: bcb_sgs
+    original_source: fgv_ibre
+    unit: percent
+    periodicity: monthly
+    value_type: rate_percent
+    methodology_note: "Candidate SGS code for IGP-M; verify against the live BCB/SGS catalog/API before operational ingestion."
+  - series_code: selic_meta
+    display_name: "Selic meta"
+    provider: bcb_sgs
+    provider_code: "432"
+    provider_code_status: planning_reference
+    requires_live_verification: true
+    source_id: bcb_sgs
+    original_source: copom
+    unit: percent_per_year
+    periodicity: daily
+    value_type: rate_percent
+    methodology_note: "Candidate SGS code for the Copom Selic target; verify against the live BCB/SGS catalog/API before operational ingestion."
+  - series_code: selic_diaria
+    display_name: "Selic diária"
+    provider: bcb_sgs
+    provider_code: "11"
+    provider_code_status: planning_reference
+    requires_live_verification: true
+    source_id: bcb_sgs
+    original_source: bcb_demab
+    unit: percent_per_day
+    periodicity: business_daily
+    value_type: rate_percent
+    methodology_note: "Candidate SGS code for daily Selic; verify against the live BCB/SGS catalog/API before operational ingestion."
+  - series_code: cdi
+    display_name: "CDI"
+    provider: bcb_sgs
+    provider_code: "12"
+    provider_code_status: planning_reference
+    requires_live_verification: true
+    source_id: bcb_sgs
+    original_source: b3_cetip
+    unit: percent_per_day
+    periodicity: business_daily
+    value_type: rate_percent
+    methodology_note: "Candidate SGS code for CDI; verify against the live BCB/SGS catalog/API before operational ingestion."
+  - series_code: ptax_usdbrl_compra
+    display_name: "PTAX USD/BRL compra"
+    provider: bcb_sgs
+    provider_code: "10813"
+    provider_code_status: planning_reference
+    requires_live_verification: true
+    source_id: bcb_sgs
+    original_source: bcb_ptax
+    unit: BRL_per_USD
+    periodicity: business_daily
+    value_type: fx_rate
+    methodology_note: "Candidate SGS code for PTAX USD/BRL compra; verify against the live BCB/SGS catalog/API before operational ingestion."
+  - series_code: ptax_usdbrl_venda
+    display_name: "PTAX USD/BRL venda"
+    provider: bcb_sgs
+    provider_code: "1"
+    provider_code_status: planning_reference
+    requires_live_verification: true
+    source_id: bcb_sgs
+    original_source: bcb_ptax
+    unit: BRL_per_USD
+    periodicity: business_daily
+    value_type: fx_rate
+    methodology_note: "Candidate SGS code for PTAX USD/BRL venda; verify against the live BCB/SGS catalog/API before operational ingestion."

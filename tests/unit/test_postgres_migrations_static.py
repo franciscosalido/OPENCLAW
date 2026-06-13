@@ -40,6 +40,7 @@ def test_migration_files_exist_and_are_ordered() -> None:
         "019_create_ops_sources_runs",
         "020_create_ops_watermarks_quality_outbox",
         "021_create_audit_agent_writes",
+        "022_create_macro_catalog_observations",
     ]
 
 
