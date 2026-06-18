@@ -303,7 +303,6 @@ WITH latest AS (
     FROM macro_observations
     WHERE
         series_code IN ('ptax_usdbrl_compra', 'ptax_usdbrl_venda')
-        -- Guard against division by zero in the derived BRL/USD columns.
         AND value <> 0
     ORDER BY series_code ASC, ref_ts ASC, revision DESC
 )

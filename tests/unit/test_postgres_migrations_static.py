@@ -42,6 +42,7 @@ def test_migration_files_exist_and_are_ordered() -> None:
         "021_create_audit_agent_writes",
         "022_create_macro_catalog_observations",
         "023_create_treasury_bonds_prices",
+        "024_create_fund_registry_daily_info",
     ]
 
 
