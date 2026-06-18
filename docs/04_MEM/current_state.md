@@ -5,7 +5,96 @@
 > meaningful sessions.
 
 **Last updated:** 2026-06-12
-**Updated by:** Codex — FINLIB-0 FL-PR06 Treasury Library
+**Updated by:** Codex — FINLIB-0 FL-PR07 Fund Library
+
+---
+
+## IN PROGRESS — FINLIB-0 FL-PR07 Fund Library
+
+Current branch: `feat/finlib-fund-library`
+
+RC-01 migration checksum hardening:
+
+- Fixed pre-existing checksum drift for
+  `022_create_macro_catalog_observations.sql`.
+- Root cause: a documentation-only SQL comment about `value <> 0` was added
+  after migration 022 had already been applied to the local PostgreSQL
+  database. The live `schema_migrations` checksum was
+  `1b2a45c168d3e6ce0b26f606a3dd437b25e19974db9b2da035959279ff741d76`.
+- Resolution: restored migration 022 to the already-applied canonical content
+  by removing the post-apply inline comment; the explanation remains in the
+  FL-PR05 SDD.
+- Added a unit guard pinning the canonical migration 022 checksum so future
+  cosmetic edits fail before runtime.
+- Fixed two Vibe integration false positives where offline LiteLLM MCP config
+  tests inherited `host.docker.internal` from the sandbox environment. The
+  tests now pass explicit loopback-only offline env maps and the runtime
+  validator remains strict.
+
+RC-01 validation:
+
+- `uv run pytest tests/unit/test_macro_series_seed.py tests/unit/test_postgres_migrations_static.py -q`
+  passed: 25 passed.
+- `uv run pytest tests/integration/test_pr07_litellm_mcp_registration_smoke.py tests/integration/test_pr08_litellm_mcp_tools_live.py tests/unit/test_macro_series_seed.py -q`
+  passed: 20 passed.
+- Vibe targeted checksum-regression suite passed:
+  `test_postgres_repository.py`, `test_pr01_concurrency_gaps.py`,
+  `test_pr02_market_bars_concurrency.py` -> 19 passed.
+- Vibe full integration suite passed: 192 passed, 14 skipped,
+  3 subtests passed.
+- `uv run mypy --strict` on changed test files passed.
+- `uvx ruff check` and format check on changed test files passed.
+
+Workflow note:
+
+- `git pull --ff-only` on local `main` reported "Already up to date".
+- Branch `feat/finlib-fund-library` was created from local `main`.
+- Draft PR creation was attempted before implementation, but `gh pr create`
+  could not proceed because the branch had not been pushed. No push or merge
+  was performed.
+
+Goal:
+
+- Add the minimal CVM fund registry and Informe Diario library for FINLIB-0
+  without implementing repositories, agents, MCP tools, runtime ingestion,
+  live CVM clients, Qdrant changes, pgvector changes or FL-PR08+ tables.
+
+Implemented in this branch:
+
+- Added migration `024_create_fund_registry_daily_info.sql`.
+- Added exactly two tables: `fund_registry` and `fund_daily_info`.
+- Seeded canonical source `cvm_informes_diarios` in `ops_data_sources` with
+  `kind='regulator'`.
+- Modeled `fund_cnpj` as the canonical 14-digit natural key in
+  `fund_registry`.
+- Modeled `fund_daily_info` as a TimescaleDB hypertable on `ts` with
+  `chunk_time_interval => INTERVAL '1 month'`.
+- Enforced revisioned history with
+  `PRIMARY KEY (fund_cnpj, ts, revision)` and idempotency with
+  `UNIQUE (lineage_hash, ts)`.
+- Added data-quality constraints for mandatory positive `quota_value`,
+  mandatory `net_worth`, non-negative `shareholders`, non-negative flows when
+  present, mandatory provenance, object-only JSONB fields and semantic text
+  guards using `~ '\S'`.
+- Documented CVM CSV semantics, CNPJ normalization, DT_COMPTC timestamp
+  semantics, future reapresentacao by `revision+1`, advisory-lock mitigation
+  and future repository/audit transaction contract.
+- Added static schema tests, CSV sample normalization/lineage tests and live
+  isolated PostgreSQL integration tests for hypertable, idempotency,
+  reapresentacao and DQ constraints.
+
+Validation so far:
+
+- `uv run pytest tests/unit/test_fund_schema_contract.py tests/unit/test_postgres_migrations_static.py -q`
+  passed: 17 passed.
+- Local integration without DSN skipped safely: 27 skipped.
+- Vibe sandbox focused unit suite passed: 17 passed.
+- Vibe sandbox live integration suite passed: 27 passed.
+- `uv run mypy --strict tests/unit/test_fund_schema_contract.py tests/integration/test_fund_daily_info_hypertable_live.py tests/integration/test_fund_daily_info_idempotency_live.py`
+  passed.
+- `uvx ruff check` on new tests passed.
+- `uvx sqlfluff lint backend/memory/postgres/migrations/024_create_fund_registry_daily_info.sql --dialect postgres`
+  passed.
 
 ---
 

@@ -5,12 +5,17 @@ from typing import Any, cast
 
 import yaml
 
+from backend.memory.postgres.migrations import compute_checksum
+
 
 SEED = Path("config/macro_series_seed.yaml")
 MIGRATION = Path(
     "backend/memory/postgres/migrations/022_create_macro_catalog_observations.sql"
 )
 SDD = Path("docs/specs/finlib-0/pr-05-macro-library.md")
+CANONICAL_MIGRATION_022_CHECKSUM = (
+    "1b2a45c168d3e6ce0b26f606a3dd437b25e19974db9b2da035959279ff741d76"
+)
 
 EXPECTED_SERIES = {
     "ipca",
@@ -153,6 +158,10 @@ def test_migration_022_exists_and_is_non_destructive() -> None:
     assert "macro." not in sql
 
 
+def test_migration_022_checksum_matches_applied_canonical() -> None:
+    assert compute_checksum(_sql()) == CANONICAL_MIGRATION_022_CHECKSUM
+
+
 def test_migration_scope_is_limited_to_macro_objects() -> None:
     lower_sql = _sql().lower()
 
@@ -244,7 +253,7 @@ def test_view_derives_brlusd_from_ptax_latest_revision() -> None:
     assert "'ptax_usdbrl_compra'" in compact
     assert "'ptax_usdbrl_venda'" in compact
     assert "INNER JOIN latest AS venda" in compact
-    assert "Guard against division by zero" in _sql()
+    assert "AND value <> 0" in compact
     assert "(1 / ((compra.value + venda.value) / 2)) AS brlusd_mid" in compact
 
 
