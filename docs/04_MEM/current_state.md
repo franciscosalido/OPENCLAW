@@ -4,8 +4,36 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Last updated:** 2026-06-12
-**Updated by:** Codex — FINLIB-0 FL-PR07 Fund Library
+**Last updated:** 2026-06-17
+**Updated by:** Codex — FINLIB-0 FL-PR07 RC-02 Fund Whitespace Coverage
+
+---
+
+## FIXED LOCALLY — FINLIB-0 FL-PR07 RC-02 Fund Whitespace Coverage
+
+Current branch: `codex/fl-pr07-rc02-fund-whitespace-tests`
+
+Context:
+
+- The adversarial V2 review confirmed the FL-PR07 schema was correct, but
+  flagged a permanent coverage gap: live whitespace tests covered
+  `legal_name` but not nullable registry descriptors `cvm_class` and
+  `fund_type`.
+
+Resolution:
+
+- Expanded the live integration parametrization to cover whitespace-only
+  `cvm_class` and `fund_type` values.
+- Fixed the test statement builder so the parametrized field is actually
+  inserted for nullable fields instead of only changing `legal_name`.
+- Documented the registry text contract in the FL-PR07 SDD: optional
+  descriptors may be absent, but cannot be semantic whitespace when present.
+
+Scope intentionally unchanged:
+
+- No migration edits.
+- No schema checksum changes.
+- No runtime ingestion, repository or agent code.
 
 ---
 

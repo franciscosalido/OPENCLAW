@@ -70,6 +70,11 @@ column. For that reason:
 
 Schema constraints cover baseline data quality:
 
+- `legal_name` is mandatory and must contain at least one non-whitespace
+  character.
+- Optional registry descriptors such as `cvm_class` and `fund_type` may be
+  absent, but when present they must contain at least one non-whitespace
+  character.
 - `quota_value` is mandatory and must be greater than zero.
 - `net_worth` is mandatory. It is not constrained to be positive because
   negative net worth can exist in special fund situations and should be a
