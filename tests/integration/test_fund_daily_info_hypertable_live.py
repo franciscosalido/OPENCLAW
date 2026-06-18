@@ -190,6 +190,10 @@ async def test_fund_foreign_keys_point_to_ops_and_registry(
         pytest.param("legal_name", "E'\\n'", id="newline-legal-name"),
         pytest.param("legal_name", "E'\\r'", id="carriage-legal-name"),
         pytest.param("legal_name", "'   '", id="space-legal-name"),
+        pytest.param("cvm_class", "E'\\t'", id="tab-cvm-class"),
+        pytest.param("cvm_class", "E'\\n'", id="newline-cvm-class"),
+        pytest.param("fund_type", "'   '", id="space-fund-type"),
+        pytest.param("fund_type", "E'\\r'", id="cr-fund-type"),
     ),
 )
 async def test_fund_registry_rejects_whitespace_only_required_text(
@@ -198,14 +202,18 @@ async def test_fund_registry_rejects_whitespace_only_required_text(
     sql_value: str,
 ) -> None:
     await _migrate(postgres_client)
-    values = {"legal_name": "'Synthetic Fund'"}
-    values[field_name] = sql_value
+    registry_values = {
+        "fund_cnpj": "'12345678000190'",
+        "legal_name": "'Synthetic Fund'",
+        "source_id": "'cvm_informes_diarios'",
+    }
+    registry_values[field_name] = sql_value
 
     with pytest.raises(CheckViolationError):
         await postgres_client.pool.execute(
             f"""
-            INSERT INTO fund_registry(fund_cnpj, legal_name, source_id)
-            VALUES('12345678000190', {values["legal_name"]}, 'cvm_informes_diarios')
+            INSERT INTO fund_registry({", ".join(registry_values)})
+            VALUES({", ".join(registry_values.values())})
             """
         )
 
