@@ -71,6 +71,9 @@ explicit human-approved privacy design. Level 0 data must not be sent to remote 
 - `debenture`
 
 `issuer_cnpj` is canonical: 14 digits without punctuation.
+The database enforces this shape, and `backend.finlib.rate_spec` exposes
+`validate_issuer_cnpj()` so future repositories can fail before attempting a
+write.
 
 `isin` is optional. When present it must follow an ISO-like shape:
 two uppercase country letters, nine uppercase alphanumeric characters and one
@@ -137,8 +140,8 @@ do not exist in this catalog.
 ## Quality Flags
 
 The Python helper `compute_quality_flags()` may emit warnings for unusual but
-possible combinations, such as LCI or LCA with `prefixado`. Those warnings are
-advisory metadata, not hard database constraints.
+possible combinations, such as LCI or LCA with `prefixado`, or CDB indexed to
+IGP-M. Those warnings are advisory metadata, not hard database constraints.
 
 ## Future Work
 

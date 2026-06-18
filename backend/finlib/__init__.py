@@ -6,6 +6,7 @@ from backend.finlib.rate_spec import (
     RateSpec,
     compute_fi_lineage_hash,
     compute_quality_flags,
+    validate_issuer_cnpj,
     validate_rate_spec_for_instrument,
 )
 
@@ -15,5 +16,6 @@ __all__ = [
     "RateSpec",
     "compute_fi_lineage_hash",
     "compute_quality_flags",
+    "validate_issuer_cnpj",
     "validate_rate_spec_for_instrument",
 ]

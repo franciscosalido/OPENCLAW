@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from datetime import date
 from decimal import Decimal
 from typing import Literal, Mapping, TypeAlias, cast
@@ -10,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, model_validator
 
 FI_KINDS = ("cdb", "lca", "lci", "cri", "cra", "debenture")
 FI_INDEXERS = ("cdi", "ipca", "prefixado", "selic", "igpm")
+ISSUER_CNPJ_PATTERN = re.compile(r"^[0-9]{14}$")
 FI_LINEAGE_FIELDS = (
     "isin",
     "kind",
@@ -136,11 +138,14 @@ def validate_rate_spec_for_instrument(
     kind: str,
     indexer: str,
     rate_spec: Mapping[str, object] | RateSpec,
+    issuer_cnpj: str | None = None,
 ) -> RateSpec:
     if kind not in FI_KINDS:
         raise ValueError(f"unsupported private fixed-income kind: {kind}")
     if indexer not in FI_INDEXERS:
         raise ValueError(f"unsupported private fixed-income indexer: {indexer}")
+    if issuer_cnpj is not None:
+        validate_issuer_cnpj(issuer_cnpj)
 
     spec = (
         rate_spec
@@ -152,8 +157,22 @@ def validate_rate_spec_for_instrument(
     return spec
 
 
+def validate_issuer_cnpj(issuer_cnpj: str) -> str:
+    """Validate issuer CNPJ as canonical 14-digit text without punctuation."""
+
+    if not ISSUER_CNPJ_PATTERN.fullmatch(issuer_cnpj):
+        raise ValueError(
+            f"issuer_cnpj must be 14 digits without punctuation; got {issuer_cnpj!r}"
+        )
+    return issuer_cnpj
+
+
 def compute_quality_flags(kind: str, indexer: str) -> dict[str, object]:
-    if (kind, indexer) in {("lci", "prefixado"), ("lca", "prefixado")}:
+    if (kind, indexer) in {
+        ("lci", "prefixado"),
+        ("lca", "prefixado"),
+        ("cdb", "igpm"),
+    }:
         return {"warnings": [f"uncommon_{kind}_{indexer}"]}
     return {}
 

@@ -5,7 +5,39 @@
 > meaningful sessions.
 
 **Last updated:** 2026-06-18
-**Updated by:** Codex — FINLIB-0 FL-PR08 Private Fixed Income
+**Updated by:** Codex — FINLIB-0 FL-PR08 RC-01 Hardening
+
+---
+
+## FIXED LOCALLY — FINLIB-0 FL-PR08 RC-01 Hardening
+
+Current branch: `feat/finlib-private-fixed-income`
+
+Context:
+
+- Adversarial review approved FL-PR08 with two nits: Python did not expose a
+  pre-DB `issuer_cnpj` validator, and `compute_quality_flags()` did not warn
+  for uncommon `cdb + igpm` combinations.
+
+Resolution:
+
+- Added `validate_issuer_cnpj()` to `backend.finlib.rate_spec` and exported it
+  from `backend.finlib`.
+- Extended `validate_rate_spec_for_instrument()` with an optional
+  `issuer_cnpj` parameter so future repositories can validate CNPJ shape
+  before attempting a database write.
+- Added unit coverage for valid, masked, short, long and non-numeric CNPJ
+  values.
+- Added an advisory `uncommon_cdb_igpm` quality flag while keeping warnings
+  non-blocking and outside database constraints.
+- Updated FL-PR08 SDD with the Python CNPJ validator and quality-flag behavior.
+
+Scope intentionally unchanged:
+
+- No migration edits after `025`.
+- No database checksum churn.
+- No repository, live ingestion, external client, user-position table or
+  runtime service changes.
 
 ---
 

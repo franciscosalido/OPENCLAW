@@ -13,6 +13,7 @@ from backend.finlib.rate_spec import (
     RateSpec,
     compute_fi_lineage_hash,
     compute_quality_flags,
+    validate_issuer_cnpj,
     validate_rate_spec_for_instrument,
 )
 
@@ -130,6 +131,54 @@ def test_validate_rate_spec_rejects_column_json_indexer_divergence() -> None:
         )
 
 
+def test_validate_rate_spec_can_validate_issuer_cnpj_when_provided() -> None:
+    spec = validate_rate_spec_for_instrument(
+        kind="cdb",
+        indexer="cdi",
+        issuer_cnpj="12345678000190",
+        rate_spec={
+            "indexer": "cdi",
+            "rate_model": "percent_of_indexer",
+            "rate": Decimal("1.0"),
+            "day_count": 252,
+            "payment_frequency": "bullet",
+        },
+    )
+
+    assert spec.indexer == "cdi"
+
+
+@pytest.mark.parametrize(
+    "issuer_cnpj",
+    ("12.345.678/0001-90", "123", "abcdefghijklmn", "1234567800019"),
+)
+def test_validate_issuer_cnpj_rejects_noncanonical_values(
+    issuer_cnpj: str,
+) -> None:
+    with pytest.raises(ValueError, match="issuer_cnpj must be 14 digits"):
+        validate_issuer_cnpj(issuer_cnpj)
+
+
+def test_validate_issuer_cnpj_accepts_canonical_value() -> None:
+    assert validate_issuer_cnpj("12345678000190") == "12345678000190"
+
+
+def test_validate_rate_spec_rejects_invalid_issuer_cnpj_when_provided() -> None:
+    with pytest.raises(ValueError, match="issuer_cnpj must be 14 digits"):
+        validate_rate_spec_for_instrument(
+            kind="cdb",
+            indexer="cdi",
+            issuer_cnpj="12.345.678/0001-90",
+            rate_spec={
+                "indexer": "cdi",
+                "rate_model": "percent_of_indexer",
+                "rate": Decimal("1.0"),
+                "day_count": 252,
+                "payment_frequency": "bullet",
+            },
+        )
+
+
 @pytest.mark.parametrize(
     "payload",
     (
@@ -208,6 +257,7 @@ def test_quality_flags_warn_for_unusual_but_possible_combinations() -> None:
     assert compute_quality_flags("lca", "prefixado") == {
         "warnings": ["uncommon_lca_prefixado"]
     }
+    assert compute_quality_flags("cdb", "igpm") == {"warnings": ["uncommon_cdb_igpm"]}
     assert compute_quality_flags("cdb", "prefixado") == {}
 
 
