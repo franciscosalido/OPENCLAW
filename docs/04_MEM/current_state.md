@@ -4,8 +4,107 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Last updated:** 2026-06-17
-**Updated by:** Codex — FINLIB-0 FL-PR07 RC-02 Fund Whitespace Coverage
+**Last updated:** 2026-06-18
+**Updated by:** Codex — FINLIB-0 FL-PR08 RC-01 Hardening
+
+---
+
+## FIXED LOCALLY — FINLIB-0 FL-PR08 RC-01 Hardening
+
+Current branch: `feat/finlib-private-fixed-income`
+
+Context:
+
+- Adversarial review approved FL-PR08 with two nits: Python did not expose a
+  pre-DB `issuer_cnpj` validator, and `compute_quality_flags()` did not warn
+  for uncommon `cdb + igpm` combinations.
+
+Resolution:
+
+- Added `validate_issuer_cnpj()` to `backend.finlib.rate_spec` and exported it
+  from `backend.finlib`.
+- Extended `validate_rate_spec_for_instrument()` with an optional
+  `issuer_cnpj` parameter so future repositories can validate CNPJ shape
+  before attempting a database write.
+- Added unit coverage for valid, masked, short, long and non-numeric CNPJ
+  values.
+- Added an advisory `uncommon_cdb_igpm` quality flag while keeping warnings
+  non-blocking and outside database constraints.
+- Updated FL-PR08 SDD with the Python CNPJ validator and quality-flag behavior.
+
+Scope intentionally unchanged:
+
+- No migration edits after `025`.
+- No database checksum churn.
+- No repository, live ingestion, external client, user-position table or
+  runtime service changes.
+
+---
+
+## IN PROGRESS — FINLIB-0 FL-PR08 Private Fixed Income
+
+Current branch: `feat/finlib-private-fixed-income`
+
+GitHub workflow:
+
+- Issue created: https://github.com/franciscosalido/OPENCLAW/issues/118
+- Draft PR creation was attempted before implementation, but GitHub rejected it
+  because the branch had no commits and local `main` is ahead of
+  `origin/main` by the stacked FINLIB commits. The branch remains local until
+  the stacked base is published or coordinated.
+
+Goal:
+
+- Add the minimal private fixed-income reference catalog for CDB, LCA, LCI,
+  CRI, CRA and debenture without repositories, agents, ingesters, external
+  clients, user positions, valuation, Qdrant or pgvector changes.
+
+Implemented in this branch:
+
+- Added migration `025_create_fi_instruments.sql`.
+- Added exactly one table: `fi_instruments`.
+- Seeded `local_fixed_income_input` and `anbima_debentures` in
+  `ops_data_sources` using existing allowed source kinds.
+- Modeled `issuer_cnpj` as 14 canonical digits and optional ISO-like `isin`.
+- Constrained `kind`, `indexer`, `rate_spec` JSONB shape, source provenance,
+  JSONB object fields, non-whitespace text and unique `lineage_hash`.
+- Enforced fail-safe FGC semantics: CRI, CRA and debenture cannot be
+  `fgc_covered = true`.
+- Enforced `maturity_date` for CRI, CRA and debenture, and `maturity_date >=
+  issue_date` when both are present.
+- Added `backend.finlib.rate_spec.RateSpec` as a strict Pydantic v2 model with
+  semantic validation for prefixado, percent-of-indexer, indexer-plus-spread
+  and inflation-plus-coupon contracts.
+- Added canonical `compute_fi_lineage_hash()` and explicit rejection of Level
+  0 position fields.
+- Documented the Level 0 boundary in the FL-PR08 SDD.
+
+Validation:
+
+- `uv run pytest tests/unit/test_fi_instruments_schema_contract.py tests/unit/test_fi_rate_spec_validation.py -q`
+  passed: 34 passed.
+- `uv run pytest tests/unit/test_fi_instruments_schema_contract.py tests/unit/test_fi_rate_spec_validation.py tests/unit/test_postgres_migrations_static.py -q`
+  passed: 41 passed.
+- `uv run pytest tests/unit -q` passed: 2013 passed, 261 subtests passed.
+- `uv run mypy --strict .` passed: no issues in 441 source files.
+- `uv run pyright backend/finlib tests/unit/test_fi_instruments_schema_contract.py tests/unit/test_fi_rate_spec_validation.py`
+  passed: 0 errors, 0 warnings.
+- `uvx ruff check .`, `uvx ruff format --check .`, and `git diff --check`
+  passed.
+- `uvx sqlfluff lint backend/memory/postgres/migrations/025_create_fi_instruments.sql --dialect postgres`
+  passed.
+- Full SQLFluff over historical migrations still fails on pre-existing
+  migrations 000-016; migration 025 is clean.
+- `scripts/vibe_deep_run.sh 'uv run pytest tests/unit/test_fi_instruments_schema_contract.py tests/unit/test_fi_rate_spec_validation.py -q'`
+  was attempted, but Docker failed before tests with `DeadlineExceeded` while
+  resolving `docker/dockerfile:1`.
+
+Scope intentionally unchanged:
+
+- No `fi_positions`.
+- No user holdings, accounts, CPF, broker/custodian or portfolio fields.
+- No live data access.
+- No repository, agent, MCP, A2A runtime, Qdrant or pgvector mutation.
 
 ---
 
