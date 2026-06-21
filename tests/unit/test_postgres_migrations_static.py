@@ -44,6 +44,7 @@ def test_migration_files_exist_and_are_ordered() -> None:
         "023_create_treasury_bonds_prices",
         "024_create_fund_registry_daily_info",
         "025_create_fi_instruments",
+        "026_create_debenture_market_data",
     ]
 
 

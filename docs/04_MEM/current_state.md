@@ -4,8 +4,79 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Last updated:** 2026-06-18
-**Updated by:** Codex — FINLIB-0 FL-PR08 RC-01 Hardening
+**Last updated:** 2026-06-21
+**Updated by:** Codex — FINLIB-0 FL-PR09 Debenture Market Data
+
+---
+
+## IN PROGRESS — FINLIB-0 FL-PR09 Debenture Market Data
+
+Current branch: `feat/finlib-debenture-market-data`
+
+GitHub workflow:
+
+- Issue created: https://github.com/franciscosalido/OPENCLAW/issues/119
+- Initial SDD committed locally:
+  `afc1506 docs: define finlib debenture market data SDD`.
+- Draft PR creation was attempted after the SDD commit, but GitHub rejected it
+  because the stacked local branch is not published and the remote could not
+  resolve a head SHA. No push, force-push or merge to `main` was performed.
+
+Goal:
+
+- Add temporal market data for debentures already represented in
+  `fi_instruments`, without repositories, agents, live downloaders, external
+  clients, user-position tables, Qdrant or pgvector changes.
+
+Implemented in this branch:
+
+- Added migration `026_create_debenture_market_data.sql`.
+- Added exactly one table: `debenture_market_data`.
+- Modeled `debenture_market_data` as a TimescaleDB hypertable on `ts` with
+  one-month chunks.
+- Used `fi_id UUID REFERENCES fi_instruments(instrument_id)` instead of ISIN
+  as database identity.
+- Enforced that market rows point only to `fi_instruments.kind = 'debenture'`
+  with trigger `trg_debenture_market_data_instrument_kind`.
+- Added revisioned temporal identity with `PRIMARY KEY (fi_id, ts, revision)`
+  and idempotent content lineage via `UNIQUE (lineage_hash, ts)`.
+- Required provenance through `source_id`, `run_id`, `lineage_hash`,
+  `schema_version`, object-only `quality_flags` and object-only `metadata`.
+- Added data-quality checks for at least one measurement, positive PU when
+  present, non-negative duration and non-whitespace lineage.
+- Narrowly hardened the existing `anbima_debentures` source limitations for
+  secondary-market observations without creating a second debenture catalog.
+- Added static schema-contract tests and live isolated PostgreSQL tests for
+  hypertable, constraints, trigger, revision history and cross-sprint tables.
+
+Validation so far:
+
+- `uv run pytest tests/unit/test_debenture_market_data_schema_contract.py tests/unit/test_postgres_migrations_static.py -q`
+  passed: 16 passed.
+- `uv run pytest tests/unit -q` passed: 2029 passed, 261 subtests passed.
+- `uv run pytest tests/integration/test_debenture_market_data_hypertable_live.py -q`
+  skipped safely: 13 skipped because no test DSN was present in the current
+  host environment.
+- `scripts/vibe_deep_run.sh 'uv run pytest tests/unit/test_debenture_market_data_schema_contract.py tests/integration/test_debenture_market_data_hypertable_live.py -q'`
+  passed in the Python 3.12 Vibe sandbox with live services: 22 passed.
+- `uv run mypy --strict tests/unit/test_debenture_market_data_schema_contract.py tests/integration/test_debenture_market_data_hypertable_live.py`
+  passed.
+- `uv run pyright tests/unit/test_debenture_market_data_schema_contract.py tests/integration/test_debenture_market_data_hypertable_live.py`
+  passed with the known cosmetic Pyright version notice.
+- `uvx ruff check` and `uvx ruff format --check` on changed Python tests
+  passed.
+- `uvx sqlfluff lint backend/memory/postgres/migrations/026_create_debenture_market_data.sql --dialect postgres`
+  passed.
+- `git diff --check` passed.
+
+Scope intentionally unchanged:
+
+- No CRI/CRA market data table.
+- No `fi_positions`.
+- No user holdings, account identifiers, personal identifiers, brokerage or
+  portfolio fields.
+- No repository, ingestion agent, HTTP client, MCP/A2A runtime, Qdrant or
+  pgvector mutation.
 
 ---
 

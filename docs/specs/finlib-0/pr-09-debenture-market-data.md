@@ -196,7 +196,7 @@ manual edits to applied migrations.
 Static unit tests:
 
 - migration 026 exists and creates exactly one table
-- no forbidden Level 0 or credential fields
+- no forbidden Level 0 or secret-like fields
 - FK uses `fi_instruments(instrument_id)`
 - no ISIN column
 - PK/unique include `ts`
