@@ -213,6 +213,7 @@ async def test_debenture_migration_applies_idempotently(
     second = await run_migrations(postgres_client)
 
     assert "026_create_debenture_market_data" in first
+    assert "027_guard_debenture_kind_drift" in first
     assert second == ()
 
 
@@ -322,6 +323,41 @@ async def test_debenture_valid_insert_and_kind_guard(
         )
 
     assert count == 1
+
+
+async def test_debenture_instrument_kind_cannot_drift_after_market_data(
+    postgres_client: PostgresClient,
+) -> None:
+    await _migrate(postgres_client)
+    run_id = await _create_run(postgres_client)
+    debenture_id = await _create_instrument(
+        postgres_client,
+        issuer_cnpj="11222333000199",
+        instrument_name="Synthetic Debenture Kind Drift Guard",
+        lineage_hash="sha256:fi-debenture-kind-drift",
+    )
+
+    await _insert_market_data(
+        postgres_client,
+        fi_id=debenture_id,
+        run_id=run_id,
+        lineage_hash="sha256:debenture-kind-drift-row",
+    )
+
+    with pytest.raises(
+        PostgresError,
+        match="cannot change fi_instruments.kind while debenture_market_data rows exist",
+    ):
+        await postgres_client.pool.execute(
+            "UPDATE fi_instruments SET kind = 'cdb' WHERE instrument_id = $1",
+            debenture_id,
+        )
+
+    kind = await postgres_client.pool.fetchval(
+        "SELECT kind FROM fi_instruments WHERE instrument_id = $1",
+        debenture_id,
+    )
+    assert kind == "debenture"
 
 
 async def test_debenture_rejects_missing_foreign_keys(

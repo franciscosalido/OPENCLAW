@@ -32,7 +32,8 @@ RAG local-first construido no RAG-1A:
 - PostgreSQL/pgvector e alternativa futura, nao alvo deste mini-sprint.
 
 Historicamente, este repositorio fixava `qdrant-client==1.13.2` em
-`pyproject.toml`. O contrato ativo agora exige `qdrant-client>=1.18`.
+`pyproject.toml`. O contrato ativo agora exige
+`qdrant-client>=1.18,<1.19`.
 
 ## Hipotese
 

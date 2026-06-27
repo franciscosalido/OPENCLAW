@@ -6,6 +6,9 @@ from pathlib import Path
 MIGRATION = Path(
     "backend/memory/postgres/migrations/026_create_debenture_market_data.sql"
 )
+KIND_DRIFT_MIGRATION = Path(
+    "backend/memory/postgres/migrations/027_guard_debenture_kind_drift.sql"
+)
 SDD = Path("docs/specs/finlib-0/pr-09-debenture-market-data.md")
 
 LEVEL0_FORBIDDEN_FIELDS = (
@@ -35,6 +38,14 @@ def _sql() -> str:
 
 def _compact_sql() -> str:
     return " ".join(_sql().split())
+
+
+def _kind_drift_sql() -> str:
+    return KIND_DRIFT_MIGRATION.read_text(encoding="utf-8")
+
+
+def _compact_kind_drift_sql() -> str:
+    return " ".join(_kind_drift_sql().split())
 
 
 def _sdd() -> str:
@@ -133,6 +144,7 @@ def test_timescale_hypertable_contract_and_indexes() -> None:
 
 def test_debenture_kind_trigger_contract() -> None:
     compact = _compact_sql()
+    drift_compact = _compact_kind_drift_sql()
 
     assert "enforce_debenture_market_data_instrument_kind" in compact
     assert (
@@ -141,6 +153,19 @@ def test_debenture_kind_trigger_contract() -> None:
     assert "BEFORE INSERT OR UPDATE OF fi_id ON debenture_market_data" in compact
     assert "kind <> 'debenture'" in compact
     assert "debenture_market_data requires a debenture instrument" in compact
+    assert KIND_DRIFT_MIGRATION.exists()
+    assert "prevent_debenture_market_data_kind_drift" in drift_compact
+    assert (
+        "CREATE OR REPLACE TRIGGER "
+        "trg_fi_instruments_debenture_market_data_kind_guard" in drift_compact
+    )
+    assert "BEFORE UPDATE OF kind ON fi_instruments" in drift_compact
+    assert "WHEN (old.kind IS DISTINCT FROM new.kind)" in drift_compact
+    assert "WHERE fi_id = OLD.instrument_id" in drift_compact
+    assert (
+        "cannot change fi_instruments.kind while debenture_market_data rows exist"
+        in drift_compact
+    )
 
 
 def test_anbima_source_is_narrowly_hardened_for_market_data() -> None:

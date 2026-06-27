@@ -74,6 +74,8 @@ mutants/
 !tests/golden/baseline/gateway2_regression_thresholds.yaml
 
 # Evaluation results — local only, never commit
+evaluation/results/*
+!evaluation/results/.gitkeep
 evaluation/results/*.csv
 evaluation/results/*.json
 evaluation/results/*.jsonl

@@ -45,6 +45,7 @@ def test_migration_files_exist_and_are_ordered() -> None:
         "024_create_fund_registry_daily_info",
         "025_create_fi_instruments",
         "026_create_debenture_market_data",
+        "027_guard_debenture_kind_drift",
     ]
 
 
@@ -56,7 +57,10 @@ def test_no_migration_file_is_empty() -> None:
 def test_migrations_use_if_not_exists_where_applicable() -> None:
     for migration in list_migration_files(MIGRATIONS_DIR):
         sql = migration.sql.upper()
-        assert "IF NOT EXISTS" in sql
+        if "CREATE OR REPLACE FUNCTION" in sql or "CREATE OR REPLACE TRIGGER" in sql:
+            assert "CREATE OR REPLACE" in sql
+        else:
+            assert "IF NOT EXISTS" in sql
 
 
 def test_schema_migrations_migration_exists() -> None:

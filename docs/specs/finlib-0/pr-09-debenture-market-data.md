@@ -76,6 +76,13 @@ A plain foreign key cannot ensure that `fi_id` points to a row with
 - lets the foreign key reject unknown IDs
 - raises a generic safe error without leaking issuer, ISIN or payload data
 
+The semantic invariant is bidirectional. Once a debenture instrument has rows
+in `debenture_market_data`, `fi_instruments.kind` must not be changed away from
+`debenture`. RC-01 adds migration `027_guard_debenture_kind_drift.sql` instead
+of editing the already reviewed migration 026, preserving migration checksum
+stability. The new migration guards `BEFORE UPDATE OF kind ON fi_instruments`
+and rejects kind drift when temporal debenture market data already exists.
+
 ### Revision Semantics
 
 ANBIMA market data can be corrected or republished. This PR deliberately uses
