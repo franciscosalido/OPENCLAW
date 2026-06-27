@@ -46,6 +46,7 @@ def test_migration_files_exist_and_are_ordered() -> None:
         "025_create_fi_instruments",
         "026_create_debenture_market_data",
         "027_guard_debenture_kind_drift",
+        "028_create_company_fundamentals",
     ]
 
 

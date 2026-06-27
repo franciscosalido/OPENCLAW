@@ -5,7 +5,78 @@
 > meaningful sessions.
 
 **Last updated:** 2026-06-27
-**Updated by:** Codex — FL-PR09 RC-01 Adversarial Nits
+**Updated by:** Codex — FL-PR10 Company Fundamentals
+
+---
+
+## IN PROGRESS — FINLIB-0 FL-PR10 Company Fundamentals
+
+Current branch: `feat/finlib-fundamentals`
+
+RC-01 adversarial review fixes:
+
+- Fixed `test_fundamentals_statement_constraints` argument ordering so `$9`
+  receives `run_id` and `$10` receives `lineage_hash`. Before this fix,
+  `asyncpg` raised `DataError` during UUID binding and the live PostgreSQL
+  CHECK constraints were not exercised.
+- Narrowed migration 028 `ops_data_sources ON CONFLICT` behavior so existing
+  `kind`, `base_url`, and `enabled` values are not silently overwritten.
+- Added static coverage asserting migration 028 does not overwrite those
+  source identity/operational fields while still merging metadata.
+
+RC-02 adversarial review follow-up:
+
+- Cowork RC-01 verdict was `APPROVE` after sandbox confirmed 7/7 live
+  `CheckViolationError` cases for `test_fundamentals_statement_constraints`.
+- Resolved the remaining source-conflict nit explicitly in the SDD: migration
+  028 may refresh documentation fields and merge metadata, but must not
+  overwrite source identity or operational fields such as `kind`, `base_url`
+  or `enabled`.
+- The remaining timing flap in `test_gateway1_proof_of_life.py` is
+  pre-existing and outside FL-PR10 scope.
+
+Scope:
+
+- Adds migration `028_create_company_fundamentals.sql`.
+- Adds four tables: `company_registry`, `company_listings`,
+  `fundamentals_statements`, and `fundamentals_indicators`.
+- Seeds public source contracts for CVM company registry, CVM DFP, CVM ITR,
+  and B3 listings through `ops_data_sources`.
+- Keeps company identity separate from listings, so PETR3/PETR4 may point to
+  one canonical `company_id`.
+- Stores DFP/ITR restatements as immutable `version + 1` statement rows.
+- Stores only statement-derived indicators; market-dependent valuation
+  indicators remain out of scope.
+- Makes `fundamentals_indicators` a TimescaleDB hypertable partitioned by
+  `ts`, with all primary/unique constraints including the partition column.
+- Adds `backend/finlib/fundamentals.py` with strict Pydantic indicator model
+  and deterministic statement-only derivation/hash helpers.
+
+Validation:
+
+- `uv run pytest tests/unit/test_company_fundamentals_schema_contract.py tests/unit/test_fundamentals_python_indicators.py tests/unit/test_postgres_migrations_static.py -q`
+  passed: 28 passed.
+- `uv run pytest tests/integration/test_fundamentals_restatement_live.py::test_fundamentals_statement_constraints -q`
+  skipped safely without host DSN: 1 skipped. Cowork should rerun this inside
+  code-sandbox-mcp with `TEST_POSTGRES_DSN` set to confirm 7 live
+  `CheckViolationError` cases.
+- `uv run pytest tests/integration/test_company_listing_link_live.py tests/integration/test_fundamentals_restatement_live.py -q`
+  collected cleanly and skipped safely without host DSN: 7 skipped.
+- `uvx ruff check backend/finlib/fundamentals.py backend/finlib/__init__.py tests/unit/test_company_fundamentals_schema_contract.py tests/unit/test_fundamentals_python_indicators.py tests/unit/test_postgres_migrations_static.py tests/integration/test_company_listing_link_live.py tests/integration/test_fundamentals_restatement_live.py`
+  passed.
+- `uvx ruff format --check backend/finlib/fundamentals.py backend/finlib/__init__.py tests/unit/test_company_fundamentals_schema_contract.py tests/unit/test_fundamentals_python_indicators.py tests/unit/test_postgres_migrations_static.py tests/integration/test_company_listing_link_live.py tests/integration/test_fundamentals_restatement_live.py`
+  passed.
+- `uvx sqlfluff lint backend/memory/postgres/migrations/028_create_company_fundamentals.sql --dialect postgres`
+  passed.
+- `uv run mypy backend/finlib/fundamentals.py --strict` passed.
+- `uv run pyright backend/finlib/fundamentals.py` passed with only the known
+  cosmetic Pyright update notice.
+
+Scope intentionally unchanged:
+
+- No repository, ingestion agent, downloader, HTTP client, MCP/A2A runtime,
+  Qdrant mutation, pgvector policy, user position, portfolio, brokerage or
+  secret handling changes.
 
 ---
 
