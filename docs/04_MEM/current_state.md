@@ -58,6 +58,34 @@ Validation so far:
 - `uv run pyright backend/finlib/repositories` passed with only the known
   cosmetic Pyright update notice.
 
+RC-01 adversarial review fix:
+
+- Cowork found a live PostgreSQL BLOCKER: repository SQL used `$N::jsonb` while
+  the repositories pass canonical JSON strings produced by
+  `_json_dumps_canonical()`.
+- The project pool configures asyncpg JSON/JSONB codecs, so `$N::jsonb` caused
+  asyncpg to encode the already-serialized string again. PostgreSQL then saw a
+  JSONB string instead of a JSONB object, tripping `jsonb_typeof(...) = 'object'`
+  checks such as `ops_data_sources_metadata_check`.
+- Fixed repository SQL to cast all pre-serialized repository payloads through
+  `::text::jsonb`.
+- Added a unit boundary test that rejects bare `::jsonb` casts inside
+  `backend/finlib/repositories/` and requires the `::text::jsonb` contract.
+
+RC-01 validation:
+
+- `uv run pytest tests/unit/test_finlib_ops_repository.py tests/unit/test_finlib_macro_repository.py tests/unit/test_finlib_treasury_repository.py tests/unit/test_finlib_repository_boundaries.py -q`
+  passed: 26 passed.
+- `uv run pytest tests/integration/test_finlib_repositories_core_live.py -q`
+  skipped safely without host DSN: 2 skipped.
+- `uvx ruff check backend/finlib/repositories backend/finlib/__init__.py tests/unit/test_finlib_ops_repository.py tests/unit/test_finlib_macro_repository.py tests/unit/test_finlib_treasury_repository.py tests/unit/test_finlib_repository_boundaries.py tests/integration/test_finlib_repositories_core_live.py`
+  passed.
+- `uvx ruff format --check backend/finlib/repositories backend/finlib/__init__.py tests/unit/test_finlib_ops_repository.py tests/unit/test_finlib_macro_repository.py tests/unit/test_finlib_treasury_repository.py tests/unit/test_finlib_repository_boundaries.py tests/integration/test_finlib_repositories_core_live.py`
+  passed.
+- `uv run mypy backend/finlib/repositories --strict` passed.
+- `uv run pyright backend/finlib/repositories` passed with only the known
+  cosmetic Pyright update notice.
+
 Scope intentionally unchanged:
 
 - No agents, ingesters, parsers, HTTP clients, ORM, SQLAlchemy, FastAPI, MCP,

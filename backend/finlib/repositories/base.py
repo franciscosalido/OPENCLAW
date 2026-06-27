@@ -130,7 +130,7 @@ class BaseRepository:
                 trace_id, run_id, agent_id, repository, target_table,
                 operation, row_count, batch_hash, metadata
             )
-            VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)
+            VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9::text::jsonb)
             RETURNING audit_id
             """,
             _as_uuid(audit.trace_id, "trace_id"),

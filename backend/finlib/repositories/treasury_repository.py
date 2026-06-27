@@ -24,7 +24,7 @@ INSERT INTO treasury_bonds(
     bond_type, security_family, maturity_date, display_name, source_id,
     is_active, metadata
 )
-VALUES($1, $2, $3, $4, $5, $6, $7::jsonb)
+VALUES($1, $2, $3, $4, $5, $6, $7::text::jsonb)
 ON CONFLICT (bond_type, maturity_date) DO UPDATE SET
     display_name = excluded.display_name,
     security_family = excluded.security_family,
@@ -38,7 +38,7 @@ INSERT INTO treasury_prices(
     bond_id, ts, price_bid, price_ask, rate_bid, rate_ask, base_value,
     source_id, run_id, lineage_hash, schema_version, quality_flags, metadata
 )
-VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13::jsonb)
+VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::text::jsonb, $13::text::jsonb)
 ON CONFLICT (lineage_hash, ts) DO NOTHING
 RETURNING bond_id
 """

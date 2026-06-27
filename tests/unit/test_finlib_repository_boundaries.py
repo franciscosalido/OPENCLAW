@@ -83,3 +83,12 @@ def test_no_agent_ingester_or_remote_client_added_to_finlib_repositories() -> No
 
     for forbidden in ("httpx", "requests", "fastapi", "qdrant", "pgvector"):
         assert forbidden not in combined
+
+
+def test_preencoded_json_parameters_cast_through_text_before_jsonb() -> None:
+    combined = "\n".join(
+        path.read_text(encoding="utf-8") for path in _python_files(REPOSITORIES)
+    )
+
+    assert "::text::jsonb" in combined
+    assert "::jsonb" not in combined.replace("::text::jsonb", "")

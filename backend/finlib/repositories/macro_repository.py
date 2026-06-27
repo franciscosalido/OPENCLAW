@@ -26,7 +26,7 @@ INSERT INTO macro_series_catalog(
     source_id, original_source, unit, periodicity, value_type, methodology_note,
     requires_live_verification, enabled, metadata
 )
-VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb)
+VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::text::jsonb)
 ON CONFLICT (series_code) DO UPDATE SET
     display_name = excluded.display_name,
     provider = excluded.provider,
@@ -66,7 +66,7 @@ INSERT INTO macro_observations(
     series_code, ref_ts, revision, value, source_id, run_id, lineage_hash,
     schema_version, quality_flags, metadata
 )
-VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb)
+VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9::text::jsonb, $10::text::jsonb)
 """
 
 

@@ -32,7 +32,7 @@ INSERT INTO ops_data_sources(
     source_id, kind, base_url, license_note, methodology_limitations,
     enabled, metadata
 )
-VALUES($1, $2, $3, $4, $5, $6, $7::jsonb)
+VALUES($1, $2, $3, $4, $5, $6, $7::text::jsonb)
 ON CONFLICT (source_id) DO UPDATE SET
     license_note = excluded.license_note,
     methodology_limitations = excluded.methodology_limitations,
@@ -44,7 +44,7 @@ START_RUN_SQL = """
 INSERT INTO ops_ingestion_runs(
     source_id, agent_id, mode, status, source_snapshot_hash, trace_id, metadata
 )
-VALUES($1, $2, $3, $4, $5, $6, $7::jsonb)
+VALUES($1, $2, $3, $4, $5, $6, $7::text::jsonb)
 RETURNING run_id
 """
 
@@ -58,7 +58,7 @@ SET status = $2,
     records_rejected = $6,
     source_snapshot_hash = $7,
     error_summary = $8,
-    metadata = metadata || $9::jsonb
+    metadata = metadata || $9::text::jsonb
 WHERE run_id = $1
   AND finished_at IS NULL
 RETURNING run_id
@@ -76,7 +76,7 @@ INSERT INTO ops_ingestion_watermarks(
     source_id, dataset, watermark_value, watermark_ts, source_snapshot_hash,
     run_id, metadata
 )
-VALUES($1, $2, $3, $4, $5, $6, $7::jsonb)
+VALUES($1, $2, $3, $4, $5, $6, $7::text::jsonb)
 ON CONFLICT (source_id, dataset) DO UPDATE SET
     watermark_value = excluded.watermark_value,
     watermark_ts = excluded.watermark_ts,
@@ -96,7 +96,7 @@ INSERT_QUALITY_SQL = """
 INSERT INTO ops_data_quality_checks(
     run_id, check_name, target_table, severity, passed, observed, expected, metadata
 )
-VALUES($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb)
+VALUES($1, $2, $3, $4, $5, $6::text::jsonb, $7::text::jsonb, $8::text::jsonb)
 RETURNING check_id
 """
 
@@ -104,7 +104,7 @@ INSERT_EVENT_SQL = """
 INSERT INTO ops_outbox_events(
     event_type, aggregate_type, aggregate_id, payload, trace_id, run_id, metadata
 )
-VALUES($1, $2, $3, $4::jsonb, $5, $6, $7::jsonb)
+VALUES($1, $2, $3, $4::text::jsonb, $5, $6, $7::text::jsonb)
 RETURNING event_id
 """
 
