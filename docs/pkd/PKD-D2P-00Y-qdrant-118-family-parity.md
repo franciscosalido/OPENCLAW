@@ -18,7 +18,7 @@ patch exato.
 ## Decisao
 
 - Server target: `qdrant/qdrant:v1.18.2`.
-- Python dependency floor: `qdrant-client>=1.18`.
+- Python dependency boundary: `qdrant-client>=1.18,<1.19`.
 - Current Python client lockfile resolution: `qdrant-client 1.18.0`.
 - Required compatibility boundary: both server and client must be in the
   `1.18.x` family.
@@ -53,7 +53,7 @@ Readiness fails if:
 
 - Qdrant server is not the configured target server version;
 - server or client is outside the `1.18.x` family;
-- `qdrant-client` resolves below `1.18`;
+- `qdrant-client` resolves below `1.18` or outside the `1.18.x` family;
 - REST or gRPC health probes fail.
 
 Readiness does not fail merely because server and client patch versions differ
@@ -74,6 +74,8 @@ this PKD.
 ## Consequencias
 
 - Compose files must pin `qdrant/qdrant:v1.18.2`.
+- `pyproject.toml` must bound the Python SDK to `qdrant-client>=1.18,<1.19`
+  so future lockfile regeneration cannot silently leave the accepted family.
 - `infra/qdrant/version_contract.yaml` must target server `1.18.2`.
 - Tests must assert family parity and explicit target pinning, not patch parity.
 - Benchmarks generated under `1.18.0` or `1.18.1` must not be relabeled as

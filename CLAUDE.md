@@ -23,10 +23,13 @@
 > It contains: the 15 token-economy rules, the A2A coordination protocol, security boundaries, session startup sequence, documentation map, handoff template, and update rules.
 >
 > Read it at the start of every session, alongside this file and `docs/04_MEM/current_state.md`.
+>
+> For Claude Cowork adversarial review, also read `docs/04_MEM/COWORK_REVIEWER_CONTEXT.md`.
 
 ```bash
 cat docs/04_MEM/AGENT_CONTEXT.md
 cat docs/04_MEM/current_state.md
+cat docs/04_MEM/COWORK_REVIEWER_CONTEXT.md
 ```
 
 ---
@@ -43,7 +46,7 @@ cat docs/04_MEM/current_state.md
 | Package manager | uv |
 | LLM local | qwen3:14b via Ollama (localhost:11434) |
 | Embedding | nomic-embed-text via Ollama (localhost:11434) |
-| Vector DB | Qdrant v1.13.2 via Docker (localhost:6333/6334) |
+| Vector DB | Qdrant v1.18.2 via Docker (localhost:6333/6334); Python SDK bounded to qdrant-client 1.18.x |
 | Gateway | LiteLLM at localhost:4000/v1 (Gateway-0) |
 | Memory | claude-mem (~/.claude-mem/claude-mem.db) |
 
@@ -59,6 +62,7 @@ git status --short
 git log --oneline --decorate -5
 cat docs/04_MEM/AGENT_CONTEXT.md   # ← shared A2A context (Claude + ChatGPT + Codex)
 cat docs/04_MEM/current_state.md   # ← live sprint state
+cat docs/04_MEM/COWORK_REVIEWER_CONTEXT.md  # ← compact adversarial reviewer pack
 ```
 
 Do not read the whole repo. Do not open node_modules, .venv, dist, caches, or large binary files.

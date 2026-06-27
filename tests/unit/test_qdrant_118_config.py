@@ -73,7 +73,7 @@ def test_version_contract_targets_server_1182_client_1180_family_parity() -> Non
     assert contract["server_target_version"] == "1.18.2"
     assert contract["server_image"] == "qdrant/qdrant:v1.18.2"
     assert contract["client_target_version"] == "1.18.0"
-    assert contract["client_dependency"] == "qdrant-client>=1.18"
+    assert contract["client_dependency"] == "qdrant-client>=1.18,<1.19"
     assert contract["version_family"] == "1.18"
     assert contract["rest_port"] == 6333
     assert contract["grpc_port"] == 6334
@@ -83,7 +83,7 @@ def test_version_contract_targets_server_1182_client_1180_family_parity() -> Non
 def test_pyproject_requires_qdrant_client_118_or_newer() -> None:
     deps = _pyproject_dependencies()
 
-    assert "qdrant-client>=1.18" in deps
+    assert "qdrant-client>=1.18,<1.19" in deps
     assert "qdrant-client==1.13.2" not in deps
 
 
@@ -93,7 +93,7 @@ def test_requirements_rag_requires_qdrant_client_118_or_newer_if_present() -> No
         return
     text = requirements_path.read_text(encoding="utf-8")
     if "qdrant-client" in text:
-        assert "qdrant-client>=1.18" in text
+        assert "qdrant-client>=1.18,<1.19" in text
         assert "qdrant-client==1.13.2" not in text
 
 
@@ -125,7 +125,7 @@ def test_server_and_client_versions_match_contract() -> None:
 
     assert contract["client_dependency"] in _pyproject_dependencies()
     assert image == contract["server_image"]
-    assert str(contract["client_dependency"]).startswith("qdrant-client>=1.18")
+    assert str(contract["client_dependency"]) == "qdrant-client>=1.18,<1.19"
     assert str(contract["server_target_version"]) in str(contract["server_image"])
     assert str(contract["server_target_version"]).startswith(
         str(contract["version_family"])

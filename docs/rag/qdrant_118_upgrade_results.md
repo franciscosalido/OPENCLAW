@@ -67,8 +67,8 @@ numbers must not be rewritten as `1.18.2` evidence.
 
 ADR-D2P-018 and PKD-D2P-00Y now target Qdrant Server `1.18.2` for local-first
 runtime evaluation because it is the latest stable patch in the accepted
-`1.18.x` family. The Python client dependency requires `qdrant-client>=1.18`,
-with `uv.lock` currently resolved at `1.18.0`.
+`1.18.x` family. The Python client dependency is bounded to
+`qdrant-client>=1.18,<1.19`, with `uv.lock` currently resolved at `1.18.0`.
 
 Qwen3 benchmarks should be repeated against server version `1.18.2`, and new
 artifacts should record `qdrant_server_version=1.18.2`. Python RRFFusion remains

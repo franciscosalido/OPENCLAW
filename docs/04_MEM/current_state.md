@@ -4,8 +4,200 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Last updated:** 2026-06-18
-**Updated by:** Codex — FINLIB-0 FL-PR08 RC-01 Hardening
+**Last updated:** 2026-06-27
+**Updated by:** Codex — FL-PR09 RC-01 Adversarial Nits
+
+---
+
+## FIXED LOCALLY — FINLIB-0 FL-PR09 RC-01 Adversarial Nits
+
+Current branch: `feat/finlib-debenture-market-data`
+
+Context:
+
+- Cowork approved FL-PR09 with nits.
+- NIT-01: `debenture_market_data` insert/update trigger guarded `fi_id`, but
+  `fi_instruments.kind` could still drift from `debenture` to another kind
+  after market data rows existed.
+- NIT-02: `evaluation/results/` artifacts were dirty in the worktree and could
+  be accidentally staged.
+
+Resolution:
+
+- Added migration `027_guard_debenture_kind_drift.sql` instead of editing the
+  already reviewed migration `026`, preserving checksum stability.
+- Added `prevent_debenture_market_data_kind_drift()`.
+- Added trigger `trg_fi_instruments_debenture_market_data_kind_guard` on
+  `fi_instruments BEFORE UPDATE OF kind`.
+- The trigger rejects changing an instrument away from `debenture` when rows
+  already exist in `debenture_market_data`.
+- Added static schema assertions for the new bidirectional kind guard.
+- Added live integration coverage for attempted `debenture -> cdb` drift after
+  inserting temporal market data.
+- Added explicit `evaluation/results/*` ignore rule while preserving
+  `evaluation/results/.gitkeep`.
+- Documented the bidirectional invariant in the FL-PR09 SDD.
+
+Validation:
+
+- `uv run pytest tests/unit/test_debenture_market_data_schema_contract.py tests/unit/test_postgres_migrations_static.py -q`
+  passed: 16 passed.
+- `uv run pytest tests/integration/test_debenture_market_data_hypertable_live.py -q`
+  skipped safely without host DSN: 14 skipped.
+- `uvx ruff check tests/unit/test_debenture_market_data_schema_contract.py tests/integration/test_debenture_market_data_hypertable_live.py`
+  passed.
+- `uvx ruff format --check tests/unit/test_debenture_market_data_schema_contract.py tests/integration/test_debenture_market_data_hypertable_live.py`
+  passed.
+- `uv run mypy --strict tests/unit/test_debenture_market_data_schema_contract.py tests/integration/test_debenture_market_data_hypertable_live.py`
+  passed.
+- `uv run pyright tests/unit/test_debenture_market_data_schema_contract.py tests/integration/test_debenture_market_data_hypertable_live.py`
+  passed with only the known cosmetic Pyright update notice.
+- `uvx sqlfluff lint backend/memory/postgres/migrations/026_create_debenture_market_data.sql backend/memory/postgres/migrations/027_guard_debenture_kind_drift.sql --dialect postgres`
+  passed.
+- `git diff --check` passed.
+
+Scope intentionally unchanged:
+
+- No repository, ingestion agent, live downloader, MCP/A2A runtime, Qdrant,
+  pgvector, user-position, brokerage, portfolio or secret handling changes.
+- Pre-existing dirty tracked result artifacts were not reverted or staged.
+
+---
+
+## CONTEXT UPDATE — Cowork Reviewer Pack
+
+Current branch: `feat/finlib-debenture-market-data`
+
+What changed:
+
+- Added `docs/04_MEM/COWORK_REVIEWER_CONTEXT.md`.
+- Added a compact pointer in `CLAUDE.md`.
+- Kept `docs/04_MEM/current_state.md` as live state and
+  `docs/04_MEM/decisions.md` as durable decision log.
+
+Purpose:
+
+- Give Claude Cowork a token-cheap A2A reviewer pack.
+- Keep adversarial review structured, compact and evidence-first.
+- Reduce repeated context expansion in reviewer prompts.
+- Preserve settled runtime truths such as Qdrant `1.18.x` family parity.
+
+Scope intentionally unchanged:
+
+- No MCP connector, desktop extension or remote connector was added.
+- No secrets, `.env`, service runtime state, DB state or generated reports were
+  touched for this context update.
+
+---
+
+## CONTEXT UPDATE — Qdrant/UV Lock Integrity
+
+Current branch: `feat/finlib-debenture-market-data`
+
+Decision treated as settled:
+
+- Qdrant server/client parity is by `1.18.x` family, not exact patch parity.
+- Active server target remains `qdrant/qdrant:v1.18.2`.
+- Accepted Python client target remains `qdrant-client 1.18.0`.
+- Do not reopen the Qdrant 1.18 family decision unless a future explicit
+  upgrade sprint requests it.
+
+What changed:
+
+- `pyproject.toml` now bounds the Python SDK to `qdrant-client>=1.18,<1.19`.
+- `uv.lock` was regenerated and resolves `qdrant-client==1.18.0`.
+- `infra/qdrant/version_contract.yaml`, ADR-018, PKD-D2P-00Y and active Qdrant
+  result docs now document the bounded `1.18.x` dependency contract.
+- `CLAUDE.md` now reports Qdrant v1.18.2 via Docker and a Python SDK bounded to
+  the `qdrant-client 1.18.x` family.
+- `backend/rag/qdrant_store.py` was inspected and did not require edits; it
+  already uses the modern `query_points` API instead of legacy `search`.
+
+Validation:
+
+- Static search confirms no active dependency on `qdrant-client==1.13.2`.
+- `uv.lock` contains `qdrant-client` version `1.18.0` under the project
+  specifier `>=1.18,<1.19`.
+- Runtime `uv run` verification was intentionally not repeated after the human
+  decision to accept server `1.18.x` and client `1.18.0` as the project truth.
+
+Scope intentionally unchanged:
+
+- No Qdrant container restart, rebuild, volume reset or collection mutation.
+- No dependency family upgrade to `1.19+`.
+- No changes to unrelated PR-08/PR-09 generated result artifacts already dirty
+  in the worktree.
+
+---
+
+## IN PROGRESS — FINLIB-0 FL-PR09 Debenture Market Data
+
+Current branch: `feat/finlib-debenture-market-data`
+
+GitHub workflow:
+
+- Issue created: https://github.com/franciscosalido/OPENCLAW/issues/119
+- Initial SDD committed locally:
+  `afc1506 docs: define finlib debenture market data SDD`.
+- Draft PR creation was attempted after the SDD commit, but GitHub rejected it
+  because the stacked local branch is not published and the remote could not
+  resolve a head SHA. No push, force-push or merge to `main` was performed.
+
+Goal:
+
+- Add temporal market data for debentures already represented in
+  `fi_instruments`, without repositories, agents, live downloaders, external
+  clients, user-position tables, Qdrant or pgvector changes.
+
+Implemented in this branch:
+
+- Added migration `026_create_debenture_market_data.sql`.
+- Added exactly one table: `debenture_market_data`.
+- Modeled `debenture_market_data` as a TimescaleDB hypertable on `ts` with
+  one-month chunks.
+- Used `fi_id UUID REFERENCES fi_instruments(instrument_id)` instead of ISIN
+  as database identity.
+- Enforced that market rows point only to `fi_instruments.kind = 'debenture'`
+  with trigger `trg_debenture_market_data_instrument_kind`.
+- Added revisioned temporal identity with `PRIMARY KEY (fi_id, ts, revision)`
+  and idempotent content lineage via `UNIQUE (lineage_hash, ts)`.
+- Required provenance through `source_id`, `run_id`, `lineage_hash`,
+  `schema_version`, object-only `quality_flags` and object-only `metadata`.
+- Added data-quality checks for at least one measurement, positive PU when
+  present, non-negative duration and non-whitespace lineage.
+- Narrowly hardened the existing `anbima_debentures` source limitations for
+  secondary-market observations without creating a second debenture catalog.
+- Added static schema-contract tests and live isolated PostgreSQL tests for
+  hypertable, constraints, trigger, revision history and cross-sprint tables.
+
+Validation so far:
+
+- `uv run pytest tests/unit/test_debenture_market_data_schema_contract.py tests/unit/test_postgres_migrations_static.py -q`
+  passed: 16 passed.
+- `uv run pytest tests/unit -q` passed: 2029 passed, 261 subtests passed.
+- `uv run pytest tests/integration/test_debenture_market_data_hypertable_live.py -q`
+  skipped safely: 13 skipped because no test DSN was present in the current
+  host environment.
+- `scripts/vibe_deep_run.sh 'uv run pytest tests/unit/test_debenture_market_data_schema_contract.py tests/integration/test_debenture_market_data_hypertable_live.py -q'`
+  passed in the Python 3.12 Vibe sandbox with live services: 22 passed.
+- `uv run mypy --strict tests/unit/test_debenture_market_data_schema_contract.py tests/integration/test_debenture_market_data_hypertable_live.py`
+  passed.
+- `uv run pyright tests/unit/test_debenture_market_data_schema_contract.py tests/integration/test_debenture_market_data_hypertable_live.py`
+  passed with the known cosmetic Pyright version notice.
+- `uvx ruff check` and `uvx ruff format --check` on changed Python tests
+  passed.
+- `uvx sqlfluff lint backend/memory/postgres/migrations/026_create_debenture_market_data.sql --dialect postgres`
+  passed.
+- `git diff --check` passed.
+
+Scope intentionally unchanged:
+
+- No CRI/CRA market data table.
+- No `fi_positions`.
+- No user holdings, account identifiers, personal identifiers, brokerage or
+  portfolio fields.
+- No repository, ingestion agent, HTTP client, MCP/A2A runtime, Qdrant or
+  pgvector mutation.
 
 ---
 
@@ -1188,15 +1380,16 @@ Base branch: `main` at `68f5716d37f6f1c421f73db08d7708f8d4709aa7`.
 
 Implemented:
 
-- Relaxed project dependency from `qdrant-client==1.18.0` to
-  `qdrant-client>=1.18`.
+- Relaxed project dependency from `qdrant-client==1.18.0` to the then-current
+  open 1.18 floor; this was superseded on 2026-06-25 by the active
+  bounded contract `qdrant-client>=1.18,<1.19`.
 - Reconciled `uv.lock` metadata offline; the locked package version remains
   `qdrant-client 1.18.0`.
 - Updated Qdrant 1.18 version contract, ADR-018 and active Qdrant handoff docs
-  to distinguish dependency floor (`>=1.18`) from current lockfile resolution
-  (`1.18.0`).
+  to distinguish dependency boundary (`>=1.18,<1.19`) from current lockfile
+  resolution (`1.18.0`).
 - Updated Qdrant 1.18 unit contracts to reject legacy `qdrant-client==1.13.2`
-  while accepting the new `>=1.18` dependency floor.
+  while accepting the new `>=1.18,<1.19` dependency boundary.
 - Applied Ruff cleanup to `backend/`: `uvx ruff format backend/` reformatted
   65 files and `uvx ruff check --fix backend/` removed 13 unused imports.
 - Updated LiteLLM MCP server identifiers from hyphenated names to
@@ -1217,7 +1410,7 @@ Validation:
   43 passed.
 - `uv lock --check`: success.
 - Host import/version check: installed `qdrant-client` is `1.18.0` and
-  satisfies `>=1.18`.
+  satisfies the active `>=1.18,<1.19` boundary.
 - `uvx ruff check backend/`: success.
 - `uvx ruff format --check backend/`: success.
 - `uv run mypy --strict backend`: success.
@@ -1249,8 +1442,8 @@ Qdrant version finding:
 - Official `qdrant-client` PyPI/GitHub release page shows `1.18.0` as the
   newest Python client release.
 - PKD-D2P-00Y now accepts Qdrant server/client parity by `1.18.x` family:
-  active server target is `qdrant/qdrant:v1.18.2`, Python dependency floor is
-  `qdrant-client>=1.18`, and the current lockfile resolution is
+  active server target is `qdrant/qdrant:v1.18.2`, Python dependency boundary is
+  `qdrant-client>=1.18,<1.19`, and the current lockfile resolution is
   `qdrant-client 1.18.0`.
 - Exact server/client patch parity remains diagnostic only
   (`version_exact_parity_ok=false`) while official PyPI client release remains

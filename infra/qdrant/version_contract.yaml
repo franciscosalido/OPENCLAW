@@ -4,13 +4,13 @@ qdrant:
   server_target_version: "1.18.2"
   server_image: "qdrant/qdrant:v1.18.2"
   client_target_version: "1.18.0"
-  client_dependency: "qdrant-client>=1.18"
+  client_dependency: "qdrant-client>=1.18,<1.19"
   version_family: "1.18"
   rest_port: 6333
   grpc_port: 6334
   config_schema_version: "qdrant-local-config-v2"
   notes:
     - "Server 1.18.2 is latest."
-    - "Client dependency requires the 1.18 family or newer."
+    - "Client dependency is bounded to the 1.18 family."
     - "uv.lock currently resolves qdrant-client 1.18.0."
     - "Patch mismatch is accepted by PKD-D2P-00Y while official qdrant-client remains 1.18.0."

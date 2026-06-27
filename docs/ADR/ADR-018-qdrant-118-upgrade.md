@@ -22,14 +22,15 @@ because the project policy is to use the latest stable patch within the accepted
 minor family. The lockfile currently resolves
 `qdrant-client==1.18.0`, so this ADR intentionally accepts a documented
 server/client patch mismatch while the project dependency requires
-`qdrant-client>=1.18` to prevent rollback to legacy 1.13.x clients.
+`qdrant-client>=1.18,<1.19` to prevent rollback to legacy 1.13.x clients and
+avoid silently leaving the accepted `1.18.x` family on future lock refreshes.
 
 ## Decision
 
 Target Qdrant Server `qdrant/qdrant:v1.18.2` for local-first runtime
 evaluation.
 
-Keep Python client dependency `qdrant-client>=1.18`; the current lockfile
+Keep Python client dependency `qdrant-client>=1.18,<1.19`; the current lockfile
 resolution remains `1.18.0`.
 
 Python Weighted RRF remains the ground truth. Native Qdrant RRF remains
@@ -45,7 +46,7 @@ development/benchmark runtime:
 - Benchmark collections can be recreated from source corpus.
 - `quimera_knowledge` and `quimera_knowledge_v2` remain protected by existing
   governance.
-- The Python client contract remains in the `1.18` family or newer, with the
+- The Python client contract remains in the `1.18` family, with the
   current lockfile resolved at `1.18.0`.
 
 ## Evidence
@@ -63,7 +64,7 @@ benchmark results regress.
 - Server target: `1.18.2`.
 - Docker image: `qdrant/qdrant:v1.18.2`.
 - Client target: `1.18.0`.
-- Client dependency: `qdrant-client>=1.18`.
+- Client dependency: `qdrant-client>=1.18,<1.19`.
 - Version family: `1.18`.
 
 Readiness requires exact server target, current lockfile client target and same
@@ -87,7 +88,7 @@ lockfile resolves `qdrant-client==1.18.0`.
 ## Alternatives Considered
 
 1. Keep Qdrant Server 1.18.0.
-2. Target latest Qdrant Server 1.18.x with `qdrant-client>=1.18`.
+2. Target latest Qdrant Server 1.18.x with `qdrant-client>=1.18,<1.19`.
 3. Revert to Qdrant 1.13.2 immediately.
 4. Promote TurboQuant or native RRF as part of the patch upgrade.
 5. Move PostgreSQL/GraphRAG into this cycle.
@@ -155,7 +156,7 @@ Rollback targets:
   "reversible": true,
   "server_target_version": "1.18.2",
   "client_target_version": "1.18.0",
-  "client_dependency": "qdrant-client>=1.18",
+  "client_dependency": "qdrant-client>=1.18,<1.19",
   "client_patch_version_note": "uv.lock currently resolves qdrant-client 1.18.0",
   "docker_image": "qdrant/qdrant:v1.18.2",
   "python_rrf_default": true,
