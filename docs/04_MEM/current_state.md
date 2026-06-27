@@ -5,7 +5,64 @@
 > meaningful sessions.
 
 **Last updated:** 2026-06-27
-**Updated by:** Codex — FL-PR10 Company Fundamentals
+**Updated by:** Codex — FL-PR11 Repositories Core
+
+---
+
+## IN PROGRESS — FINLIB-0 FL-PR11 Repositories Core
+
+Current branch: `feat/finlib-repositories-core`
+
+GitHub:
+
+- Issue created: `https://github.com/franciscosalido/OPENCLAW/issues/120`.
+- Draft PR remote creation deferred because local `main` is ahead of
+  `origin/main` by 31 commits. Opening a Draft PR now would include unrelated
+  prior local sprint commits.
+
+Scope:
+
+- Added SDD `docs/specs/finlib-0/pr-11-repositories-core.md`.
+- Added asyncpg-only repository package under `backend/finlib/repositories/`.
+- Added typed DTOs for audit context, ops, macro and treasury writes.
+- Added shared audited transaction helper that writes domain data and exactly
+  one `audit_agent_writes` row in one transaction.
+- Added `OpsRepository` for sources, runs, watermarks, quality checks and
+  outbox polling.
+- Added `MacroRepository` for macro catalog and append-only observations with
+  advisory-lock revision allocation.
+- Added `TreasuryRepository` for treasury bond catalog and idempotent temporal
+  prices.
+- Added unit boundary tests and live integration test for repository flow,
+  audit counts, rollback and outbox concurrency.
+
+Schema reality:
+
+- Migration head at PR start: `028_create_company_fundamentals.sql`.
+- Watermark backing table already exists: `ops_ingestion_watermarks`.
+- No new migration is planned for FL-PR11.
+- `audit_agent_writes.batch_hash` is the audit hash column used by
+  `AuditContext.batch_hash`.
+
+Validation so far:
+
+- `uv run pytest tests/unit/test_finlib_ops_repository.py tests/unit/test_finlib_macro_repository.py tests/unit/test_finlib_treasury_repository.py tests/unit/test_finlib_repository_boundaries.py -q`
+  passed: 25 passed.
+- `uv run pytest tests/integration/test_finlib_repositories_core_live.py -q`
+  skipped safely without host DSN: 2 skipped.
+- `uvx ruff check backend/finlib/repositories backend/finlib/__init__.py tests/unit/test_finlib_ops_repository.py tests/unit/test_finlib_macro_repository.py tests/unit/test_finlib_treasury_repository.py tests/unit/test_finlib_repository_boundaries.py tests/integration/test_finlib_repositories_core_live.py`
+  passed.
+- `uvx ruff format --check backend/finlib/repositories backend/finlib/__init__.py tests/unit/test_finlib_ops_repository.py tests/unit/test_finlib_macro_repository.py tests/unit/test_finlib_treasury_repository.py tests/unit/test_finlib_repository_boundaries.py tests/integration/test_finlib_repositories_core_live.py`
+  passed.
+- `uv run mypy backend/finlib/repositories --strict` passed.
+- `uv run pyright backend/finlib/repositories` passed with only the known
+  cosmetic Pyright update notice.
+
+Scope intentionally unchanged:
+
+- No agents, ingesters, parsers, HTTP clients, ORM, SQLAlchemy, FastAPI, MCP,
+  A2A runtime, Qdrant mutation, pgvector policy, private portfolio data or
+  secrets.
 
 ---
 
