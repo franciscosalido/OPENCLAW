@@ -1,6 +1,7 @@
 # FINLIB-0 FL-PR12 — Repositories Assets
 
 Branch: `feat/finlib-repositories-assets`
+GitHub Issue: `#121`
 Status: Initial SDD
 
 ## Objective
@@ -25,6 +26,8 @@ application services.
 - Local `main` is ahead of `origin/main` by 35 commits. Remote Draft PR
   creation is deferred until the human authorizes publishing the stacked local
   sprint history or origin is synchronized.
+- GitHub Issue created:
+  `https://github.com/franciscosalido/OPENCLAW/issues/121`.
 - Existing dirty files outside FL-PR12 scope are preserved and must not be
   staged by this PR.
 

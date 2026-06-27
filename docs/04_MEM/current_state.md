@@ -9,6 +9,66 @@
 
 ---
 
+## IN PROGRESS — FINLIB-0 FL-PR12 Repositories Assets
+
+Current branch: `feat/finlib-repositories-assets`
+
+GitHub:
+
+- Issue created: `https://github.com/franciscosalido/OPENCLAW/issues/121`.
+- Draft PR remote creation deferred because local `main` is ahead of
+  `origin/main` by 35 commits. Publishing this branch now would include the
+  stacked local sprint history not yet present on GitHub.
+
+Scope:
+
+- Added SDD `docs/specs/finlib-0/pr-12-repositories-assets.md`.
+- Added asset DTOs in `backend/finlib/repositories/models_assets.py`.
+- Added `FundRepository` for `fund_registry` and `fund_daily_info`.
+- Added `FixedIncomeRepository` for `fi_instruments` and
+  `debenture_market_data`.
+- Added `FundamentalsRepository` for `company_registry`, `company_listings`,
+  `fundamentals_statements` and `fundamentals_indicators`.
+- Reused FL-PR11 `BaseRepository`, audited transaction helper,
+  `AuditContext`, `BatchWriteResult`, canonical JSON serialization and Level 0
+  recursive validation.
+- Added architecture tests for FINLIB import boundaries and raw SQL placement.
+- Added live integration coverage for idempotency, revision/version semantics,
+  audit counts and rollback behavior.
+
+Schema reality:
+
+- Migration head at PR start: `028_create_company_fundamentals.sql`.
+- No new migration is planned for FL-PR12.
+- All repository JSON payload casts use `::text::jsonb` because inputs are
+  pre-serialized through `_json_dumps_canonical()`.
+
+Validation so far:
+
+- `uv run pytest tests/unit/test_finlib_fund_repository.py tests/unit/test_finlib_fixed_income_repository.py tests/unit/test_finlib_fundamentals_repository.py tests/integration/test_finlib_repositories_assets_live.py tests/architecture/test_finlib_import_boundaries.py tests/architecture/test_no_raw_sql_outside_repositories.py -q`
+  passed locally: 24 passed, 1 skipped without host DSN.
+- `uv run pytest tests/unit -q` passed: 2096 passed, 261 subtests passed.
+- `uv run pytest tests/architecture -q` passed: 4 passed.
+- `uv run pytest tests/integration/test_finlib_repositories_assets_live.py -q`
+  skipped safely without host DSN: 1 skipped.
+- `uvx ruff check .` passed.
+- `uvx ruff format --check .` passed.
+- `uv run mypy backend/finlib/repositories --strict` passed.
+- `uv run mypy --strict .` passed: no issues found in 469 source files.
+- `uv run pyright backend/finlib/repositories` passed with only the known
+  cosmetic Pyright update notice.
+- `uv run pyright` global was attempted but interrupted after several minutes
+  without producing diagnostics; focused FL-PR12 Pyright passed.
+- `git diff --check` passed.
+
+Scope intentionally unchanged:
+
+- No migrations, agents, ingesters, parsers, HTTP clients, ORM, SQLAlchemy,
+  FastAPI, MCP, A2A runtime, Qdrant mutation, LLM call, pgvector policy,
+  private portfolio data or secrets.
+
+---
+
 ## IN PROGRESS — FINLIB-0 FL-PR11 Repositories Core
 
 Current branch: `feat/finlib-repositories-core`
