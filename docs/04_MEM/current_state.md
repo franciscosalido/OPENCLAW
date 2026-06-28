@@ -4,12 +4,36 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Last updated:** 2026-06-27
-**Updated by:** Codex — FL-PR13 Memory Boundary
+**Last updated:** 2026-06-28
+**Updated by:** Codex — FL-PR13 RC-01 Ready For Local Merge
 
 ---
 
-## IN PROGRESS — FINLIB-0 FL-PR13 Memory Boundary
+## READY FOR LOCAL MERGE — FINLIB-0 FL-PR13 Memory Boundary
+
+**Adversarial review verdict:** `APPROVE_WITH_NITS`
+**Report:** `docs/04_MEM/FL_PR13_ADVERSARIAL_REVIEW.md`
+**Sandbox:** container `f205ddd50d99` (openclaw-sandbox:latest)
+**Tests in sandbox:** 23/23 boundary unit + 16/16 architecture + 89/89 FINLIB unit = 128 targeted PASSED
+**import-linter:** 6/6 contracts KEPT
+**mypy --strict (scope):** 0 errors
+**ruff:** all clean
+
+**NITs (non-blocking):**
+- FND-01 [MAJOR]: FL-PR12 not merged into main — BLK-02 fix present and
+  correct (Caminho B, commit `09a00c8`). Local merge should merge FL-PR12 and
+  FL-PR13 together because this branch is intentionally stacked.
+- FND-02 [NIT]: policy.py env-read gap was resolved by RC-01 commit `e0b473c`
+  (`test: block memory policy environment reads`).
+- FND-03 [NIT]: Pre-existing gateway timing test failure (unrelated).
+- FND-04 [NIT]: Pre-existing SQLFluff violations in migrations 012-016.
+  FL-PR13 adds zero SQL files.
+- FND-05 [NIT]: Synthetic CPF "00000000000" in test fixtures (harmless).
+
+**Merge condition:** merge FL-PR12 and FL-PR13 simultaneously via
+`feat/finlib-memory-boundary`, preserving the stacked order:
+FL-PR12 SDD -> FL-PR12 implementation -> FL-PR12 RC -> FL-PR13 SDD ->
+FL-PR13 implementation -> FL-PR13 RC-01.
 
 Current branch: `feat/finlib-memory-boundary`
 
