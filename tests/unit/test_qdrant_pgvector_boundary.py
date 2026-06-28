@@ -125,6 +125,51 @@ def test_policy_module_has_no_runtime_client_imports() -> None:
     assert imports.isdisjoint(forbidden)
 
 
+def _qualified_name(node: ast.AST) -> str | None:
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        parent = _qualified_name(node.value)
+        if parent is None:
+            return None
+        return f"{parent}.{node.attr}"
+    return None
+
+
+def test_policy_module_has_no_environment_access() -> None:
+    tree = ast.parse(POLICY_PATH.read_text(encoding="utf-8"))
+    os_aliases = {"os"}
+    imported_env_names: set[str] = set()
+    env_attrs = {"environ", "environb"}
+    env_functions = {"getenv", "getenvb", "putenv", "unsetenv", "reload_environ"}
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name == "os":
+                    os_aliases.add(alias.asname or alias.name)
+        elif isinstance(node, ast.ImportFrom) and node.module == "os":
+            for alias in node.names:
+                if alias.name in env_attrs | env_functions:
+                    imported_env_names.add(alias.asname or alias.name)
+
+    offenders: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Attribute):
+            qualified = _qualified_name(node)
+            if qualified is None:
+                continue
+            root = qualified.split(".", 1)[0]
+            if root in os_aliases and (
+                node.attr in env_attrs or node.attr in env_functions
+            ):
+                offenders.append(qualified)
+        elif isinstance(node, ast.Name) and node.id in imported_env_names:
+            offenders.append(node.id)
+
+    assert offenders == []
+
+
 def test_memory_policy_doc_mentions_all_authorized_pgvector_uses() -> None:
     text = MEMORY_POLICY_DOC.read_text(encoding="utf-8")
 
