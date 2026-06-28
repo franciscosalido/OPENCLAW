@@ -200,6 +200,21 @@ Repository payloads are serialized with `_json_dumps_canonical()`. Because the
 project pool configures asyncpg JSON/JSONB codecs, repository SQL must cast
 pre-serialized JSON strings as `::text::jsonb`, never bare `::jsonb`.
 
+### Advisory Lock Parameter Contract
+
+Revision/version allocation uses transaction-scoped `pg_advisory_xact_lock`
+inside the same audited transaction. Advisory lock keys are built as textual
+strings, but SQL placeholders must first declare the real PostgreSQL type
+expected from Python/asyncpg and only then cast to text:
+
+- `datetime` parameters: `$N::timestamptz::text`;
+- `date` parameters: `$N::date::text`;
+- `UUID` parameters: `$N::uuid::text`.
+
+Do not cast non-string asyncpg parameters directly as `$N::text`; doing so makes
+asyncpg select the TEXT encoder and raises client-side `DataError` before the
+query reaches PostgreSQL.
+
 ### Idempotency And Revision Policies
 
 - `fund_registry`: natural key `fund_cnpj`.

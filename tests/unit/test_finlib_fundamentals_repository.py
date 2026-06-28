@@ -108,6 +108,8 @@ def test_fundamentals_repository_sql_contracts() -> None:
     assert "ON CONFLICT (exchange, ticker)" in source
     assert "ON CONFLICT (lineage_hash, ts) DO NOTHING" in source
     assert "pg_advisory_xact_lock" in source
+    assert "$1::uuid::text" in source
+    assert "$5::date::text" in source
     assert "ORDER BY version DESC" in source
     assert "UPDATE fundamentals_statements" not in source
     assert "::jsonb" not in source.replace("::text::jsonb", "")

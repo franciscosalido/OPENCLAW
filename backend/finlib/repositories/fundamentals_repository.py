@@ -73,8 +73,8 @@ WHERE lineage_hash = $1
 LOCK_STATEMENT_SLOT_SQL = """
 SELECT pg_advisory_xact_lock(
     hashtext(
-        'fundamentals_statement:' || $1::text || ':' || $2 || ':' || $3 || ':'
-        || $4 || ':' || $5::text
+        'fundamentals_statement:' || $1::uuid::text || ':' || $2 || ':' || $3
+        || ':' || $4 || ':' || $5::date::text
     )
 )
 """

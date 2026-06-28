@@ -41,7 +41,9 @@ WHERE lineage_hash = $1
 """
 
 LOCK_DEBENTURE_SLOT_SQL = """
-SELECT pg_advisory_xact_lock(hashtext('debenture_market_data:' || $1::text || ':' || $2::text))
+SELECT pg_advisory_xact_lock(
+    hashtext('debenture_market_data:' || $1::uuid::text || ':' || $2::timestamptz::text)
+)
 """
 
 NEXT_DEBENTURE_REVISION_SQL = """

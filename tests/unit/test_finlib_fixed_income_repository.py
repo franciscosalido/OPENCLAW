@@ -81,6 +81,8 @@ def test_fixed_income_repository_sql_contracts() -> None:
     assert "ON CONFLICT (lineage_hash) DO NOTHING" in source
     assert "ON CONFLICT (lineage_hash, ts) DO NOTHING" in source
     assert "pg_advisory_xact_lock" in source
+    assert "$1::uuid::text" in source
+    assert "$2::timestamptz::text" in source
     assert "MAX(revision)" in source
     assert "::jsonb" not in source.replace("::text::jsonb", "")
 

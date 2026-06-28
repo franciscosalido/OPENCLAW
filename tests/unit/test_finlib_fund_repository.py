@@ -63,6 +63,8 @@ def test_fund_repository_sql_contracts() -> None:
 
     assert "ON CONFLICT (fund_cnpj)" in source
     assert "pg_advisory_xact_lock" in source
+    assert "$2::timestamptz::text" in source
+    assert "$2::text" not in source
     assert "MAX(revision)" in source
     assert "UPDATE fund_daily_info" not in source
     assert "::jsonb" not in source.replace("::text::jsonb", "")

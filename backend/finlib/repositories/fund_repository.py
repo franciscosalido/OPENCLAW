@@ -43,7 +43,9 @@ WHERE lineage_hash = $1
 """
 
 LOCK_FUND_DAILY_SLOT_SQL = """
-SELECT pg_advisory_xact_lock(hashtext('fund_daily_info:' || $1 || ':' || $2::text))
+SELECT pg_advisory_xact_lock(
+    hashtext('fund_daily_info:' || $1 || ':' || $2::timestamptz::text)
+)
 """
 
 NEXT_FUND_DAILY_REVISION_SQL = """
