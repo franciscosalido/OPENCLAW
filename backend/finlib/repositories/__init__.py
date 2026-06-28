@@ -6,6 +6,9 @@ from backend.finlib.repositories.base import (
     RepositoryIntegrityError,
     RunAlreadyFinishedError,
 )
+from backend.finlib.repositories.fixed_income_repository import FixedIncomeRepository
+from backend.finlib.repositories.fund_repository import FundRepository
+from backend.finlib.repositories.fundamentals_repository import FundamentalsRepository
 from backend.finlib.repositories.macro_repository import MacroRepository
 from backend.finlib.repositories.models import (
     AuditContext,
@@ -21,6 +24,16 @@ from backend.finlib.repositories.models import (
     TreasuryPriceInput,
     WatermarkInput,
 )
+from backend.finlib.repositories.models_assets import (
+    CompanyListingInput,
+    CompanyRegistryInput,
+    DebentureMarketDataInput,
+    FixedIncomeInstrumentInput,
+    FundDailyInfoInput,
+    FundRegistryInput,
+    FundamentalsIndicatorInput,
+    FundamentalsStatementInput,
+)
 from backend.finlib.repositories.ops_repository import OpsRepository
 from backend.finlib.repositories.treasury_repository import TreasuryRepository
 
@@ -28,8 +41,19 @@ __all__ = [
     "AuditContext",
     "BaseRepository",
     "BatchWriteResult",
+    "CompanyListingInput",
+    "CompanyRegistryInput",
     "DataQualityCheckInput",
     "DataSourceInput",
+    "DebentureMarketDataInput",
+    "FixedIncomeInstrumentInput",
+    "FixedIncomeRepository",
+    "FundDailyInfoInput",
+    "FundRegistryInput",
+    "FundRepository",
+    "FundamentalsIndicatorInput",
+    "FundamentalsRepository",
+    "FundamentalsStatementInput",
     "IngestionRunInput",
     "MacroObservationInput",
     "MacroRepository",

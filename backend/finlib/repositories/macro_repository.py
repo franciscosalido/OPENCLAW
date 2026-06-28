@@ -51,7 +51,7 @@ WHERE lineage_hash = $1
 """
 
 LOCK_MACRO_SLOT_SQL = """
-SELECT pg_advisory_xact_lock(hashtext('macro:' || $1 || ':' || $2::text))
+SELECT pg_advisory_xact_lock(hashtext('macro:' || $1 || ':' || $2::timestamptz::text))
 """
 
 NEXT_REVISION_SQL = """

@@ -57,6 +57,8 @@ def test_macro_observation_revision_uses_advisory_lock_and_lineage_skip() -> Non
     source = _source()
 
     assert "pg_advisory_xact_lock" in source
+    assert "$2::timestamptz::text" in source
+    assert "$2::text" not in source
     assert "MAX(revision)" in source
     assert "UNIQUE (lineage_hash, ref_ts)" not in source
     assert "SELECT 1 FROM macro_observations" in source

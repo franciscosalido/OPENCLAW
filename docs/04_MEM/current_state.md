@@ -4,8 +4,133 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Last updated:** 2026-06-27
-**Updated by:** Codex — FL-PR11 Repositories Core
+**Last updated:** 2026-06-28
+**Updated by:** Codex — FL-PR13 RC-01 Ready For Local Merge
+
+---
+
+## READY FOR LOCAL MERGE — FINLIB-0 FL-PR13 Memory Boundary
+
+**Adversarial review verdict:** `APPROVE_WITH_NITS`
+**Report:** `docs/04_MEM/FL_PR13_ADVERSARIAL_REVIEW.md`
+**Sandbox:** container `f205ddd50d99` (openclaw-sandbox:latest)
+**Tests in sandbox:** 23/23 boundary unit + 16/16 architecture + 89/89 FINLIB unit = 128 targeted PASSED
+**import-linter:** 6/6 contracts KEPT
+**mypy --strict (scope):** 0 errors
+**ruff:** all clean
+
+**NITs (non-blocking):**
+- FND-01 [MAJOR]: FL-PR12 not merged into main — BLK-02 fix present and
+  correct (Caminho B, commit `09a00c8`). Local merge should merge FL-PR12 and
+  FL-PR13 together because this branch is intentionally stacked.
+- FND-02 [NIT]: policy.py env-read gap was resolved by RC-01 commit `e0b473c`
+  (`test: block memory policy environment reads`).
+- FND-03 [NIT]: Pre-existing gateway timing test failure (unrelated).
+- FND-04 [NIT]: Pre-existing SQLFluff violations in migrations 012-016.
+  FL-PR13 adds zero SQL files.
+- FND-05 [NIT]: Synthetic CPF "00000000000" in test fixtures (harmless).
+
+**Merge condition:** merge FL-PR12 and FL-PR13 simultaneously via
+`feat/finlib-memory-boundary`, preserving the stacked order:
+FL-PR12 SDD -> FL-PR12 implementation -> FL-PR12 RC -> FL-PR13 SDD ->
+FL-PR13 implementation -> FL-PR13 RC-01.
+
+Current branch: `feat/finlib-memory-boundary`
+
+GitHub:
+
+- Issue created: `https://github.com/franciscosalido/OPENCLAW/issues/122`.
+- Draft PR remote creation deferred because the local FINLIB stack is ahead of
+  `origin/main` and FL-PR12 has not been published/merged remotely from this
+  workspace.
+
+Scope:
+
+- Added SDD `docs/specs/finlib-0/pr-13-memory-boundary.md`.
+- Added ADR `docs/ADR/ADR-006-qdrant-postgres-pgvector-boundary.md`.
+- Added active policy doc `docs/specs/memory_policy.md`.
+- Added LongRAG planning reference
+  `docs/references/long-rag-postgres-memory-reference.md`.
+- Added pure policy module `backend/memory/policy.py`.
+- Added unit and architecture tests that make the boundary executable:
+  Qdrant remains primary semantic/hybrid retriever, PostgreSQL/TimescaleDB
+  remains structured long-term memory, pgvector remains auxiliary only, and
+  FINLIB repositories do not import Qdrant/RAG/LLM/HTTP clients.
+- Extended `.importlinter` with FINLIB/RAG/memory-policy boundary contracts.
+
+Scope intentionally unchanged:
+
+- No LongRAG runtime, migrations, tables, retrievers, agents, Qdrant
+  collection mutation, pgvector retriever, FINLIB repository mutation, LLM
+  calls, HTTP clients, secrets, DSNs, portfolio data or runtime data mutation.
+
+---
+
+## IN PROGRESS — FINLIB-0 FL-PR12 Repositories Assets
+
+Adversarial RC-01 verdict was `REQUEST_CHANGES`; Codex applied the advisory
+lock fix locally.
+
+Current branch: `feat/finlib-repositories-assets`
+
+GitHub:
+
+- Issue created: `https://github.com/franciscosalido/OPENCLAW/issues/121`.
+- Draft PR remote creation deferred because local `main` is ahead of
+  `origin/main` by 35 commits.
+
+RC-01 fix:
+
+- Replaced advisory-lock placeholder casts that coerced Python `datetime`,
+  `date` or `UUID` values through PostgreSQL `text` OID.
+- Adopted typed SQL casts instead of Python pre-stringification:
+  - `fund_repository.py`: `$2::timestamptz::text`
+  - `fixed_income_repository.py`: `$1::uuid::text`,
+    `$2::timestamptz::text`
+  - `fundamentals_repository.py`: `$1::uuid::text`, `$5::date::text`
+  - `macro_repository.py`: `$2::timestamptz::text`
+- Added unit assertions that lock SQLs use typed casts and do not regress to
+  bare temporal `$N::text` casts.
+
+Cowork sandbox before fix (container 8b973cab9fec):
+
+- Unit: 20/20 + 67/67 FINLIB + 123 cross-sprint PASSED
+- Architecture: 4/4 PASSED
+- Integration FL-PR12: 0/1 FAILED (BLK-02 live)
+- Integration cross-sprint: test_finlib_repositories_core_live 1/2 FAILED (BLK-02b)
+- mypy strict 0 errors | pyright 0 | ruff clean | bandit clean | BLK-01 fixed ✅
+
+Local RC-01 validation after fix:
+
+- `uv run pytest tests/unit/test_finlib_fund_repository.py tests/unit/test_finlib_fixed_income_repository.py tests/unit/test_finlib_fundamentals_repository.py tests/unit/test_finlib_macro_repository.py -q`
+  passed: 26 passed.
+- `uv run pytest tests/integration/test_finlib_repositories_assets_live.py tests/integration/test_finlib_repositories_core_live.py -q`
+  skipped safely without host DSN: 3 skipped.
+- `uv run pytest tests/architecture -q` passed: 4 passed.
+- `uv run mypy backend/finlib/repositories tests/unit/test_finlib_fund_repository.py tests/unit/test_finlib_fixed_income_repository.py tests/unit/test_finlib_fundamentals_repository.py tests/unit/test_finlib_macro_repository.py --strict`
+  passed: no issues in 14 source files.
+- `uv run pyright backend/finlib/repositories tests/unit/test_finlib_fund_repository.py tests/unit/test_finlib_fixed_income_repository.py tests/unit/test_finlib_fundamentals_repository.py tests/unit/test_finlib_macro_repository.py`
+  passed with only the known cosmetic Pyright update notice.
+- `uvx ruff check ...` passed.
+- `uvx ruff format --check ...` passed.
+
+Scope:
+
+- Added SDD `docs/specs/finlib-0/pr-12-repositories-assets.md`.
+- Added asset DTOs in `backend/finlib/repositories/models_assets.py`.
+- Added `FundRepository` for `fund_registry` and `fund_daily_info`.
+- Added `FixedIncomeRepository` for `fi_instruments` and `debenture_market_data`.
+- Added `FundamentalsRepository` for `company_registry`, `company_listings`,
+  `fundamentals_statements` and `fundamentals_indicators`.
+- Reused FL-PR11 `BaseRepository`, audited transaction helper, `AuditContext`,
+  `BatchWriteResult`, canonical JSON serialization and Level 0 recursive validation.
+- Added architecture tests for FINLIB import boundaries and raw SQL placement.
+
+Scope intentionally unchanged:
+
+- No migrations, agents, ingesters, parsers, HTTP clients, ORM, SQLAlchemy,
+  FastAPI, MCP, A2A runtime, Qdrant mutation, LLM call, pgvector policy,
+  private portfolio data or secrets.
 
 ---
 
