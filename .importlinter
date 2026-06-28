@@ -1,5 +1,6 @@
 [importlinter]
 root_package = backend
+include_external_packages = True
 
 [importlinter:contract:agent0-does-not-import-memory-backends]
 name = Agent0 must not import memory backends directly
@@ -10,3 +11,59 @@ forbidden_modules =
     backend.memory
     backend.working_memory
     backend.temporal
+
+[importlinter:contract:finlib-does-not-import-qdrant]
+name = FINLIB must not import Qdrant clients
+type = forbidden
+source_modules =
+    backend.finlib
+forbidden_modules =
+    qdrant_client
+
+[importlinter:contract:finlib-does-not-import-rag]
+name = FINLIB must not import RAG modules
+type = forbidden
+source_modules =
+    backend.finlib
+forbidden_modules =
+    backend.rag
+
+[importlinter:contract:finlib-does-not-import-llm]
+name = FINLIB must not import LLM or HTTP clients
+type = forbidden
+source_modules =
+    backend.finlib
+forbidden_modules =
+    anthropic
+    httpx
+    langchain
+    litellm
+    ollama
+    openai
+    requests
+
+[importlinter:contract:rag-does-not-import-finlib]
+name = RAG must not import FINLIB directly
+type = forbidden
+source_modules =
+    backend.rag
+forbidden_modules =
+    backend.finlib
+
+[importlinter:contract:memory-policy-is-self-contained]
+name = Memory policy must not import runtime clients
+type = forbidden
+source_modules =
+    backend.memory.policy
+forbidden_modules =
+    anthropic
+    asyncpg
+    httpx
+    litellm
+    ollama
+    openai
+    psycopg
+    psycopg2
+    qdrant_client
+    requests
+    sqlalchemy

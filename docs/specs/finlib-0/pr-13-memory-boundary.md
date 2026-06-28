@@ -16,7 +16,7 @@ in docs, Python policy and tests so future drift fails in CI.
 
 ## Real Repository Paths
 
-- Active ADR path: `docs/adr/`.
+- Active ADR path: `docs/ADR/`.
 - Active specs path: `docs/specs/`.
 - Memory policy path selected for this PR: `docs/specs/memory_policy.md`.
 - FINLIB path: `backend/finlib/`.
@@ -100,7 +100,7 @@ semantic retrieval.
 
 ## Required Deliverables
 
-- ADR: `docs/adr/ADR-006-qdrant-postgres-pgvector-boundary.md`.
+- ADR: `docs/ADR/ADR-006-qdrant-postgres-pgvector-boundary.md`.
 - Memory policy doc: `docs/specs/memory_policy.md`.
 - LongRAG reference doc:
   `docs/references/long-rag-postgres-memory-reference.md`.
@@ -163,4 +163,3 @@ docker run --rm \
 - LLM calls;
 - HTTP clients;
 - secrets, DSNs, private portfolio data or real financial account data.
-

@@ -5,7 +5,40 @@
 > meaningful sessions.
 
 **Last updated:** 2026-06-27
-**Updated by:** Codex — FL-PR12 RC-01 Advisory Lock Fix
+**Updated by:** Codex — FL-PR13 Memory Boundary
+
+---
+
+## IN PROGRESS — FINLIB-0 FL-PR13 Memory Boundary
+
+Current branch: `feat/finlib-memory-boundary`
+
+GitHub:
+
+- Issue created: `https://github.com/franciscosalido/OPENCLAW/issues/122`.
+- Draft PR remote creation deferred because the local FINLIB stack is ahead of
+  `origin/main` and FL-PR12 has not been published/merged remotely from this
+  workspace.
+
+Scope:
+
+- Added SDD `docs/specs/finlib-0/pr-13-memory-boundary.md`.
+- Added ADR `docs/ADR/ADR-006-qdrant-postgres-pgvector-boundary.md`.
+- Added active policy doc `docs/specs/memory_policy.md`.
+- Added LongRAG planning reference
+  `docs/references/long-rag-postgres-memory-reference.md`.
+- Added pure policy module `backend/memory/policy.py`.
+- Added unit and architecture tests that make the boundary executable:
+  Qdrant remains primary semantic/hybrid retriever, PostgreSQL/TimescaleDB
+  remains structured long-term memory, pgvector remains auxiliary only, and
+  FINLIB repositories do not import Qdrant/RAG/LLM/HTTP clients.
+- Extended `.importlinter` with FINLIB/RAG/memory-policy boundary contracts.
+
+Scope intentionally unchanged:
+
+- No LongRAG runtime, migrations, tables, retrievers, agents, Qdrant
+  collection mutation, pgvector retriever, FINLIB repository mutation, LLM
+  calls, HTTP clients, secrets, DSNs, portfolio data or runtime data mutation.
 
 ---
 
