@@ -71,6 +71,14 @@ def test_default_yaml_loads() -> None:
     assert config.conventions.day_count == "business_252"
     assert config.conventions.rate_compounding == "annual_exp_252"
     assert config.conventions.rate_compounding_assumed is True
+    assert config.conventions.calendars_dir == "config/calendars"
+    assert config.conventions.trading_calendar_id == "B3_LISTED_TRADING"
+    assert config.conventions.financial_calendar_id == "BR_ANBIMA_BUSINESS"
+    assert config.conventions.day_count_calendar == "trading"
+    assert config.conventions.day_count_calendar_assumed is True
+    assert config.conventions.interval_convention == "(D0,Dv]"
+    assert config.conventions.interval_convention_assumed is True
+    assert config.conventions.year_basis == 252
     assert config.budget.per_minute == 100
     assert config.budget.per_second == 50
     assert config.budget.max_retries == 0
