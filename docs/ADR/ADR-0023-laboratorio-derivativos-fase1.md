@@ -79,6 +79,29 @@ Todas configuraveis em `config/derivatives.yaml` e carregadas em
 - Spot: `spot_price` da linha da opcao e o spot no ultimo negocio da opcao,
   nao cotacao atual; flag `spot_not_synchronous` quando dessincronizado.
 
+## Calendarios 3.0.0 e convencoes temporais (DL-PR02)
+
+Os bundles `config/calendars/b3_calendar_{2026,2027,2028}.yaml`
+(schema 3.0.0, JSON estrito, checksums em `SHA256SUMS`, evidencia
+OC 041/2026 errata) substituem o `holidays_file` previsto acima. Hipoteses
+declaradas, com flag, ate homologacao:
+
+- **`trading` como relogio do DU** (`day_count_calendar: trading`,
+  `day_count_calendar_assumed: true`): a contagem de dias uteis usa
+  `B3_LISTED_TRADING`; `BR_ANBIMA_BUSINESS` fica carregado como referencia
+  financeira. A equivalencia DU pregao x DU financeiro na B3 nao esta
+  demonstrada.
+- **Convencao de intervalo `(D0,Dv]`** (`interval_convention_assumed: true`):
+  exclui a data de avaliacao, inclui o vencimento — padrao DU brasileiro.
+- **Base anual 252** (`year_basis: 252`): os 247/249/251 dias observados nos
+  calendarios nao substituem o denominador 252.
+- **Recusa do desconhecido:** B3 2027/2028 sao `unknown` nos bundles; esses
+  anos ficam fora de `coverage_years` e qualquer contagem que os toque
+  levanta `CalendarCoverageError`. A projecao 2027 e lida e ignorada; nunca
+  e promovida a cobertura.
+- `third_friday_preceding` produz candidato por regra publicada (3a sexta
+  civil, recuo ao dia util anterior); nao afirma serie listada.
+
 ## Barreira deterministica anti-fixture
 
 - `Provenance` e `Purpose` atribuidos pelo adaptador de transporte; payload
