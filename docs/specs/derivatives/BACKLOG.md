@@ -21,6 +21,12 @@
 
 ## Itens nomeados (fora do Lab ou de fase futura)
 
+- Suite regenera artefatos rastreados: `docs/rag/rag_01b_pr08_integration_report.md`,
+  `evaluation/results/rag_01b_pr08_agentic0_smoke_summary.json`,
+  `rag_01b_pr08_integration_health.json`, `rag_01b_pr08_latency_summary.json`,
+  `rag_01b_pr09_health_report.json`, `rag_01b_pr09_smoke_summary.json` —
+  migrar para `tmp_path`; fora do Lab.
+- `test_wm_docs.py` referencia `docs/adr/` minusculo; canonico e `docs/ADR/`.
 - Bundle OKF para `knowledge/` (`okf_init`) — fora do Lab.
 - Python 3.14 no shell vs 3.12 do projeto — verificar interpretador fora do
   `uv`.
