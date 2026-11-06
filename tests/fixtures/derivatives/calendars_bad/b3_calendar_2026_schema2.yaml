@@ -1,0 +1,10 @@
+{
+  "schema_version": "2.0.0",
+  "year": 2026,
+  "bundle_id": "synthetic-schema2-for-tests",
+  "data": {
+    "calendar_day": [],
+    "calendar_version": [],
+    "calendar_day_projection": []
+  }
+}

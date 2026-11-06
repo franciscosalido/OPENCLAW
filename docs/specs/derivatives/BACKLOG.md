@@ -34,3 +34,13 @@
 - Superficie de vol / SVI-SSVI — pesquisa posterior.
 - Andersen/Andreasen (americanas rapidas) — so apos CRR de referencia
   (Fase 2).
+- Verificar hashes canonicos internos dos bundles de calendario
+  (`integrity.*_sha256`) conforme `integrity.canonicalization` — so se a
+  especificacao no arquivo for inequivoca.
+- Persistir calendario em PostgreSQL quando houver 2o consumidor.
+- Calendarios EUA (NYSE/SIFMA/Fedwire) → eventos do Mapeador (Fase 2), nao
+  calendario do pricer.
+- Renumeracao 2026-11-06: DL-PR02 = tempo (calendario + convencoes),
+  DL-PR03 = BSM + gregas, DL-PR04 = IV, DL-PR05 = cliente OpLab,
+  DL-PR06 = ChainService + latencia, DL-PR07 = servidor MCP,
+  DL-PR08 = CLI (opcional).

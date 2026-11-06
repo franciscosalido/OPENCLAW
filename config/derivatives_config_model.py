@@ -16,6 +16,8 @@ from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 
 DayCount = Literal["business_252", "calendar_365"]
 RateCompounding = Literal["annual_exp_252", "continuous"]
+IntervalConvention = Literal["(D0,Dv]", "[D0,Dv)"]
+YearBasis = Literal[252, 365]
 
 STRICT_MODEL_CONFIG = ConfigDict(extra="forbid", frozen=True)
 
@@ -37,7 +39,14 @@ class Conventions(BaseModel):
     dividend_yield: float = Field(default=0.0, ge=0.0)
     strike_adjusted_by_exchange_assumed: bool = True
     rate_compounding_assumed: bool = True
-    holidays_file: str | None = None
+    calendars_dir: str = "config/calendars"
+    trading_calendar_id: Literal["B3_LISTED_TRADING"] = "B3_LISTED_TRADING"
+    financial_calendar_id: Literal["BR_ANBIMA_BUSINESS"] = "BR_ANBIMA_BUSINESS"
+    day_count_calendar: Literal["trading", "financial"] = "trading"
+    day_count_calendar_assumed: bool = True
+    interval_convention: IntervalConvention = "(D0,Dv]"
+    interval_convention_assumed: bool = True
+    year_basis: YearBasis = 252
 
 
 class Quality(BaseModel):
@@ -131,8 +140,10 @@ __all__ = [
     "Budget",
     "Conventions",
     "DerivativesConfig",
+    "IntervalConvention",
     "Iv",
     "Oplab",
     "Quality",
+    "YearBasis",
     "load_derivatives_config",
 ]

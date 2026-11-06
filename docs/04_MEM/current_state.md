@@ -5,11 +5,63 @@
 > meaningful sessions.
 
 **Last updated: 2026-11-06
-**Updated by: Claude Code — DL-PR01 Lab de Derivativos (vendor models + dominio + qualidade)
+**Updated by: Claude Code — DL-PR02 Lab de Derivativos (calendarios 3.0.0 + convencoes temporais)
 
 ---
 
-## IN PROGRESS — Lab de Derivativos DL-PR01
+## IN PROGRESS — Lab de Derivativos DL-PR02
+
+Current branch: `feat/dl-pr02-calendar-conventions`
+
+Base: DL-PR01 mergeado via PR #126; `main == origin/main == 05592cb` no
+inicio da sessao (artefato regenerado de `evaluation/` guardado em stash
+`dl-pr02-preflight`, nunca commitado).
+
+Renumeracao (06/11): DL-PR02 = tempo (calendario + convencoes),
+DL-PR03 = BSM + gregas, DL-PR04 = IV, DL-PR05 = cliente OpLab,
+DL-PR06 = ChainService, DL-PR07 = MCP, DL-PR08 = CLI opcional.
+
+Scope:
+
+- Versionado `config/calendars/` byte a byte (3 bundles 3.0.0 2026-2028,
+  PDF OC 041/2026 errata, SHA256SUMS, README); checksums conferem antes e
+  depois do commit.
+- `Conventions` perdeu `holidays_file` e ganhou `calendars_dir`,
+  `trading_calendar_id`, `financial_calendar_id`,
+  `day_count_calendar`(+assumed), `interval_convention`(+assumed),
+  `year_basis` (252).
+- Added `backend/derivatives/pricing/calendar.py`: `CalendarId`,
+  `TradingCalendar` congelado, `load_calendar_bundle` (JSON estrito: chave
+  duplicada/NaN recusados, schema 3.0.0, ano e SHA-256 conferidos),
+  `build_calendar` (ano com `unknown` fica inteiro fora; projecao 2027
+  lida e ignorada), `load_calendars`, `business_days_between` (bissecao),
+  `is_business_day` (recusa fora da cobertura), `third_friday_preceding`.
+- Added `backend/derivatives/pricing/conventions.py`: `year_fraction`,
+  `continuous_rate`, `TimeToExpiry`/`time_to_expiry`, `model_assumptions`.
+- Added 78 testes novos (`test_calendar.py`, `test_conventions.py`,
+  extensao de `test_config.py` e boundaries) + fixture
+  `calendars_bad/`; coleta do Lab = 159.
+- Errata do card: base de coleta era 81 (nao ~117); alvo >= 150 atingido
+  com testes substantivos (registrada no SDD_DL-PR02).
+
+Validation:
+
+- `pytest tests/ -q --ignore=tests/integration --timeout=120`: 2285+ passed
+  (v_tests=0); carga dos 3 bundles + 2 calendarios < 1 s (guarda de teste).
+- `mypy backend/ --strict` 0; `pyright backend/` 0;
+  `mypy config/derivatives_config_model.py --strict` 0.
+- 286 linhas de producao adicionadas (<= 300).
+
+Scope intentionally unchanged:
+
+- Sem BSM/gregas (PR03), IV (PR04), HTTP (PR05), persistencia PostgreSQL,
+  calendarios EUA, `market_context_day`, hashes canonicos internos
+  (`integrity.*_sha256` — backlog), alteracao de formato dos YAMLs.
+- Next: DL-PR03 (BSM + gregas, referencias de Hull) apos merge.
+
+---
+
+## MERGED — Lab de Derivativos DL-PR01 (PR #126)
 
 Current branch: `feat/dl-pr01-vendor-domain-quality`
 
