@@ -4,12 +4,62 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Last updated: 2026-06-28
-**Updated by: Claude Cowork — FL-PR14 Adversarial Review APPROVED
+**Last updated: 2026-11-05
+**Updated by: Claude Code — DL-PR00 Lab de Derivativos (fundacao)
 
 ---
 
-## IN PROGRESS — FINLIB-0 FL-PR14 Aggregates Readiness Closeout
+## IN PROGRESS — Lab de Derivativos DL-PR00
+
+Current branch: `feat/dl-pr00-derivatives-foundation`
+
+Base: FL-PR14 mergeado via PR #124; `main == origin/main == 231b500` no
+inicio da sessao; Gate 0 (G0-A..G0-F) passou integralmente com o criterio
+E3 (`--ignore=tests/integration`).
+
+Scope:
+
+- Added `docs/adr/ADR-0023-laboratorio-derivativos-fase1.md` (Accepted):
+  decisoes 1-8, estados A/B/C, convencoes numericas como hipoteses com flag,
+  barreira deterministica anti-fixture, seguranca do token OpLab, pendencias
+  de homologacao.
+- Added `docs/adr/ADR-0024-reversao-proibicao-corretora.md` (PROPOSED, nao
+  assinado; nao altera `CLAUDE.md`).
+- Added `docs/specs/derivatives/SDD_DL-PR00.md` and
+  `docs/specs/derivatives/BACKLOG.md`.
+- Added `backend/derivatives/` (`provenance.py`, `config.py`): enums
+  Provenance/Purpose/Readiness, heranca worst-of, `ProvenanceStamp`,
+  `DerivativesMcpConfig` (porta 8814) com loader env-injetavel e bloqueio
+  duro de `live_homologated`.
+- Added `config/derivatives.yaml` + `config/derivatives_config_model.py`
+  (pydantic `extra="forbid"`, allowlist so `/market/`).
+- Added `tests/fixtures/derivatives/documental/` (7 exemplos byte a byte da
+  doc OpLab v3 + README + manifest.json com SHA-256 gerados por shasum).
+- Added 31 testes: `tests/unit/derivatives/` (provenance, config, fixtures)
+  e `tests/architecture/test_derivatives_boundaries.py`.
+
+Validation:
+
+- `uv run pytest tests/ -q --ignore=tests/integration --timeout=120`
+  passed: 2186 passed, 15 skipped (v_tests=0).
+- Lab collect: 31 testes (v_collect=0).
+- `uv run mypy backend/ --strict` 0 errors; `uv run pyright backend/` 0
+  errors; `config/derivatives_config_model.py` verificado em separado
+  (mypy/pyright 0).
+- Manifesto confere nos dois sentidos, 0 hash divergente.
+- Diff vazio contra `main` em `CLAUDE.md`/`AGENTS.md`/`.claude/`/
+  `pyproject.toml`/`uv.lock`; 306 linhas de producao (< 400).
+
+Scope intentionally unchanged:
+
+- No vendor models, normalizacao, BSM, IV, cliente HTTP, transporte,
+  servidor MCP, CLI, fixture sintetica, dependencia nova, chamada de rede,
+  token, rota de ordens.
+- Next: DL-PR01 (vendor models + normalizacao + qualidade) apos merge.
+
+---
+
+## MERGED — FINLIB-0 FL-PR14 Aggregates Readiness Closeout (PR #124)
 
 Current branch: `feat/finlib-aggregates-readiness-closeout`
 

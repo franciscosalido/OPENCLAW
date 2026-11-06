@@ -1,0 +1,35 @@
+{
+  "source": "https://apidocs.oplab.com.br/",
+  "captured_at": "2026-11-05",
+  "provenance": "documental",
+  "files": {
+    "market_instruments_XBOV11.json": {
+      "sha256": "acf52524ce6789f56580f6d4e8d8c648b35ddaf18bf037897517d5f3fb4e87a4",
+      "endpoint": "GET /market/instruments/{symbol}"
+    },
+    "market_interest_rates.json": {
+      "sha256": "1ac66bc7cced230416ca8a8ebe09117d6f52a3d29db629cddae1a28e8f71d7b6",
+      "endpoint": "GET /market/interest_rates"
+    },
+    "market_options_PETR3.json": {
+      "sha256": "7411b99309c27f72a5b28ed0d32aeed68d4674e373f86f9eea211eb9bf0cda28",
+      "endpoint": "GET /market/options/{symbol}"
+    },
+    "market_options_bs_example.json": {
+      "sha256": "108a320a5a378319fe0026492ee326923e5c913162711a8d451465ba363a9fc5",
+      "endpoint": "GET /market/options/bs"
+    },
+    "market_options_details_PETRE100.json": {
+      "sha256": "c7976a817f046b498dc37a1d4dd2f3600659073135d3c442bee2708bfe0f5599",
+      "endpoint": "GET /market/options/details/{symbol}"
+    },
+    "market_status.json": {
+      "sha256": "8a13b5ebf39fed75721b958f24affaf1d284363ed3cdcef29cf198d35a054d7e",
+      "endpoint": "GET /market/status"
+    },
+    "market_stocks_PETR4.json": {
+      "sha256": "4303256a5c9bbc33a0cc6f2f8f2609db0f03ef2cf1322aa0b1d343e40503575e",
+      "endpoint": "GET /market/stocks/{symbol}"
+    }
+  }
+}
