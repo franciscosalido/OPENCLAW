@@ -4,8 +4,8 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Last updated:** 2026-06-28
-**Updated by:** Codex — FL-PR14 Aggregates Readiness Closeout
+**Last updated: 2026-06-28
+**Updated by: Claude Cowork — FL-PR14 Adversarial Review APPROVED
 
 ---
 

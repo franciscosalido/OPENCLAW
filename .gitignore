@@ -103,3 +103,6 @@ secrets/
 infra/litellm/generated/*
 !infra/litellm/generated/
 !infra/litellm/generated/.gitkeep
+
+# Obsidian workspace cache
+**/.obsidian/
