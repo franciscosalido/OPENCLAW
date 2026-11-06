@@ -1,0 +1,41 @@
+# Laboratorio de Derivativos — QUIMERA · Fase 1 (estado A: verificado offline)
+#
+# HIPOTESES ATE HOMOLOGACAO: toda convencao numerica abaixo e hipotese
+# declarada (ADR-0023); as flags *_assumed permanecem true ate observacao de
+# respostas reais da API. Contrato validado por
+# config/derivatives_config_model.py (pydantic, extra="forbid").
+
+conventions:
+  day_count: "business_252"           # T = dias uteis B3 / 252 (alternativa nomeada: calendar_365)
+  rate_compounding: "annual_exp_252"  # r_cont = ln(1 + i/100) — padrao CDI/Selic (hipotese)
+  dividend_yield: 0.0                 # q = 0: B3 ajusta strike por proventos (hipotese por contrato)
+  strike_adjusted_by_exchange_assumed: true
+  rate_compounding_assumed: true
+  holidays_file: null                 # config/b3_holidays_2026.yaml quando fornecido; ausente => holidays_missing
+
+quality:
+  max_age_s: 60                 # idade maxima da cotacao antes de stale=true
+  spot_sync_tolerance_s: 60     # |t_spot - t_opcao| acima disto => spot_not_synchronous=true
+
+budget:
+  per_minute: 100               # limite publicado OpLab: 100 req/min (429 + bloqueio de 5 min)
+  per_second: 50                # limite publicado OpLab: 50 req/s (503)
+  timeout_s: 10.0
+  max_retries: 0                # zero retries na Fase 1
+
+oplab:
+  base_url: "https://api.oplab.com.br/v3"
+  allowed_routes:               # allowlist e controle de seguranca, nao estilo
+    - "/market/options/{symbol}"
+    - "/market/stocks/{symbol}"
+    - "/market/interest_rates"
+    - "/market/status"
+
+iv:
+  bracket_lo: 1.0e-4
+  bracket_hi: 5.0
+  bracket_hi_max: 20.0          # teto da expansao do bracket (maximo 2x ate 20)
+  max_iterations: 200
+  tol_price_rel: 1.0e-8
+  tol_vol: 1.0e-8
+  low_vega_threshold: 1.0e-4
