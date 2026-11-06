@@ -4,8 +4,58 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Last updated:** 2026-06-28
-**Updated by:** Codex — FL-PR13 RC-01 Ready For Local Merge
+**Last updated: 2026-06-28
+**Updated by: Claude Cowork — FL-PR14 Adversarial Review APPROVED
+
+---
+
+## IN PROGRESS — FINLIB-0 FL-PR14 Aggregates Readiness Closeout
+
+Current branch: `feat/finlib-aggregates-readiness-closeout`
+
+GitHub:
+
+- Issue created: `https://github.com/franciscosalido/OPENCLAW/issues/123`.
+- Draft PR remote creation deferred because local `main` is ahead of
+  `origin/main` and the FINLIB stack is still local-only in this workspace.
+
+Scope:
+
+- Added SDD `docs/specs/finlib-0/pr-14-aggregates-readiness-closeout.md`.
+- Added migration `029_create_finlib_aggregates_readiness.sql`.
+- Added read-only latest/aggregate views for macro, treasury, funds and
+  market bars.
+- Added conservative Timescale continuous aggregate readiness for
+  `market_bars_1d_cagg`.
+- Added `scripts/check_finlib_readiness.py`, a read-only JSON readiness gate
+  for PostgreSQL/TimescaleDB extensions, schema groups, repositories, memory
+  boundary, aggregate surfaces, non-destructive retention and closeout docs.
+- Added data dictionary, FINLIB-0 done criteria and handoff documentation for
+  future data agents.
+- Added unit, architecture and integration tests for migration registration,
+  readiness contract, destructive-retention absence, docs contract and live
+  aggregate/readiness behavior.
+
+Scope intentionally unchanged:
+
+- No destructive retention policy, no data drop, no Qdrant mutation, no Kronos
+  runtime, no LLM calls, no agent implementation, no ingestion pipeline, no
+  portfolio/private data access and no changes to RAG semantic retrieval.
+
+Local validation:
+
+- `uv run pytest tests/unit/test_finlib*.py tests/unit/test_postgres_migrations_static.py tests/architecture/test_finlib_no_destructive_retention.py -q`
+  passed: 87 passed.
+- `uv run pytest tests/integration/test_finlib_continuous_aggregates_live.py tests/integration/test_check_finlib_readiness_live.py -q`
+  skipped safely without DSN: 3 skipped.
+- `uvx ruff check ...` passed.
+- `uvx ruff format --check ...` passed.
+- `uv run mypy ... --strict` passed.
+- `uv run pyright ...` passed with only the known cosmetic Pyright update
+  notice.
+- `uv run sqlfluff lint backend/memory/postgres/migrations/029_create_finlib_aggregates_readiness.sql --dialect postgres`
+  passed: All Finished.
+- `git diff --check` passed.
 
 ---
 
