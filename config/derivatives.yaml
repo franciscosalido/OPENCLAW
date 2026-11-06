@@ -11,7 +11,14 @@ conventions:
   dividend_yield: 0.0                 # q = 0: B3 ajusta strike por proventos (hipotese por contrato)
   strike_adjusted_by_exchange_assumed: true
   rate_compounding_assumed: true
-  holidays_file: null                 # config/b3_holidays_2026.yaml quando fornecido; ausente => holidays_missing
+  calendars_dir: "config/calendars"   # bundles 3.0.0 versionados no DL-PR02 (JSON estrito em .yaml)
+  trading_calendar_id: "B3_LISTED_TRADING"     # relogio do pregao (247 sessoes confirmadas em 2026)
+  financial_calendar_id: "BR_ANBIMA_BUSINESS"  # referencia financeira nacional (ANBIMA)
+  day_count_calendar: "trading"       # HIPOTESE: DU conta no calendario de pregao, nao no financeiro
+  day_count_calendar_assumed: true
+  interval_convention: "(D0,Dv]"      # HIPOTESE: exclui D0, inclui Dv (padrao DU brasileiro)
+  interval_convention_assumed: true
+  year_basis: 252                     # denominador anual; 247/249/251 observados NAO o substituem
 
 quality:
   max_age_s: 60                 # idade maxima da cotacao antes de stale=true
