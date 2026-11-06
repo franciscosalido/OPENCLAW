@@ -4,12 +4,59 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Last updated: 2026-11-05
-**Updated by: Claude Code — DL-PR00 Lab de Derivativos (fundacao)
+**Last updated: 2026-11-06
+**Updated by: Claude Code — DL-PR01 Lab de Derivativos (vendor models + dominio + qualidade)
 
 ---
 
-## IN PROGRESS — Lab de Derivativos DL-PR00
+## IN PROGRESS — Lab de Derivativos DL-PR01
+
+Current branch: `feat/dl-pr01-vendor-domain-quality`
+
+Base: DL-PR00 mergeado via PR #125; `main == origin/main == a3d3fcf` no
+inicio da sessao (apos restaurar artefatos regenerados pela suite).
+
+Scope:
+
+- Added `backend/derivatives/oplab/vendor_models.py`: espelho literal da doc
+  OpLab v3 (`extra="allow"`, frozen), `unknown_fields`, parsers com
+  `VendorPayloadError` sanitizado.
+- Added `backend/derivatives/domain/models.py`: dominio imutavel
+  (`extra="forbid"`, `Decimal`, `AwareDatetime` anti-naive), `Chain` com
+  `purpose` validado contra `inherit_purpose(stamp.purpose)`.
+- Added `backend/derivatives/domain/quality.py`: `assess_quality` pura com
+  `now` injetado; limiares do modelo `Quality` existente.
+- Added `backend/derivatives/adapters/normalize.py`: epoch ms -> UTC,
+  `money` via `Decimal(str(...))`, zero-vs-ausente, spot com fallback
+  OPTION_LAST_TRADE, SELIC preferida, `normalize_chain` com warning unico
+  por campo desconhecido. (Decisao: `normalize` em `adapters/`, nao em
+  `domain/`, para fronteira de import uniforme — ver SDD_DL-PR01.)
+- Added 53 testes novos em `tests/unit/derivatives/` (total 81) + 2 testes
+  de arquitetura (dominio nao importa oplab; sem relogio interno).
+- `.gitignore`: +1 linha (`.claude/settings.local.json`).
+- Errata do card registrada no SDD: epoch 1620423900000 ms =
+  2021-05-07T21:45:00Z (card dizia 22:25:00).
+
+Validation:
+
+- `uv run pytest tests/ -q --ignore=tests/integration --timeout=120`:
+  2241 passed, 15 skipped, 261 subtests (v_tests=0); collect do Lab = 81.
+- `uv run mypy backend/ --strict` 0 errors; `uv run pyright backend/` 0
+  errors.
+- 396 linhas de producao adicionadas em `backend/` (< 400).
+- Protegidos intocados; nenhum artefato de `docs/rag/`/`evaluation/` no PR.
+
+Scope intentionally unchanged:
+
+- Sem BSM/IV/gregas, HTTP, token, orcamento, ChainService, fixture
+  sintetica, MCP, CLI, persistencia, calendario de feriados, dependencia
+  nova. `config/b3_holidays_2026.yaml` apareceu no working tree durante a
+  sessao e ficou fora do PR (pendencia do ADR-0023, dono: Francisco).
+- Next: DL-PR02 (BSM + gregas + convencoes) apos merge.
+
+---
+
+## MERGED — Lab de Derivativos DL-PR00 (PR #125)
 
 Current branch: `feat/dl-pr00-derivatives-foundation`
 

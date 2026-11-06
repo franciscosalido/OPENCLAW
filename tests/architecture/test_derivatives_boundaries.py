@@ -1,4 +1,4 @@
-"""Fronteiras de import e de conteudo do Laboratorio de Derivativos (DL-PR00)."""
+"""Fronteiras de import e de conteudo do Laboratorio de Derivativos (DL-PR00/DL-PR01)."""
 
 from __future__ import annotations
 
@@ -58,3 +58,26 @@ def test_no_domain_routes_in_lab() -> None:
         if "/domain" in path.read_text(encoding="utf-8")
     ]
     assert hits == [], "rota do dominio de ordens e proibida no Laboratorio"
+
+
+def test_domain_package_does_not_import_vendor_layer() -> None:
+    offenders: dict[str, list[str]] = {}
+    for path in _python_files(DERIVATIVES / "domain"):
+        bad = sorted(
+            imported
+            for imported in _imports(path)
+            if imported.startswith("backend.derivatives.oplab")
+        )
+        if bad:
+            offenders[str(path)] = bad
+    assert offenders == {}, "o dominio nao conhece o fornecedor (conversao so em adapters)"
+
+
+def test_no_wall_clock_in_derivatives() -> None:
+    hits = [
+        str(path)
+        for path in _python_files(DERIVATIVES)
+        if "datetime.now(" in path.read_text(encoding="utf-8")
+        or "datetime.utcnow(" in path.read_text(encoding="utf-8")
+    ]
+    assert hits == [], "tempo e sempre injetado no Laboratorio (sem relogio interno)"

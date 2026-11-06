@@ -106,3 +106,4 @@ infra/litellm/generated/*
 
 # Obsidian workspace cache
 **/.obsidian/
+.claude/settings.local.json
