@@ -130,6 +130,41 @@ declaradas, com flag, ate homologacao:
   (`tests/fixtures/derivatives/reference/`, 92 casos a 50 dps, paridade
   interna < 1e-30 declarada no proprio arquivo).
 
+## IV por bissecao protegida (DL-PR04)
+
+- **Algoritmo:** bissecao pura (sem Newton/Brent nesta fase) sobre
+  `bsm.price` — unica implementacao BSM do pacote. Protecoes, nesta ordem:
+  dominio (`DOMAIN_ERROR`, nenhuma excecao escapa; alvo negativo e erro de
+  dominio), `T == 0` -> `NOT_APPLICABLE`, limites de nao-arbitragem
+  (`BELOW_INTRINSIC` / `ABOVE_UPPER_BOUND`, com folga
+  `tol = tol_price_rel x max(1, alvo)`), mudanca de sinal estrita no
+  bracket `[bracket_lo, bracket_hi]` com expansao dobrada e contada ate
+  `bracket_hi_max`, e maximo de iteracoes.
+- **Tolerancia dupla:** para somente quando
+  `|preco(sigma) - alvo| <= tol_price` **e** `hi - lo <= tol_vol`.
+  Estourar `max_iterations` devolve `NO_CONVERGENCE` com `sigma=None` —
+  nunca o meio do bracket e nunca `sigma=0` como marcador.
+- **Politica de `LOW_VEGA`:** convergiu, mas a vega bruta na solucao fica
+  abaixo de `low_vega_threshold`; `sigma` vem **preenchido** e declarado mal
+  condicionado (preco plano em sigma no float). Alvo exatamente no
+  intrinseco ITM: plato por underflow -> `LOW_VEGA` no topo do plato, ou
+  `NO_CONVERGENCE` quando a raiz fica abaixo de `bracket_lo`.
+- **bid/ask/mid separados e cotacao intocada:** `iv_for_quote` inverte cada
+  lado existente; lado ausente e campo `None` (nunca status disfarcado);
+  **`mid` e indicativo e nao pressupoe execucao** (`price_source_note`).
+  Mercado cruzado continua calculado; a flag e de `QualityFlags` (DL-PR01).
+- **Recusa explicada na ponte:** `price_contract_from_quote` recusa
+  americana/estilo desconhecido **antes** de qualquer IV; fonte pedida sem
+  IV utilizavel vira `supported=False`,
+  `reason=iv_unavailable:<status|missing_quote>`, numericos `None` e os
+  diagnosticos completos em `iv`.
+- **Hipoteses registradas:** `theta_basis` e irrelevante para a inversao
+  (passa 252); vega bruta = `vega_per_pct_point x 100`; a recuperabilidade
+  em float64 e limitada pela planicie do preco (deep ITM/OTM curtos de vol
+  baixa nao sao inversiveis — contrato degrada para `LOW_VEGA`/
+  `NO_CONVERGENCE`, nunca excecao); o caso-limite ATM `T=1e-9` do oraculo e
+  bem condicionado e recupera sigma (errata ao card registrada no SDD).
+
 ## Barreira deterministica anti-fixture
 
 - `Provenance` e `Purpose` atribuidos pelo adaptador de transporte; payload

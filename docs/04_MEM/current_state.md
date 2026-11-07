@@ -5,11 +5,68 @@
 > meaningful sessions.
 
 **Last updated: 2026-11-06
-**Updated by: Claude Code — DL-PR03 Lab de Derivativos (BSM europeu + gregas)
+**Updated by: Claude Code — DL-PR04 Lab de Derivativos (IV por bissecao protegida)
 
 ---
 
-## IN PROGRESS — Lab de Derivativos DL-PR03
+## IN PROGRESS — Lab de Derivativos DL-PR04
+
+Current branch: `feat/dl-pr04-implied-vol`
+
+Base: DL-PR03 mergeado via PR #128; `main == origin/main == c9c6e68` no
+inicio da sessao, arvore limpa.
+
+Scope:
+
+- Added `backend/derivatives/pricing/implied_vol.py` (puro; `Iv` via
+  `TYPE_CHECKING`): `IvStatus` (7 estados), `IvDiagnostic`/`IvResult`
+  (frozen+slots, invariante `sigma is None <=> status fora de
+  {OK, LOW_VEGA}` no `__post_init__`), `price_bounds`, `implied_vol` —
+  bissecao pura com dominio validado, limites de nao-arbitragem, expansao
+  de bracket dobrada/contada ate `bracket_hi_max`, tolerancia dupla
+  (preco E vol), `NO_CONVERGENCE` com `sigma=None` (nunca o meio do
+  bracket), `LOW_VEGA` com sigma preenchido e mal condicionado.
+- Added `backend/derivatives/pricing/quote_iv.py`: `QuoteIv`/
+  `IvResultModel`/`IvDiagnosticModel` (pydantic forbid/frozen, enum como
+  str), `iv_for_quote` — bid/ask/mid separados, lado ausente vira `None`,
+  cotacao intocada, `price_source_note` ("mid e indicativo").
+- `contract_pricing.py`: `PricingOutcome` ganha `iv`/`sigma_source`
+  opcionais (PR03 compativel); `price_contract_from_quote` em
+  `contract_pricing` (nao em `quote_iv`: evitaria import circular) com
+  recusa `iv_unavailable:<status|missing_quote>` e americana recusada
+  antes de qualquer IV.
+- Tests: `test_implied_vol.py` (round-trip 150 lados, oraculo 184 lados,
+  limites, expansao, iteracoes, determinismo, dominio, invariante),
+  `test_quote_iv.py`, boundaries (pureza de `implied_vol.py`, grep
+  anti-`sigma=0.0`). Coleta do Lab: 891 (>= 650).
+- Docs: `SDD_DL-PR04.md`, ADR-0023 secao "IV por bissecao protegida",
+  BACKLOG (Jäckel/Brent validados contra esta bissecao; reformat
+  calendar.py <= 100 col; casos de IV no oraculo seguem pendentes).
+
+Validation:
+
+- Round-trip: 128/150 lados OK, pior erro 7.3e-9 (tol 1e-6); 22 lados
+  degenerados documentados (vega < low_vega_threshold).
+- Oraculo: 132/184 lados OK, pior erro 7.3e-9 (tol 1e-7); 52 degenerados
+  (44 LOW_VEGA, 8 NO_CONVERGENCE), zero excecoes; desfechos dos 6 `limit`
+  pinados (ATM T=1e-9 recupera sigma=0.20 — errata ao card no SDD).
+- Iteracoes OK: min 29 / mediana 29 / max 32 (max_iterations=200).
+- `pytest tests/ --ignore=tests/integration` rc 0 (3057 passed);
+  `mypy backend/ --strict` 0; `pyright backend/` 0.
+- Producao 386 linhas (<= 400); 0 linhas > 100 col nos arquivos do PR
+  (16 linhas longas pre-existentes de calendar/conventions viram BACKLOG).
+
+Scope intentionally unchanged:
+
+- Sem Newton/Brent/Jäckel, americanas, superficie, HTTP/OpLab,
+  ChainService (PR06), MCP (PR07), `/market/options/bs`, campo novo em
+  `Iv`, mudanca em `calendar.py`/`conventions.py`.
+- Next: DL-PR05 (cliente OpLab: transporte, allowlist, orcamento, erros —
+  sem rede nos testes) apos merge.
+
+---
+
+## MERGED — Lab de Derivativos DL-PR03 (PR #128)
 
 Current branch: `feat/dl-pr03-bsm-greeks`
 
