@@ -109,6 +109,27 @@ def test_bsm_module_is_arithmetic_only() -> None:
     assert internal == {"backend.derivatives.domain.models"}
 
 
+def test_implied_vol_module_is_arithmetic_only() -> None:
+    imports = _imports(DERIVATIVES / "pricing" / "implied_vol.py")
+    roots = {name.split(".", 1)[0] for name in imports}
+    assert "pydantic" not in roots, "implied_vol.py e aritmetica pura: pydantic na ponte"
+    assert "decimal" not in roots, "implied_vol.py trabalha em float; Decimal na ponte"
+    internal = {name for name in imports if name.startswith("backend.")}
+    assert internal == {
+        "backend.derivatives.pricing.bsm",
+        "backend.derivatives.domain.models",
+    }, "implied_vol.py importa so bsm e domain.models (unica implementacao BSM)"
+
+
+def test_no_sigma_zero_as_absence_marker_in_iv_modules() -> None:
+    for name in ("implied_vol.py", "quote_iv.py"):
+        text = (DERIVATIVES / "pricing" / name).read_text(encoding="utf-8")
+        compact = text.replace(" ", "")
+        assert "sigma=0.0" not in compact, (
+            f"{name}: sigma == 0.0 jamais pode marcar ausencia (DL-PR04, A6)"
+        )
+
+
 def test_no_random_in_derivatives() -> None:
     offenders = [
         str(path)
