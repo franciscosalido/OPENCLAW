@@ -102,6 +102,34 @@ declaradas, com flag, ate homologacao:
 - `third_friday_preceding` produz candidato por regra publicada (3a sexta
   civil, recuo ao dia util anterior); nao afirma serie listada.
 
+## BSM europeu — convencoes e regimes (DL-PR03)
+
+- **Unidades das gregas no nome do campo:** `vega_per_pct_point` e
+  `rho_per_pct_point` sao sensibilidades por ponto percentual
+  (derivada bruta x 0.01); `theta_per_day` e o theta anual
+  (`dP/dt` no calendario, negativo para compradas tipicas) dividido por
+  `theta_basis` (252|365, vindo de `year_basis` do DL-PR02).
+- **Regime `expiry` (`T == 0`):** preco = intrinseco puro; delta em
+  {0, +-1}, com +-0.5 em `S == K` declarado como convencao (limite lateral
+  inexistente); gamma/vega/theta/rho = 0; `d1 = d2 = None`; nota
+  `expiry_day_intrinsic`. Nunca se divide por `sqrt(T) = 0`.
+- **Regime `zero_vol` (`sigma == 0`, `T > 0`):** preco = intrinseco
+  descontado do forward (`max(S e^{-qT} - K e^{-rT}, 0)` e simetrico);
+  gregas pela derivada do intrinseco descontado, com
+  `N(d1) = N(d2) = n in {1, 0.5, 0}` saturado pelo sinal do forward —
+  `n = 0.5` no ATM-forward e o limite de `N(d1)` com `sigma -> 0+`;
+  vega = 0; nota `zero_volatility_limit`.
+- **Recusa de americanas e estilo desconhecido:** `price_contract` responde
+  `supported=False` com `reason` (`american_not_supported_phase1` |
+  `unknown_exercise_style`) e todos os campos numericos `None`; americana
+  nunca recebe BSM "por aproximacao" (decisao 4). O resultado europeu
+  carrega `assumptions` com as chaves de `model_assumptions` (DL-PR02) mais
+  `pricing_model = bsm_european_v1`.
+- **Validacao independente:** Hull (call ~4.76, put ~0.81), paridade
+  call-put, diferencas finitas centrais e o oraculo mpmath do Codex
+  (`tests/fixtures/derivatives/reference/`, 92 casos a 50 dps, paridade
+  interna < 1e-30 declarada no proprio arquivo).
+
 ## Barreira deterministica anti-fixture
 
 - `Provenance` e `Purpose` atribuidos pelo adaptador de transporte; payload

@@ -100,6 +100,24 @@ def test_pricing_calendar_is_json_only() -> None:
     )
 
 
+def test_bsm_module_is_arithmetic_only() -> None:
+    imports = _imports(DERIVATIVES / "pricing" / "bsm.py")
+    roots = {name.split(".", 1)[0] for name in imports}
+    assert "pydantic" not in roots, "bsm.py e aritmetica pura: pydantic vive na ponte"
+    assert "decimal" not in roots, "bsm.py trabalha em float; Decimal entra/sai na ponte"
+    internal = {name for name in imports if name.startswith("backend.")}
+    assert internal == {"backend.derivatives.domain.models"}
+
+
+def test_no_random_in_derivatives() -> None:
+    offenders = [
+        str(path)
+        for path in _python_files(DERIVATIVES)
+        if "random" in {name.split(".", 1)[0] for name in _imports(path)}
+    ]
+    assert offenders == [], "nada de aleatoriedade no Laboratorio (determinismo auditavel)"
+
+
 def test_no_wall_clock_in_derivatives() -> None:
     hits = [
         str(path)
