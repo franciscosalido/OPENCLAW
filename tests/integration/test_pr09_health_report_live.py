@@ -16,11 +16,28 @@ def test_pr09_health_report_live_outputs_files(tmp_path: Path) -> None:
     md_path = tmp_path / "health.md"
     env = os.environ.copy()
     env["PYTHONPATH"] = str(Path.cwd())
+    bootstrap = """
+import sys
+from pathlib import Path
+
+import pytest
+
+from integration import health_report
+
+output_path = Path(sys.argv[1])
+with pytest.MonkeyPatch.context() as monkeypatch:
+    monkeypatch.setattr(health_report, "HEALTH_REPORT_PATH", output_path)
+    monkeypatch.setattr(
+        sys, "argv", ["integration.health_report", *sys.argv[2:]]
+    )
+    raise SystemExit(health_report.main())
+"""
     result = subprocess.run(
         [
             sys.executable,
-            "-m",
-            "integration.health_report",
+            "-c",
+            bootstrap,
+            str(tmp_path / "rag_01b_pr09_health_report.json"),
             "--json",
             str(json_path),
             "--markdown",
