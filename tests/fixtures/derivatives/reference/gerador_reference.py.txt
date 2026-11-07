@@ -1,0 +1,281 @@
+"""Gera referências BSM europeias usando somente mpmath e a biblioteca padrão.
+
+Executar fora de qualquer repositório. Precisão de trabalho: 50 dígitos;
+entradas e resultados publicados: strings com 20 dígitos significativos.
+"""
+
+from __future__ import annotations
+
+import argparse
+from collections import Counter
+from dataclasses import dataclass
+from hashlib import sha256
+import json
+from pathlib import Path
+import re
+from typing import Any
+
+import mpmath as mp
+
+WORK_DPS = 50
+CHECK_DPS = 100
+SIGNIFICANT_DIGITS = 20
+INPUT_FIELDS = ("S", "K", "r_cont", "q", "sigma", "T_years")
+RESULT_FIELDS = (
+    "call_price", "put_price", "delta_call", "delta_put", "gamma",
+    "vega_per_pct_point", "theta_per_day_252", "theta_per_day_365",
+    "rho_per_pct_point_call", "rho_per_pct_point_put", "d1", "d2",
+)
+DECIMAL_PATTERN = re.compile(r"-?[0-9]\.[0-9]{19}e[+-][0-9]+\Z")
+
+
+@dataclass(frozen=True)
+class CaseSpec:
+    """Parâmetros nominais; T_source admite uma divisão explícita de inteiros."""
+
+    case_id: str
+    case_type: str
+    S: str
+    K: str
+    r_cont: str
+    q: str
+    sigma: str
+    T_source: str
+
+
+def decimal20(value: mp.mpf) -> str:
+    """Usa mantissa de vinte algarismos e expoente decimal explícito."""
+    if not mp.isfinite(value):
+        raise ValueError("Referência não finita")
+    if value == 0:
+        return "0." + "0" * (SIGNIFICANT_DIGITS - 1) + "e+0"
+    text = mp.nstr(
+        value, n=SIGNIFICANT_DIGITS, strip_zeros=False,
+        min_fixed=0, max_fixed=0, show_zero_exponent=True,
+    )
+    if DECIMAL_PATTERN.fullmatch(text) is None:
+        raise ValueError(f"Formato decimal inesperado: {text!r}")
+    return text
+
+
+def normal_cdf(value: mp.mpf) -> mp.mpf:
+    """Evita 1+erf nas caudas negativas, sem truncar probabilidades."""
+    return mp.erfc(-value / mp.sqrt(2)) / 2
+
+
+def bsm(values: dict[str, mp.mpf]) -> dict[str, mp.mpf]:
+    """Preços independentes de call/put e gregas analíticas na precisão vigente."""
+    S, K, r, q, sigma, T = (values[name] for name in INPUT_FIELDS)
+    if not all(mp.isfinite(value) for value in values.values()):
+        raise ValueError("Entradas devem ser finitas")
+    if S <= 0 or K <= 0 or sigma <= 0 or T <= 0:
+        raise ValueError("S, K, sigma e T devem ser estritamente positivos")
+    root_T = mp.sqrt(T)
+    vol_time = sigma * root_T
+    d1 = (mp.log(S / K) + (r - q + sigma * sigma / 2) * T) / vol_time
+    d2 = d1 - vol_time
+    discount_q = mp.exp(-q * T)
+    A = S * discount_q
+    B = K * mp.exp(-r * T)
+    density = mp.exp(-d1 * d1 / 2) / mp.sqrt(2 * mp.pi)
+    Nd1, Nd2 = normal_cdf(d1), normal_cdf(d2)
+    Nmd1, Nmd2 = normal_cdf(-d1), normal_cdf(-d2)
+    call = A * Nd1 - B * Nd2
+    put = B * Nmd2 - A * Nmd1
+    theta_call_annual = -A * density * sigma / (2 * root_T) - r * B * Nd2 + q * A * Nd1
+    point = mp.mpf("0.01")
+    results = {
+        "call_price": call,
+        "put_price": put,
+        "delta_call": discount_q * Nd1,
+        "delta_put": -discount_q * Nmd1,
+        "gamma": discount_q * density / (S * vol_time),
+        "vega_per_pct_point": A * density * root_T * point,
+        "theta_per_day_252": theta_call_annual / 252,
+        "theta_per_day_365": theta_call_annual / 365,
+        "rho_per_pct_point_call": T * B * Nd2 * point,
+        "rho_per_pct_point_put": -T * B * Nmd2 * point,
+        "d1": d1,
+        "d2": d2,
+    }
+    if not all(mp.isfinite(value) for value in results.values()):
+        raise ValueError("Resultado BSM não finito")
+    if call <= 0 or put <= 0:
+        raise ArithmeticError("Preço não positivo: possível perda numérica na cauda")
+    return results
+
+
+def case_specs() -> list[CaseSpec]:
+    """Retorna 1 Hull + 80 grade + 5 dividendos + 6 limites, em ordem fixa."""
+    specs = [CaseSpec("hull_42_40", "hull", "42", "40", "0.10", "0", "0.20", "0.5")]
+    strikes = (("70", "0p70"), ("85", "0p85"), ("100", "1p00"),
+               ("115", "1p15"), ("130", "1p30"))
+    sigmas = (("0.05", "0p05"), ("0.2", "0p20"), ("0.6", "0p60"), ("2.0", "2p00"))
+    times = (("1/252", "1d252"), ("10/252", "10d252"), ("0.5", "0p5"), ("2.0", "2p0"))
+    for K, ratio_id in strikes:
+        for sigma, sigma_id in sigmas:
+            for T_source, time_id in times:
+                specs.append(CaseSpec(
+                    f"grid_ks_{ratio_id}_sigma_{sigma_id}_T_{time_id}",
+                    "grid", "100", K, "0.10", "0", sigma, T_source,
+                ))
+    for K, ratio_id in strikes:
+        specs.append(CaseSpec(
+            f"q003_ks_{ratio_id}", "q_constant", "100", K, "0.10", "0.03", "0.20", "0.5",
+        ))
+    for K in ("90", "100", "110"):
+        specs.append(CaseSpec(
+            f"limit_sigma_1e-6_K{K}", "limit", "100", K, "0", "0", "0.000001", "0.5",
+        ))
+    for K in ("90", "100", "110"):
+        specs.append(CaseSpec(
+            f"limit_T_1e-9_K{K}", "limit", "100", K, "0.10", "0", "0.20", "0.000000001",
+        ))
+    return specs
+
+
+def published_inputs(spec: CaseSpec) -> dict[str, str]:
+    """Define primeiro as entradas decimais exatas que o consumidor receberá."""
+    texts = {name: getattr(spec, name) for name in INPUT_FIELDS if name != "T_years"}
+    if "/" in spec.T_source:
+        numerator, denominator = spec.T_source.split("/")
+        T = mp.mpf(numerator) / mp.mpf(denominator)
+    else:
+        T = mp.mpf(spec.T_source)
+    return {**{name: decimal20(mp.mpf(value)) for name, value in texts.items()},
+            "T_years": decimal20(T)}
+
+
+def parity_residual(values: dict[str, mp.mpf], call: mp.mpf, put: mp.mpf) -> mp.mpf:
+    """Resíduo assinado C-P-S*exp(-qT)+K*exp(-rT), sem impor paridade ao preço."""
+    S, K, r, q, _, T = (values[name] for name in INPUT_FIELDS)
+    return mp.fsum((call, -put, -S * mp.exp(-q * T), K * mp.exp(-r * T)))
+
+
+def build_dataset() -> dict[str, Any]:
+    """Calcula a 50 dps e confirma o arredondamento dos resultados a 100 dps."""
+    cases: list[dict[str, str]] = []
+    residuals: list[mp.mpf] = []
+    serialized_residuals: list[mp.mpf] = []
+    with mp.workdps(WORK_DPS):
+        specs = case_specs()
+        for spec in specs:
+            inputs = published_inputs(spec)
+            values = {name: mp.mpf(value) for name, value in inputs.items()}
+            results = bsm(values)
+            residual = parity_residual(values, results["call_price"], results["put_price"])
+            if abs(residual) >= mp.mpf("1e-30"):
+                raise ArithmeticError(f"Falha de paridade: {spec.case_id}")
+            output = {name: decimal20(results[name]) for name in RESULT_FIELDS}
+            serialized = parity_residual(values, mp.mpf(output["call_price"]), mp.mpf(output["put_price"]))
+            with mp.workdps(CHECK_DPS):
+                checked = bsm({name: mp.mpf(value) for name, value in inputs.items()})
+                for name in RESULT_FIELDS:
+                    if decimal20(checked[name]) != output[name]:
+                        raise ArithmeticError(f"20 dígitos instáveis: {spec.case_id}/{name}")
+            cases.append({
+                "case_id": spec.case_id,
+                **inputs,
+                **output,
+                "case_type": spec.case_type,
+                "parity_residual": decimal20(residual),
+                "parity_residual_serialized": decimal20(serialized),
+            })
+            residuals.append(abs(residual))
+            serialized_residuals.append(abs(serialized))
+        if len(cases) != 92 or len({case["case_id"] for case in cases}) != 92:
+            raise AssertionError("Cobertura ou identidade dos casos incorreta")
+        for case in cases:
+            for name, value in case.items():
+                if not isinstance(value, str):
+                    raise AssertionError("Todos os valores dos casos devem ser strings")
+                if name not in ("case_id", "case_type") and DECIMAL_PATTERN.fullmatch(value) is None:
+                    raise AssertionError(f"Valor fora do formato decimal: {name}")
+        metadata = {
+            "schema_version": "1.0.0",
+            "model": "Black-Scholes-Merton; European exercise; continuous constant dividend yield q",
+            "data_source": "synthetic_analytic_reference",
+            "mpmath_version": mp.__version__,
+            "working_precision_decimal_digits": str(WORK_DPS),
+            "crosscheck_precision_decimal_digits": str(CHECK_DPS),
+            "serialized_significant_digits": str(SIGNIFICANT_DIGITS),
+            "numeric_representation": "decimal scientific notation in JSON strings; 1+19 mantissa digits",
+            "input_policy": "Round nominal inputs to 20 significant decimal digits, then reparse those published strings at working precision before all BSM calculations.",
+            "fractional_time_inputs": {"1d252": "1/252", "10d252": "10/252"},
+            "fractional_time_policy": "T_years is the authoritative 20-digit decimal approximation; the rational label identifies its nominal grid origin.",
+            "theta_option_type": "call",
+            "theta_sign": "dC/dt = -dC/dT_years; other input parameters fixed",
+            "theta_day_scaling": "annual call theta / 252 or / 365; a derivative scaling, not a finite one-day repricing",
+            "vega_scaling": "dV/dsigma * 0.01; same for call and put",
+            "rho_scaling": "dV/dr_cont * 0.01; q fixed; continuous-rate percentage point",
+            "r_and_q_convention": "annual continuously compounded rate and continuous dividend yield, in decimal units",
+            "price_units": "per one unit of underlying; S and K in the same currency; no contract multiplier",
+            "parity_residual_formula": "call_price - put_price - S*exp(-q*T_years) + K*exp(-r_cont*T_years)",
+            "parity_residual_scope": "computed on independent unrounded call and put at 50 dps; only the residual is then printed to 20 significant digits",
+            "parity_residual_serialized_scope": "recomputed at 50 dps from the exported 20-digit call/put prices and input strings; not subject to the internal 1e-30 criterion",
+            "limit_policy": "Strictly positive sigma=1e-6 or T=1e-9, separately; no zero-volatility or expiry substitution, clipping, or parity-derived put.",
+            "case_counts": {name: str(count) for name, count in Counter(case["case_type"] for case in cases).items()},
+            "case_count_total": str(len(cases)),
+            "validation": {
+                "parity_threshold_absolute": decimal20(mp.mpf("1e-30")),
+                "parity_comparison": "strictly less than",
+                "max_abs_parity_residual": decimal20(max(residuals)),
+                "max_abs_parity_residual_serialized": decimal20(max(serialized_residuals)),
+                "all_internal_parity_checks": "PASS",
+                "all_result_fields_20_digits_stable_at_100_dps": "PASS",
+                "output_rounding_crosschecks": str(len(cases) * len(RESULT_FIELDS)),
+            },
+            "references": [
+                "https://book.derivative-securities.org/Chapter_BlackScholes.html",
+                "https://mpmath.org/doc/current/basics.html",
+                "https://mpmath.org/doc/current/general.html",
+                "https://mpmath.org/doc/current/functions/expintegrals.html",
+                "https://search.r-project.org/CRAN/refmans/QFRM/html/BS_Simple.html",
+            ],
+        }
+    return {"metadata": metadata, "cases": cases}
+
+
+def require_outside_repository(path: Path) -> None:
+    """Recusa diretórios dentro de Git, Mercurial, Subversion ou Bazaar."""
+    resolved = path.resolve()
+    for parent in (resolved, *resolved.parents):
+        if any((parent / marker).exists() for marker in (".git", ".hg", ".svn", ".bzr")):
+            raise ValueError(f"O destino precisa ficar fora de repositórios: {parent}")
+        if (parent / "HEAD").is_file() and (parent / "objects").is_dir() and (parent / "refs").is_dir():
+            raise ValueError(f"Possível repositório Git bare: {parent}")
+
+
+def main() -> int:
+    """Emite JSON determinístico e seu SHA-256; --check verifica sem sobrescrever."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--output-dir", type=Path, default=Path(__file__).resolve().parent)
+    parser.add_argument("--check", action="store_true")
+    args = parser.parse_args()
+    output_dir = args.output_dir.resolve()
+    require_outside_repository(output_dir)
+    dataset = build_dataset()
+    raw = (json.dumps(dataset, ensure_ascii=False, indent=2, allow_nan=False) + "\n").encode("utf-8")
+    digest = sha256(raw).hexdigest()
+    target = output_dir / "bsm_reference_cases.json"
+    checksum = output_dir / "bsm_reference_cases.sha256"
+    checksum_text = f"{digest}  {target.name}\n"
+    if args.check:
+        if target.read_bytes() != raw or checksum.read_text(encoding="utf-8") != checksum_text:
+            raise ValueError("Os arquivos não correspondem à regeneração determinística")
+    else:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        if target.exists() or checksum.exists():
+            raise FileExistsError("Saída existente; use --check ou escolha outra pasta vazia")
+        target.write_bytes(raw)
+        checksum.write_text(checksum_text, encoding="utf-8")
+    print(json.dumps({
+        "status": "PASS", "mode": "check" if args.check else "generate",
+        "cases": len(dataset["cases"]), "sha256": digest,
+        "json": str(target), "validation": dataset["metadata"]["validation"],
+    }, ensure_ascii=False, indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

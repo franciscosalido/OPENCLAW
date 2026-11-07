@@ -1,0 +1,96 @@
+{
+  "status": "PASS",
+  "case_count": 92,
+  "input_sha256": "aa15a6dedd03da14adbc809fdcbd4f2195d462449ad0cc77bb79dcce4892d74d",
+  "independent_precision_dps": 100,
+  "price_function_uses_separate_d2_formula": true,
+  "theta_crosscheck_uses_pde": true,
+  "all_output_20_digit_roundings_match": true,
+  "mismatches": [],
+  "derivative_checks": [
+    {
+      "case_id": "hull_42_40",
+      "greeks_checked": 8,
+      "status": "PASS"
+    },
+    {
+      "case_id": "q003_ks_0p70",
+      "greeks_checked": 8,
+      "status": "PASS"
+    },
+    {
+      "case_id": "q003_ks_0p85",
+      "greeks_checked": 8,
+      "status": "PASS"
+    },
+    {
+      "case_id": "q003_ks_1p00",
+      "greeks_checked": 8,
+      "status": "PASS"
+    },
+    {
+      "case_id": "q003_ks_1p15",
+      "greeks_checked": 8,
+      "status": "PASS"
+    },
+    {
+      "case_id": "q003_ks_1p30",
+      "greeks_checked": 8,
+      "status": "PASS"
+    }
+  ],
+  "derivative_greeks_count": 48,
+  "generator_imported": false,
+  "generator_sha256": "126dc132c826d15792e15819faa1e6f41255381a7813350ea679cd0ed155e415",
+  "case_counts": {
+    "hull": 1,
+    "grid": 80,
+    "q_constant": 5,
+    "limit": 6
+  },
+  "exact_field_set": [
+    "K",
+    "S",
+    "T_years",
+    "call_price",
+    "case_id",
+    "case_type",
+    "d1",
+    "d2",
+    "delta_call",
+    "delta_put",
+    "gamma",
+    "parity_residual",
+    "parity_residual_serialized",
+    "put_price",
+    "q",
+    "r_cont",
+    "rho_per_pct_point_call",
+    "rho_per_pct_point_put",
+    "sigma",
+    "theta_per_day_252",
+    "theta_per_day_365",
+    "vega_per_pct_point"
+  ],
+  "all_numeric_fields_20_mantissa_digits": true,
+  "every_case_internal_residual_below_1e_30": true,
+  "grid_cartesian_product_coverage_exact": true,
+  "generator_imports": [
+    "__future__",
+    "argparse",
+    "collections",
+    "dataclasses",
+    "hashlib",
+    "json",
+    "pathlib",
+    "re",
+    "typing",
+    "mpmath"
+  ],
+  "only_mpmath_and_stdlib": true,
+  "code_review_status": "PASS",
+  "repository_locations_written": [],
+  "serialized_parity_fields_independently_recomputed": "PASS",
+  "serialized_parity_fields_checked": 92,
+  "max_abs_serialized_parity_residual": "9.9355086190394243586e-19"
+}
