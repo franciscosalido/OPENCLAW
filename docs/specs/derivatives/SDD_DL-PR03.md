@@ -66,10 +66,11 @@ mercado.
   Decisao: versionar `tests/fixtures/derivatives/reference/` neste PR para a
   suite ser auto-contida em CI. O teste mantem o ramo de skip
   ("oráculo mpmath ainda não entregue") para arvores sem a fixture.
-- **Theta do oraculo e da call:** `metadata.theta_option_type = "call"`; a
-  comparacao de `theta_per_day_{252,365}` no teste do oraculo cobre so a
-  call. O theta da put e validado por diferencas finitas e pela identidade
-  de paridade nos demais testes.
+- **Theta do oraculo e da call:** `metadata.theta_option_type = "call"`;
+  `theta_per_day_{252,365}` comparam a call diretamente e a put pela
+  identidade de paridade
+  `theta_put = theta_call - q*S*e^{-qT} + r*K*e^{-rT}` (ambas as bases),
+  alem das diferencas finitas centrais dos demais testes.
 - **Casos `limit` do oraculo caem no regime `regular`:** o gerador usa
   `sigma = 1e-6` e `T = 1e-9` estritamente positivos (politica declarada no
   metadata: sem substituicao por zero); o teste verifica regime `regular` e

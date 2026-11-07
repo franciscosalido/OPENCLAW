@@ -349,3 +349,10 @@ def test_bsm_against_mpmath_oracle(case: dict[str, str] | None) -> None:
     call_365 = _result(OptionKind.CALL, s, k, t, r, sigma, q, basis=365)
     assert call_365.greeks.theta_per_day == pytest.approx(
         float(case["theta_per_day_365"]), abs=1e-8)
+    # theta_per_day_* do oraculo e da CALL (metadata.theta_option_type); a put
+    # vem da paridade: theta_put = theta_call - q*S*e^{-qT} + r*K*e^{-rT}.
+    put_annual = (float(case["theta_per_day_252"]) * 252.0
+                  - q * s * math.exp(-q * t) + r * k * math.exp(-r * t))
+    assert put.greeks.theta_per_day == pytest.approx(put_annual / 252.0, abs=1e-8)
+    put_365 = _result(OptionKind.PUT, s, k, t, r, sigma, q, basis=365)
+    assert put_365.greeks.theta_per_day == pytest.approx(put_annual / 365.0, abs=1e-8)
