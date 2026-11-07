@@ -40,14 +40,20 @@
 - Persistir calendario em PostgreSQL quando houver 2o consumidor.
 - Calendarios EUA (NYSE/SIFMA/Fedwire) → eventos do Mapeador (Fase 2), nao
   calendario do pricer.
-- Jäckel *Let's Be Rational* como metodo rapido de IV, apos oraculo
-  (PR04+); a bissecao protegida do DL-PR04 vem primeiro.
+- Jäckel *Let's Be Rational* e/ou Brent como aceleracao de IV, validados
+  contra a bissecao protegida do DL-PR04 (que passa a ser o oraculo de
+  referencia da inversao); mesma bateria round-trip + oraculo mpmath.
+- Reformatar `pricing/calendar.py` (15 linhas) e `pricing/conventions.py`
+  (1 linha) para <= 100 colunas — pre-existente do DL-PR02, detectado no
+  gate V-B do DL-PR04; so formatacao, sem mudanca semantica.
 - CRR/BS-1993 (Bjerksund-Stensland) para americanas — Fase 2, com
   referencia numerica propria.
 - `/market/options/bs` da OpLab: so reconciliacao na homologacao (estado
   B); nunca fonte de preco do Lab.
 - Oraculo mpmath: estender `bsm_reference_cases.json` com casos de IV
-  (alvo do DL-PR04) e theta da put; hoje `theta_option_type = call`.
+  (Codex; o DL-PR04 inverteu os 92 casos existentes — casos dedicados de IV
+  com sigma-alvo publicado seguem pendentes) e theta da put; hoje
+  `theta_option_type = call`.
 - Renumeracao 2026-11-06: DL-PR02 = tempo (calendario + convencoes),
   DL-PR03 = BSM + gregas, DL-PR04 = IV, DL-PR05 = cliente OpLab,
   DL-PR06 = ChainService + latencia, DL-PR07 = servidor MCP,
