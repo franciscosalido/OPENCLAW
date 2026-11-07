@@ -25,6 +25,9 @@ from backend.derivatives.pricing.bsm import (
 ORACLE_PATH = Path("tests/fixtures/derivatives/reference/bsm_reference_cases.json")
 RATE = 0.10
 H_REL = 1e-5
+# So no gamma (segunda diferenca): o ruido de arredondamento escala com eps/h^2 e
+# com h = 1e-5*S encostava na tolerancia em libm nao-macOS (SDD_DL-PR04, adendo).
+H_REL_GAMMA = 1e-4
 
 PARITY_GRID = [
     (s, k, sigma, t, q)
@@ -95,7 +98,7 @@ def test_delta_matches_central_difference(kind: OptionKind, s: float, k: float, 
 @pytest.mark.parametrize(("s", "k", "t", "r", "sigma", "q"), REGULAR_POINTS)
 def test_gamma_matches_second_difference(kind: OptionKind, s: float, k: float, t: float,
                                          r: float, sigma: float, q: float) -> None:
-    h = s * H_REL
+    h = s * H_REL_GAMMA
     fd = (_premium(kind, s + h, k, t, r, sigma, q) - 2.0 * _premium(kind, s, k, t, r, sigma, q)
           + _premium(kind, s - h, k, t, r, sigma, q)) / (h * h)
     assert _result(kind, s, k, t, r, sigma, q).greeks.gamma == pytest.approx(fd, rel=1e-5)

@@ -86,6 +86,28 @@ superficie/interpolacao, HTTP/OpLab, `ChainService` (PR06), MCP (PR07),
   verdadeiro `< low_vega_threshold` (no oraculo, vega do proprio arquivo)
   ou `sigma_verdadeiro < bracket_lo`.
 
+## Adendo: passo do gamma por diferencas finitas (test_bsm.py)
+
+`test_gamma_matches_second_difference` falhava em Linux por tolerancia. A
+segunda diferenca central tem erro total
+`O(h^2) [truncatura] + O(eps*P/h^2) [arredondamento]`, com `P ~ 10` e
+`eps ~ 2e-16`:
+
+- Com `h = 1e-5*S` (= 1e-3), o termo de arredondamento domina:
+  `~4*eps*P/h^2 ~ 1e-8` absoluto -> ate ~5e-6 relativo no gamma. Pior margem
+  observada no macOS: 5.2e-6 contra tolerancia 1e-5 — ruido dependente da
+  libm, que em glibc ultrapassa o limite.
+- Com `h = 1e-4*S` (= 1e-2), o arredondamento cai ~100x (`~1e-10` absoluto,
+  ~1e-8 relativo) e o residuo passa a ser truncatura `O(h^2)`,
+  deterministica e estavel entre libms (depende de valores suaves da
+  funcao, nao de cancelamento). Pior erro observado: 1.0e-6 relativo
+  (dominado pelo ponto de menor `sigma*sqrt(T)` = 0.075), margem ~10x sob
+  a tolerancia 1e-5, que fica inalterada.
+
+Correcao no teste (`H_REL_GAMMA = 1e-4`, so no gamma; as primeiras
+diferencas de delta/vega/rho/theta mantem `H_REL = 1e-5`); `bsm.py`
+intocado.
+
 ## Acceptance evidence
 
 - Round-trip (5 sigmas x 5 moneyness x 3 prazos x call/put = 150 lados):

@@ -55,6 +55,10 @@ Validation:
   `mypy backend/ --strict` 0; `pyright backend/` 0.
 - Producao 386 linhas (<= 400); 0 linhas > 100 col nos arquivos do PR
   (16 linhas longas pre-existentes de calendar/conventions viram BACKLOG).
+- Adendo: gamma por diferencas finitas falhava em Linux por tolerancia;
+  passo do teste subiu para h = 1e-4*S (ruido eps/h^2 cai ~100x; residuo
+  vira truncatura O(h^2) estavel, pior erro 1.0e-6 vs tol 1e-5 mantida).
+  Justificativa numerica no SDD_DL-PR04; bsm.py intocado.
 
 Scope intentionally unchanged:
 
