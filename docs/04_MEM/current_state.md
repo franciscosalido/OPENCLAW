@@ -5,11 +5,64 @@
 > meaningful sessions.
 
 **Last updated: 2026-11-06
-**Updated by: Claude Code — DL-PR02 Lab de Derivativos (calendarios 3.0.0 + convencoes temporais)
+**Updated by: Claude Code — DL-PR03 Lab de Derivativos (BSM europeu + gregas)
 
 ---
 
-## IN PROGRESS — Lab de Derivativos DL-PR02
+## IN PROGRESS — Lab de Derivativos DL-PR03
+
+Current branch: `feat/dl-pr03-bsm-greeks`
+
+Base: DL-PR02 mergeado via PR #127; `main == origin/main == e8d3719` no
+inicio da sessao. Oraculo mpmath do Codex chegou como untracked em
+`tests/fixtures/derivatives/reference/` apos o pre-voo (SHA-256 conferido:
+`aa15a6de...92d74d`) e foi versionado neste PR.
+
+Scope:
+
+- Added `backend/derivatives/pricing/bsm.py`: `PricingModel`
+  (`bsm_european_v1`), `PricingDomainError`, `BsmInputs` (dominio validado
+  em `__post_init__`), `Greeks` (unidades no nome: `vega_per_pct_point`,
+  `theta_per_day`, `rho_per_pct_point` + `theta_basis`), `BsmResult`
+  (`d1`/`d2`/`regime`/`notes`), `norm_cdf`/`norm_pdf` via `math.erf`,
+  `price` com regimes `regular`/`expiry`/`zero_vol` (nucleo `_analytic`
+  unico; limite `sigma->0` com `N(d)` saturado), `unsupported`.
+- Added `backend/derivatives/pricing/contract_pricing.py`:
+  `PricingOutcome` (pydantic strict/frozen) + `price_contract` — europeia
+  vira `Decimal(str(price))` + assumptions com `pricing_model`; americana/
+  desconhecida: `supported=False`, motivo, campos numericos `None`.
+- Added `tests/unit/derivatives/test_bsm.py` (Hull, paridade 162 casos,
+  diferencas finitas centrais 5 gregas x 8 pontos, unidades, regimes,
+  dominio, oraculo 92 casos) e `test_contract_pricing.py`; extensao de
+  `tests/architecture/test_derivatives_boundaries.py` (bsm.py sem
+  pydantic/decimal; `random` proibido no pacote).
+- Versionado `tests/fixtures/derivatives/reference/` (oraculo mpmath:
+  JSON 92 casos, README, gerador congelado, sha256, validation_report).
+- Docs: `SDD_DL-PR03.md`, ADR-0023 secao "BSM europeu — convencoes e
+  regimes", BACKLOG (Jäckel, CRR/BS-1993 Fase 2, `/market/options/bs` so
+  reconciliacao, extensao do oraculo).
+
+Validation:
+
+- Hull: call 4.759422, put 0.808599, d1 0.769263, d2 0.627841.
+- Paridade: residuo maximo ~2e-14; FD vs analitico pior caso ~5.2e-6
+  (gamma, tolerancia 1e-5); oraculo pior erro ~2.8e-14 (tolerancias
+  1e-9/1e-8).
+- `pytest tests/ -q --ignore=tests/integration --timeout=120` rc 0;
+  coleta `tests/unit/derivatives` >= 200 (506).
+- `mypy backend/ --strict` 0; `pyright backend/` 0.
+- Producao 245 linhas (<= 250), zero linhas > 100 colunas.
+
+Scope intentionally unchanged:
+
+- Sem IV (PR04), americanas (Fase 2), dividendos discretos, HTTP,
+  MCP, persistencia, campo novo em `Conventions`.
+- Next: DL-PR04 (IV por bissecao protegida, bid/ask/mid, diagnosticos)
+  apos merge.
+
+---
+
+## MERGED — Lab de Derivativos DL-PR02 (PR #127)
 
 Current branch: `feat/dl-pr02-calendar-conventions`
 
