@@ -37,3 +37,50 @@ Saída: `Failed: DID NOT RAISE <class 'backend.derivatives.domain.series_terms.T
 `1 failed in 0.07s`, rc 1. O teste foi coletado e o construtor aceitou a ausência do lote.
 
 Commit do RED: e0f4664595d7fa4464783b9a7b983f6e045a3ba2.
+
+## GREEN local no macOS
+
+macOS 15.8.1 arm64, Python 3.12.13. Comandos abaixo via
+`uv run --offline --no-sync`, com `UV_PROJECT_ENVIRONMENT` apontando para o ambiente
+preexistente do repositório principal, cache uv temporário e `PYTHONDONTWRITEBYTECODE=1`.
+
+| Gate | Resultado | rc |
+|---|---|---|
+| `python -m pytest tests/unit/derivatives/test_series_terms.py -q` | 20 passed | 0 |
+| `python -m pytest tests/ -q --ignore=tests/integration --timeout=120` | 8145 passed, 16 skipped, 261 subtests passed | 0 |
+| `python -m mypy backend/ --strict` | 157 arquivos, zero erros | 0 |
+| `pyright backend/` | 0 erros, 0 avisos de análise | 0 |
+
+Pyright informou que o checkout não contém a subpasta configurada `.venv`.
+A repetição com `--pythonpath /Users/fas/projetos/OPENCLAW/.venv/bin/python` confirmou zero erros.
+
+### Regressão da Fase 01
+
+Na base limpa, antes da SPEC, e na candidata, no mesmo diretório e plataforma:
+
+    python -m backend.derivatives.cli chain BOVA11 2026-11-19 --provider offline_fixture
+
+A comparação dos arquivos de stdout com `cmp` retornou 0. Cada JSON tem 67097 bytes e
+SHA-256 `a7d82699b47d31acec31995ccea3cf4149ebcb92311f980fb23390627b1de9c3`.
+Sem a opção de provider, a candidata devolveu `LIVE_NOT_ACTIVATED`, rc 3.
+
+O SDD de correções da Fase 01 registra `840770d25be12b8602c614bd` para preços, gregas
+e IVs. O comando original segue pendente com a coordenação. Prova alternativa executada:
+
+    git diff --exit-code 11838cd HEAD -- backend/derivatives ':(exclude)backend/derivatives/domain/series_terms.py'
+
+Diff vazio, rc 0. A subárvore base de produção do Lab tem ID
+`9283207aab3bf52bb563571705d6567d3f5d34f8`. O único acréscimo nela é o módulo isolado.
+O SHA-256 acima mede a demo inteira.
+
+### Entrega para coordenação
+
+SPEC_PRONTA, RED_MOSTRADO e GREEN local concluídos. Revisão independente, Linux,
+verificador do digest histórico e abertura de PR pendentes. Estado A.
+Os metadados Git do worktree ficam no repositório principal, fora da área gravável.
+A sequência de commits da branch foi preservada em um bundle incremental sobre a base.
+
+A repetição de pytest com `-rs` confirmou os 16 skips: 15 testes de serviços opt-in e
+um teste do artefato de benchmark Q18 ignorado pelo Git. Todos os 20 casos novos rodaram.
+`git diff --check 11838cd HEAD` sem saída; numstat com quatro arquivos e +100 linhas
+de produção. `pyproject.toml`, `uv.lock` e o formato da Fase 01 permanecem na base.

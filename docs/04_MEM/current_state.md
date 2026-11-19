@@ -7,14 +7,16 @@
 **Última atualização:** 2026-11-19 11:20 BRT · **Turno:** Claude (fechamento da Fase 01).
 
 ## Fase 02 — Marco 2A
-Turno: Claude Code desde 2026-11-19 13:43 BRT
-PR atual: DL2-PR00 — MERGEADO (PR #141; ADR-0025 Accepted). Proximo: DL2-PR01.
-main: squash do PR #141 sobre 1421116 · gate: 8126 aprovados / 15 pulados / 0 falhas
-Decisoes: L1..L5 = padrao do ADR-0025
+Turno: Codex CLI, DL2-PR01 em 2026-11-19. Estado A.
+Base: squash do #141 em `11838cd`; ADR-0025 Accepted, L1..L5 vigentes.
+DL2-PR01: SPEC_PRONTA → RED_MOSTRADO (`e0f4664`) → GREEN local em macOS.
+Gate nativo: 8145 aprovados, 16 pulados, 261 subtestes aprovados; mypy e pyright em zero.
+[Cartão e evidências](../specs/derivatives/fase2/DL2-PR01.md).
 Riscos abertos:
-- Tolerancia CRR x BSM do par 200/201 nao fixada (adendo antes do GREEN do DL2-PR03).
-- Politica de ajuste de strike sem documento datado da B3: tudo `UNKNOWN` (L5).
-Proxima acao (uma so): Codex abre o PR do DL2-PR01 com cartao e RED mostrado.
+- Política conclusiva exige documento B3 datado, versionado e aplicável.
+- Tolerância CRR × BSM do par 200/201 depende de adendo antes do GREEN do PR03.
+Próxima ação: coordenação recebe o bundle local para revisão independente por Claude.
+Linux, reprodução do digest histórico e abertura do PR continuam pendentes.
 
 ## Fase 01 do Lab de Derivativos — CONCLUIDA e integrada na `main` (estado A)
 
