@@ -29,6 +29,8 @@ def _imports(path: Path) -> set[str]:
 
 
 HTTP_TRANSPORT = DERIVATIVES / "oplab" / "transport.py"
+MCP_SURFACE = DERIVATIVES / "mcp"
+MCP_SERVER = MCP_SURFACE / "derivatives_server.py"
 
 
 def test_derivatives_does_not_import_mcp_or_io_clients() -> None:
@@ -42,9 +44,13 @@ def test_derivatives_does_not_import_mcp_or_io_clients() -> None:
         ]
         if path == HTTP_TRANSPORT:
             bad = [imported for imported in bad if imported != "httpx"]
+        if MCP_SURFACE in path.parents:
+            bad = [imported for imported in bad if not imported.startswith("backend.mcp")]
         if bad:
             offenders[str(path)] = sorted(bad)
-    assert offenders == {}, "httpx so entra em oplab/transport.py (DL-PR05b)"
+    assert offenders == {}, (
+        "httpx so em oplab/transport.py (DL-PR05b); backend.mcp so em mcp/ (DL-PR07)"
+    )
 
 
 def test_httpx_is_imported_only_by_the_http_transport() -> None:
@@ -157,14 +163,17 @@ def test_no_random_in_derivatives() -> None:
     assert offenders == [], "nada de aleatoriedade no Laboratorio (determinismo auditavel)"
 
 
-def test_no_wall_clock_in_derivatives() -> None:
+def test_wall_clock_enters_only_through_the_mcp_server_root() -> None:
     hits = [
         str(path)
         for path in _python_files(DERIVATIVES)
         if "datetime.now(" in path.read_text(encoding="utf-8")
         or "datetime.utcnow(" in path.read_text(encoding="utf-8")
     ]
-    assert hits == [], "tempo e sempre injetado no Laboratorio (sem relogio interno)"
+    assert hits == [str(MCP_SERVER)], "tempo e injetado; o relogio real so entra na raiz MCP"
+    text = MCP_SERVER.read_text(encoding="utf-8")
+    assert text.count("datetime.now(") == 1 and "datetime.utcnow(" not in text
+    assert "datetime.now(UTC)" in text, "o unico relogio do Lab e tz-aware em UTC"
 
 
 def test_oplab_does_not_import_pricing_adapters_or_mcp() -> None:
@@ -208,7 +217,7 @@ def test_only_the_service_package_composes_vendor_and_pricing() -> None:
     service = DERIVATIVES / "service"
     offenders: list[str] = []
     for path in _python_files(DERIVATIVES):
-        if service in path.parents:
+        if service in path.parents or MCP_SURFACE in path.parents:
             continue
         imports = _imports(path)
         uses_vendor = any(name.startswith("backend.derivatives.oplab") for name in imports)
@@ -216,10 +225,40 @@ def test_only_the_service_package_composes_vendor_and_pricing() -> None:
         uses_service = any(name.startswith("backend.derivatives.service") for name in imports)
         if (uses_vendor and uses_pricing) or uses_service:
             offenders.append(str(path))
-    assert offenders == [], "so service/ compoe fornecedor e precificacao (ADR-0023)"
+    assert offenders == [], "so service/ compoe; mcp/ e a raiz de composicao (ADR-0023)"
 
 
 def test_service_has_no_network_clock_or_cache() -> None:
     for path in _python_files(DERIVATIVES / "service"):
         roots = {name.split(".", 1)[0] for name in _imports(path)}
         assert roots.isdisjoint({"httpx", "time", "functools", "asyncio", "mcp"}), str(path)
+
+
+def test_mcp_surface_is_a_leaf_nothing_below_imports_it() -> None:
+    offenders: dict[str, list[str]] = {}
+    for path in _python_files(DERIVATIVES):
+        if MCP_SURFACE in path.parents:
+            continue
+        bad = sorted(
+            name for name in _imports(path)
+            if name.startswith("backend.derivatives.mcp") or name.split(".", 1)[0] == "fastmcp"
+        )
+        if bad:
+            offenders[str(path)] = bad
+    assert offenders == {}, "dominio, pricing, oplab e service nao conhecem a superficie MCP"
+
+
+def test_mcp_server_never_reads_credentials_or_opens_http() -> None:
+    text = MCP_SERVER.read_text(encoding="utf-8")
+    roots = {name.split(".", 1)[0] for name in _imports(MCP_SERVER)}
+    assert roots.isdisjoint({"httpx", "os", "socket", "asyncpg", "qdrant_client"})
+    assert "HttpTransport" not in text, "o servidor da Fase 1 nao monta transporte HTTP"
+    assert "environ" not in text, "ambiente so entra por load_derivatives_mcp_config"
+    assert 'host="127.0.0.1"' not in text, "host vem da configuracao, nao de literal"
+
+
+def test_production_tool_module_has_one_barrier_before_serialization() -> None:
+    text = MCP_SERVER.read_text(encoding="utf-8")
+    assert text.count("def production_view(") == 1
+    assert text.count("= production_view(priced") == 1, "tool produtiva so sai pela barreira"
+    assert text.count("chain_view(priced, status=") == 2, "barreira e demo; nenhuma outra saida"
