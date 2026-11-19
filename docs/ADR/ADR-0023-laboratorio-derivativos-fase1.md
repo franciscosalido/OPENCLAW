@@ -175,6 +175,35 @@ declaradas, com flag, ate homologacao:
   `NO_CONVERGENCE`, nunca excecao); o caso-limite ATM `T=1e-9` do oraculo e
   bem condicionado e recupera sigma (errata ao card registrada no SDD).
 
+## Cliente OpLab — allowlist, orcamento e erros (DL-PR05)
+
+- **Dupla lista de rotas:** uma rota so e aceita se pertencer ao enum
+  `MarketRoute` (codigo) **e** a `oplab.allowed_routes` (YAML). O YAML pode
+  restringir, nunca ampliar. A checagem e positiva (`fullmatch` do caminho
+  inteiro), sobre esquema `https`, host exato `api.oplab.com.br`, prefixo
+  `/v3` e metodo `GET`; query string e fragmento sao proibidos.
+- **Dominio de ordens:** qualquer segmento `domain` no caminho e recusado
+  explicitamente, alem de ja nao casar com nenhuma rota enumerada.
+- **`symbol` restrito a `[A-Z0-9]{4,12}`:** sem barra, ponto, interrogacao
+  ou minusculas; e o unico parametro de rota existente.
+- **Taxonomia de erros:** 401 `AuthError`, 402 `SubscriptionError`, 403
+  `PermissionError_`, 404 `NotFoundError`, 429 `RateLimitedError`, 503 e
+  demais 5xx `UnavailableError`; recusas locais `ForbiddenRouteError`,
+  `ForbiddenHostError`, `BudgetExceededError`, `NetworkForbiddenError`;
+  falha de transporte `TransportError`. A mensagem nunca carrega corpo,
+  headers, URL recusada nem token.
+- **`Retry-After` sem retry:** 429/503 carregam `next_eligible_at` (header
+  em segundos ou HTTP-date); sem header legivel valem os bloqueios
+  publicados — **429: 5 min; 503: 1 s** (hipotese ate homologacao). O
+  cliente nunca dorme e nunca repete a chamada: quem decide esperar e o
+  chamador.
+- **Orcamento por credencial:** janelas deslizantes de 50/s e 100/min em
+  memoria, chaveadas pelo SHA-256 dos 8 primeiros caracteres do token (o
+  token nunca e guardado); recusa local acontece antes de qualquer rede.
+- **Divisao do PR:** a implementacao mediu 444 linhas de producao; o card
+  mandava dividir acima de 400. Parte A (erros, rotas, orcamento — pura) e
+  Parte B (transporte e cliente — unico ponto de `httpx` e do token).
+
 ## Barreira deterministica anti-fixture
 
 - `Provenance` e `Purpose` atribuidos pelo adaptador de transporte; payload
