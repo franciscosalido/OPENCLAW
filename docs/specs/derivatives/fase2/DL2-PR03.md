@@ -662,3 +662,81 @@ O executor `scope.py` confere o prefixo de 26.633 bytes do cartão, o hash do ad
 os seis caminhos, os limites do bloco de memória e os diffs protegidos.
 
 **EM_REVISAO.** Entrega local ao orquestrador para publicação em rascunho e revisão de Claude.
+
+## Revisão independente: GO (Claude, 2026-11-19)
+
+Head revisado `d6bbd5c5ef5bf0a53e383ca049ee9a7b28e5eaa7`, árvore `5cb0dba4f3ec`. Estado:
+MERGEADO pelo PR #144. Tudo abaixo foi executado pelo revisor em clone limpo, Linux aarch64,
+Python 3.12, sem reaproveitar saídas do autor.
+
+### Resumo
+
+O núcleo e a parametrização cumprem o contrato. Nenhum defeito de produção foi encontrado. A
+suíte do autor deixava nove mutantes vivos nas bordas do domínio; a revisão acrescentou nove
+testes para prendê-los, sem tocar em produção.
+
+### Conferências
+
+| Verificação | Resultado no head do autor |
+|---|---|
+| Diff anexado à revisão × `git diff ad86380 d6bbd5c` | idênticos byte a byte |
+| Cartão no primeiro commit e no head; Adendo 1 no SDD | hashes conferem; SDD sem linha removida |
+| RED 1 em `c81fdb4` / RED 2 em `e4c2db0` | 4.192654 no lugar de 5.089632 / `DID NOT RAISE` |
+| Focal (contrato, isolamento, guarda dos termos) | 576 aprovados |
+| Suíte sem integração | 9.085 aprovados, 16 pulados, 261 subtestes, 0 falhas |
+| mypy estrito / Pyright | 159 arquivos sem erros / 0 erros |
+| Produção fora de `binomial.py`, config, scripts, protegidos | diff vazio (rc 0) |
+| Demo sintética e CLI padrão | idêntica à base no Linux (`f4f8003f…`) / rc 3 |
+
+### Ataques
+
+- **Valores de livro-texto.** Put americana de Hull (`S = K = 50`, `r = 10%`, `sigma = 40%`,
+  5 meses): 4.488, 4.263, 4.272, 4.278 e 4.283 com 5, 30, 50, 100 e 500 passos. O livro
+  imprime 4.49, 4.263, 4.272, 4.278 e 4.283.
+- **Diferencial.** Contra implementação própria do revisor, que percorre níveis de tempo e
+  não colunas: 6.000 casos, 0 divergência de resultado ou de código, maior diferença relativa
+  de 1.1e-12.
+- **Entradas inválidas e extremas.** 120.000 chamadas nas três funções: 0 exceção não tipada,
+  0 valor não finito, 0 árvore inválida devolvida.
+- **Propriedades.** Doze, em 2.500 casos válidos: 0 violação.
+- **Passos no teto.** `N = 5000`, put americana: 1.25 s, pico de 469 KiB, diferença de 2e-15
+  contra o revisor.
+
+As doze propriedades: `americana >= europeia`; `americana >= intrínseco`; paridade e pisos da
+europeia; tetos (`call <= S`, `put <= K` com `r >= 0`); monotonia em `K` e em `S`;
+homogeneidade de grau 1 em `(S, K)`; regiões sem prêmio de call e de put; e a simetria
+put-call americana, `C(S, K, r, q) = P(K, S, q, r)`, que valeu com diferença relativa de até
+1.9e-12. A simetria é resultado clássico (McDonald e Schroder), citado de memória e conferido
+numericamente aqui.
+
+Uma referência candidata foi descartada: o valor 6.0875 de arXiv:2106.12049 para a put de
+`S = K = 100` não é o preço exato, porque a tabela fixa o passo de espaço da malha. O próprio
+artigo diz isso. Não serve de critério para a árvore.
+
+### Mutação do revisor
+
+33 mutantes em `binomial.py`, lista própria. No head do autor: 21 mortos e 12 vivos.
+
+- **Três são equivalentes ou redundantes por construção.** `peaks[0]` já é o `spot`, então o
+  condicional da coluna da raiz não muda nada (regra numérica 1 cumprida de qualquer forma).
+  As duas conferências do maior preço do ativo, por potência e por produto acumulado, cobrem
+  uma à outra.
+- **Nove eram lacunas de teste, com a produção correta.** Strike exatamente zero no núcleo e
+  em `crr_price`; spot zero e rendimento negativo no vencimento, que devolveriam intrínseco;
+  `sigma` e rendimento negativos em chamada direta de `crr_parameters`, que devolveria árvore
+  invertida; desconto que arredonda para zero; `up` infinito sem `OverflowError`; subclasse de
+  `TreeParameters`.
+
+O revisor acrescentou `test_price_domain_holds_at_expiry`, `test_tree_refuses_zero_strike`,
+`test_parameters_direct_domain` e `test_tree_subclass_is_refused` no commit desta seção. Com
+eles: 30 de 33 mortos, restando só os três equivalentes; contrato com 552 testes; suíte sem
+integração com 9.094 aprovados, 16 pulados e 261 subtestes.
+
+### Observações sem ação
+
+- A divergência de código entre as duas implementações em 3 das 120.000 entradas inválidas
+  (`probability_out_of_range` contra `tree_not_representable`) vem da ordem em que cada uma
+  calcula o desconto. O cartão permite as duas.
+- A suíte ficou cerca de 8 s mais lenta, por causa das árvores de 1.000 passos do critério 2.
+- No ambiente Linux do autor a imagem trazia Click 8.3.3 e o lock pede 8.4.1; ele montou a
+  versão certa e registrou. O portão do revisor rodou em outro ambiente e deu o mesmo número.

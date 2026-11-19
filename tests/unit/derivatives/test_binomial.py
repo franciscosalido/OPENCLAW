@@ -335,3 +335,57 @@ def test_tiny_down_factor() -> None:
     tree = TreeParameters(up=1.0, down=1e-200, prob_up=.5, discount=1.0, steps=2)
     value = tree_price(kind=PUT, style=EU, spot=1e300, strike=2e-100, tree=tree)
     assert value == pytest.approx(2.5e-101, rel=1e-14, abs=0)
+
+
+# Testes acrescentados na revisão independente (Claude). Cada um prende um mutante que
+# sobrevivia à suíte do autor; a produção já estava correta em todos eles.
+
+
+@pytest.mark.parametrize("updates", [
+    {"strike": 0.0, "time_years": 0.0},
+    {"spot": 0.0, "time_years": 0.0},
+    {"dividend_yield": -0.01, "time_years": 0.0},
+])
+def test_price_domain_holds_at_expiry(updates: dict[str, Any]) -> None:
+    """No vencimento, zero exato em spot ou strike e rendimento negativo não viram intrínseco."""
+    with pytest.raises(BinomialRefusal) as exc:
+        crr_price(**(BASE | updates))
+    assert exc.value.code is BinomialRefusalCode.INPUT_OUT_OF_DOMAIN
+
+
+def test_tree_refuses_zero_strike() -> None:
+    """O núcleo recusa strike exatamente zero, não só negativo."""
+    with pytest.raises(BinomialRefusal) as exc:
+        tree_price(kind=PUT, style=AM, spot=50.0, strike=0.0, tree=TREE)
+    assert exc.value.code is BinomialRefusalCode.INPUT_OUT_OF_DOMAIN
+
+
+@pytest.mark.parametrize("updates,code", [
+    ({"sigma": -0.1}, "input_out_of_domain"),
+    ({"dividend_yield": -0.01}, "input_out_of_domain"),
+    # exp(-1e5) arredonda para zero: a árvore sairia com desconto nulo
+    ({"rate_cont": 1e5, "dividend_yield": 1e5, "steps": 1}, "tree_not_representable"),
+    # o expoente vai a infinito sem OverflowError; up deixa de ser finito
+    ({"sigma": 1.7e308, "time_years": 4.0, "steps": 1}, "tree_not_representable"),
+])
+def test_parameters_direct_domain(updates: dict[str, Any], code: str) -> None:
+    """Chamada direta de crr_parameters nunca devolve árvore invertida ou com desconto nulo."""
+    args = {key: BASE[key] for key in ("rate_cont", "dividend_yield", "sigma",
+                                       "time_years", "steps")}
+    with pytest.raises(BinomialRefusal) as exc:
+        crr_parameters(**(args | updates))
+    assert exc.value.code is BinomialRefusalCode(code)
+
+
+class _LooseTree(TreeParameters):
+    """Subclasse que um chamador poderia usar para trocar o comportamento dos campos."""
+
+    __slots__ = ()
+
+
+def test_tree_subclass_is_refused() -> None:
+    """A árvore tem de ser TreeParameters exato, como os números têm de ser float exato."""
+    with pytest.raises(BinomialRefusal) as exc:
+        tree_price(kind=PUT, style=AM, spot=50.0, strike=52.0,
+                   tree=_LooseTree(1.2, 0.8, 0.6, 0.95, 2))
+    assert exc.value.code is BinomialRefusalCode.INVALID_INPUT_TYPE

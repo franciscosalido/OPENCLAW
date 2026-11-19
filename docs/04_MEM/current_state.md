@@ -4,21 +4,23 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-19 · **Turno:** Claude (GO e merge do DL2-PR02).
+**Última atualização:** 2026-11-19 · **Turno:** Claude (GO e merge do DL2-PR03).
 
 ## Fase 02 — Marco 2A
 
-PR atual: DL2-PR03 — EM_REVISAO. Estado A.
-Base: `ad86380` (DL2-PR02, PR #143). ADR-0025 e Adendo 1 do SDD vigentes.
-O núcleo isolado recebe a árvore pronta; a parametrização CRR e a entrada composta
-validam domínio, probabilidade e representabilidade. O exercício americano inclui a raiz.
-REDs comportamentais `c81fdb4` e `e4c2db0`; implementação `78a90fe`.
-Gates do autor em clones limpos macOS arm64 e Linux aarch64: 9.085 aprovados,
-16 pulados, 261 subtestes em cada um. Mypy estrito e Pyright em zero.
-Mutação do autor: 18 mortos em 18. Demo idêntica à base em cada plataforma.
-[Cartão, comandos e evidências do autor](../specs/derivatives/fase2/DL2-PR03.md).
+PR atual: DL2-PR03 — MERGEADO (PR #144, GO na primeira rodada de revisão). Estado A.
+Base: `main` após o squash do #144. ADR-0025 e Adendo 1 do SDD vigentes.
+Entregue: `backend/derivatives/pricing/binomial.py` (153 linhas), isolado. Núcleo de indução
+com exercício americano em todos os nós, parametrização CRR separada e oito recusas tipadas.
+Nada em produção importa o módulo; a americana segue recusada na chain, no MCP e no CLI.
+Gate do head aprovado, Linux aarch64 limpo: 9.094 aprovados, 16 pulados, 261 subtestes.
+Revisão: valores de Hull reproduzidos, 6.000 casos iguais à implementação do revisor,
+120.000 entradas inválidas sem exceção não tipada, 30 de 33 mutantes mortos (3 equivalentes).
+[Cartão, REDs, evidências e revisão](../specs/derivatives/fase2/DL2-PR03.md).
 
 Riscos abertos:
+- L3 do ADR-0025 ficou contraditório: manda o Codex gerar a referência americana do
+  DL2-PR04, mas o Codex implementou o DL2-PR03. Francisco decide quem gera.
 - Manual B3 de 01/07/2026, §3.3.1: puts de ações, BDRs e ETFs são só europeias. O CRR
   americano vale, na prática, para calls. Adendo ao ADR-0025 pendente (Claude).
 - §3.2.9 do mesmo manual cobre opções sobre ações; BOVA11 segue com ajuste `UNKNOWN` (L5).
@@ -26,7 +28,8 @@ Riscos abertos:
   relativo dentro de função. Dono: PR da ponte (Marco 2B).
 - Verificador do digest numérico da Fase 01 ainda fora do repositório (PR do Claude).
 
-Próxima ação: o orquestrador publica o rascunho para a revisão independente de Claude.
+Próxima ação (uma só): Claude escreve o cartão do DL2-PR04 (referência independente,
+invariantes em grade, mutação do critério 8 e medição), depois da decisão sobre L3.
 
 ## Fase 01 do Lab de Derivativos — CONCLUIDA e integrada na `main` (estado A)
 
