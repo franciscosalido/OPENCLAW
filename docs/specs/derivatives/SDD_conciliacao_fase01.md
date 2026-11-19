@@ -63,3 +63,29 @@ evidências históricas CS1–11 permanecem nos SDD originais. Gate global,
 pyright e benchmark nativo dedicado não foram repetidos neste clone. O
 BACKLOG e a memória do snapshot Dots registram o bundle OKF do Lab como
 pendente. A candidata aguarda revisão independente.
+
+
+## Gate final de Dots — código `17bc0c3`
+
+Em clones descartáveis equivalentes a `17bc0c3` + PR #130 `95a043b` +
+patch de portabilidade `2c2583cd…` (sem JSON ignorado):
+
+| Ambiente | Python | Pytest sem integração | Mypy strict | Pyright |
+|---|---|---|---|---|
+| macOS arm64 | 3.12.13 | 8.052 passaram, 15 pulados, 0 falhas | 0 erros / 155 arquivos | 0 erros |
+| Linux aarch64 | 3.12.13 | 8.052 passaram, 15 pulados, 0 falhas | 0 erros / 155 arquivos | 0 erros |
+
+Smoke separado usou o FastMCP por HTTP real em 127.0.0.1:8814 dentro de
+um contêiner sem rede externa. Tool produtiva bloqueada em prod e test;
+demo não registrada em prod; BOVA11 synthetic/test retornou 100 linhas em
+test; Host externo recebeu 403. Os processos foram terminados.
+
+CS10: protocolo PR06 nativo em macOS arm64, 30 execuções, 100 opções
+europeias precificadas; p50 24,25 ms, p95 29,61 ms, meta p95 <2.000 ms
+atendida. É um cenário sintético, não SLA live. Na base Claude `6892c82`
+o mesmo Mac mediu p95 28,22 ms; o gate amplo da base registrou 8.028
+aprovados. A comparação não é benchmark controlado de regressão.
+
+A documentação posterior ao código não altera a árvore executável.
+A candidata única é `review/fase01-claude-dots`. Revisão Claude e
+integração owner continuam pendentes; B/C e CLI opcional ficam fora.
