@@ -202,3 +202,24 @@ def test_no_token_query_parameter_in_lab() -> None:
         if needle in path.read_text(encoding="utf-8")
     ]
     assert hits == [], "token so viaja no header; parametro de query e proibido (ADR-0023)"
+
+
+def test_only_the_service_package_composes_vendor_and_pricing() -> None:
+    service = DERIVATIVES / "service"
+    offenders: list[str] = []
+    for path in _python_files(DERIVATIVES):
+        if service in path.parents:
+            continue
+        imports = _imports(path)
+        uses_vendor = any(name.startswith("backend.derivatives.oplab") for name in imports)
+        uses_pricing = any(name.startswith("backend.derivatives.pricing") for name in imports)
+        uses_service = any(name.startswith("backend.derivatives.service") for name in imports)
+        if (uses_vendor and uses_pricing) or uses_service:
+            offenders.append(str(path))
+    assert offenders == [], "so service/ compoe fornecedor e precificacao (ADR-0023)"
+
+
+def test_service_has_no_network_clock_or_cache() -> None:
+    for path in _python_files(DERIVATIVES / "service"):
+        roots = {name.split(".", 1)[0] for name in _imports(path)}
+        assert roots.isdisjoint({"httpx", "time", "functools", "asyncio", "mcp"}), str(path)

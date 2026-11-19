@@ -215,6 +215,26 @@ declaradas, com flag, ate homologacao:
   bruto nao sai do pacote; payload malformado vira `VendorPayloadError` sem
   os valores do payload.
 
+## ChainService — uma captura, recusa explicada (DL-PR06)
+
+- **Uma captura = quatro leituras** (chain, ativo, taxas, status), em ordem
+  fixa; todos os calculos reutilizam a mesma captura. Falha de leitura
+  propaga erro tipado: nao ha chain parcial nem fallback para fixture.
+- **Carimbo worst-of:** o proposito da captura herda das quatro leituras.
+  `PricedChain.purpose` e recalculado (campo, carimbo, procedencia) e por
+  isso resiste a `model_copy`, que nao valida.
+- **Recusa da chain inteira** com motivo nomeado quando falta spot, taxa,
+  cobertura de calendario, prazo valido ou quando `day_count` nao e
+  `business_252` (`calendar_365` esta nomeado no contrato, sem contagem
+  implementada).
+- **Sigma do mid:** preco BSM com a IV do mid serve para as gregas; nao e
+  validacao. A validacao independente usa a fixture sintetica, cujo sigma
+  verdadeiro precisa cair em `[IV_bid, IV_ask]`.
+- **Data de avaliacao** e `now` no fuso `America/Sao_Paulo`.
+- **Renumeracao:** onde este ADR cita "DL-PR05 service" e "DL-PR06 mcp" na
+  arvore alvo, e "testes de contaminacao (DL-PR06)", leia-se DL-PR06
+  (servico) e DL-PR07 (MCP), conforme a renumeracao de 2026-11-06.
+
 ## Barreira deterministica anti-fixture
 
 - `Provenance` e `Purpose` atribuidos pelo adaptador de transporte; payload

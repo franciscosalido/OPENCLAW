@@ -66,3 +66,11 @@
   no mesmo processo.
 - `vendor_models.py` tem 1 linha > 100 colunas pre-existente do DL-PR01
   (detectada no DL-PR05); so formatacao.
+- Medir o protocolo de latencia nativamente em macOS (DL-PR06 mediu em VM
+  Linux aarch64 no mesmo hardware).
+- `day_count: calendar_365` esta no contrato YAML sem contagem
+  implementada; o `ChainService` recusa. Implementar ou remover do contrato.
+- Politica para ativo ausente (404 em `/market/stocks`): hoje a captura
+  falha inteira; avaliar chain com spot da propria opcao e flag.
+- `sigma_source` configuravel por chamada (hoje: mid) e leitura paralela das
+  quatro rotas — so com medicao que justifique.

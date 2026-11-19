@@ -5,7 +5,7 @@
 > meaningful sessions.
 
 **Last updated: 2026-11-18
-**Updated by: Claude (turno autonomo Fase 1, coordenado com Dots) — DL-PR05b
+**Updated by: Claude (turno autonomo Fase 1, coordenado com Dots) — DL-PR06
 
 ---
 
@@ -25,6 +25,46 @@
   o arquivo ainda nao chegou ao repo) -> DL-PR05a -> DL-PR05b -> DL-PR06 ->
   DL-PR07. As branches do Lab estao **empilhadas**; apos cada squash-merge,
   rebasear a seguinte com `git rebase --onto origin/main <base-antiga>`.
+
+---
+
+## READY FOR PR — Lab de Derivativos DL-PR06 (ChainService + sintetica + latencia)
+
+Current branch: `feat/dl-pr06-chain-service`
+
+Base: `feat/dl-pr05b-oplab-transport-client` (empilhada).
+
+Scope:
+
+- Added `backend/derivatives/service/chain_service.py`: `Capture`,
+  `PricedRow`, `PricedChain`, `ChainService` (`acquire`/`normalize`/`price`/
+  `build`); captura de 4 leituras em ordem fixa; carimbo worst-of;
+  `PricedChain.purpose` recalculado; recusa de chain com motivo nomeado.
+- Added `scripts/derivatives_make_synthetic_fixture.py` e
+  `tests/fixtures/derivatives/synthetic/` (BOVA11, 100 europeias, manifesto
+  com hashes, README).
+- Added `scripts/derivatives_latency_protocol.py` (relatorio em
+  `reports/derivatives/`, ignorado pelo Git).
+- Tests: `test_chain_service.py`, `test_synthetic_fixture.py`,
+  `test_latency_protocol.py` (34 testes) + 2 fronteiras.
+- Docs: `SDD_DL-PR06.md`, ADR-0023 secao ChainService, BACKLOG.
+
+Validation (Linux aarch64, Python 3.12.16, deps do `uv.lock`):
+
+- `pytest tests/ --ignore=tests/integration` rc 0 (7.964 passed, 15
+  skipped); Lab + arquitetura 5.827 passed (3 ordens).
+- `mypy backend/ --strict` 0 (151 arquivos); `pyright backend/` 0.
+- Producao 163 linhas (<= 400); protegidos intocados.
+- Latencia em VM Linux no Mac: p95 total 27,8 ms em 30 execucoes de 100
+  europeias (meta 2000 ms). Medicao nativa em macOS pendente.
+- Validacao independente: sigma verdadeiro da sintetica dentro de
+  `[IV_bid, IV_ask]` nas linhas bem condicionadas.
+
+Scope intentionally unchanged:
+
+- Sem MCP (PR07), sem cache, sem persistencia, sem chamada real.
+- Next: DL-PR07 (servidor MCP `quimera-derivatives`, barreira e testes de
+  contaminacao).
 
 ---
 
