@@ -106,6 +106,12 @@ class AdjustmentEvidence(_TermsModel):
     policy: AdjustmentPolicy
     _require_mapping = model_validator(mode="before")(_input_mapping)
 
+    @model_validator(mode="after")
+    def _published_by_effective_date(self) -> Self:
+        if self.published_on > self.effective_on:
+            raise ValueError("documento publicado depois da vigência observada")
+        return self
+
 
 class SeriesTerms(_TermsModel):
     """Uma observação por série e data de vigência explícita.
