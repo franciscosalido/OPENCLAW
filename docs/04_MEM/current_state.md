@@ -4,19 +4,21 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-19 11:20 BRT · **Turno:** Claude (fechamento da Fase 01).
+**Última atualização:** 2026-11-19 14:50 BRT · **Turno:** Codex (correção do DL2-PR01).
 
 ## Fase 02 — Marco 2A
-Turno: Codex CLI, DL2-PR01 em 2026-11-19. Estado A.
-Base: squash do #141 em `11838cd`; ADR-0025 Accepted, L1..L5 vigentes.
-DL2-PR01: SPEC_PRONTA → RED_MOSTRADO (`e0f4664`) → GREEN em macOS e Linux aarch64.
-Gate: 8145 aprovados, 16 pulados e 261 subtestes em ambos; mypy e pyright sem erros.
-[Cartão e evidências](../specs/derivatives/fase2/DL2-PR01.md).
-Riscos abertos:
-- Política conclusiva exige documento B3 datado, versionado e aplicável.
-- Tolerância CRR × BSM do par 200/201 depende de adendo antes do GREEN do PR03.
-Próxima ação: Claude revisa o DL2-PR01; sem merge até o parecer independente.
-Pendente: recuperar o verificador original do digest histórico da Fase 01.
+
+DL2-PR01, draft #142 em revisão. Estado A. Base do PR `11838cd`, ADR-0025 aceito.
+O parecer sobre `f36f644` apontou B1–B3. RED registrado em `6078aac` e `153ef0a`.
+A candidata de código `46ddfda` valida cópias, documentação aplicável e JSON estrito.
+macOS arm64 passou com 89 testes focais e 8.214 globais, 16 pulados, 261 subtestes aprovados.
+mypy estrito e Pyright sem erros. Demo idêntica à base no Mac, modo live com rc 3.
+[Cartão, decisões I1–I6 e evidências](../specs/derivatives/fase2/DL2-PR01.md).
+
+A coordenação repete os gates em Linux e atualiza o mesmo draft para novo parecer do Claude.
+A integração de um consumidor depende de identidade da série e procedência verificável.
+O verificador do digest histórico fica em PR separado do Claude. A tolerância CRR × BSM
+do par 200/201 continua pendente de adendo antes do GREEN do PR03.
 
 ## Fase 01 do Lab de Derivativos — CONCLUIDA e integrada na `main` (estado A)
 
