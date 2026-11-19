@@ -4,9 +4,59 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-19 09:00 BRT · **Turno:** Claude (correcoes do NO-GO).
+**Última atualização:** 2026-11-19 11:20 BRT · **Turno:** Claude (fechamento da Fase 01).
 
-## Fase 01 — revisada, rebaseada sobre a `main` nova e com CLI (estado A)
+## Fase 01 do Lab de Derivativos — CONCLUIDA e integrada na `main` (estado A)
+
+**Estado A (offline verificado) fechado em 2026-11-19.** Tudo abaixo esta na
+`main` do GitHub; nao ha branch pendente da Fase 01.
+
+| PR | Conteudo | Gate nativo (macOS, arvore limpa) |
+|---|---|---|
+| #132 | testes hermeticos para clone limpo | 7.766 passed |
+| #133 | DL-PR05a: rotas, erros e orcamento OpLab | 7.875 passed |
+| #134 | DL-PR05b: transporte e cliente OpLab | 7.930 passed |
+| #135 | DL-PR06: ChainService, fixture sintetica, latencia | 7.966 passed |
+| #136 | DL-PR07: servidor MCP `quimera-derivatives` | 8.030 passed |
+| #137 | conciliacao Dots + revisao Claude | 8.059 passed |
+| #138 | correcoes da revisao independente (REPLAY, `invalid_rate`) | 8.101 passed |
+
+- Apos o #138 a `main` ficou em `b0ca5a5`, arvore `df34e1d`: **a mesma arvore
+  aprovada pela revisao independente** (Codex) em macOS e Linux, com 22 de 22
+  regressoes plantadas detectadas. Gate final nessa `main`: 8.101 passed,
+  16 skipped, 0 failed; `mypy --strict` 0 (155 arquivos); `pyright` 0.
+- O DL-PR08 (CLI `quimera chain`, opcional) e este registro entraram em
+  seguida, pelos dois PRs seguintes, com o mesmo procedimento.
+- Integracao feita por `reports/fase01/integrar_fila.sh` (fora do Git):
+  rebase e gate em arvore de trabalho propria, arvore conferida antes do gate
+  e depois de cada squash-merge, merge preso ao commit testado.
+
+### O que a Fase 01 entrega
+
+Cliente OpLab offline (rotas em allowlist, orcamento, erros tipados),
+`ChainService` (uma captura, IV e BSM por linha, recusa explicada), servidor
+MCP em loopback com barreira de procedencia e CLI fino. A tool produtiva
+devolve sempre `LIVE_NOT_ACTIVATED`; so a demo sintetica (`purpose=test`)
+mostra numeros. Nenhuma chamada real a OpLab e nenhum token real foram usados.
+
+### Proximo turno
+
+1. **Fase 02 offline:** definir o primeiro recorte (SDD antes do codigo).
+2. **Estado B** (homologacao com dados reais da OpLab) e **estado C**
+   (promocao explicita por Francisco) continuam fora; ver `BACKLOG.md` do Lab
+   e as pendencias de homologacao no ADR-0023.
+3. Pendencias nao bloqueantes registradas no BACKLOG: guarda do FastMCP
+   depende de atributo privado da versao 3.4.0; procedencia da captura herda
+   so da leitura de opcoes; limite de plausibilidade da taxa.
+4. A `main` nao tem protecao de branch. Vale ligar "exigir branch atualizado"
+   antes de varios agentes voltarem a mergear em paralelo.
+
+---
+
+## Historico — turno Claude de 2026-11-19 (revisao, DL-PR08 e correcoes do NO-GO)
+
+> Registro do turno, anterior a integracao. Onde este trecho diz "pendente",
+> "fila" ou "NO-GO", leia como historia: tudo foi integrado (secao acima).
 
 **Turno do Claude iniciado e encerrado em 2026-11-19**, a pedido de
 Francisco: revisar o delta de conciliacao do Dots, corrigir e iniciar o
