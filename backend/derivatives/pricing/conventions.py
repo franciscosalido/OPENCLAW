@@ -19,11 +19,27 @@ def year_fraction(business_days: int, *, basis: YearBasis) -> float:
     return business_days / basis
 
 
+class RateDomainError(ValueError):
+    """Taxa fora do dominio da capitalizacao declarada; a mensagem nao ecoa o valor."""
+
+
 def continuous_rate(value_pct_aa: Decimal, *, compounding: RateCompounding) -> float:
     """Converte % a.a. em taxa continua: ``annual_exp_252`` -> ``ln(1 + i/100)``
-    (padrao CDI/Selic, hipotese ADR-0023); ``continuous`` -> ``i/100``."""
-    fraction = float(value_pct_aa) / 100.0
-    return math.log(1.0 + fraction) if compounding == "annual_exp_252" else fraction
+    (padrao CDI/Selic, hipotese ADR-0023); ``continuous`` -> ``i/100``.
+
+    Raises:
+        RateDomainError: taxa nao finita, ou ``i <= -100%`` na capitalizacao composta
+            (``ln`` de valor nao positivo). Taxa negativa acima de -100% e valida.
+    """
+    fraction = float(value_pct_aa) / 100.0 if value_pct_aa.is_finite() else math.nan
+    if not math.isfinite(fraction):
+        raise RateDomainError("taxa nao finita")
+    if compounding != "annual_exp_252":
+        return fraction
+    growth = 1.0 + fraction
+    if growth <= 0.0:
+        raise RateDomainError("taxa composta menor ou igual a -100% a.a.")
+    return math.log(growth)
 
 
 @dataclass(frozen=True, slots=True)

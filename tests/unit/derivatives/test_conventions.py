@@ -15,12 +15,17 @@ from backend.derivatives.pricing.calendar import (
     load_calendars,
 )
 from backend.derivatives.pricing.conventions import (
+    RateDomainError,
     continuous_rate,
     model_assumptions,
     time_to_expiry,
     year_fraction,
 )
-from config.derivatives_config_model import Conventions, load_derivatives_config
+from config.derivatives_config_model import (
+    Conventions,
+    RateCompounding,
+    load_derivatives_config,
+)
 
 
 @pytest.fixture(scope="module")
@@ -67,6 +72,41 @@ def test_continuous_rate_negative_rate() -> None:
     assert continuous_rate(
         Decimal("-0.5"), compounding="annual_exp_252"
     ) == pytest.approx(math.log(0.995))
+
+
+@pytest.mark.parametrize("value", ["-100", "-100.0000001", "-150", "-1E+6"])
+def test_compound_rate_at_or_below_minus_100_pct_is_a_domain_error(value: str) -> None:
+    # ln(1 + i) nao existe para i <= -100%: antes escapava "math domain error".
+    with pytest.raises(RateDomainError):
+        continuous_rate(Decimal(value), compounding="annual_exp_252")
+
+
+@pytest.mark.parametrize("value", ["-99.99999999999999", "-99.999999", "-50", "-0.5"])
+def test_negative_compound_rate_above_minus_100_pct_stays_valid(value: str) -> None:
+    rate = continuous_rate(Decimal(value), compounding="annual_exp_252")
+    assert rate == pytest.approx(math.log(1.0 + float(value) / 100.0))
+    assert math.isfinite(rate) and rate < 0.0
+
+
+@pytest.mark.parametrize("value", ["-100", "-150", "-1E+6"])
+def test_continuous_compounding_has_no_lower_bound(value: str) -> None:
+    assert continuous_rate(Decimal(value), compounding="continuous") == float(value) / 100.0
+
+
+@pytest.mark.parametrize("compounding", ["annual_exp_252", "continuous"])
+@pytest.mark.parametrize("value", ["NaN", "sNaN", "Infinity", "-Infinity", "1E+400"])
+def test_non_finite_rate_is_a_domain_error_in_both_compoundings(
+    value: str, compounding: RateCompounding,
+) -> None:
+    with pytest.raises(RateDomainError):
+        continuous_rate(Decimal(value), compounding=compounding)
+
+
+def test_rate_domain_error_is_a_value_error_and_does_not_echo_the_value() -> None:
+    assert issubclass(RateDomainError, ValueError)
+    with pytest.raises(RateDomainError) as caught:
+        continuous_rate(Decimal("-123.456"), compounding="annual_exp_252")
+    assert "123.456" not in str(caught.value)
 
 
 def test_time_to_expiry_regular_window(b3: TradingCalendar) -> None:

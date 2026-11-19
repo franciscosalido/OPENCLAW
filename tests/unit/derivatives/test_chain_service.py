@@ -251,6 +251,64 @@ async def test_missing_inputs_refuse_every_row_with_the_reason(
     assert all(item.pricing.price is None for item in result.rows)
 
 
+def _set_every_rate(directory: Path, value: float) -> None:
+    path = directory / "market_interest_rates.json"
+    rates = json.loads(path.read_text(encoding="utf-8"))
+    for rate in rates:
+        rate["value"] = value
+    path.write_text(json.dumps(rates), encoding="utf-8")
+
+
+@pytest.mark.parametrize("value", [-100.0, -100.0000001, -150.0, -1e6])
+async def test_compound_rate_out_of_domain_refuses_every_row_and_keeps_them(
+    tmp_path: Path, calendars: dict[CalendarId, TradingCalendar], value: float,
+) -> None:
+    # NO-GO de 19/11: -100% a.a. chegava a log(0) e a excecao escapava de build().
+    directory = _clone_synthetic(tmp_path)
+    _set_every_rate(directory, value)
+    result = await _service(FixtureTransport(directory), calendars).build(
+        "BOVA11", EXPIRY, now=NOW)
+    assert result.unpriceable_reason == "invalid_rate"
+    assert result.time_to_expiry is None
+    assert len(result.rows) == 100
+    assert {item.pricing.reason for item in result.rows} == {"chain_unpriceable:invalid_rate"}
+    for item in result.rows:
+        assert item.pricing.supported is False
+        assert item.pricing.price is None and item.pricing.greeks is None
+        assert item.pricing.iv is None
+    # A taxa recusada continua visivel na chain, para diagnostico.
+    assert result.chain.rate is not None
+    assert float(result.chain.rate.value_pct_aa) == value
+
+
+@pytest.mark.parametrize("value", [-99.999999, -50.0, -0.5, 0.0])
+async def test_negative_rates_inside_the_domain_are_still_priced(
+    tmp_path: Path, calendars: dict[CalendarId, TradingCalendar], value: float,
+) -> None:
+    directory = _clone_synthetic(tmp_path)
+    _set_every_rate(directory, value)
+    result = await _service(FixtureTransport(directory), calendars).build(
+        "BOVA11", EXPIRY, now=NOW)
+    assert result.unpriceable_reason is None
+    assert result.time_to_expiry is not None
+    priced = [item.pricing.price for item in result.rows if item.pricing.supported]
+    assert priced and all(price is not None and math.isfinite(price) for price in priced)
+    assert not any((item.pricing.reason or "").startswith("chain_unpriceable")
+                   for item in result.rows)
+
+
+async def test_continuous_compounding_accepts_minus_100_pct(
+    tmp_path: Path, calendars: dict[CalendarId, TradingCalendar],
+) -> None:
+    directory = _clone_synthetic(tmp_path)
+    _set_every_rate(directory, -100.0)
+    conventions = CFG.conventions.model_copy(update={"rate_compounding": "continuous"})
+    cfg = CFG.model_copy(update={"conventions": conventions})
+    result = await _service(FixtureTransport(directory), calendars, cfg).build(
+        "BOVA11", EXPIRY, now=NOW)
+    assert result.unpriceable_reason is None
+
+
 async def test_missing_spot_refuses_every_row(
     tmp_path: Path, calendars: dict[CalendarId, TradingCalendar],
 ) -> None:
