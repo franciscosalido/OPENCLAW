@@ -455,3 +455,135 @@ O rótulo entre parênteses diz o peso da fonte.
 
 Quant Stack Exchange: a busca restrita ao site voltou vazia hoje, como na escrita do
 DL2-PR03. Nenhuma afirmação deste cartão se apoia nele.
+
+## Evidências do autor — 2026-11-19
+
+**EM_REVISAO · estado A.** Base `1dc7760595d29f8e867b0b54124e29ec7f926915`,
+especificação e referência em `5557d25b0a81932876cfc0a1cd3415ea6add2676`, testes
+congelados em `487b694bc6fe9e2e45b85b73b863156f846bba88`. O commit dos testes acrescenta
+somente `tests/unit/derivatives/test_binomial_validation.py`. Os resultados abaixo foram
+obtidos nesta execução. Os logs ficam no Mac em `../evidencias-dl2-pr04/logs/`, a partir
+da raiz deste clone.
+
+### Referência e grade
+
+O manifesto da entrega passou em `sha256sum -c SHA256SUMS.txt` (6/6). Nos dois sistemas,
+T1 confirmou o SHA-256 dos bytes do JSON e a linha completa do arquivo de soma. T2
+regenerou os mesmos bytes em memória. T3 confirmou os 42 identificadores distintos, a
+representação das seis entradas e a distribuição de 20 calls, 22 puts, 35 prêmios positivos
+(16 em calls) e sete empates nos identificadores prescritos.
+
+T4 comparou 84 preços em `Decimal`. O maior erro dividido por `max(1, |referência|)` foi
+`1.705874e-13` para a europeia (`crr_05_hull`) e `1.420966e-13` para a americana
+(`crr_14_call_yield`). T5 aprovou as 126 comparações de parâmetros nos limites do cartão;
+T6 reproduziu os seis números impressos para a árvore de Hull.
+
+| Grade T7 | Pontos verificados |
+|---|---:|
+| Produto cartesiano | 2.880 |
+| Admissíveis, com G1 e G2 | 2.740 |
+| Inadmissíveis, todos com `probability_out_of_range` | 140 |
+| G3, call sem rendimento e taxa não negativa | 340 |
+| G4, put com taxa não positiva | 680 |
+| G5, prêmio da call maior que 0,01 | 36 |
+| G6, simetria nos dois estilos | 2.080 |
+
+### Mutação e controle
+
+No Mac, cada rodada partiu dos mesmos bytes de `binomial.py` em um clone temporário do
+commit congelado. O diff de cada mutante tinha uma única substituição. Foi executado
+somente `python -m pytest -q --tb=short tests/unit/derivatives/test_binomial_validation.py`,
+com relatório JUnit por rodada. T4 conta os casos que violaram a tolerância de preço.
+Em M2b, T5 falhou especificamente no desconto. A coluna T7 identifica a primeira asserção
+que interrompeu a grade.
+
+| Rodada | Falhas T4 | Falhas T5 | Falha T7 | Falhas / 89 | rc |
+|---|---:|---:|---|---:|---:|
+| M1 · sem exercício antecipado | 35 | 0 | G2, intrínseco na raiz | 36 | 1 |
+| M2a · sem desconto | 41 | 0 | G6, simetria europeia | 42 | 1 |
+| M2b · desconto com `r - q` | 18 | 18 | G6, simetria europeia | 37 | 1 |
+| M3 · probabilidades trocadas | 42 | 0 | G6, simetria americana | 43 | 1 |
+| M4 · sinais de call e put trocados | 42 | 0 | G2, intrínseco na raiz | 43 | 1 |
+| M5 · exercício só no penúltimo nível | 34 | 0 | G2, intrínseco na raiz | 35 | 1 |
+| M6 · exercício só na raiz | 32 | 0 | G5, prêmio maior que 0,01 | 33 | 1 |
+| Controle final, módulo original | 0 | 0 | passou | 0 | 0 |
+
+O controle final passou nos 89 testes e `git status --porcelain` devolveu saída vazia.
+Em `logs/mutations/`, cada mutante tem seu patch, log e XML. O arquivo `results.json`
+registra o SHA-256 do módulo em cada rodada, o comando, os identificadores dos testes
+que falharam, as asserções e o estado final do clone.
+
+### Gates, demos e portabilidade
+
+A partir de clones limpos do commit congelado, os dois ambientes executaram
+`python -m pytest tests/ -q --ignore=tests/integration --timeout=120`,
+`python -m mypy backend/ --strict` e `pyright --venvpath <diretório-do-ambiente> backend/`.
+O uv usou o ambiente já preparado com `--offline --frozen --no-sync --no-env-file`.
+No Linux, os clones ficaram no sistema de arquivos do contêiner ARM64, com rede desativada.
+Imagem local `openclaw-sandbox`, ID
+`sha256:943825bb4a63ab6e0c7400dbee77cddeeb31ecd457b3366293b7c45d201ca7d8`.
+O Click 8.4.1 já preparado foi montado para leitura e a versão ativa foi conferida contra o
+lock. A versão do Python foi 3.12.13 em ambos.
+
+| Verificação | macOS 15.8.1 arm64 | Linux aarch64 |
+|---|---:|---:|
+| uv / requisitos ativos conferidos | 0.12.1 / 102 | 0.11.20 / 104 |
+| Arquivo T1–T7 | 89 aprovados | 89 aprovados |
+| Suíte sem integração | 9.183 aprovados, 16 pulados | 9.183 aprovados, 16 pulados |
+| Subtestes aprovados / falhas | 261 / 0 | 261 / 0 |
+| Mypy estrito | 159 arquivos, 0 erros | 159 arquivos, 0 erros |
+| Pyright | 0 erros, 0 avisos de análise | 0 erros, 0 avisos de análise |
+| Demo BOVA11, base × testes (`cmp`) | rc 0, 67.097 bytes | rc 0, 67.101 bytes |
+| CLI padrão, base e testes | `LIVE_NOT_ACTIVATED`, A, rc 3 | `LIVE_NOT_ACTIVATED`, A, rc 3 |
+
+Os 89 testes novos explicam todo o aumento sobre a linha de base de 9.094 do cartão.
+Os comandos do CLI da seção “Regressão e portão” foram executados de novo na base e na
+ponta, em cada sistema. A demo sintética de 100 linhas teve SHA-256
+`a7d82699b47d31acec31995ccea3cf4149ebcb92311f980fb23390627b1de9c3` no Mac e
+`f4f8003f2021b2744202c782f6e5245872c09d7f9d1968a3356466a7e85ead08` no Linux.
+
+Em prova adicional nos dois sistemas, dez linhas da captura sintética receberam estilo
+americano em memória. ChainService, tool MCP de demo (cliente em memória) e CLI offline
+recusaram os mesmos dez símbolos com `american_not_supported_phase1`, preço, gregas e IV
+nulos. As outras 90 linhas europeias continuaram suportadas. Saídas em
+`logs/{mac,linux}/american.log`.
+
+Saída de stderr do procedimento hexadecimal. A comparação direta dos arquivos com 42 pares
+de preços também devolveu rc 0. A diferença máxima entre plataformas foi zero.
+
+```text
+Darwin arm64 3.12.13 773a2bcdf3a122bd6662cb4f6e5b26c015106e63b886f43e716243fcee418ef1
+Linux aarch64 3.12.13 773a2bcdf3a122bd6662cb4f6e5b26c015106e63b886f43e716243fcee418ef1
+```
+
+`git diff --check 1dc7760 HEAD` e os dois `git diff --exit-code` do portão devolveram
+rc 0. Desde `1421116`, o diff de `backend config scripts` listou três adições,
+`domain/series_terms.py` (215 linhas), `domain/carry.py` (131) e `pricing/binomial.py`
+(153), todas em `backend/derivatives/`. O DL2-PR04 acrescentou zero linha de produção.
+
+### Medição nativa
+
+Saída integral do procedimento de medição do cartão, no macOS, antes dos gates e mutações
+do autor. Valores para a put americana sintética com `S = K = 100`. A decisão sobre NumPy
+cabe ao Marco 2B.
+
+```text
+macOS-15.8.1-arm64-arm-64bit arm64 3.12.13
+N=1000 preco=6.089595282977972 mediana=0.0468s minimo=0.0457s execucoes=7
+N=5000 preco=6.090219408091187 mediana=1.2330s minimo=1.2283s execucoes=3
+```
+
+### Provas dos dez critérios do Marco 2A
+
+| Nº | Critério | Onde está a prova |
+|---|---|---|
+| 1 | Caso à mão | `DL2-PR03.md`, RED 1 e `test_h1_american_put` |
+| 2 | CRR europeu contra BSM | `test_european_bsm_and_parity` e Adendo 1 do SDD, A1 |
+| 3 | Referência independente | T1–T6, regeneração byte a byte, 84 preços, 126 parâmetros e âncora de Hull |
+| 4 | Invariantes em grade | T7, 2.740 pontos precificados e 140 recusas tipadas; contagens G1–G6 acima |
+| 5 | Recusas do binomial | `test_binomial.py` e Adendo 1 do SDD, A2 |
+| 6 | Recusas de série e de carry | `DL2-PR01.md` e `DL2-PR02.md` |
+| 7 | Regressão | Gates, demos e recusas nos três caminhos nos dois sistemas; diff do Adendo 2, B3 |
+| 8 | Mutação | Sete mutantes mortos pelo arquivo novo, controle final 89/89 |
+| 9 | Portabilidade | Contagens iguais, 84 preços idênticos nas duas listas hexadecimais |
+| 10 | Disciplina e medição | 215, 131, 153 e 0 linhas de produção por PR; medição nativa acima |

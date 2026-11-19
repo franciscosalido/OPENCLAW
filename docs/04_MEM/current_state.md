@@ -8,28 +8,25 @@
 
 ## Fase 02 — Marco 2A
 
-PR atual: DL2-PR03 — MERGEADO (PR #144, GO na primeira rodada de revisão). Estado A.
-Base: `main` após o squash do #144. ADR-0025 e Adendo 1 do SDD vigentes.
-Entregue: `backend/derivatives/pricing/binomial.py` (153 linhas), isolado. Núcleo de indução
-com exercício americano em todos os nós, parametrização CRR separada e oito recusas tipadas.
-Nada em produção importa o módulo; a americana segue recusada na chain, no MCP e no CLI.
-Gate do head aprovado, Linux aarch64 limpo: 9.094 aprovados, 16 pulados, 261 subtestes.
-Revisão: valores de Hull reproduzidos, 6.000 casos iguais à implementação do revisor,
-120.000 entradas inválidas sem exceção não tipada, 30 de 33 mutantes mortos (3 equivalentes).
-[Cartão, REDs, evidências e revisão](../specs/derivatives/fase2/DL2-PR03.md).
+PR atual: DL2-PR04 — EM_REVISAO. Estado A.
+Base `1dc7760` (#144), especificação `5557d25`, T1–T7 congelados em `487b694`.
+Claude forneceu a referência da árvore CRR finita e o gerador decimal conforme o Adendo 1
+do ADR-0025. O Adendo 2 do SDD fixa as provas de regressão, mutação e portabilidade.
 
-Riscos abertos:
-- L3 do ADR-0025 ficou contraditório: manda o Codex gerar a referência americana do
-  DL2-PR04, mas o Codex implementou o DL2-PR03. Francisco decide quem gera.
-- Manual B3 de 01/07/2026, §3.3.1: puts de ações, BDRs e ETFs são só europeias. O CRR
-  americano vale, na prática, para calls. Adendo ao ADR-0025 pendente (Claude).
-- §3.2.9 do mesmo manual cobre opções sobre ações; BOVA11 segue com ajuste `UNKNOWN` (L5).
-- Guarda por alcance não vê salto por `config/` a partir de `scripts/`, nem import dinâmico
-  relativo dentro de função. Dono: PR da ponte (Marco 2B).
-- Verificador do digest numérico da Fase 01 ainda fora do repositório (PR do Claude).
+- Mac arm64 e Linux aarch64, Python 3.12.13. Em cada um passaram 9.183 testes e 261
+  subtestes, com 16 pulados. Mypy e Pyright passaram.
+- Os 84 preços coincidiram bit a bit entre sistemas. A grade precificou 2.740 pontos e
+  recusou os 140 inadmissíveis. Os sete mutantes caíram com o arquivo novo sozinho.
+- Cada demo coincidiu com a sua base. A americana segue recusada na chain, no MCP e no CLI.
+  O CLI padrão devolveu `LIVE_NOT_ACTIVATED` em A, rc 3. Produção: zero linha neste PR.
+- Put americana no Mac, medianas de 0,0468 s (1.000 passos) e 1,2330 s (5.000 passos).
+  A escolha de NumPy, a ponte com a chain e os pontos cegos da guarda cabem ao Marco 2B.
 
-Próxima ação (uma só): Claude escreve o cartão do DL2-PR04 (referência independente,
-invariantes em grade, mutação do critério 8 e medição), depois da decisão sobre L3.
+O Adendo 1 do ADR registra o alcance do manual B3 de 01/07/2026. As puts americanas da
+referência exercitam o núcleo. Para ETFs como BOVA11, o ajuste de strike segue `UNKNOWN`.
+O Adendo 2 do SDD formaliza a prova de arquivos preservados desde o fim da Fase 01.
+Rascunho a cargo de Dots. Marco aguardando revisão.
+[Cartão e evidências do autor](../specs/derivatives/fase2/DL2-PR04.md).
 
 ## Fase 01 do Lab de Derivativos — CONCLUIDA e integrada na `main` (estado A)
 
