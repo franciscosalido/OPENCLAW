@@ -28,6 +28,9 @@ def _imports(path: Path) -> set[str]:
     return names
 
 
+HTTP_TRANSPORT = DERIVATIVES / "oplab" / "transport.py"
+
+
 def test_derivatives_does_not_import_mcp_or_io_clients() -> None:
     offenders: dict[str, list[str]] = {}
     for path in _python_files(DERIVATIVES):
@@ -37,18 +40,33 @@ def test_derivatives_does_not_import_mcp_or_io_clients() -> None:
             if imported.split(".", 1)[0] in FORBIDDEN_IMPORTS
             or imported.startswith(FORBIDDEN_PREFIXES)
         ]
+        if path == HTTP_TRANSPORT:
+            bad = [imported for imported in bad if imported != "httpx"]
         if bad:
             offenders[str(path)] = sorted(bad)
-    assert offenders == {}
+    assert offenders == {}, "httpx so entra em oplab/transport.py (DL-PR05b)"
 
 
-def test_oplab_token_absent_in_dl_pr00() -> None:
-    hits = [
+def test_httpx_is_imported_only_by_the_http_transport() -> None:
+    importers = [
         str(path)
         for path in _python_files(DERIVATIVES)
+        if "httpx" in {name.split(".", 1)[0] for name in _imports(path)}
+    ]
+    assert importers == [str(HTTP_TRANSPORT)]
+
+
+def test_oplab_token_is_read_in_exactly_one_backend_file() -> None:
+    hits = [
+        str(path)
+        for path in _python_files(Path("backend"))
         if "OPLAB_TOKEN" in path.read_text(encoding="utf-8")
     ]
-    assert hits == [], "OPLAB_TOKEN so pode aparecer no transporte (DL-PR04)"
+    assert hits == [str(HTTP_TRANSPORT)], "OPLAB_TOKEN so e lido no transporte HTTP"
+    text = HTTP_TRANSPORT.read_text(encoding="utf-8")
+    assert text.count("OPLAB_TOKEN") == 2, "uma leitura e uma mencao na docstring"
+    assert text.count('.get("OPLAB_TOKEN")') == 1
+    assert "os.environ[" not in text
 
 
 def test_no_domain_routes_in_lab() -> None:
