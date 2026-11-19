@@ -50,7 +50,7 @@ class AdjustmentPolicy(StrEnum):
 
 
 Text = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
-TERMS_CONFIG = ConfigDict(strict=True, frozen=True, extra="forbid")
+TERMS_CONFIG = ConfigDict(strict=True, frozen=True, extra="forbid", revalidate_instances="always")
 
 
 def _input_mapping(data: object) -> dict[str, object]:
@@ -59,10 +59,20 @@ def _input_mapping(data: object) -> dict[str, object]:
     return dict(data)
 
 
-class AdjustmentEvidence(BaseModel):
+class _TermsModel(BaseModel):
+    model_config = TERMS_CONFIG
+
+    def model_copy(self, *, update: Mapping[str, object] | None = None, deep: bool = False) -> Self:
+        """Copia conforme deep. Uma atualização reconstrói e valida o registro completo."""
+        if not update:
+            return super().model_copy(deep=deep)
+        fields = self.model_dump(exclude_unset=True)
+        return type(self).model_validate({**fields, **update})
+
+
+class AdjustmentEvidence(_TermsModel):
     """Declaração documental fornecida pelo chamador; não consulta o emissor."""
 
-    model_config = TERMS_CONFIG
     issuer: Literal["B3"]
     document: Text
     version: Text
@@ -73,14 +83,13 @@ class AdjustmentEvidence(BaseModel):
     _require_mapping = model_validator(mode="before")(_input_mapping)
 
 
-class SeriesTerms(BaseModel):
+class SeriesTerms(_TermsModel):
     """Uma observação por série e data de vigência explícita.
 
     FATCOT admite neste recorte cotação por unidade (1) ou por mil (1000),
     conforme o layout COTAHIST rev. 02, p. 6. O lote tem fonte própria.
     """
 
-    model_config = TERMS_CONFIG
     symbol: Text
     effective_on: date
     source: Text
