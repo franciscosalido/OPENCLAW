@@ -31,6 +31,7 @@ def _imports(path: Path) -> set[str]:
 HTTP_TRANSPORT = DERIVATIVES / "oplab" / "transport.py"
 MCP_SURFACE = DERIVATIVES / "mcp"
 MCP_SERVER = MCP_SURFACE / "derivatives_server.py"
+CLI_SURFACE = DERIVATIVES / "cli.py"
 
 
 def test_derivatives_does_not_import_mcp_or_io_clients() -> None:
@@ -243,6 +244,9 @@ def test_mcp_surface_is_a_leaf_nothing_below_imports_it() -> None:
             name for name in _imports(path)
             if name.startswith("backend.derivatives.mcp") or name.split(".", 1)[0] == "fastmcp"
         )
+        if path == CLI_SURFACE:
+            # A CLI e a segunda superficie: reutiliza as funcoes das tools, nada mais.
+            bad = [name for name in bad if name != "backend.derivatives.mcp.derivatives_server"]
         if bad:
             offenders[str(path)] = bad
     assert offenders == {}, "dominio, pricing, oplab e service nao conhecem a superficie MCP"
@@ -268,3 +272,19 @@ def test_only_demo_can_project_quotes_in_phase_a() -> None:
     assert users == {"demo_tool"}
     names = {node.id for node in ast.walk(functions["chain_tool"]) if isinstance(node, ast.Name)}
     assert names.isdisjoint({"production_view", "config", "live_service", "_inputs", "demo_tool"})
+
+
+def test_cli_is_a_thin_surface_over_the_tool_functions() -> None:
+    text = CLI_SURFACE.read_text(encoding="utf-8")
+    internal = {name for name in _imports(CLI_SURFACE) if name.startswith("backend.")}
+    assert internal == {
+        "backend.derivatives.config",
+        "backend.derivatives.mcp.derivatives_server",
+        "backend.derivatives.oplab.demo_fixture",
+    }, "a CLI nao compoe servico, transporte nem precificacao por conta propria"
+    roots = {name.split(".", 1)[0] for name in _imports(CLI_SURFACE)}
+    assert roots.isdisjoint({"httpx", "os", "socket", "fastmcp"})
+    assert "print(" not in text, "saida por sys.stdout.write; logs por loguru em stderr"
+    assert "datetime.now(" not in text, "o relogio continua entrando so por system_clock"
+    for forbidden in ("--path", "--url", "--fixture", "--dir", "--token", "--host"):
+        assert forbidden not in text, f"a CLI nao oferece {forbidden}"
