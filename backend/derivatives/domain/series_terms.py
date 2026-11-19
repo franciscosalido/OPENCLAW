@@ -6,6 +6,7 @@ from datetime import date
 from decimal import Decimal
 from enum import StrEnum
 from typing import Annotated, Literal, Self
+from warnings import warn
 
 from pydantic import (
     BaseModel,
@@ -68,6 +69,16 @@ class _TermsModel(BaseModel):
             return super().model_copy(deep=deep)
         fields = self.model_dump(exclude_unset=True)
         return type(self).model_validate({**fields, **update})
+
+    def copy(
+        self, *, include: object = None, exclude: object = None,
+        update: dict[str, object] | None = None, deep: bool = False,
+    ) -> Self:
+        """Encaminha a API legada à cópia validada de registros completos."""
+        warn("copy está obsoleto, use model_copy", DeprecationWarning, stacklevel=2)
+        if include is not None or exclude is not None:
+            raise ValueError("para projetar campos use model_dump(include=..., exclude=...)")
+        return self.model_copy(update=update, deep=deep)
 
 
 class AdjustmentEvidence(_TermsModel):
