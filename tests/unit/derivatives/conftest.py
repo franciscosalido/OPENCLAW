@@ -50,3 +50,19 @@ def documental_stamp() -> ProvenanceStamp:
         source="tests/fixtures documental OpLab v3",
         captured_at=NOW,
     )
+
+
+@pytest.fixture(autouse=True)
+def no_network(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Nenhum teste do Lab abre socket: transporte httpx real e ``connect`` lancam."""
+    import socket
+
+    import httpx
+
+    def _refuse(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("teste do Laboratorio tentou abrir rede real")
+
+    monkeypatch.setattr(httpx.AsyncHTTPTransport, "handle_async_request", _refuse)
+    monkeypatch.setattr(httpx.HTTPTransport, "handle_request", _refuse)
+    monkeypatch.setattr(socket.socket, "connect", _refuse)
+    monkeypatch.setenv("QUIMERA_DERIV_FORBID_NETWORK", "1")
