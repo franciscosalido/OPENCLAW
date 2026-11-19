@@ -89,3 +89,76 @@ aprovados. A comparação não é benchmark controlado de regressão.
 A documentação posterior ao código não altera a árvore executável.
 A candidata única é `review/fase01-claude-dots`. Revisão Claude e
 integração owner continuam pendentes; B/C e CLI opcional ficam fora.
+
+
+## Revisao Claude do delta `6892c82..c1cd172` (2026-11-19)
+
+Revisado em clone isolado, Linux aarch64, Python 3.12.16, `uv.lock`. O gate
+da candidata `c1cd172` foi reproduzido antes de qualquer mudanca: 8.052
+aprovados, 15 pulados, 0 falhas; mypy strict 0 (155 arquivos); pyright 0;
+digest bit a bit de precos, gregas e IVs inalterado.
+
+**Aceito sem mudanca**
+
+- `LoopbackHeaders`: verificacao de `Host` e `Origin` antes do corpo. Era a
+  lacuna real da pilha Claude (DNS rebinding contra servidor local). Sonda
+  HTTP real: `Host` externo, de rebinding, sem porta, com ponto final ou em
+  outra caixa -> 403; `Origin` externo, `null` ou `https` -> 403; corpo
+  acima de 64 KiB (com e sem `Content-Length`) -> 413.
+- `HttpTransport` restrito a `MockTransport` + `dict` explicitos e
+  `trust_env=False`: no estado A nao existe caminho de rede real.
+- Excecoes publicas levantadas **fora** do `except`: o `from None` da pilha
+  Claude suprimia a exibicao, mas `__context__` ainda retinha a requisicao
+  `httpx` (com o header do token) e o erro do pydantic (com o payload).
+- `parse_retry_after`: `isdigit()` sem `isascii()` aceitava digitos Unicode
+  que `float()` rejeita, e `Retry-After` enorme estourava `timedelta`. Eram
+  dois defeitos da pilha Claude; ambos corrigidos por Dots.
+- Tool produtiva constante (`LIVE_NOT_ACTIVATED`) e `production_view` que
+  sempre recusa: mais estrito que o caminho "ativavel" da pilha Claude.
+- Demo presa a captura versionada com SHA-256 do manifesto fixado.
+
+**Corrigido nesta revisao**
+
+1. **Chamada rejeitada derrubava a sessao do agente.** Uma `tools/call` bem
+   formada mas fora do contrato (argumento a mais, tipo errado, tool
+   inexistente) recebia HTTP 400. O cliente MCP trata 400 como falha de
+   transporte: a sessao morre e as chamadas seguintes falham ("Client is not
+   connected"). Reproduzido com cliente FastMCP real. Agora a chamada e
+   trocada por uma chamada neutra e o dispatcher guardado responde
+   `INVALID_TOOL_CALL` em HTTP 200, sem eco. Protocolo malformado continua
+   400. A demo desabilitada ficou indistinguivel de tool inexistente.
+2. **Servidor consultava o PyPI ao subir.** O banner do FastMCP verifica
+   atualizacoes por HTTP. `show_banner=False` remove a chamada (o conteiner
+   sem rede de Dots nao a exibia; num Mac com rede ela acontece).
+3. **`except Exception` sem registro na demo.** Passou a capturar excecoes
+   nomeadas e a registrar apenas o nome da classe.
+4. **Simbolo fora da fixture caia como falha generica.** `DemoFixture`
+   levantava `KeyError`, nao `FileNotFoundError`; agora devolve
+   `DEMO_SYMBOL_NOT_IN_FIXTURE`, sem ecoar o simbolo.
+5. **Falha de configuracao encerrava com codigo 2 em silencio.** Agora
+   registra os nomes das variaveis a conferir, nunca os valores.
+6. **`id` JSON-RPC refletido sem limite** na resposta 400 (ate 64 KiB).
+   Agora so ate 64 caracteres; acima disso, `null`.
+7. **Guarda e schema podiam divergir.** `_valid_call` repete os nomes e
+   argumentos das tools; um teste novo compara a guarda com as tools
+   registradas nos dois contextos.
+
+**Mantido, com ressalva registrada no BACKLOG**
+
+- A guarda usa `server._mcp_server.request_handlers`, atributo privado do
+  FastMCP 3.4.0. Falha fechada se o atributo sumir (o servidor nao sobe);
+  se o SDK deixar de consultar o dicionario, a validacao propria do FastMCP
+  ainda recusa argumentos fora do schema, e os testes de eco acusam.
+- `live_service`, `production_view`, `root` e `fixture_dir` viraram
+  parametros sem efeito pratico; ficam ate a fase B redesenhar a ativacao.
+- `demo_fixture.py` usa `O_NOFOLLOW`/`dir_fd` (POSIX) e mora em `oplab/`.
+- `Retry-After` gigante bloqueia o orcamento ate o limite de `datetime`
+  (reinicio do processo desfaz). Teto menor e decisao de homologacao.
+- Recusa de `parent_symbol` divergente e hipotese ate ver dado real.
+
+Resultado apos as correcoes: `pytest tests/ --ignore=tests/integration`
+8.057 aprovados, 15 pulados, 0 falhas; Lab + arquitetura em 3 ordens; mypy
+strict 0 (155 arquivos); pyright 0. Producao do delta de conciliacao com a
+revisao: 300 adicoes sobre `6892c82` (<= 400). Sonda com cliente FastMCP
+real em loopback, contextos `test` e `prod`: tres chamadas rejeitadas
+seguidas e a sessao segue viva.
