@@ -163,8 +163,18 @@ git diff --exit-code 153ef0a HEAD -- tests
 
 Rc 0 nos quatro comandos. Produção total do PR: **184 linhas** em `series_terms.py`.
 Os outros três arquivos do diff são os testes, este cartão e a memória da Fase 2A.
-O digest numérico histórico é objeto de PR separado do Claude. A coordenação replica Linux,
-atualiza o mesmo draft #142 e solicita novo parecer independente. Estado A, em revisão.
+O digest numérico histórico é objeto de PR separado do Claude. Estado A, em revisão.
+
+### Revalidação da candidata no Linux aarch64
+
+Clone limpo sem rede na imagem local do projeto, Python 3.12.13.
+Mesmo código e mesmos testes de `46ddfda`: 89 testes focais, 8.214 globais,
+16 pulados, 261 subtestes aprovados e 7 avisos esperados da API legada.
+Mypy estrito: 157 arquivos sem erros. Pyright: 0 erros, 0 avisos, 0 informações.
+Todos os gates com rc 0. Pyright usa o venv existente da imagem via `--venvpath`.
+Demo idêntica byte a byte à base `11838cd`, comparação rc 0 e SHA-256
+`f4f8003f2021b2744202c782f6e5245872c09d7f9d1968a3356466a7e85ead08`.
+CLI padrão: `LIVE_NOT_ACTIVATED`, rc 3. Sem mudança em produção da Fase 01.
 
 [layout]:
 <https://www.b3.com.br/data/files/33/67/B9/50/D84057102C784E47AC094EA8/SeriesHistoricas_Layout.pdf>

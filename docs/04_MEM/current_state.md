@@ -15,7 +15,8 @@ macOS arm64 passou com 89 testes focais e 8.214 globais, 16 pulados, 261 subtest
 mypy estrito e Pyright sem erros. Demo idêntica à base no Mac, modo live com rc 3.
 [Cartão, decisões I1–I6 e evidências](../specs/derivatives/fase2/DL2-PR01.md).
 
-A coordenação repete os gates em Linux e atualiza o mesmo draft para novo parecer do Claude.
+Linux aarch64 confirmou os mesmos 89 focais, 8.214 globais, 16 pulados e 261 subtestes.
+Próxima ação: Claude revalida o novo head do draft #142. Sem merge até o parecer.
 A integração de um consumidor depende de identidade da série e procedência verificável.
 O verificador do digest histórico fica em PR separado do Claude. A tolerância CRR × BSM
 do par 200/201 continua pendente de adendo antes do GREEN do PR03.
