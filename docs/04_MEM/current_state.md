@@ -4,9 +4,74 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-19 00:13 BRT · **Turno:** Dots com Codex.
+**Última atualização:** 2026-11-19 07:00 BRT · **Turno:** Claude (revisao + DL-PR08).
 
-## Fase 01 — candidata única validada offline (estado A)
+## Fase 01 — revisada, rebaseada sobre a `main` nova e com CLI (estado A)
+
+**Turno do Claude iniciado e encerrado em 2026-11-19**, a pedido de
+Francisco: revisar o delta de conciliacao do Dots, corrigir e iniciar o
+DL-PR08. Trabalho feito em clone isolado; nenhum push, PR ou merge.
+
+Estado da origem: `origin/main == aec9b8e` (PR #131 `bcb2188` e PR #130
+`aec9b8e` mergeados por Dots). A arvore da `main` foi conferida contra a
+simulacao previa: identica (`26fb46c`).
+
+### O que mudou neste turno
+
+- **Revisao do delta `6892c82..c1cd172`:** aceito no essencial (guarda de
+  `Host`/`Origin`, transporte HTTP so com `MockTransport`, excecoes fora do
+  `except`, `Retry-After` robusto). **Sete correcoes** em 3 commits; a
+  principal: chamada de tool rejeitada devolvia HTTP 400 e derrubava a
+  sessao do cliente MCP; agora devolve `INVALID_TOOL_CALL` em HTTP 200.
+  Tambem: o servidor deixou de consultar o PyPI ao subir. Detalhes em
+  `SDD_conciliacao_fase01.md` (secao "Revisao Claude").
+- **Pilha inteira rebaseada sobre `origin/main` `aec9b8e`**, sem conflito;
+  cada branch difere da versao anterior apenas pelos 5 arquivos do PR #130.
+  As versoes antigas seguem no reflog do repo.
+- **DL-PR08 implementado:** `backend/derivatives/cli.py` + entrada
+  `[project.scripts] quimera` no `pyproject.toml` (`SDD_DL-PR08.md`).
+
+### Fila de integracao (push -> PR -> revisao -> squash-merge)
+
+| # | Branch | Ponta | Base antiga para `rebase --onto` |
+|---|---|---|---|
+| 1 | `feat/dl-pr05a-oplab-routes-errors-budget` | `e8ea887` | ja sobre `aec9b8e` |
+| 2 | `feat/dl-pr05b-oplab-transport-client` | `d3af143` | `e8ea887` |
+| 3 | `feat/dl-pr06-chain-service` | `27cf097` | `d3af143` |
+| 4 | `feat/dl-pr07-mcp-server` | `cc2d3e1` | `27cf097` |
+| 5 | `review/fase01-claude-dots` (conciliacao + revisao) | `334f2e9` | `cc2d3e1` |
+| 6 | `feat/dl-pr08-cli` | ponta da branch | `334f2e9` |
+
+O item 1 pode ir a PR agora. Depois de cada squash-merge:
+`git fetch origin && git rebase --onto origin/main <base-antiga> <branch>`.
+O patch de portabilidade do Codex (2 testes) **continua fora do repo**; sem
+ele, um clone limpo em Linux mantem as 2 falhas antigas da `main`
+(`test_qwen3_summary...` e `test_pr10_sdd_and_adr_contracts_exist`). Ele
+pode entrar antes ou depois da fila; nao toca nos mesmos arquivos.
+
+### Evidencia (Linux aarch64, Python 3.12.16, `uv.lock`, ponta `feat/dl-pr08-cli`)
+
+- `pytest tests/ --ignore=tests/integration`: 8.081 passed, 15 skipped, 0
+  falhas (com o JSON legado do Qwen3 presente e `docs/adr` resolvivel);
+  arvore limpa apos a suite. Lab + arquitetura: 5.944 em 3 ordens.
+- `mypy backend/ --strict` 0 (156 arquivos); `pyright backend/` 0.
+- Sonda HTTP real em loopback com cliente FastMCP: sessao sobrevive a
+  chamadas rejeitadas; `Host`/`Origin` externos -> 403; sem banner/PyPI.
+
+### Proximo turno
+
+1. Owner (ou Dots com `gh`): abrir o PR do item 1 e seguir a fila.
+2. Quem pegar o turno: **anotar aqui o inicio antes de mexer em branches**;
+   o checkout principal ficou em `feat/dl-pr08-cli`, arvore limpa. O clone
+   `OPENCLAW-fase01-dots` ficou intocado em `c1cd172`; para alinhar:
+   `git fetch source-mac` e usar as branches de la.
+3. Fora da fase: estado B (assinatura OpLab), medicao do CLI/servidor
+   nativos no Mac, bundle OKF.
+
+---
+
+## Historico — turno Dots com Codex (2026-11-19 00:13 BRT)
+
 
 Branch local `review/fase01-claude-dots`, clone `OPENCLAW-fase01-dots`.
 Código validado `17bc0c3`, parent `6892c82` (pilha Claude). #131/Adendo 2

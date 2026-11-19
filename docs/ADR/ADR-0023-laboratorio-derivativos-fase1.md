@@ -255,6 +255,15 @@ declaradas, com flag, ate homologacao:
   a resposta e reprodutivel e sempre rotulada `DEMO_TEST_DATA`/`test`.
 - **Relogio real:** entra apenas por `system_clock`, na raiz de composicao.
 
+## CLI `quimera chain` (DL-PR08)
+
+- Segunda superficie, de terminal, sobre as mesmas funcoes das tools MCP;
+  sem logica propria, sem opcao de caminho, URL, token ou diretorio.
+- Padrao `--provider live` -> `LIVE_NOT_ACTIVATED` com exit 3; a demo exige
+  `--provider offline_fixture` e sai sempre rotulada como teste (exit 0).
+- Unica mudanca em arquivo protegido da Fase 1: a entrada
+  `[project.scripts]` do `pyproject.toml`, sem dependencia nova.
+
 ## Barreira deterministica anti-fixture
 
 - `Provenance` e `Purpose` atribuidos pelo adaptador de transporte; payload
