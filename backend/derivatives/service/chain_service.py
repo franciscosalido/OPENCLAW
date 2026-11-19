@@ -23,8 +23,8 @@ from backend.derivatives.pricing.calendar import (CalendarCoverageError, Calenda
     TradingCalendar)
 from backend.derivatives.pricing.contract_pricing import (PricingOutcome,
     price_contract_from_quote)
-from backend.derivatives.pricing.conventions import (TimeToExpiry, continuous_rate,
-    model_assumptions, time_to_expiry)
+from backend.derivatives.pricing.conventions import (RateDomainError, TimeToExpiry,
+    continuous_rate, model_assumptions, time_to_expiry)
 from backend.derivatives.provenance import ProvenanceStamp, Purpose, inherit_purpose, purpose_of
 from config.derivatives_config_model import DerivativesConfig
 
@@ -110,33 +110,42 @@ class ChainService:
         assumptions = model_assumptions(self._cfg.conventions, self._calendar)
         return chain.model_copy(update={"model_assumptions": assumptions})
 
-    def _time(self, chain: Chain, valuation: date) -> tuple[TimeToExpiry | None, str | None]:
+    def _inputs(
+        self, chain: Chain, valuation: date,
+    ) -> tuple[TimeToExpiry | None, float | None, str | None]:
+        """Prazo e taxa continua da chain inteira, ou o primeiro motivo de recusa."""
         conventions = self._cfg.conventions
         if conventions.day_count != "business_252":
-            return None, f"unsupported_day_count:{conventions.day_count}"
+            return None, None, f"unsupported_day_count:{conventions.day_count}"
         if chain.spot is None:
-            return None, "missing_spot"
+            return None, None, "missing_spot"
         if chain.rate is None:
-            return None, "missing_rate"
+            return None, None, "missing_rate"
+        try:
+            rate = continuous_rate(chain.rate.value_pct_aa,
+                                   compounding=conventions.rate_compounding)
+        except RateDomainError:
+            return None, None, "invalid_rate"
         try:
             return time_to_expiry(self._calendar, valuation_date=valuation,
-                                  expiry=chain.expiry, cfg=conventions), None
+                                  expiry=chain.expiry, cfg=conventions), rate, None
         except CalendarCoverageError:
-            return None, "calendar_coverage"
+            return None, None, "calendar_coverage"
         except ValueError:
-            return None, "expiry_before_valuation"
+            return None, None, "expiry_before_valuation"
 
     def price(self, chain: Chain, *, market_status: str, now: datetime) -> PricedChain:
         """IV de bid/ask/mid e BSM (sigma do mid) por linha; recusa sempre explicada.
 
-        A data de avaliacao e ``now`` no fuso da B3. Sem spot, taxa, cobertura de
-        calendario ou prazo valido, toda linha recebe ``chain_unpriceable:<motivo>``.
+        A data de avaliacao e ``now`` no fuso da B3. Sem spot, taxa (ausente ou fora do
+        dominio da capitalizacao), cobertura de calendario ou prazo valido, toda linha
+        recebe ``chain_unpriceable:<motivo>``. A taxa e convertida uma vez por chain.
         """
         valuation = now.astimezone(B3_TIMEZONE).date()
-        tte, reason = self._time(chain, valuation)
+        tte, rate_cont, reason = self._inputs(chain, valuation)
         rows: list[PricedRow] = []
         for row in chain.rows:
-            if tte is None or chain.spot is None or chain.rate is None:
+            if tte is None or rate_cont is None or chain.spot is None:
                 outcome = PricingOutcome(
                     supported=False, reason=f"chain_unpriceable:{reason}", model=None,
                     price=None, greeks=None, regime=None,
@@ -144,10 +153,7 @@ class ChainService:
                     assumptions=dict(chain.model_assumptions))
             else:
                 outcome = price_contract_from_quote(
-                    row.contract, row.quote, spot=chain.spot.price,
-                    rate_cont=continuous_rate(
-                        chain.rate.value_pct_aa,
-                        compounding=self._cfg.conventions.rate_compounding),
+                    row.contract, row.quote, spot=chain.spot.price, rate_cont=rate_cont,
                     tte=tte, cfg_conv=self._cfg.conventions, cfg_iv=self._cfg.iv,
                     assumptions=chain.model_assumptions)
             rows.append(PricedRow(row=row, pricing=outcome))

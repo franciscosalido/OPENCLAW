@@ -60,6 +60,21 @@ Nenhum push, merge, deploy, token real ou chamada à OpLab.
 
 [SDD da conciliação](../specs/derivatives/SDD_conciliacao_fase01.md)
 
+### Correcoes apos o NO-GO da revisao independente (2026-11-19, turno Claude)
+
+Branch `fix/dl-fase01-procedencia-taxa`, sobre `review/fase01-claude-dots`.
+Dois defeitos reproduzidos e corrigidos, com os tres testes do revisor
+incorporados sem alteracao:
+
+- Transporte simulado carimbava `observed/production`; agora `REPLAY/test`,
+  com trava de AST contra qualquer atribuicao de `OBSERVED` em A.
+- Taxa composta `<= -100% a.a.` chegava a `log(0)`; agora a chain e
+  recusada com `invalid_rate`, linhas preservadas.
+- Cauda da put passa a ser conferida contra oraculo `Decimal`.
+
+Precos inalterados (mesmo digest). Detalhes e evidencia em
+[SDD das correcoes](../specs/derivatives/SDD_correcoes_fase01.md).
+
 ---
 
 ## Histórico de coordenação — turno Claude de 2026-11-18

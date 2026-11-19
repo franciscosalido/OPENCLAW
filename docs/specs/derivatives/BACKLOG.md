@@ -90,3 +90,8 @@
   `Retry-After` (hoje bloqueia ate o limite de `datetime`).
 - `demo_fixture.py` usa APIs POSIX e mora em `oplab/`; mover para um pacote
   de demonstracao quando houver segunda fixture.
+- Homologacao: `OBSERVED` deve nascer apenas no caminho de aquisicao real;
+  alterar de proposito `test_phase_a_production_code_never_assigns_observed`
+  junto com o ADR-0023. Definir tambem limite de plausibilidade para a taxa
+  (hoje so o dominio matematico e validado) e fazer o carimbo da captura
+  herdar a procedencia worst-of das quatro leituras, nao so a de opcoes.

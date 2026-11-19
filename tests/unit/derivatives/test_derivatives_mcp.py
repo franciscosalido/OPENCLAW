@@ -8,6 +8,7 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
+import httpx
 import pytest
 from fastmcp import Client, FastMCP
 from fastmcp.exceptions import ToolError
@@ -17,6 +18,7 @@ from backend.derivatives.config import (
     DerivativesMcpConfig,
     load_derivatives_mcp_config,
 )
+from backend.derivatives.mcp import derivatives_server
 from backend.derivatives.mcp.derivatives_server import (
     CHAIN_SCHEMA,
     DEMO_TEST_DATA,
@@ -30,10 +32,15 @@ from backend.derivatives.mcp.derivatives_server import (
     production_view,
     system_clock,
 )
+from backend.derivatives.oplab.budget import RequestBudget
 from backend.derivatives.oplab.client import OplabMarketClient
 from backend.derivatives.oplab.errors import RateLimitedError
 from backend.derivatives.oplab.routes import MarketRoute
-from backend.derivatives.oplab.transport import FixtureTransport, VendorResponse
+from backend.derivatives.oplab.transport import (
+    FixtureTransport,
+    HttpTransport,
+    VendorResponse,
+)
 from backend.derivatives.pricing.calendar import load_calendars
 from backend.derivatives.provenance import Provenance, Purpose, Readiness
 from backend.derivatives.service.chain_service import ChainService, PricedChain
@@ -422,3 +429,34 @@ async def test_in_memory_invalid_tool_calls_have_fixed_errors(caplog) -> None:
                 await client.call_tool(name, args)
             assert marker not in str(error.value)
     assert marker not in caplog.text
+
+
+def _mock_http_over_synthetic() -> tuple[HttpTransport, list[str]]:
+    """``HttpTransport`` do estado A servindo, em memoria, os bytes da fixture sintetica."""
+    cfg = load_derivatives_config()
+    paths: list[str] = []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        paths.append(request.url.path)
+        name = request.url.path.removeprefix("/v3/").replace("/", "_") + ".json"
+        return httpx.Response(200, content=(SYNTHETIC / name).read_bytes())
+
+    transport = HttpTransport(cfg.oplab, RequestBudget(cfg.budget, key="simulador"),
+                              env={"OPLAB_TOKEN": "synthetic-placeholder"},
+                              mock_transport=httpx.MockTransport(respond))
+    return transport, paths
+
+
+async def test_phase_a_mock_fed_chain_is_replay_and_crosses_no_barrier() -> None:
+    # NO-GO de 19/11: quatro respostas simuladas geravam 100 linhas observed/production.
+    transport, paths = _mock_http_over_synthetic()
+    priced = await _service(transport).build("BOVA11", date(2026, 11, 19), now=CLOCK_NOW)
+    assert len(paths) == 4 and len(priced.rows) == 100
+    stamp = priced.chain.stamp
+    assert (stamp.provenance, stamp.purpose) == (Provenance.REPLAY, Purpose.TEST)
+    assert priced.chain.purpose is Purpose.TEST and priced.purpose is Purpose.TEST
+    # Nem a demo (so SYNTHETIC do adaptador verificado) nem a projecao produtiva aceitam.
+    with pytest.raises(ProvenanceBarrierError, match="fixture_provenance"):
+        derivatives_server._demo_view(priced, as_of=CLOCK_NOW)
+    with pytest.raises(ProvenanceBarrierError, match=LIVE_NOT_ACTIVATED):
+        production_view(priced, readiness=Readiness.C_PROMOTED, as_of=CLOCK_NOW)

@@ -85,7 +85,11 @@ class FixtureTransport:
         return json.loads((self._directory / name).read_bytes())
 
 class HttpTransport:
-    """Contrato HTTP em A: cliente isolado com MockTransport e ambiente de teste explícitos."""
+    """Contrato HTTP em A: cliente isolado com MockTransport e ambiente de teste explícitos.
+
+    Toda resposta daqui sai de um simulador em memoria, logo nasce ``REPLAY`` (proposito
+    de teste). ``OBSERVED`` fica reservado a aquisicao homologada do estado B.
+    """
 
     def __init__(
         self, cfg: Oplab, budget: RequestBudget, *, env: dict[str, str] | None = None,
@@ -146,5 +150,5 @@ class HttpTransport:
         except ValueError:
             pass
         else:
-            return VendorResponse(status, payload, safe, now, rendered, Provenance.OBSERVED)
+            return VendorResponse(status, payload, safe, now, rendered, Provenance.REPLAY)
         raise TransportError("corpo da resposta nao e JSON", status=status, route=rendered)

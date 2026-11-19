@@ -208,7 +208,9 @@ declaradas, com flag, ate homologacao:
   `OPLAB_TOKEN`; sem redirecionamento (3xx e `ForbiddenHostError`), sem
   retry (`max_retries != 0` e recusado na construcao) e com a causa `httpx`
   suprimida (`from None`), porque a requisicao carrega o header do token.
-  `received_at` e o relogio injetado. Procedencia `OBSERVED` so nasce aqui.
+  `received_at` e o relogio injetado. Em A toda resposta vem de simulador e
+  nasce `REPLAY`; `OBSERVED` so nascera na aquisicao homologada do estado B
+  (adendo de 2026-11-19).
 - **Transporte de fixtures:** mesmo contrato, procedencia `DOCUMENTAL`,
   `SYNTHETIC` ou `REPLAY` — nunca `OBSERVED` (recusado na construcao).
 - **Cliente:** devolve modelos do fornecedor + `ProvenanceStamp`; o JSON
@@ -312,3 +314,20 @@ implementação da Fase 1. B e C exigem homologação e implementação própria
 A demo usa o manifesto sintético fixado da BOVA11. O cliente HTTP só opera
 por injeção explícita de mock e ambiente de teste. O registro de validação
 da candidata está no [SDD de conciliação](../specs/derivatives/SDD_conciliacao_fase01.md).
+
+### Correcoes apos a revisao independente (2026-11-19)
+
+- **Procedencia do transporte simulado.** `HttpTransport` em A carimba
+  `REPLAY`, nunca `OBSERVED`. `REPLAY` significa resposta reproduzida por
+  simulador em memoria, de conteudo nao atestado: proposito `test`, e nao
+  atravessa a demo (que exige `SYNTHETIC` do adaptador de manifesto) nem a
+  projecao produtiva. Nenhum modulo de `backend/derivatives/` atribui
+  `OBSERVED` em A; um teste de AST e a trava, a ser alterada de proposito
+  quando a aquisicao real do estado B for implementada.
+- **Dominio da taxa.** Na capitalizacao `annual_exp_252`, `i <= -100% a.a.`
+  esta fora do dominio de `ln(1 + i)`. A conversao levanta `RateDomainError`
+  e a chain inteira e recusada com `invalid_rate`, linhas preservadas.
+  Taxas negativas acima de -100% e a capitalizacao `continuous` seguem
+  validas. Limite de plausibilidade e decisao de homologacao.
+
+Registro: [SDD das correcoes](../specs/derivatives/SDD_correcoes_fase01.md).
