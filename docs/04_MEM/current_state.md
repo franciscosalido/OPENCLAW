@@ -42,21 +42,41 @@ simulacao previa: identica (`26fb46c`).
 | 5 | `review/fase01-claude-dots` (conciliacao + revisao) | `334f2e9` | `cc2d3e1` |
 | 6 | `feat/dl-pr08-cli` | ponta da branch | `334f2e9` |
 
+Fora da pilha, independente e pronto para PR: `chore/tests-hermetic-main-gates`
+(`07bb7ba`, so 2 arquivos de teste, sobre `aec9b8e`).
+
 O item 1 pode ir a PR agora. Depois de cada squash-merge:
 `git fetch origin && git rebase --onto origin/main <base-antiga> <branch>`.
-O patch de portabilidade do Codex (2 testes) **continua fora do repo**; sem
-ele, um clone limpo em Linux mantem as 2 falhas antigas da `main`
-(`test_qwen3_summary...` e `test_pr10_sdd_and_adr_contracts_exist`). Ele
-pode entrar antes ou depois da fila; nao toca nos mesmos arquivos.
 
-### Evidencia (Linux aarch64, Python 3.12.16, `uv.lock`, ponta `feat/dl-pr08-cli`)
+**Testes hermeticos.** O patch de portabilidade do Codex nunca chegou ao
+repo. Para nao segurar a fila, Claude escreveu a branch
+`chore/tests-hermetic-main-gates`: o teste do resumo Qwen3 passa a gerar o
+resumo pelo serializador real a partir de runs sinteticos que carregam os
+campos proibidos (teste de mutacao: falha se o serializador vazar), e o
+teste de ADR usa `docs/ADR`. Com ela, `main` em clone limpo no Linux fica
+com **0 falhas** (7.766 passed). Se o patch do Codex aparecer, escolher um
+dos dois; eles tocam os mesmos 2 arquivos.
 
-- `pytest tests/ --ignore=tests/integration`: 8.081 passed, 15 skipped, 0
-  falhas (com o JSON legado do Qwen3 presente e `docs/adr` resolvivel);
-  arvore limpa apos a suite. Lab + arquitetura: 5.944 em 3 ordens.
-- `mypy backend/ --strict` 0 (156 arquivos); `pyright backend/` 0.
+### Evidencia (Linux aarch64, Python 3.12.16, `uv.lock`, clone limpo)
+
+Sem o JSON legado do Qwen3 e sem `docs/adr`; testes hermeticos aplicados.
+
+| Arvore | `pytest tests/ --ignore=tests/integration` | Producao do PR |
+|---|---|---|
+| `main` + hermeticos | 7.766 passed, 16 skipped, 0 failed | 0 linhas |
+| + DL-PR05a | 7.875 passed, 0 failed | 242 |
+| + DL-PR05b | 7.930 passed, 0 failed | 203 |
+| + DL-PR06 | 7.966 passed, 0 failed | 163 |
+| + DL-PR07 | 8.030 passed, 0 failed | 205 |
+| + conciliacao e revisao | 8.059 passed, 0 failed | 300 |
+| + DL-PR08 | 8.083 passed, 0 failed | 70 |
+
+- Ponta final: mesma contagem em ordem natural, invertida e embaralhada;
+  `mypy backend/ --strict` 0 (156 arquivos); `pyright backend/` 0; digest
+  bit a bit de precos, gregas e IVs inalterado; arvore limpa apos a suite.
 - Sonda HTTP real em loopback com cliente FastMCP: sessao sobrevive a
   chamadas rejeitadas; `Host`/`Origin` externos -> 403; sem banner/PyPI.
+- Ainda nao executado nativamente em macOS neste turno.
 
 ### Proximo turno
 
