@@ -39,7 +39,12 @@ def test_latency_regression_detection_modes() -> None:
 
 def test_smoke_summary_exposes_status_alias_for_overall(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
+    monkeypatch.setattr(
+        "integration.smoke_summary.SMOKE_SUMMARY_PATH",
+        tmp_path / "rag_01b_pr09_smoke_summary.json",
+    )
     monkeypatch.setattr(
         "integration.smoke_summary.build_integration_health_report",
         lambda: {
