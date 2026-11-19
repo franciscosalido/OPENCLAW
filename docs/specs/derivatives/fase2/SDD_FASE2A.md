@@ -195,3 +195,52 @@ no Mac e registrado.
 - Definicao exata do digest e do procedimento de comparacao da demo por
   plataforma: reaproveitar o que o `SDD_correcoes_fase01.md` usou e citar o
   comando na SPEC do DL2-PR01.
+
+## Adendo 1 (2026-11-19) - antes do GREEN do DL2-PR03
+
+Autor: Claude. Entra no commit de SPEC do DL2-PR03. Nao reescreve o texto acima; onde houver
+conflito, vale este adendo. Francisco pode vetar qualquer item antes do RED.
+
+### A1. Criterio 2: tolerancia do par 200/201
+
+**0.15 em valor absoluto para `S = 100` com `N` em `{200, 201}`.** E a mesma regra do 0.03 em
+`N >= 1000`: tolerancia igual a `30/N`. A base e a ordem de convergencia 1 do CRR para
+europeias (Leisen e Reimer, 1996; Diener e Diener, 2004; Chang e Palmer, 2007).
+
+Medido antes do GREEN, nos 24 casos do cartao do DL2-PR03, com implementacao do revisor que
+nao foi entregue ao autor: maior erro absoluto 0.0292 em 200/201 e 0.0059 em 1000/1001.
+
+Fecha a pendencia "Tolerancia do criterio 2 para o par 200/201".
+
+### A2. Criterio 5: identificadores das recusas do binomial
+
+| Identificador | Condicao |
+|---|---|
+| `invalid_input_type` | numero que nao e `float` exato; `kind`, `style` ou arvore de outro tipo |
+| `unknown_exercise_style` | estilo `UNKNOWN` |
+| `non_finite_input` | `NaN` ou infinito em qualquer entrada numerica |
+| `invalid_steps` | passos que nao sao `int` exato, ou fora de `[1, 5000]` |
+| `input_out_of_domain` | `S <= 0`, `K <= 0`, `sigma < 0`, `T < 0`, `q < 0`; no nucleo, ver nota |
+| `zero_volatility` | `sigma = 0` com `T > 0`, na parametrizacao CRR |
+| `probability_out_of_range` | `p <= 0` ou `p >= 1` |
+| `tree_not_representable` | estouro em `float`, `u` e `d` iguais, ou resultado nao finito |
+
+Nota: no nucleo, `input_out_of_domain` cobre tambem `d <= 0`, `u <= d` e desconto `<= 0`.
+
+Os quatro itens do criterio 5 correspondem a `probability_out_of_range`,
+`invalid_steps`, `zero_volatility` e `non_finite_input`. Os outros quatro existem para que
+nenhuma entrada produza excecao nao tipada.
+
+Fecha a pendencia "Identificadores das recusas do criterio 5".
+
+### A3. Criterio 4: igualdade da call americana com a europeia
+
+Onde se le "com tolerancia 1e-12", leia-se:
+**`|americana - europeia| <= 1e-11 * max(1, europeia)`**. A condicao `q = 0` e `r >= 0` nao
+muda.
+
+Motivo, medido antes do GREEN: com `r = 0` e call muito dentro do dinheiro, a continuacao e o
+intrinseco sao iguais em aritmetica exata, e o arredondamento decide qual deles entra. Em
+`S = 100`, `K = 40`, `sigma = 0.1`, `T = 0.05`, `N = 500` a diferenca absoluta foi 3.0e-12; em
+`S = 10000` chegou a 1.9e-10. Em termos relativos ao preco, o maior valor em 1.458 casos foi
+3.1e-14. Um limite absoluto de 1e-12 reprovaria uma implementacao correta.
