@@ -9,14 +9,14 @@
 ## Fase 02 — Marco 2A
 Turno: Codex CLI, DL2-PR01 em 2026-11-19. Estado A.
 Base: squash do #141 em `11838cd`; ADR-0025 Accepted, L1..L5 vigentes.
-DL2-PR01: SPEC_PRONTA → RED_MOSTRADO (`e0f4664`) → GREEN local em macOS.
-Gate nativo: 8145 aprovados, 16 pulados, 261 subtestes aprovados; mypy e pyright em zero.
+DL2-PR01: SPEC_PRONTA → RED_MOSTRADO (`e0f4664`) → GREEN em macOS e Linux aarch64.
+Gate: 8145 aprovados, 16 pulados e 261 subtestes em ambos; mypy e pyright sem erros.
 [Cartão e evidências](../specs/derivatives/fase2/DL2-PR01.md).
 Riscos abertos:
 - Política conclusiva exige documento B3 datado, versionado e aplicável.
 - Tolerância CRR × BSM do par 200/201 depende de adendo antes do GREEN do PR03.
-Próxima ação: coordenação recebe o bundle local para revisão independente por Claude.
-Linux, reprodução do digest histórico e abertura do PR continuam pendentes.
+Próxima ação: Claude revisa o DL2-PR01; sem merge até o parecer independente.
+Pendente: recuperar o verificador original do digest histórico da Fase 01.
 
 ## Fase 01 do Lab de Derivativos — CONCLUIDA e integrada na `main` (estado A)
 

@@ -75,12 +75,31 @@ O SHA-256 acima mede a demo inteira.
 
 ### Entrega para coordenação
 
-SPEC_PRONTA, RED_MOSTRADO e GREEN local concluídos. Revisão independente, Linux,
-verificador do digest histórico e abertura de PR pendentes. Estado A.
-Os metadados Git do worktree ficam no repositório principal, fora da área gravável.
-A sequência de commits da branch foi preservada em um bundle incremental sobre a base.
+SPEC_PRONTA, RED_MOSTRADO e GREEN concluídos. Revisão independente e recuperação
+do verificador do digest histórico seguem pendentes. Estado A.
 
 A repetição de pytest com `-rs` confirmou os 16 skips: 15 testes de serviços opt-in e
 um teste do artefato de benchmark Q18 ignorado pelo Git. Todos os 20 casos novos rodaram.
 `git diff --check 11838cd HEAD` sem saída; numstat com quatro arquivos e +100 linhas
 de produção. `pyproject.toml`, `uv.lock` e o formato da Fase 01 permanecem na base.
+
+## GREEN no Linux aarch64
+
+Clone limpo, imagem local `openclaw-sandbox`, Python 3.12.13, sem rede.
+Código e testes medidos no commit `6ac0b1a`; os commits seguintes só registram evidências.
+Base `11838cd` no mesmo ambiente: 8125 passed, 16 skipped, 261 subtests passed.
+
+| Gate | Resultado | rc |
+|---|---|---|
+| Pytest focal | 20 passed | 0 |
+| Pytest global sem integração | 8145 passed, 16 skipped, 261 subtests passed | 0 |
+| mypy backend/ --strict | 157 arquivos, zero erros | 0 |
+| Pyright backend/ | 0 erros, 0 avisos, 0 informações | 0 |
+| CLI demo: comparação de stdout com `cmp` | Idêntico à base no Linux | 0 |
+| CLI live padrão | LIVE_NOT_ACTIVATED | 3 |
+
+No contêiner, o `venvPath` do projeto inicialmente não enxergou as dependências.
+O gate verde usa `pyright --venvpath /tmp/pyright-env backend/`, com
+`/tmp/pyright-env/.venv` apontando para `/opt/openclaw-venv`; sem mudar a configuração.
+SHA-256 da demo nas duas execuções Linux:
+`f4f8003f2021b2744202c782f6e5245872c09d7f9d1968a3356466a7e85ead08`.
