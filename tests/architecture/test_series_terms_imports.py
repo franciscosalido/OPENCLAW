@@ -54,3 +54,14 @@ def test_static_import_boundary(tmp_path: Path, path: Path | str, statement: str
     consumer.parent.mkdir(parents=True)
     consumer.write_text(f"# import sintético\n{statement}\n", encoding="utf-8")
     assert _offenders(tmp_path) == ([] if allowed else [f"{path}:2"])
+
+
+def test_domain_facade_does_not_publish_series_terms(tmp_path: Path) -> None:
+    """A surface cannot reach the series terms through a domain facade."""
+    facade = tmp_path / DOMAIN / "facade.py"
+    consumer = tmp_path / "backend/derivatives/service/s.py"
+    facade.parent.mkdir(parents=True)
+    consumer.parent.mkdir(parents=True)
+    facade.write_text(f"from {TERMS} import SeriesTerms\n", encoding="utf-8")
+    consumer.write_text("from backend.derivatives.domain import facade\n", encoding="utf-8")
+    assert _offenders(tmp_path) == ["backend/derivatives/service/s.py:1"]
