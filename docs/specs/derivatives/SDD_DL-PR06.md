@@ -48,7 +48,8 @@ persistencia, americanas, superficie de vol, chamadas reais.
   proposito adulterado e rejeitada pelo validador da `Chain`.
 - **Data de avaliacao = `now` no fuso `America/Sao_Paulo`.**
 - **Recusa de chain inteira, explicada:** `unsupported_day_count:<valor>`,
-  `missing_spot`, `missing_rate`, `calendar_coverage`,
+  `missing_spot`, `missing_rate`, `invalid_rate` (taxa fora do dominio da
+  capitalizacao, correcao de 2026-11-19), `calendar_coverage`,
   `expiry_before_valuation`. Cada linha recebe
   `chain_unpriceable:<motivo>` e nenhum numero. `calendar_365` existe no
   contrato YAML mas nao tem contagem implementada: e recusado, nunca
