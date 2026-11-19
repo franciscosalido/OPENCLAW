@@ -4,29 +4,31 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-19 · **Turno:** Claude (GO e merge do DL2-PR01).
+**Última atualização:** 2026-11-19 · **Turno:** Claude (GO e merge do DL2-PR02).
 
 ## Fase 02 — Marco 2A
 
-PR atual: DL2-PR02 — EM_REVISAO. Estado A. Draft para revisão independente.
-Base `b423817` (PR #142, DL2-PR01 integrado). A SPEC está em `be150eb` e os REDs em
-`4ce0f21` e `59509ae`. O GREEN mantém os dois no histórico.
-
-A premissa explicita rendimento, fonte e vigência. A resolução revalida os dois registros
-e recusa dupla contagem. A guarda cobre alcance transitivo e inicialização dos pacotes.
-No macOS arm64, 8.531 testes aprovados, 16 pulados e 261 subtestes aprovados. Mypy estrito e
-Pyright em zero. Mutação do autor com 12 mortos de 12. Demo idêntica às duas bases por `cmp`.
-[Cartão, REDs e evidências](../specs/derivatives/fase2/DL2-PR02.md).
+PR atual: DL2-PR02 — MERGEADO (PR #143, GO na primeira rodada de revisão). Estado A.
+Base: `main` após o squash do #143. ADR-0025 aceito, L1..L5 vigentes.
+Entregue: `backend/derivatives/domain/carry.py` (131 linhas), isolado. `resolve_carry` revalida
+termos e premissa, exige série e data iguais e só devolve `q > 0` com ajuste `UNPROTECTED`.
+Premissa ausente é recusa, nunca `q = 0`. A guarda de imports cobre alcance transitivo,
+literais e uma prova em interpretador novo.
+Gate do head aprovado, Linux aarch64 limpo: 8.539 aprovados, 16 pulados, 261 subtestes.
+Mutação do revisor: 28 de 28, depois de dois testes acrescentados na revisão.
+[Cartão, REDs, evidências e revisão](../specs/derivatives/fase2/DL2-PR02.md).
 
 Riscos abertos:
 - Manual B3 de 01/07/2026, §3.3.1: puts de ações, BDRs e ETFs são só europeias. O CRR
   americano vale, na prática, para calls. Adendo ao ADR-0025 pendente (Claude).
 - §3.2.9 do mesmo manual cobre opções sobre ações; BOVA11 segue com ajuste `UNKNOWN` (L5).
-- Tolerância CRR × BSM do par 200/201: adendo antes do GREEN do DL2-PR03.
+- Guarda por alcance não vê salto por `config/` a partir de `scripts/`, nem import dinâmico
+  relativo dentro de função. Dono: PR da ponte (Marco 2B).
+- Tolerância CRR × BSM do par 200/201 e identificadores das recusas do critério 5: têm de
+  entrar no cartão do DL2-PR03, antes do GREEN.
 - Verificador do digest numérico da Fase 01 ainda fora do repositório (PR do Claude).
 
-Próxima ação: Claude revisa a fronteira Decimal/float, roda mutação independente e decide
-a integração. O autor não faz merge.
+Próxima ação (uma só): Claude escreve o cartão do DL2-PR03 (núcleo binomial e CRR).
 
 ## Fase 01 do Lab de Derivativos — CONCLUIDA e integrada na `main` (estado A)
 

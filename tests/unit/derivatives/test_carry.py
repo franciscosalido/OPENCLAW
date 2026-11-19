@@ -333,3 +333,32 @@ def test_mutated_base_instances_are_revalidated() -> None:
     with pytest.raises(ValidationError) as invalid_terms:
         resolve_carry(terms, carry)
     assert invalid_terms.value.errors()[0]["loc"] == ()
+
+
+@pytest.mark.parametrize("policy", list(AdjustmentPolicy))
+@pytest.mark.parametrize("updates", [{"symbol": "OTHER"}, {"effective_on": date(2026, 1, 6)}])
+def test_none_for_another_series_or_date_is_missing(
+    policy: AdjustmentPolicy, updates: dict[str, object],
+) -> None:
+    """NONE declarado para outra série ou outra data não vira q = 0 nesta (revisão, R01)."""
+    assumption = _carry(CarryKind.NONE).model_copy(update=updates)
+    with pytest.raises(CarryRefusal) as error:
+        resolve_carry(_terms(policy), assumption)
+    assert str(error.value) == error.value.code.value == "missing_carry_assumption"
+
+
+class _LooseDecimal(Decimal):
+    """Subclasse que responde outro valor na conversão para float."""
+
+    def __float__(self) -> float:
+        return 0.5
+
+
+@pytest.mark.parametrize("strict", [True, False])
+def test_decimal_subclass_is_rejected(strict: bool) -> None:
+    """O rendimento exige Decimal exato: a subclasse poderia mentir em float() (revisão, R07b)."""
+    fields = _carry(CarryKind.CONTINUOUS_YIELD, Decimal("0.03")).model_dump()
+    with pytest.raises(ValidationError) as error:
+        CarryAssumption.model_validate(fields | {"dividend_yield": _LooseDecimal("7")},
+                                       strict=strict)
+    assert [item["loc"] for item in error.value.errors()] == [("dividend_yield",)]

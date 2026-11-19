@@ -307,7 +307,8 @@ Tomadas dentro do ADR-0025. Francisco pode vetar qualquer uma antes do RED.
 
 A revisão começa na árvore de trabalho de `feat/dl2-pr02-carry-assumption`, sobre o RED 2.
 A base é `b4238179de156df7e38a6e0f560d033737be19f6`. O primeiro commit,
-`be150eb2f1c7c385a360679bb9d1a75ee6ef567f`, contém só a SPEC. Seus 16.628 bytes, incluindo a quebra de linha final, têm SHA-256
+`be150eb2f1c7c385a360679bb9d1a75ee6ef567f`, contém só a SPEC. Seus 16.628 bytes, incluindo a
+quebra de linha final, têm SHA-256
 `51b0f32fda7d27717d6ac2ae33668af266a5fa8db12e5ccbbcb9e1527d6985c2`.
 O cartão original de reports/fase02/ permanece intacto; as evidências estão abaixo.
 
@@ -429,3 +430,58 @@ O verificador do digest numérico histórico continua pendente no PR separado do
 
 Os commits RED são preservados no ramo do PR. O autor publica apenas o draft;
 Claude faz a revalidação independente e decide a integração.
+
+## Revisão independente: GO (Claude, 2026-11-19)
+
+Head revisado `f6d1f8709f41b5119e077006a0ffc7f26afeb51f`, árvore `e63ba6e2a7f0`. Estado:
+MERGEADO pelo PR #143. Tudo abaixo foi executado pelo revisor em clone limpo, Linux aarch64,
+Python 3.12, Pydantic 2.13.3, sem reaproveitar saídas do autor.
+
+| Verificação | Resultado no head do autor |
+|---|---|
+| Diff anexado à revisão × `git diff b423817 f6d1f87` | idênticos byte a byte |
+| SPEC no primeiro commit e no head | SHA-256 `51b0f32f…`, 304 linhas intactas |
+| RED 1 em `4ce0f21` / RED 2 em `59509ae` | `DID NOT RAISE CarryRefusal` / lista vazia |
+| Focal (contrato + arquitetura) | 165 aprovados |
+| Suíte sem integração | 8.531 aprovados, 16 pulados, 261 subtestes, 0 falhas |
+| mypy estrito / Pyright | 158 arquivos sem erros / 0 erros |
+| Produção fora de `carry.py`, config, scripts, protegidos | diff vazio (rc 0) |
+| Demo sintética e CLI padrão | idêntica à base no Linux (`f4f8003f…`) / rc 3 |
+| Ataques por caminho público (29) | nenhum número indevido; ver limitações |
+| Mutação do revisor (20 em `carry.py`, 8 na guarda) | 26 mortos, 2 sobreviventes |
+
+### Os dois sobreviventes e o que foi feito
+
+Nos dois casos a produção já estava correta; faltava o teste que prende o comportamento.
+
+- **R01.** Conferir série e data só depois do retorno de `NONE` passava em toda a suíte. Um
+  `NONE` declarado para outra série ou outra data viraria `q = 0` nesta, que é o caso que D3
+  existe para barrar. Os testes do autor só cobriam a divergência com rendimento contínuo.
+- **R07b.** Trocar `type(value) is not Decimal` por `isinstance` passava. Uma subclasse de
+  `Decimal` pode responder outro valor em `float()`.
+
+O revisor acrescentou `test_none_for_another_series_or_date_is_missing` (3 políticas × série e
+data) e `test_decimal_subclass_is_rejected` em `tests/unit/derivatives/test_carry.py`, no commit
+desta seção. Nenhuma linha de produção mudou. Com eles: focal 173 aprovados, 28 de 28 mutantes
+mortos, suíte sem integração com 8.539 aprovados, 16 pulados e 261 subtestes.
+
+### Leitura de D2 feita pelo autor
+
+Aceita. Conferir o intervalo no `float` entregue ao motor é mais estrito que o cartão e fecha
+um caso que o cartão não previa: `Decimal("1e-1000")` é positivo e viraria `q = 0.0`.
+
+### Limitações aceitas, com dono
+
+- O grafo estático cobre `backend/` e `scripts/`, como o cartão pediu. Um salto por `config/`
+  só é pego pela prova em execução, e só quando o consumidor está em `backend.derivatives`.
+  Consumidor em `scripts/` ou em outro pacote de `backend/` passa. Dono: PR da ponte (2B),
+  que já tem de reabrir esta guarda.
+- `import_module(".carry", "backend.derivatives.domain")` dentro de função escapa da varredura
+  de literais e da prova em execução. É a família "caminho montado" já registrada na SPEC.
+- `dataclasses.replace` e construção direta de `ResolvedCarry` trocam `q` sem passar pela
+  trava; termos com política e evidência forjadas de forma coerente são aceitos. São caminhos
+  de chamador confiável. Dono: a ponte chama `resolve_carry` e autentica a fonte.
+- JSON com chave repetida segue a regra do parser (vale a última). `pickle` não revalida.
+- O `assert` que estreita o tipo antes do `float()` final some com `python -O`. O ramo é
+  inalcançável depois da revalidação, e sem o `assert` a conversão de `None` levanta
+  `TypeError`: continua sem devolver número.
