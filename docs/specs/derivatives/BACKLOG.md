@@ -47,7 +47,8 @@
   (1 linha) para <= 100 colunas — pre-existente do DL-PR02, detectado no
   gate V-B do DL-PR04; so formatacao, sem mudanca semantica.
 - CRR/BS-1993 (Bjerksund-Stensland) para americanas — Fase 2, com
-  referencia numerica propria.
+  referencia numerica propria. CRR: regido pelo ADR-0025 (Marco 2A);
+  Bjerksund-Stensland segue fora (ver "Fora do Marco 2A" no ADR-0025).
 - `/market/options/bs` da OpLab: so reconciliacao na homologacao (estado
   B); nunca fonte de preco do Lab.
 - Oraculo mpmath: estender `bsm_reference_cases.json` com casos de IV

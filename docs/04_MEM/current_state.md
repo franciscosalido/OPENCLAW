@@ -6,6 +6,17 @@
 
 **Última atualização:** 2026-11-19 11:20 BRT · **Turno:** Claude (fechamento da Fase 01).
 
+## Fase 02 — Marco 2A
+Turno: Claude Code desde 2026-11-19 13:43 BRT
+PR atual: DL2-PR00 — EM_REVISAO
+main: 1421116 · gate: 8126 aprovados / 15 pulados / 0 falhas
+Decisoes: L1..L5 = padrao do ADR-0025
+Riscos abertos:
+- ADR-0025 ainda Proposed: nenhum PR de codigo do 2A antes da aprovacao.
+- Tolerancia CRR x BSM do par 200/201 nao fixada (adendo antes do GREEN do DL2-PR03).
+- Politica de ajuste de strike sem documento datado da B3: tudo `UNKNOWN` (L5).
+Proxima acao (uma so): Francisco revisa e aprova (ou devolve) o PR do DL2-PR00.
+
 ## Fase 01 do Lab de Derivativos — CONCLUIDA e integrada na `main` (estado A)
 
 **Estado A (offline verificado) fechado em 2026-11-19.** Tudo abaixo esta na

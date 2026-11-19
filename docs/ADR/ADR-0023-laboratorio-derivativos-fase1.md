@@ -302,6 +302,7 @@ americanos, Redis, Telegram, NumPy/SciPy, persistencia PostgreSQL de
 snapshots, nem alteracao de `CLAUDE.md`/`AGENTS.md`/`.claude/`. Reversao da
 proibicao de corretora e assunto exclusivo do ADR-0024 (proposto, nao
 assinado).
+Modelos americanos passam a ser regidos pelo ADR-0025 (Fase 02, Marco 2A).
 
 ## Referencias
 
