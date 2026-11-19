@@ -8,22 +8,25 @@
 
 ## Fase 02 — Marco 2A
 
-PR atual: DL2-PR01 — MERGEADO (PR #142, GO na terceira rodada de revisão). Estado A.
-Base: `main` após o squash do #142. ADR-0025 aceito, L1..L5 vigentes.
-Entregue: `backend/derivatives/domain/series_terms.py` (215 linhas), isolado; termos por série
-e vigência, recusas tipadas, cópia e JSON validados, tipos exatos mesmo com `strict=False`.
-Gate do head aprovado, Linux aarch64 limpo: 8.379 aprovados, 16 pulados, 261 subtestes.
-[Cartão, três rodadas de revisão e evidências](../specs/derivatives/fase2/DL2-PR01.md).
+PR atual: DL2-PR02 — EM_REVISAO. Estado A. Draft para revisão independente.
+Base `b423817` (PR #142, DL2-PR01 integrado). A SPEC está em `be150eb` e os REDs em
+`4ce0f21` e `59509ae`. O GREEN mantém os dois no histórico.
+
+A premissa explicita rendimento, fonte e vigência. A resolução revalida os dois registros
+e recusa dupla contagem. A guarda cobre alcance transitivo e inicialização dos pacotes.
+No macOS arm64, 8.531 testes aprovados, 16 pulados e 261 subtestes aprovados. Mypy estrito e
+Pyright em zero. Mutação do autor com 12 mortos de 12. Demo idêntica às duas bases por `cmp`.
+[Cartão, REDs e evidências](../specs/derivatives/fase2/DL2-PR02.md).
 
 Riscos abertos:
 - Manual B3 de 01/07/2026, §3.3.1: puts de ações, BDRs e ETFs são só europeias. O CRR
   americano vale, na prática, para calls. Adendo ao ADR-0025 pendente (Claude).
 - §3.2.9 do mesmo manual cobre opções sobre ações; BOVA11 segue com ajuste `UNKNOWN` (L5).
-- Guarda de import dos termos não vê alcance transitivo; o DL2-PR02 deve fechá-la.
 - Tolerância CRR × BSM do par 200/201: adendo antes do GREEN do DL2-PR03.
 - Verificador do digest numérico da Fase 01 ainda fora do repositório (PR do Claude).
 
-Próxima ação (uma só): Claude escreve o cartão do DL2-PR02 (carry e dupla contagem).
+Próxima ação: Claude revisa a fronteira Decimal/float, roda mutação independente e decide
+a integração. O autor não faz merge.
 
 ## Fase 01 do Lab de Derivativos — CONCLUIDA e integrada na `main` (estado A)
 

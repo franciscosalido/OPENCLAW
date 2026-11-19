@@ -302,3 +302,130 @@ Tomadas dentro do ADR-0025. Francisco pode vetar qualquer uma antes do RED.
 - Manual de Procedimentos Operacionais de Negociação da B3, versão de 01/07/2026, itens 3.2.9
   e 3.3.1. SHA-256 do PDF conferido:
   `35df8963b85b36774f431ae3c9b04c867a8ea7b863621307a45f3812e8b250ec`.
+
+## Evidências da implementação no macOS — 2026-11-19
+
+A revisão começa na árvore de trabalho de `feat/dl2-pr02-carry-assumption`, sobre o RED 2.
+A base é `b4238179de156df7e38a6e0f560d033737be19f6`. O primeiro commit,
+`be150eb2f1c7c385a360679bb9d1a75ee6ef567f`, contém só a SPEC. Seus 16.628 bytes, incluindo a quebra de linha final, têm SHA-256
+`51b0f32fda7d27717d6ac2ae33668af266a5fa8db12e5ccbbcb9e1527d6985c2`.
+O cartão original de reports/fase02/ permanece intacto; as evidências estão abaixo.
+
+### REDs anteriores à implementação
+
+**RED 1 · `4ce0f2125449a6d9cb250ec453256d7cab94fea2`.**
+O esqueleto devolvia um resultado para a combinação protegida com rendimento contínuo.
+Trecho do log original `red-1.log`:
+
+```text
+tests/unit/derivatives/test_carry.py:44: in test_protected_refuses_continuous_yield
+    with pytest.raises(CarryRefusal) as error:
+E   Failed: DID NOT RAISE <class 'backend.derivatives.domain.carry.CarryRefusal'>
+=========================== short test summary info ============================
+FAILED tests/unit/derivatives/test_carry.py::test_protected_refuses_continuous_yield
+1 failed in 0.06s
+```
+
+**RED 2 · `59509ae44ec7e2c197448ccc6ad3fe12e21d3a90`.**
+O diff desse commit acrescenta apenas o teste da fachada à guarda do PR01.
+Trecho do log original `red-2.log`:
+
+```text
+>       assert _offenders(tmp_path) == ["backend/derivatives/service/s.py:1"]
+E       AssertionError: assert [] == ['backend/der...rvice/s.py:1']
+E
+E         Right contains one more item: 'backend/derivatives/service/s.py:1'
+E         Use -v to get more diff
+
+tests/architecture/test_series_terms_imports.py:67: AssertionError
+```
+
+O pytest registrou `1 failed in 0.02s`. Os dois SHAs permanecem ancestrais da candidata.
+
+### GREEN e fronteiras do contrato
+
+O único arquivo novo de produção tem 131 linhas. A função revalida primeiro os termos,
+depois a premissa presente, confere série e data e só então aplica a matriz. As instâncias
+devolvidas têm os tipos base exatos. Os testes cobrem construção sem validação, alteração de
+`__dict__`, subclasses, precedência das recusas e conjunto exato de hipóteses da Fase 01 e 02.
+A revalidação confere consistência. A autenticação da fonte cabe à futura ponte.
+
+**Leitura conservadora de D2 para o revisor.** O intervalo aberto precisa valer também para o
+`float` entregue ao motor. `Decimal("1e-1000")` é positivo e arredonda para `0.0`.
+`Decimal("0.99999999999999999")` é menor que um e arredonda para `1.0`. Nos dois casos,
+Python e JSON acusam `ValidationError` em `dividend_yield`, inclusive sob `strict=False`.
+Os vizinhos interiores `math.nextafter(0.0, 1.0)` e `math.nextafter(1.0, 0.0)` são aceitos.
+O registro conserva o Decimal original. O JSON de `Decimal("0.0300")` volta como `"0.0300"`.
+
+A guarda estática propaga alcance pelos imports de `backend/` e `scripts/`, inclusive
+`__init__.py` dos ancestrais, resoluções relativas e ciclos. O diagnóstico aponta a linha do
+import inicial de cada consumidor. A prova em interpretador isolado bloqueia rede e tem
+timeout de 60 s. Uma árvore sintética mostra que um nome montado ao inicializar o pacote pai
+escapa da análise estática e é detectado em `sys.modules`. Caminhos calculados que só executam
+após o import ficam fora da prova. O smoke, conforme a SPEC, importa todo o pacote exceto
+os dois módulos protegidos: é deliberadamente mais estrito do que a análise estática.
+Se surgir um consumidor legítimo apenas de domínio, poderá exigir rever esse smoke;
+neste PR o teste e a regra do cartão permanecem inalterados.
+
+### Mutação do autor
+
+Controle original com 135 testes aprovados. Os 12 mutantes, um por execução, terminaram com
+rc 1 e falha de teste identificada. A tabela usa as linhas do `carry.py` de SHA-256
+`dc6e771582c162e624d6d29ff53dd67dc15499b224f76d7257deeeb6412b9d21`.
+Para reproduzir, execute o controle abaixo numa cópia temporária da candidata. Em cada rodada,
+substitua só a instrução indicada na tabela, conserve a indentação, repita o comando e restaure
+o arquivo original antes da próxima rodada. Na rodada 4, a fonte sintética é `"mutante"`.
+
+```sh
+python -B -m pytest tests/unit/derivatives/test_carry.py -q --tb=line -p no:cacheprovider
+```
+
+| Nº | Alteração em carry.py | Falhas | Exemplo de teste que detectou |
+|---:|---|---:|---|
+| 1 | L127 → `pass` | 5 | `test_protected_refuses_continuous_yield` |
+| 2 | L129 → `pass` | 4 | `test_policy_grid[0.0001-UNKNOWN]` |
+| 3 | Permutar as instruções L127 e L129 | 9 | `test_protected_refuses_continuous_yield` |
+| 4 | L120 → atribuir a `carry` premissa NONE com série e data dos termos | 3 | `test_absent_assumption` |
+| 5 | L77 → `return Decimal("0")` | 5 | `test_frozen_models_and_revalidated_copy` |
+| 6 | L118 → `pass` | 7 | `test_revalidate_constructed_terms` |
+| 7 | L121 → `assumption = carry` | 6 | `test_revalidate_constructed_carry` |
+| 8 | L88 → `if not 0 <= float(value) < 1:` | 6 | `test_python_field_errors` |
+| 9 | L88 → `if not 0 < float(value):` | 9 | `test_python_field_errors` |
+| 10 | L122 → comparar apenas a data | 1 | `test_mismatch_precedes_policy[updates0]` |
+| 11 | L122 → comparar apenas a série | 1 | `test_mismatch_precedes_policy[updates1]` |
+| 12 | L80 → `return None` | 3 | `test_none_has_no_yield` |
+
+Resultado do autor: **12 mortos, 0 sobreviventes**. O diretório de logs entregue ao Dots
+inclui o executor exato `verificacao-candidata/mutacao.py`, o controle `m00.log` e as doze
+saídas `m01.log` a `m12.log`. A lista independente é responsabilidade do revisor.
+
+### Regressão e entrega
+
+macOS 15.8.1 arm64, Python 3.12.13, Pydantic 2.13.3. Os gates usaram os executáveis do
+venv autorizado, com os proxies removidos. As comparações Git abaixo usaram a árvore de
+trabalho contra a base porque o commit GREEN fica com Dots.
+
+| Gate | Resultado | rc |
+|---|---|---:|
+| Pytest focal, contrato e arquitetura | 165 aprovados | 0 |
+| Pytest global sem integração, timeout 120 s | 8.531 aprovados, 16 pulados, 261 subtestes | 0 |
+| Mypy estrito em `backend/` | 158 arquivos, zero erros | 0 |
+| Mypy estrito nos dois arquivos de testes | Zero erros | 0 |
+| Pyright em `backend/` com o interpretador do venv explícito | Zero erros e avisos de análise | 0 |
+| `git diff --check b423817` | Diff limpo | 0 |
+| Diff da produção contra `b423817` excluindo `carry.py` | Vazio | 0 |
+| Diff de config, scripts, dependências e arquivos protegidos | Vazio | 0 |
+
+A contagem global aumentou em 152 sobre a base de 8.379. O Pyright sinalizou que o diretório
+da cópia isolada carece da subpasta local `.venv`.
+
+A demo sintética foi executada em três árvores na mesma plataforma: `11838cd` (antes do
+PR01), `b423817` (base do PR02) e a candidata. As bases vieram dos objetos Git locais.
+As três execuções com `--provider offline_fixture` deram rc 0 e stdout idêntico ao baseline
+por `cmp` (67.097 bytes). SHA-256 da demo completa:
+`a7d82699b47d31acec31995ccea3cf4149ebcb92311f980fb23390627b1de9c3`.
+O CLI padrão devolveu `LIVE_NOT_ACTIVATED`, estado A, rc 3 nas três execuções.
+O verificador do digest numérico histórico continua pendente no PR separado do Claude.
+
+Os commits RED são preservados no ramo do PR. O autor publica apenas o draft;
+Claude faz a revalidação independente e decide a integração.
