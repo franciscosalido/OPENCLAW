@@ -5,6 +5,9 @@ GitHub Issue: pendente (sem card dedicado; segue o prompt v1 §5.4/§7, as
 erratas v1.1 E4-E6 e o ADR-0023)
 Status: implementado; aguarda PR e revisao
 
+**Adendo local de 2026-11-19.** Na candidata, C injetado não habilita produção. A demo verifica a captura BOVA11 e o transporte oficial passa pelo preflight ASGI local.
+[Conciliação da Fase 01](SDD_conciliacao_fase01.md)
+
 ## Objective
 
 Expor o Laboratorio por MCP, somente leitura, em loopback: servidor

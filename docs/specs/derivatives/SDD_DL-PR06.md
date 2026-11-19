@@ -6,6 +6,9 @@ GitHub Issue: pendente (sem card dedicado; segue o prompt v1 §7, as erratas
 v1.1 e o handoff do card DL-PR05)
 Status: implementado; aguarda PR e revisao
 
+**Adendo local de 2026-11-19.** O cálculo worst-of permanece um diagnóstico de procedência. A autorização para publicar cotações fica fechada em A mesmo quando carimbo e propósito são trocados juntos.
+[Conciliação da Fase 01](SDD_conciliacao_fase01.md)
+
 ## Objective
 
 `ChainService` compoe o que DL-PR01..05 entregaram: **uma captura** (quatro

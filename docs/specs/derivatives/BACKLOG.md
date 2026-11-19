@@ -16,7 +16,7 @@
   NumPy/SciPy/pandas, Ruff/Black, qualquer dependencia nova.
 - Persistencia em PostgreSQL (snapshots duraveis entram na Fase 2 com
   migracao propria).
-- CLI alem de um wrapper fino opcional (DL-PR07).
+- CLI alem de um wrapper fino opcional (DL-PR08).
 - Alterar `CLAUDE.md`, `AGENTS.md`, `.claude/`.
 
 ## Itens nomeados (fora do Lab ou de fase futura)
@@ -80,3 +80,13 @@
   nos clientes MCP dos agentes consultores.
 - Resposta da demonstracao tem ~67 KB para 100 linhas: avaliar filtro por
   faixa de strike ou paginacao antes de expor chains reais maiores.
+- Guarda MCP depende de `FastMCP._mcp_server.request_handlers` (privado,
+  FastMCP 3.4.0): revalidar a cada atualizacao do SDK; avaliar trocar por
+  `TransportSecuritySettings` nativo quando o FastMCP o expuser.
+- Fase B: `HttpTransport` so aceita `MockTransport` no estado A; reabilitar
+  rede real exige ADR proprio. Remover entao os parametros sem efeito
+  (`live_service`, `production_view`, `root`, `fixture_dir`).
+- Homologacao: confirmar `parent_symbol` das opcoes e definir teto para
+  `Retry-After` (hoje bloqueia ate o limite de `datetime`).
+- `demo_fixture.py` usa APIs POSIX e mora em `oplab/`; mover para um pacote
+  de demonstracao quando houver segunda fixture.

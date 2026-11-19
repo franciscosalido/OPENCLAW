@@ -173,15 +173,17 @@ async def test_priced_rows_reproduce_the_mid_and_have_sane_greeks(
 
 
 async def test_documental_2021_chain_is_refused_for_calendar_coverage(
-    tmp_path: Path, calendars: dict[CalendarId, TradingCalendar],
+    calendars: dict[CalendarId, TradingCalendar],
 ) -> None:
-    for name in ("market_options_PETR3.json", "market_interest_rates.json",
-                 "market_status.json"):
-        shutil.copyfile(DOCUMENTAL / name, tmp_path / name)
-    # A doc oficial traz a chain de PETR3 e o ativo PETR4; o ativo e reaproveitado.
-    shutil.copyfile(DOCUMENTAL / "market_stocks_PETR4.json",
-                    tmp_path / "market_stocks_PETR3.json")
-    service = _service(FixtureTransport(tmp_path), calendars)
+    class CalendarTransport(FixtureTransport):
+        async def get(self, route, *, params, now):
+            if route is MarketRoute.STOCK:
+                # O cenário de calendário precisa de PETR3; a doc só publica o spot de PETR4.
+                return VendorResponse(200, {"symbol": "PETR3", "close": 10.0}, {}, now,
+                                      "/market/stocks/PETR3", Provenance.SYNTHETIC)
+            return await super().get(route, params=params, now=now)
+
+    service = _service(CalendarTransport(DOCUMENTAL), calendars)
     capture = await service.acquire("PETR3", now=NOW)
     assert capture.stamp.provenance is Provenance.DOCUMENTAL
     chain = service.normalize(capture, date(2021, 5, 21), now=NOW)

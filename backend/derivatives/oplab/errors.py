@@ -66,8 +66,9 @@ def parse_retry_after(value: str | None, *, now: datetime) -> float | None:
     if value is None:
         return None
     text = value.strip()
-    if text.isdigit():
-        return float(text)
+    if text.isascii() and text.isdigit():
+        maximum = datetime.max.replace(tzinfo=now.tzinfo)
+        return min(float(text), (maximum - now).total_seconds())
     try:
         when = parsedate_to_datetime(text)
     except (TypeError, ValueError):
@@ -92,6 +93,10 @@ def classify_status(
         wait_s = parse_retry_after(retry_after, now=now)
         if wait_s is None:
             wait_s = RATE_LIMIT_BLOCK_S if status == 429 else UNAVAILABLE_BLOCK_S
-    eligible = None if wait_s is None else now + timedelta(seconds=wait_s)
+    try:
+        eligible = None if wait_s is None else now + timedelta(seconds=wait_s)
+    except OverflowError:
+        # O limite superior arredondado em segundos pode passar do último microssegundo.
+        eligible = datetime.max.replace(tzinfo=now.tzinfo)
     return error_type(f"OpLab respondeu status {status}", status=status, route=route,
                       retry_after_s=wait_s, next_eligible_at=eligible)

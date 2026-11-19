@@ -64,8 +64,8 @@ class PricedChain(BaseModel):
     def purpose(self) -> Purpose:
         """Proposito efetivo, worst-of entre campo, carimbo e procedencia.
 
-        Recalculado a cada leitura: ``model_copy(update={"purpose": ...})`` nao valida
-        e portanto nao pode promover uma chain de teste a producao.
+        A troca isolada de propósito não promove a chain. Este cálculo não autentica
+        um carimbo substituído e não autoriza uma projeção produtiva.
         """
         stamp = self.chain.stamp
         return inherit_purpose(self.chain.purpose, stamp.purpose, purpose_of(stamp.provenance))

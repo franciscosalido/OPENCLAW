@@ -4,12 +4,65 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Last updated: 2026-11-18
-**Updated by: Claude (turno autonomo Fase 1, coordenado com Dots) — DL-PR07 / fechamento da Fase 1
+**Última atualização:** 2026-11-19 00:13 BRT · **Turno:** Dots com Codex.
+
+## Fase 01 — candidata única validada offline (estado A)
+
+Branch local `review/fase01-claude-dots`, clone `OPENCLAW-fase01-dots`.
+Código validado `17bc0c3`, parent `6892c82` (pilha Claude). #131/Adendo 2
+`629df7e` é a base comum. A pilha Dots `847eb9c` foi mantida como referência
+e **não deve ser integrada em paralelo**. Ela forneceu guardas e testes, sem
+substituir o cliente, ChainService ou demo de 100 opções da pilha Claude.
+O checkout original permanece em `feat/dl-pr07-mcp-server`, limpo.
+
+### Evidência
+
+- **Mac arm64 + Linux aarch64, Python 3.12.13:** 8.052 passaram, 15 pulados,
+  261 subtestes passaram, zero falhas em cada plataforma no gate
+  `pytest tests/ --ignore=tests/integration --timeout=120`. Mypy strict
+  (155 arquivos) e Pyright retornaram 0 nos dois.
+- Composição de gate: `17bc0c3` mais #130 `95a043b` e patch de
+  portabilidade `2c2583cd…`, **somente em clones descartáveis**. Não houve
+  dependência do JSON legado. Esses dois itens seguem separados da pilha
+  do Lab e precisam chegar à main para reproduzir a árvore verificada.
+- **Prova HTTP real apenas em loopback**, dentro de contêiner Linux sem
+  rede externa: prod não anunciou demo; teste retornou 100 linhas BOVA11
+  rotuladas synthetic/test; produtiva retornou LIVE_NOT_ACTIVATED/A nos
+  dois contextos, sem cotação. Host externo foi recusado, servidores
+  efêmeros foram encerrados.
+- **CS10 no Mac nativo:** 30 rodadas, 100 europeias sintéticas e 100
+  precificadas; p50 24,25 ms, p95 29,61 ms (meta <2.000 ms). É medição
+  offline da candidata, não latência de mercado.
+- Segurança: desativação produtiva antes do serviço, sem modo vivo mesmo
+  com C injetado nesta implementação; HTTP Market funciona apenas com
+  MockTransport; 4 arquivos e manifesto sintéticos verificados por SHA-256;
+  Host/Origin verificados; corpo limitado a 64 KiB; erros sem eco de
+  parâmetros ou nomes desconhecidos; cliente rejeita ativo divergente e
+  números não finitos. Dependências e fixtures documentais intactas.
+
+### Próximo turno
+
+1. Claude revisa **apenas** o delta `6892c82..review/fase01-claude-dots`,
+   em especial a guarda do SDK MCP versão fixada. Anotar início do turno
+   no ponto de handoff compartilhado **antes** de abrir outro checkout.
+2. Owner conduz publicação/revisão/merge: alinhar #131 (incluindo Adendo 2),
+   #130 e patch de portabilidade; depois PR05A, PR05B, PR06, PR07 e o delta
+   de conciliação em ordem de dependência. Não integrar a segunda
+   implementação P05–07. Após os merges, repetir o gate numa main limpa.
+3. PR08 CLI é opcional e ficou fora. OKF próprio do Lab não foi localizado;
+   SDD, ADR e esta memória são o handoff. O BACKLOG guarda os itens não
+   bloqueantes (p. ex., calendário B3 após 2026 e convenção civil).
+   B = homologação de dados reais; C = promoção explícita. Ambos fora da fase.
+
+**Status:** implementação e validação técnica offline concluídas localmente.
+Revisão do diff conciliado por Claude e integração na main pendentes.
+Nenhum push, merge, deploy, token real ou chamada à OpLab.
+
+[SDD da conciliação](../specs/derivatives/SDD_conciliacao_fase01.md)
 
 ---
 
-## TURNO / COORDENACAO — Fase 1 do Lab (Claude x Dots)
+## Histórico de coordenação — turno Claude de 2026-11-18
 
 - **Turno do Claude encerrado em 2026-11-18.** Fase 1 implementada ate o
   DL-PR07 em branches locais empilhadas; nada foi enviado a origem.
