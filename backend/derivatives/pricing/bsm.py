@@ -80,8 +80,8 @@ class BsmResult:
 
 
 def norm_cdf(x: float) -> float:
-    """CDF da normal padrao via ``math.erf`` (zero dependencias novas, ADR-0023)."""
-    return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
+    """CDF da normal padrao via ``math.erfc`` (caudas sem cancelamento, ADR-0023)."""
+    return 0.5 * math.erfc(-x / math.sqrt(2.0))
 
 
 def norm_pdf(x: float) -> float:
@@ -112,7 +112,7 @@ def _expiry(inp: BsmInputs, basis: int) -> BsmResult:
 def _analytic(inp: BsmInputs, basis: int, n_d1: float, n_d2: float, pdf_d1: float,
               d1: float | None, d2: float | None, regime: Regime,
               notes: tuple[str, ...]) -> BsmResult:
-    """Formulas BSM com ``q``; nos limites chegam ``n_d1``/``n_d2`` saturados e pdf 0."""
+    """CDFs de d1/d2 para call, -d1/-d2 para put; nos limites sao saturadas com pdf 0."""
     t = inp.time_years
     df_q = math.exp(-inp.dividend_yield * t)
     df_r = math.exp(-inp.rate_cont * t)
@@ -125,11 +125,12 @@ def _analytic(inp: BsmInputs, basis: int, n_d1: float, n_d2: float, pdf_d1: floa
                  - inp.rate_cont * inp.strike * df_r * n_d2)
         rho_raw = inp.strike * t * df_r * n_d2
     else:
-        value = inp.strike * df_r * (1.0 - n_d2) - inp.spot * df_q * (1.0 - n_d1)
-        delta = df_q * (n_d1 - 1.0)
-        carry = (inp.rate_cont * inp.strike * df_r * (1.0 - n_d2)
-                 - inp.dividend_yield * inp.spot * df_q * (1.0 - n_d1))
-        rho_raw = -inp.strike * t * df_r * (1.0 - n_d2)
+        value = inp.strike * df_r * n_d2 - inp.spot * df_q * n_d1
+        delta = -df_q * n_d1
+        carry = (inp.rate_cont * inp.strike * df_r * n_d2
+                 - inp.dividend_yield * inp.spot * df_q * n_d1)
+        rho_raw = -inp.strike * t * df_r * n_d2
+    value = max(value, 0.0)  # Apos CDFs diretas, o residuo restante e subnormal (~1e-322).
     gamma = diffusion / (inp.spot * inp.spot * inp.sigma * sqrt_t) if diffusion > 0.0 else 0.0
     theta_annual = carry - diffusion * inp.sigma / (2.0 * sqrt_t)
     greeks = Greeks(delta, gamma, diffusion * sqrt_t * 0.01, theta_annual / basis,
@@ -141,9 +142,11 @@ def price(inputs: BsmInputs, *, theta_basis: Literal[252, 365]) -> BsmResult:
     """Preco e gregas BSM de uma europeia; regimes ``expiry`` e ``zero_vol`` a parte."""
     if inputs.time_years == 0.0:
         return _expiry(inputs, theta_basis)
+    sign = 1.0 if inputs.kind is OptionKind.CALL else -1.0
     if inputs.sigma == 0.0:
         forward_gap = (inputs.spot * math.exp(-inputs.dividend_yield * inputs.time_years)
                        - inputs.strike * math.exp(-inputs.rate_cont * inputs.time_years))
+        forward_gap *= sign
         n_limit = 1.0 if forward_gap > 0.0 else 0.5 if forward_gap == 0.0 else 0.0
         return _analytic(inputs, theta_basis, n_limit, n_limit, 0.0, None, None,
                          "zero_vol", ("zero_volatility_limit",))
@@ -153,5 +156,5 @@ def price(inputs: BsmInputs, *, theta_basis: Literal[252, 365]) -> BsmResult:
            + (inputs.rate_cont - inputs.dividend_yield + 0.5 * inputs.sigma * inputs.sigma)
            * inputs.time_years) / sigma_sqrt_t)
     d2 = d1 - sigma_sqrt_t
-    return _analytic(inputs, theta_basis, norm_cdf(d1), norm_cdf(d2), norm_pdf(d1), d1, d2,
-                     "regular", ())
+    return _analytic(inputs, theta_basis, norm_cdf(sign * d1), norm_cdf(sign * d2),
+                     norm_pdf(d1), d1, d2, "regular", ())
