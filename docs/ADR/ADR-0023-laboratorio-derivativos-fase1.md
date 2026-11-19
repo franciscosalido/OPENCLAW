@@ -129,6 +129,51 @@ declaradas, com flag, ate homologacao:
   call-put, diferencas finitas centrais e o oraculo mpmath do Codex
   (`tests/fixtures/derivatives/reference/`, 92 casos a 50 dps, paridade
   interna < 1e-30 declarada no proprio arquivo).
+- **Emenda 2026-11-18 — caudas numericas (DL-PR04, Adendo 2):** a CDF
+  passa de `0.5*(1+erf)` para `0.5*erfc(-x/sqrt(2))`, ainda sem
+  dependencias novas. Preco, delta, carry e rho da put usam `N(-d1)` e
+  `N(-d2)` diretamente, nunca `1-N(d)`, evitando cancelamento observado
+  em Linux aarch64 (`S=100`, `K=70`, `T=2`, `r=0.10`, `sigma=0.05`).
+  O sinal call/put orienta tambem a saturacao em `zero_vol`, preservando
+  o limite ATM-forward `n=0.5`. Depois das CDFs diretas, o preco recebe
+  piso zero para eventual residuo subnormal (~`1e-322`). O SDD_DL-PR04
+  registra grade de nao negatividade/paridade, resultados e limites
+  da validacao; testes existentes e tolerancias permanecem intactos.
+
+## IV por bissecao protegida (DL-PR04)
+
+- **Algoritmo:** bissecao pura (sem Newton/Brent nesta fase) sobre
+  `bsm.price` — unica implementacao BSM do pacote. Protecoes, nesta ordem:
+  dominio (`DOMAIN_ERROR`, nenhuma excecao escapa; alvo negativo e erro de
+  dominio), `T == 0` -> `NOT_APPLICABLE`, limites de nao-arbitragem
+  (`BELOW_INTRINSIC` / `ABOVE_UPPER_BOUND`, com folga
+  `tol = tol_price_rel x max(1, alvo)`), mudanca de sinal estrita no
+  bracket `[bracket_lo, bracket_hi]` com expansao dobrada e contada ate
+  `bracket_hi_max`, e maximo de iteracoes.
+- **Tolerancia dupla:** para somente quando
+  `|preco(sigma) - alvo| <= tol_price` **e** `hi - lo <= tol_vol`.
+  Estourar `max_iterations` devolve `NO_CONVERGENCE` com `sigma=None` —
+  nunca o meio do bracket e nunca `sigma=0` como marcador.
+- **Politica de `LOW_VEGA`:** convergiu, mas a vega bruta na solucao fica
+  abaixo de `low_vega_threshold`; `sigma` vem **preenchido** e declarado mal
+  condicionado (preco plano em sigma no float). Alvo exatamente no
+  intrinseco ITM: plato por underflow -> `LOW_VEGA` no topo do plato, ou
+  `NO_CONVERGENCE` quando a raiz fica abaixo de `bracket_lo`.
+- **bid/ask/mid separados e cotacao intocada:** `iv_for_quote` inverte cada
+  lado existente; lado ausente e campo `None` (nunca status disfarcado);
+  **`mid` e indicativo e nao pressupoe execucao** (`price_source_note`).
+  Mercado cruzado continua calculado; a flag e de `QualityFlags` (DL-PR01).
+- **Recusa explicada na ponte:** `price_contract_from_quote` recusa
+  americana/estilo desconhecido **antes** de qualquer IV; fonte pedida sem
+  IV utilizavel vira `supported=False`,
+  `reason=iv_unavailable:<status|missing_quote>`, numericos `None` e os
+  diagnosticos completos em `iv`.
+- **Hipoteses registradas:** `theta_basis` e irrelevante para a inversao
+  (passa 252); vega bruta = `vega_per_pct_point x 100`; a recuperabilidade
+  em float64 e limitada pela planicie do preco (deep ITM/OTM curtos de vol
+  baixa nao sao inversiveis — contrato degrada para `LOW_VEGA`/
+  `NO_CONVERGENCE`, nunca excecao); o caso-limite ATM `T=1e-9` do oraculo e
+  bem condicionado e recupera sigma (errata ao card registrada no SDD).
 
 ## Barreira deterministica anti-fixture
 
