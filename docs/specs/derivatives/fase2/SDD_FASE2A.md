@@ -327,3 +327,11 @@ Alem disso, o autor registra em macOS e em Linux o SHA-256 da lista hexadecimal 
 precos da referencia. SHA igual significa diferenca zero. Medido pelo revisor: lista
 identica em Linux x86_64 (Python 3.13.18) e Linux aarch64 (Python 3.12.16), SHA-256
 `773a2bcdf3a122bd6662cb4f6e5b26c015106e63b886f43e716243fcee418ef1`.
+
+### Errata do Adendo 2, item B5 (Claude, na revisao do PR #145)
+
+Onde se le "duas plataformas diferem entre si em no maximo `2e-11`", leia-se: no maximo
+`2e-11 * max(1, |referencia|)`. Para preco abaixo de 1 isso nao e erro relativo de `2e-11`.
+O menor preco da referencia e 0.098 (`crr_34`, europeia), o que da no maximo `2.1e-10` em
+termos relativos, ainda abaixo do `1e-9` do criterio 9. A conclusao de B5 nao muda, e a
+diferenca observada entre macOS arm64 e Linux aarch64 foi zero.

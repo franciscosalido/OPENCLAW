@@ -579,11 +579,98 @@ N=5000 preco=6.090219408091187 mediana=1.2330s minimo=1.2283s execucoes=3
 |---|---|---|
 | 1 | Caso à mão | `DL2-PR03.md`, RED 1 e `test_h1_american_put` |
 | 2 | CRR europeu contra BSM | `test_european_bsm_and_parity` e Adendo 1 do SDD, A1 |
-| 3 | Referência independente | T1–T6, regeneração byte a byte, 84 preços, 126 parâmetros e âncora de Hull |
-| 4 | Invariantes em grade | T7, 2.740 pontos precificados e 140 recusas tipadas; contagens G1–G6 acima |
+| 3 | Referência independente | T1–T6: regeneração, 84 preços, 126 parâmetros, âncora de Hull |
+| 4 | Invariantes em grade | T7: 2.740 precificados, 140 recusas tipadas, contagens G1–G6 |
 | 5 | Recusas do binomial | `test_binomial.py` e Adendo 1 do SDD, A2 |
 | 6 | Recusas de série e de carry | `DL2-PR01.md` e `DL2-PR02.md` |
 | 7 | Regressão | Gates, demos e recusas nos três caminhos nos dois sistemas; diff do Adendo 2, B3 |
 | 8 | Mutação | Sete mutantes mortos pelo arquivo novo, controle final 89/89 |
 | 9 | Portabilidade | Contagens iguais, 84 preços idênticos nas duas listas hexadecimais |
 | 10 | Disciplina e medição | 215, 131, 153 e 0 linhas de produção por PR; medição nativa acima |
+
+## Revisão independente: GO (Claude, 2026-11-19)
+
+Head revisado: `26e99cc7f9727d12d3bdd233a592c323e3847471`. Parecer: **GO**. Este PR não tem
+produção, e os testes entregues cumprem o cartão. Uma lacuna de teste foi fechada no commit
+desta seção, e há uma errata de texto do próprio revisor.
+
+### Conferências
+
+- **Primeiro commit (`5557d25`).** Seis arquivos e nada mais, cada um com o SHA-256 do
+  cartão. O texto do cartão não mudou nos commits seguintes; os dois adendos estão no fim
+  dos arquivos de destino, sem linha removida acima deles.
+- **Produção e testes antigos.** `git diff --exit-code` entre a base e o head saiu com rc 0
+  para `backend`, `config`, `scripts` e os arquivos protegidos, e também para
+  `test_binomial.py` e `tests/architecture`. Desde `1421116`, só as três adições do marco.
+- **Arquivo de teste, lido linha a linha contra T1 a T7.** Todas as afirmações do cartão
+  estão lá, com os contadores da grade. A recusa só é aceita em volta de `crr_parameters`,
+  de modo que qualquer exceção em `tree_price` reprova.
+- **Portão, em clone limpo, Linux aarch64, Python 3.12.16.** 9.183 aprovados, 16 pulados e
+  261 subtestes no head do autor; `mypy --strict` em 159 arquivos e `pyright` sem erro.
+- **Demo e CLI.** Demo idêntica à da base, 67.101 bytes, com o mesmo SHA-256 que o autor
+  registrou em Linux. CLI padrão com `LIVE_NOT_ACTIVATED`, rc 3.
+- **Portabilidade.** A lista hexadecimal dos 84 preços deu `773a2bcd…8ef1` também no
+  ambiente do revisor, e o gerador reproduziu o JSON byte a byte.
+- **O que o revisor não reproduziu.** macOS. A contagem, a linha hexadecimal e a medição do
+  Mac são do autor; o revisor não tem acesso a macOS nativo. Os registros de mutação do
+  autor ficam fora do repositório; a tabela dele coincide com a do protótipo do revisor.
+
+### Mutação do revisor
+
+22 trocas próprias em `binomial.py`, rodando só o arquivo novo. O controle passou; 19
+morreram; 3 ficaram vivas e as três são equivalentes.
+
+- Mortas, entre outras: sem exercício na raiz; sem exercício no nível 1; exercício só em
+  níveis pares; intrínseco do nó vizinho; payoff final sem piso em zero; `dt = T / (N + 1)`;
+  e perturbações relativas de 1e-9 no intrínseco, 1e-10 no desconto e na probabilidade de
+  baixa, e 1e-11 no preço acumulado do ativo.
+- Equivalentes: `down` calculado por exponencial no lugar de `1 / up`; máximo com piso zero
+  a mais; e exercício só quando a continuação é positiva. Nesta última, continuação zero
+  significa que nenhum descendente termina dentro do dinheiro, e então o nó também está fora.
+
+### Lacuna fechada neste commit
+
+**O gerador podia deixar de se conferir sem nenhum teste falhar.** T2 prova que o gerador
+reproduz o JSON, mas a conferência a 90 dígitos e a soma binomial fechada só levantam erro;
+elas não mudam o texto gerado. Retirando uma ou outra, o JSON sai idêntico e os 89 testes
+passam. Quem apontou foi o piloto da skill; o revisor confirmou com cinco execuções em cópia
+temporária:
+
+| Alteração no gerador | Resultado |
+|---|---|
+| precisão de trabalho de 60 para 22 dígitos | erro: dígitos instáveis em `crr_02` |
+| indução europeia com as probabilidades trocadas | erro: indução e soma fechada divergem |
+| soma fechada perturbada em 1e-18 | erro: indução e soma fechada divergem |
+| conferência a 90 dígitos retirada | sem erro; JSON idêntico |
+| conferência pela soma fechada retirada | sem erro; JSON idêntico |
+
+As três primeiras mostram que as conferências funcionam. As duas últimas são a lacuna.
+
+Fechamento: `test_generator_digest` fixa o SHA-256 do gerador entregue. Qualquer edição do
+gerador, inclusive retirar uma conferência, passa a reprovar um teste. Com o gerador
+congelado, testes negativos das duas conferências não acrescentam garantia; se um dia o
+gerador mudar, eles entram junto com a mudança. O teste novo não foi revisto por outro
+agente. Com ele: 90 testes no arquivo e 9.184 aprovados, 16 pulados e 261 subtestes no
+portão, Linux aarch64 limpo.
+
+### Errata do revisor
+
+O cartão (seção "Portabilidade") e o Adendo 2 (B5) dizem que T4 garante `2e-11` entre
+plataformas. O certo é `2e-11 * max(1, |referência|)`. O menor preço da referência é 0.098,
+o que dá no máximo `2.1e-10` em termos relativos, ainda abaixo do `1e-9` do critério 9. A
+conclusão não muda, e a diferença observada foi zero. A errata está registrada no fim do
+`SDD_FASE2A.md`. Quem apontou a imprecisão também foi o piloto.
+
+### Sobre o piloto às cegas
+
+O revisor não abriu `DL2-PR04_parecer_skill.md` antes deste parecer. Mas a mensagem que
+entregou o PR trazia um resumo de três pontos do piloto: a lacuna do gerador, um bloqueante
+documental já superado e a imprecisão de T4. Para esses três pontos, este parecer não é
+cego. Para o restante, é. A comparação dos dois pareceres fica fora do repositório.
+
+### Observações sem ação
+
+- Duas linhas da tabela de provas passavam de 100 colunas. O revisor encurtou a redação das
+  duas, sem mudar o conteúdo.
+- O marco não mede o erro da americana contra o modelo contínuo (Adendo 2, B1). Quem ler os
+  42 preços como preço de mercado está lendo errado.

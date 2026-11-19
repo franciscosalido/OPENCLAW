@@ -45,6 +45,7 @@ class ReferenceCase(TypedDict):
 REFERENCE = (Path(__file__).resolve().parents[2] / "fixtures" / "derivatives" / "reference"
              / "crr_american_reference.json")
 SHA256 = "04fbaa7c5bd00e2bfabd52176be0a54a7ba8ddfc4d0892e50d74fec17201d135"
+GENERATOR_SHA256 = "4d8f7eef3151a036cd4d4cd5f8dffaeb5e0fde3f1599aa5d2f9cab6f30d922a0"
 DOCUMENT = json.loads(REFERENCE.read_bytes())
 CASES: list[ReferenceCase] = DOCUMENT["cases"]
 CASE_IDS = [case["case_id"] for case in CASES]
@@ -57,6 +58,12 @@ def test_reference_digest() -> None:
     assert hashlib.sha256(REFERENCE.read_bytes()).hexdigest() == SHA256
     checksum = REFERENCE.with_suffix(".sha256").read_bytes()
     assert checksum == f"{SHA256}  crr_american_reference.json\n".encode("ascii")
+
+
+def test_generator_digest() -> None:
+    """Fixa os bytes do gerador: T2 não exercita as conferências internas dele."""
+    generator = REFERENCE.with_name("crr_reference_generator.py")
+    assert hashlib.sha256(generator.read_bytes()).hexdigest() == GENERATOR_SHA256
 
 
 def test_reference_regenerates() -> None:

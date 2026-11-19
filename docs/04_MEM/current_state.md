@@ -6,27 +6,37 @@
 
 **Última atualização:** 2026-11-19 · **Turno:** Claude (GO e merge do DL2-PR03).
 
-## Fase 02 — Marco 2A
+## Fase 02 — Marco 2A — FECHADO (estado A)
 
-PR atual: DL2-PR04 — EM_REVISAO. Estado A.
-Base `1dc7760` (#144), especificação `5557d25`, T1–T7 congelados em `487b694`.
-Claude forneceu a referência da árvore CRR finita e o gerador decimal conforme o Adendo 1
-do ADR-0025. O Adendo 2 do SDD fixa as provas de regressão, mutação e portabilidade.
+PR atual: DL2-PR04 — MERGEADO (PR #145, GO na primeira rodada de revisão). Marco fechado.
+Os dez critérios do SDD têm a prova apontada em
+[DL2-PR04.md](../specs/derivatives/fase2/DL2-PR04.md), na tabela "Provas dos dez critérios".
 
-- Mac arm64 e Linux aarch64, Python 3.12.13. Em cada um passaram 9.183 testes e 261
-  subtestes, com 16 pulados. Mypy e Pyright passaram.
-- Os 84 preços coincidiram bit a bit entre sistemas. A grade precificou 2.740 pontos e
-  recusou os 140 inadmissíveis. Os sete mutantes caíram com o arquivo novo sozinho.
-- Cada demo coincidiu com a sua base. A americana segue recusada na chain, no MCP e no CLI.
-  O CLI padrão devolveu `LIVE_NOT_ACTIVATED` em A, rc 3. Produção: zero linha neste PR.
-- Put americana no Mac, medianas de 0,0468 s (1.000 passos) e 1,2330 s (5.000 passos).
-  A escolha de NumPy, a ponte com a chain e os pontos cegos da guarda cabem ao Marco 2B.
+Entregue no marco, sem nenhum consumidor em produção:
+- `domain/series_terms.py` (215 linhas), `domain/carry.py` (131) e `pricing/binomial.py`
+  (153). Nenhum arquivo de produção da Fase 01 foi alterado.
+- Referência CRR de 42 casos em decimal de 60 dígitos, com gerador versionado e fixado por
+  SHA-256, e grade de 2.880 pontos com seis invariantes.
+- Portão do head, Linux aarch64 limpo: 9.184 aprovados, 16 pulados, 261 subtestes. O autor
+  registrou 9.183 em macOS arm64 e em Linux aarch64, antes do teste que o revisor somou.
+- Os 84 preços da referência coincidem bit a bit entre macOS arm64 e Linux.
+- Custo no Mac, Python puro: 0,047 s por preço com 1.000 passos e 1,23 s com 5.000.
 
-O Adendo 1 do ADR registra o alcance do manual B3 de 01/07/2026. As puts americanas da
-referência exercitam o núcleo. Para ETFs como BOVA11, o ajuste de strike segue `UNKNOWN`.
-O Adendo 2 do SDD formaliza a prova de arquivos preservados desde o fim da Fase 01.
-Rascunho a cargo de Dots. Marco aguardando revisão.
-[Cartão e evidências do autor](../specs/derivatives/fase2/DL2-PR04.md).
+O que o marco não prova:
+- O erro da americana contra o modelo contínuo. A referência é o preço da árvore finita.
+- Nada com dado real. Sem OpLab, sem token; a americana segue recusada na chain, no MCP e
+  no CLI, e o CLI padrão devolve `LIVE_NOT_ACTIVATED`.
+
+Pendências que passam para o Marco 2B:
+- Ponte com a chain, valor de `PricingModel` e pontos cegos da guarda (salto por `config/`
+  a partir de `scripts/`; import dinâmico relativo dentro de função).
+- Decisão de NumPy (L4 do ADR-0025), com a medição acima.
+- Ajuste de strike em ETF segue `UNKNOWN` até haver documento datado da B3 (L5).
+- Simplificação de `crr_parameters`, sugerida no piloto da skill de revisão.
+- A `main` segue sem proteção de branch (Francisco).
+
+Próxima ação (uma só): Francisco define o recorte do Marco 2B. Antes de qualquer código,
+SDD próprio.
 
 ## Fase 01 do Lab de Derivativos — CONCLUIDA e integrada na `main` (estado A)
 
