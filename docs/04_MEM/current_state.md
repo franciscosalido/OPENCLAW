@@ -5,7 +5,7 @@
 > meaningful sessions.
 
 **Last updated: 2026-11-18
-**Updated by: Claude (turno autonomo Fase 1, coordenado com Dots) — DL-PR05a
+**Updated by: Claude (turno autonomo Fase 1, coordenado com Dots) — DL-PR05b
 
 ---
 
@@ -25,6 +25,40 @@
   o arquivo ainda nao chegou ao repo) -> DL-PR05a -> DL-PR05b -> DL-PR06 ->
   DL-PR07. As branches do Lab estao **empilhadas**; apos cada squash-merge,
   rebasear a seguinte com `git rebase --onto origin/main <base-antiga>`.
+
+---
+
+## READY FOR PR — Lab de Derivativos DL-PR05b (transporte e cliente)
+
+Current branch: `feat/dl-pr05b-oplab-transport-client`
+
+Base: `feat/dl-pr05a-oplab-routes-errors-budget` (empilhada).
+
+Scope:
+
+- Added `backend/derivatives/oplab/transport.py`: `VendorResponse`,
+  protocolo `Transport`, `FixtureTransport` (nunca `OBSERVED`),
+  `HttpTransport` (unico ponto de `httpx` e de `OPLAB_TOKEN`; sem redirect,
+  sem retry; causa `httpx` suprimida), `redact`.
+- Added `backend/derivatives/oplab/client.py`: `OplabMarketClient` (4
+  leituras tipadas + `ProvenanceStamp`; JSON bruto nao sai do pacote).
+- Tests: `test_oplab_transport.py`, `test_oplab_client.py` (54 testes);
+  fixture autouse `no_network` no `conftest.py` do Lab; fronteiras: `httpx`
+  so em `oplab/transport.py`; `OPLAB_TOKEN` em exatamente 1 arquivo.
+- Docs: `SDD_DL-PR05.md` (Parte B), ADR-0023.
+
+Validation (Linux aarch64, Python 3.12.16, deps do `uv.lock`):
+
+- `pytest tests/ --ignore=tests/integration` rc 0 (7.928 passed, 15
+  skipped); Lab + arquitetura 5.791 passed.
+- `mypy backend/ --strict` 0 (149 arquivos); `pyright backend/` 0.
+- Producao 203 linhas (<= 400); 0 linhas > 100 col; protegidos intocados.
+
+Scope intentionally unchanged:
+
+- Nenhuma chamada real; nenhum token real; sem `ChainService` (PR06), sem
+  MCP (PR07), sem cache, sem retry.
+- Next: DL-PR06 (`ChainService` + fixture sintetica + protocolo de latencia).
 
 ---
 

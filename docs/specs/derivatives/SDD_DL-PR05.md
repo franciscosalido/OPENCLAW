@@ -3,7 +3,7 @@
 Branches: `feat/dl-pr05a-oplab-routes-errors-budget` (Parte A) e
 `feat/dl-pr05b-oplab-transport-client` (Parte B, empilhada sobre a A)
 GitHub Issue: pendente (card READ-DO `DL-PR05_CARD.md` de 2026-11-06)
-Status: Parte A implementada; Parte B em seguida
+Status: Partes A e B implementadas; aguardam PR e revisao
 
 ## Objective
 
@@ -87,6 +87,65 @@ e a unica que relaxa a fronteira de `httpx` (so em `oplab/transport.py`).
 - Producao da Parte A: 242 linhas novas; 0 linhas > 100 colunas.
 - Protegidos intocados; nenhuma dependencia nova; `OPLAB_TOKEN` e `httpx`
   continuam ausentes de `backend/derivatives/` nesta parte.
+
+## Parte B - Files
+
+- `backend/derivatives/oplab/transport.py`: `VendorResponse` (congelado;
+  `headers_safe` so com `Retry-After`, `Content-Type`, `Date`), protocolo
+  `Transport`, `FixtureTransport`, `HttpTransport`, `redact`.
+- `backend/derivatives/oplab/client.py`: `OplabMarketClient` com
+  `options_chain`, `stock`, `interest_rates`, `market_status`; cada metodo
+  devolve modelos do fornecedor + `ProvenanceStamp`. O JSON bruto nao sai do
+  pacote; nao ha cache nem retry.
+- Testes: `test_oplab_transport.py` (38), `test_oplab_client.py` (16);
+  fixture `no_network` (autouse) em `tests/unit/derivatives/conftest.py`;
+  fronteiras de `httpx` e de `OPLAB_TOKEN` atualizadas.
+
+## Parte B - Decisoes dentro do escopo
+
+- **Ordem das recusas no `HttpTransport.get`:** rota renderizada ->
+  `QUIMERA_DERIV_FORBID_NETWORK` -> `assert_allowed` -> token -> orcamento ->
+  envio. Tudo antes do envio acontece sem criar cliente HTTP; os testes
+  provam com contador de handler igual a zero.
+- **Token em um unico ponto:** `self._env.get("OPLAB_TOKEN")` dentro de
+  `get`; nao e guardado na instancia, nao entra em `repr`, mensagem ou URL.
+  O header e posto no cliente (`client.headers[...]`) e a linha que envia
+  (`client.get(url, ...)`) nao referencia o token: um traceback com
+  variaveis (loguru `diagnose`) nao o expoe.
+- **`raise ... from None` em falha de transporte:** a excecao `httpx`
+  carrega a requisicao, e a requisicao carrega o header do token. A causa e
+  suprimida de proposito; a mensagem segura leva so o nome da classe.
+- **Mesma supressao no cliente:** `pydantic.ValidationError` carrega os
+  valores do payload bruto; vira `VendorPayloadError` com a contagem de
+  erros, sem causa encadeada.
+- **3xx e `ForbiddenHostError`**, com `follow_redirects=False` no cliente
+  default **e** em cada requisicao (vale tambem para cliente injetado).
+- **Sem retry:** `max_retries != 0` e recusado na construcao (`ValueError`),
+  em vez de ser ignorado em silencio. 429/503 bloqueiam o orcamento ate
+  `next_eligible_at`; a chamada seguinte e recusada localmente.
+- **`received_at` e o relogio injetado** (`now`), nao o header `Date`.
+- **`FixtureTransport` exige o diretorio** (sem default apontando para
+  `tests/` em codigo de producao). Procedencia: `SYNTHETIC` se o diretorio
+  se chama `synthetic`, senao `DOCUMENTAL`; `REPLAY` so explicito; `OBSERVED`
+  e recusado na construcao. O nome do arquivo deriva da rota ja validada
+  (`/market/stocks/PETR4` -> `market_stocks_PETR4.json`), o que impede
+  travessia de diretorio.
+- **`redact`** existe para mensagens futuras que possam conter o token; as
+  mensagens atuais nao o contem por construcao.
+
+## Parte B - Acceptance evidence (Linux aarch64, Python 3.12.16, `uv.lock`)
+
+- `pytest tests/ --ignore=tests/integration` (com `no_network` ativo e
+  `QUIMERA_DERIV_FORBID_NETWORK=1`): rc 0, 7.928 passed, 15 skipped.
+- `pytest tests/unit/derivatives tests/architecture`: 5.791 passed.
+- `mypy backend/ --strict`: 0 erros (149 arquivos); `pyright backend/`: 0.
+- Producao da Parte B: 203 linhas; 0 linhas > 100 colunas.
+- `OPLAB_TOKEN` em exatamente 1 arquivo de `backend/`
+  (`backend/derivatives/oplab/transport.py`); token de query e literal do
+  dominio de ordens: 0 ocorrencias em `backend/derivatives/`; `sleep(` e
+  relogio interno em `oplab/`: 0.
+- Prova de zero sockets: a fixture `no_network` faz o transporte `httpx`
+  real e `socket.connect` lancarem; a suite inteira do Lab passa com ela.
 
 ## O que nao esta demonstrado
 

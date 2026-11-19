@@ -204,6 +204,17 @@ declaradas, com flag, ate homologacao:
   mandava dividir acima de 400. Parte A (erros, rotas, orcamento — pura) e
   Parte B (transporte e cliente — unico ponto de `httpx` e do token).
 
+- **Transporte HTTP (Parte B):** unico modulo que importa `httpx` e le
+  `OPLAB_TOKEN`; sem redirecionamento (3xx e `ForbiddenHostError`), sem
+  retry (`max_retries != 0` e recusado na construcao) e com a causa `httpx`
+  suprimida (`from None`), porque a requisicao carrega o header do token.
+  `received_at` e o relogio injetado. Procedencia `OBSERVED` so nasce aqui.
+- **Transporte de fixtures:** mesmo contrato, procedencia `DOCUMENTAL`,
+  `SYNTHETIC` ou `REPLAY` — nunca `OBSERVED` (recusado na construcao).
+- **Cliente:** devolve modelos do fornecedor + `ProvenanceStamp`; o JSON
+  bruto nao sai do pacote; payload malformado vira `VendorPayloadError` sem
+  os valores do payload.
+
 ## Barreira deterministica anti-fixture
 
 - `Provenance` e `Purpose` atribuidos pelo adaptador de transporte; payload
