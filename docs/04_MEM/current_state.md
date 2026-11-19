@@ -4,22 +4,27 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-19 14:50 BRT · **Turno:** Codex (correção do DL2-PR01).
+**Última atualização:** 2026-11-19 · **Turno:** Codex (segunda rodada do DL2-PR01).
 
 ## Fase 02 — Marco 2A
 
-DL2-PR01, draft #142 em revisão. Estado A. Base do PR `11838cd`, ADR-0025 aceito.
-O parecer sobre `f36f644` apontou B1–B3. RED registrado em `6078aac` e `153ef0a`.
-A candidata de código `46ddfda` valida cópias, documentação aplicável e JSON estrito.
-macOS arm64 passou com 89 testes focais e 8.214 globais, 16 pulados, 261 subtestes aprovados.
-mypy estrito e Pyright sem erros. Demo idêntica à base no Mac, modo live com rc 3.
-[Cartão, decisões I1–I6 e evidências](../specs/derivatives/fase2/DL2-PR01.md).
+DL2-PR01, estado A, ADR-0025 aceito. Candidata local no worktree
+`OPENCLAW-dl2-pr01`, branch `feat/dl2-pr01-series-terms`, sobre `a8f6ea3` do draft #142.
+O RED sobre esse head registrou 77 falhas e 177 aprovações. A correção verifica tipos por
+campo inclusive com `strict=False`, preserva a escala do strike no JSON fixo e permite
+imports estáticos dos termos no domínio puro. A guarda cobre o restante de backend e scripts.
 
-Linux aarch64 confirmou os mesmos 89 focais, 8.214 globais, 16 pulados e 261 subtestes.
-Próxima ação: Claude revalida o novo head do draft #142. Sem merge até o parecer.
-A integração de um consumidor depende de identidade da série e procedência verificável.
-O verificador do digest histórico fica em PR separado do Claude. A tolerância CRR × BSM
-do par 200/201 continua pendente de adendo antes do GREEN do PR03.
+macOS arm64 passou com 254 testes focais, 8.379 globais, 16 pulados e 261 subtestes.
+mypy estrito e Pyright sem erros. Seis testes detectaram o mutante de data compacta.
+Demo sintética idêntica à base `11838cd` no Mac. Saídas locais em `/tmp/q142-r2.OMtOQZ/`.
+[Cartão do DL2-PR01, comandos e decisões S1–S3](../specs/derivatives/fase2/DL2-PR01.md).
+
+Dots confere o remoto, faz o commit e publica a candidata com os números da segunda rodada
+na descrição do draft. Claude revalida esse head. A conferência do PDF B3 segue com Dots.
+O PR02 deverá revalidar termos na entrada. Autenticação da fonte e distinção entre fixture
+e observação cabem ao primeiro PR que conectar service, MCP, CLI ou adapters.
+O verificador do digest histórico fica em PR separado do Claude. A tolerância CRR × BSM do
+par 200/201 continua pendente de adendo antes do GREEN do PR03.
 
 ## Fase 01 do Lab de Derivativos — CONCLUIDA e integrada na `main` (estado A)
 

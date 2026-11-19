@@ -1,15 +1,15 @@
-import ast
 import json
-from collections.abc import Mapping
-from datetime import date
+from collections.abc import Callable, Mapping
+from datetime import date, datetime
 from decimal import Decimal
-from importlib.util import resolve_name
+from enum import StrEnum
+from functools import partial
 from pathlib import Path
 from types import MappingProxyType, SimpleNamespace
 from typing import Any
 
 import pytest
-from pydantic import ValidationError
+from pydantic import BaseModel, TypeAdapter, ValidationError
 
 from backend.derivatives.domain import series_terms
 from backend.derivatives.domain.models import ExerciseStyle
@@ -126,15 +126,18 @@ def test_conclusive_policy_requires_matching_evidence(policy: AdjustmentPolicy) 
     with pytest.raises(ValidationError):
         SeriesTerms(**fields)
     doc = evidence(policy)
-    accepted = SeriesTerms(**fields, evidence=doc).evidence
+    accepted = SeriesTerms(**(fields | {"evidence": doc})).evidence
     assert accepted is not None and accepted.version == "rev1"
-    for patch in [dict(issuer="vendor"), dict(version=" "), dict(document=""),
-                  dict(published_on=None), dict(effective_on=date(2025, 1, 5)),
-                  dict(symbol="SYNX65"), dict(policy=AdjustmentPolicy.UNKNOWN),
-                  dict(policy=(AdjustmentPolicy.UNPROTECTED if policy == AdjustmentPolicy.PROTECTED
-                               else AdjustmentPolicy.PROTECTED))]:
+    other = (AdjustmentPolicy.UNPROTECTED if policy is AdjustmentPolicy.PROTECTED
+             else AdjustmentPolicy.PROTECTED)
+    patches: list[dict[str, object]] = [
+        dict(issuer="vendor"), dict(version=" "), dict(document=""), dict(published_on=None),
+        dict(effective_on=date(2025, 1, 5)), dict(symbol="SYNX65"),
+        dict(policy=AdjustmentPolicy.UNKNOWN), dict(policy=other),
+    ]
+    for patch in patches:
         with pytest.raises(ValidationError):
-            SeriesTerms(**fields, evidence=doc | patch)
+            SeriesTerms(**(fields | {"evidence": doc | patch}))
 
 
 @pytest.mark.parametrize(("original", "update", "error"), [
@@ -203,25 +206,33 @@ def test_b1_deep_update_rechecks_the_whole_record() -> None:
 
 def test_b1_legacy_copy_checks_terms() -> None:
     original = terms()
-    with pytest.raises(TermsRefusal):
+    with pytest.warns(DeprecationWarning, match="model_copy"), pytest.raises(TermsRefusal):
         original.copy(update={"contract_size": None})
-    with pytest.raises(ValidationError):
+    with pytest.warns(DeprecationWarning, match="model_copy"), pytest.raises(ValidationError):
         original.copy(update={"adjustment_policy": AdjustmentPolicy.PROTECTED})
-    assert original.copy(update={"contract_size": 41}).contract_size == 41
+    with pytest.warns(DeprecationWarning, match="model_copy"):
+        assert original.copy(update={"contract_size": 41}).contract_size == 41
 
 
 def test_b1_legacy_copy_checks_evidence() -> None:
     doc = AdjustmentEvidence.model_validate(evidence(AdjustmentPolicy.PROTECTED))
-    with pytest.raises(ValidationError):
+    with pytest.warns(DeprecationWarning, match="model_copy"), pytest.raises(ValidationError):
         doc.copy(update={"issuer": "fixture"})
-    assert doc.copy(update={"version": " rev2 "}, deep=True).version == "rev2"
+    with pytest.warns(DeprecationWarning, match="model_copy"):
+        assert doc.copy(update={"version": " rev2 "}, deep=True).version == "rev2"
 
 
 def test_b1_legacy_copy_cannot_drop_required_fields() -> None:
     original = terms()
-    with pytest.raises(ValueError, match="model_dump"):
+    with (
+        pytest.warns(DeprecationWarning, match="model_copy"),
+        pytest.raises(ValueError, match="model_dump"),
+    ):
         original.copy(exclude={"contract_size"})
-    with pytest.raises(ValueError, match="model_dump"):
+    with (
+        pytest.warns(DeprecationWarning, match="model_copy"),
+        pytest.raises(ValueError, match="model_dump"),
+    ):
         original.copy(include={"strike"})
 
 
@@ -253,7 +264,8 @@ def test_b3_json_round_trip(policy: AdjustmentPolicy) -> None:
     restored = SeriesTerms.model_validate_json(wire)
     assert restored == original
     assert restored.strike.as_tuple() == original.strike.as_tuple()
-    assert restored.exercise_style is original.exercise_style and restored.adjustment_policy is policy
+    assert restored.exercise_style is original.exercise_style
+    assert restored.adjustment_policy is policy
     assert type(restored.effective_on) is date
     if original.evidence is not None:
         assert restored.evidence is not None and restored.evidence.policy is policy
@@ -270,6 +282,7 @@ def test_b3_python_and_json_dicts() -> None:
         SeriesTerms.model_validate(original.model_dump(mode="json"))
 
 
+@pytest.mark.parametrize("strict", [None, False])
 @pytest.mark.parametrize(("path", "value"), [
     ("effective_on", 1767571200), ("effective_on", "2026-02-30"),
     ("contract_size", True), ("contract_size", "37"), ("contract_size", 37.0),
@@ -279,14 +292,17 @@ def test_b3_python_and_json_dicts() -> None:
     ("exercise_style", 1), ("adjustment_policy", True), ("adjustment_policy", "protected"),
     ("evidence.effective_on", True), ("evidence.published_on", "2026-01-01T00:00:00"),
     ("evidence.policy", 1), ("evidence.document", 1),
+    ("source", 123), ("symbol", 123), ("currency", 1), ("evidence.issuer", 3),
+    ("effective_on", "20260105"), ("evidence.effective_on", "20260105"),
+    ("evidence.published_on", "20260102"),
 ])
-def test_b3_invalid_json_field(path: str, value: object) -> None:
+def test_b3_invalid_json_field(path: str, value: object, strict: bool | None) -> None:
     data = terms(AdjustmentPolicy.PROTECTED).model_dump(mode="json")
     parts = path.split(".")
     target = data if len(parts) == 1 else data[parts[0]]
     target[parts[-1]] = value
     with pytest.raises(ValidationError) as exc:
-        SeriesTerms.model_validate_json(json.dumps(data))
+        SeriesTerms.model_validate_json(json.dumps(data), strict=strict)
     assert tuple(parts) in {error["loc"] for error in exc.value.errors()}
 
 
@@ -331,20 +347,114 @@ def test_frozen_models_and_extra_fields() -> None:
             type(model).model_validate(model.model_dump() | {"typo": 1})
 
 
-def test_no_production_imports_of_series_terms() -> None:
-    backend = Path(series_terms.__file__).resolve().parents[2]
-    forbidden = series_terms.__name__
-    offenders: list[str] = []
-    for path in backend.rglob("*.py"):
-        package = ".".join(path.parent.relative_to(backend.parent).parts)
-        for node in ast.walk(ast.parse(path.read_text())):
-            if isinstance(node, ast.Import):
-                imports = [alias.name for alias in node.names]
-            elif isinstance(node, ast.ImportFrom):
-                module = resolve_name("." * node.level + (node.module or ""), package)
-                imports = [module, *(f"{module}.{alias.name}" for alias in node.names)]
-            else:
-                continue
-            if forbidden in imports:
-                offenders.append(f"{path.relative_to(backend.parent)}:{node.lineno}")
-    assert not offenders, offenders
+class _Envelope(BaseModel, strict=False):
+    terms: SeriesTerms
+
+
+class _Label(StrEnum):
+    BRL = "BRL"
+    B3 = "B3"
+
+
+@pytest.mark.parametrize(("path", "value"), [
+    ("contract_size", True), ("contract_size", "37"), ("contract_size", 37.0),
+    ("quotation_form", True), ("quotation_form", "1000"), ("quotation_form", 1000.0),
+    ("exercise_style", "EUROPEAN"), ("exercise_style", "UNKNOWN"),
+    ("effective_on", "2026-01-05"), ("effective_on", datetime(2026, 1, 5)),
+    ("adjustment_policy", "PROTECTED"), ("evidence.policy", "PROTECTED"),
+    ("evidence.published_on", 1767312000), ("evidence.effective_on", "2026-01-05"),
+    ("strike", "176.00"), ("strike", 176), ("strike", 176.0),
+    ("symbol", b"SYNX63"), ("source", bytearray(b"fixture")), ("currency", _Label.BRL),
+    ("evidence.symbol", b"SYNX63"), ("evidence.document", b"fixture"),
+    ("evidence.version", b"rev1"), ("evidence.issuer", _Label.B3),
+    ("evidence", [("policy", "PROTECTED")]),
+])
+@pytest.mark.parametrize(("validate", "prefix"), [
+    pytest.param(partial(SeriesTerms.model_validate, strict=False), (), id="model"),
+    pytest.param(partial(TypeAdapter(SeriesTerms).validate_python, strict=False), (), id="adapter"),
+    pytest.param(_Envelope.model_validate, ("terms",), id="lax-container"),
+    pytest.param(partial(_Envelope.model_validate, strict=False), ("terms",), id="container-call"),
+])
+def test_s1_lax_python_field(
+    path: str, value: object, validate: Callable[[object], object], prefix: tuple[str, ...],
+) -> None:
+    data = terms(AdjustmentPolicy.PROTECTED).model_dump()
+    parts = path.split(".")
+    target = data if len(parts) == 1 else data["evidence"]
+    target[parts[-1]] = value
+    with pytest.raises(ValidationError) as exc:
+        validate({"terms": data} if prefix else data)
+    assert [e["loc"] for e in exc.value.errors()] == [(*prefix, *parts)]
+
+
+def test_s1_native_json_and_wire_dict_in_lax_python() -> None:
+    original = terms(AdjustmentPolicy.PROTECTED)
+    wire = original.model_dump_json()
+    assert TypeAdapter(SeriesTerms).validate_json(wire, strict=False) == original
+    payload = json.loads(wire)
+    with pytest.raises(ValidationError) as exc:
+        SeriesTerms.model_validate(payload, strict=False)
+    assert {e["loc"] for e in exc.value.errors()} == {
+        ("effective_on",), ("strike",), ("exercise_style",), ("adjustment_policy",),
+        ("evidence", "effective_on"), ("evidence", "published_on"), ("evidence", "policy"),
+    }
+    payload["contract_size"] = "37"
+    with pytest.raises(ValidationError) as adapter:
+        TypeAdapter(SeriesTerms).validate_json(json.dumps(payload), strict=False)
+    assert [e["loc"] for e in adapter.value.errors()] == [("contract_size",)]
+    with pytest.raises(ValidationError) as outer:
+        _Envelope.model_validate_json(json.dumps({"terms": payload}), strict=False)
+    assert [e["loc"] for e in outer.value.errors()] == [("terms", "contract_size")]
+
+
+@pytest.mark.parametrize("wire", [False, True])
+def test_s1_unknown_style_precedes_missing_currency(wire: bool) -> None:
+    data = terms().model_dump(mode="json" if wire else "python")
+    del data["currency"]
+    data["exercise_style"] = "UNKNOWN" if wire else ExerciseStyle.UNKNOWN
+    with pytest.raises(TermsRefusal) as exc:
+        if wire:
+            SeriesTerms.model_validate_json(json.dumps(data), strict=False)
+        else:
+            SeriesTerms.model_validate(data, strict=False)
+    assert exc.value.code is RefusalCode.UNKNOWN_EXERCISE_STYLE
+
+
+def test_s1_unknown_evidence_preserves_inconclusive_policy() -> None:
+    policy = AdjustmentPolicy.UNKNOWN
+    original = SeriesTerms.model_validate(sample() | {"evidence": evidence(policy)})
+    assert original.evidence is not None and original.evidence.policy is policy
+    assert SeriesTerms.model_validate_json(original.model_dump_json()) == original
+    with pytest.raises(ValidationError):
+        original.model_copy(update={"adjustment_policy": AdjustmentPolicy.PROTECTED})
+
+
+def test_s1_revalidate_instance_in_lax_container() -> None:
+    invalid = SeriesTerms.model_construct(**(sample() | {"contract_size": True}))
+    with pytest.raises(ValidationError) as exc:
+        _Envelope.model_validate({"terms": invalid}, strict=False)
+    assert [e["loc"] for e in exc.value.errors()] == [("terms", "contract_size")]
+
+
+@pytest.mark.parametrize("strike", [" 176 ", "1_76", "１７６", "+176", "0176", "176.", "1.76e2"])
+def test_s3_json_strike_grammar(strike: str) -> None:
+    payload = terms().model_dump(mode="json") | {"strike": strike}
+    for strict in (None, False):
+        with pytest.raises(ValidationError) as exc:
+            SeriesTerms.model_validate_json(json.dumps(payload), strict=strict)
+        assert [e["loc"] for e in exc.value.errors()] == [("strike",)]
+
+
+@pytest.mark.parametrize("fixed", ["176", "176.00", "0.0000001200", "0.010"])
+def test_s3_fixed_json_round_trip(fixed: str) -> None:
+    original = terms().model_copy(update={"strike": Decimal(fixed)})
+    wire = original.model_dump_json()
+    assert json.loads(wire)["strike"] == original.model_dump(mode="json")["strike"] == fixed
+    restored = SeriesTerms.model_validate_json(wire, strict=False)
+    assert restored.strike.as_tuple() == Decimal(fixed).as_tuple()
+
+
+def test_s3_positive_exponent_has_no_lossless_fixed_representation() -> None:
+    with pytest.raises(ValidationError) as exc:
+        SeriesTerms.model_validate(sample() | {"strike": Decimal("1.20E+4")})
+    assert [e["loc"] for e in exc.value.errors()] == [("strike",)]

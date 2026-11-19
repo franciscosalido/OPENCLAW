@@ -2,7 +2,93 @@
 
 Base `11838cdafae0e3de0ed339a2acca736f480967fb`, branch `feat/dl2-pr01-series-terms`.
 
-## Correção da revisão do draft #142
+## Segunda rodada do draft #142
+
+Head revisado `a8f6ea348d97f203d2d7fef33015061c5393c0b4`. O worktree isolado começou
+limpo. A revisão usada foi o último comentário de `/tmp/q142-round2.json`. Rodada local
+no macOS 15.8.1 arm64, Python 3.12.13, Pydantic 2.13.3 e pydantic-core 2.46.3 do lock.
+
+### Contrato de entrada e persistência
+
+- **S1.** Os validadores de campo verificam a representação recebida antes de qualquer
+  coerção. Em Python, lote e fator exigem `int` exato, datas exigem `date` civil, o strike
+  exige `Decimal` e estilo e política exigem os respectivos enums. Os campos textuais,
+  inclusive os literais de moeda e emissor, exigem `str`. Em JSON, datas, enums e strike
+  chegam como texto, lote e fator como inteiros. A data precisa reproduzir a entrada com
+  `isoformat()`. Erros estruturais identificam o campo, inclusive em evidências aninhadas.
+  A fonte instalada de `BaseModel` e `TypeAdapter` encaminha o `strict` da chamada ao
+  validador. A distinção usada pelos campos é `ValidationInfo.mode`.
+  [Strict mode][pyd-strict] · [BaseModel 2.13.3][pyd-src] · [TypeAdapter 2.13.3][pyd-adapter].
+- **UNKNOWN.** O membro `ExerciseStyle.UNKNOWN` em Python e o texto `"UNKNOWN"` em JSON
+  produzem `unknown_exercise_style` após a leitura do enum. O mesmo texto em um mapping
+  Python dá `ValidationError` no campo `exercise_style`, inclusive com `strict=False`.
+  A ordem das recusas continua lote, fator, estilo e moeda. Para a **política** UNKNOWN,
+  uma evidência também UNKNOWN pode registrar qual documento foi consultado. A declaração
+  continua inconclusiva e a promoção a uma política conclusiva exige evidência correspondente.
+- **S2.** A guarda de arquitetura permite consumir termos em `backend/derivatives/domain/`
+  e recusa imports estáticos diretos do módulo e seus submódulos no restante de `backend/`
+  e em `scripts/`. Cobre `import`, `from`, aliases, imports relativos e limites de nome
+  entre módulos. Imports dinâmicos ficam fora da análise AST. O primeiro PR que conectar
+  termos a service, MCP, CLI ou adapters deverá autenticar a fonte e distinguir fixture de
+  observação. Ao PR02 cabe revalidar os termos recebidos com
+  `SeriesTerms.model_validate(terms)`, como defesa adicional de consistência.
+- **S3.** A gramática canônica do strike no JSON é `(0|[1-9][0-9]*)(\.[0-9]+)?`,
+  aplicada ao texto inteiro, com valor finito e positivo. A escrita fixa preserva a tupla
+  Decimal, inclusive em `0.0000001200`. Um expoente interno positivo é erro no campo
+  `strike`, pois escrever `Decimal("1.20E+4")` como `"12000"` apagaria a escala de centenas.
+  O valor econômico continua representável como `Decimal("12000")`. As grafias `176` e
+  `176.00` preservam escalas distintas. Um hash por valor econômico exigiria uma decisão
+  própria de normalização.
+
+### RED, mutação e gates locais
+
+Antes do GREEN, o diff de produção contra o head revisado estava vazio. A focal com a
+guarda anterior e os testes de regressão deu **77 falhas e 177 aprovações**, rc 1.
+Foram 62 falhas de S1, seis de S2 e nove de S3. Entre elas, lote booleano e estilo
+escrito foram aceitos pelo modelo, pelo adaptador e pelo contêiner com `strict=False`.
+A guarda barrou dois consumidores de domínio e deixou passar dois scripts e dois imports
+de submódulo. As sete grafias do parecer passaram pelo parser de strike anterior.
+
+O patch de testes do RED e as saídas completas estão em `/tmp/q142-r2.OMtOQZ/` neste Mac.
+O SHA-256 de `red-tests.patch` é
+`bb3b4f05e1fb6721e443199f075506e8a8c22f86a0dcf25ceed68692272882a4`.
+Reapliquei esse patch a uma extração local de `a8f6ea3` e reproduzi as 77 falhas.
+Os comandos abaixo usam os binários do ambiente existente.
+
+```sh
+unset HTTP_PROXY HTTPS_PROXY ALL_PROXY NO_PROXY FTP_PROXY
+unset http_proxy https_proxy all_proxy no_proxy ftp_proxy RUN_LITELLM_SMOKE
+export VIRTUAL_ENV=/Users/fas/projetos/OPENCLAW/.venv
+export PATH="$VIRTUAL_ENV/bin:$PATH" PYTHONDONTWRITEBYTECODE=1
+out=/tmp/q142-r2.OMtOQZ
+unit=tests/unit/derivatives/test_series_terms.py
+arch=tests/architecture/test_series_terms_imports.py
+python -m pytest "$unit" "$arch" -q --tb=short -p no:cacheprovider
+python -m pytest tests/ -q --ignore=tests/integration --timeout=120 -p no:cacheprovider
+python -m mypy backend/ --strict --cache-dir "$out/mypy-cache"
+pyright --venvpath /Users/fas/projetos/OPENCLAW backend/
+python -m backend.derivatives.cli chain BOVA11 2026-11-19 --provider offline_fixture
+```
+
+| Verificação | Saída observada | rc |
+|---|---|---:|
+| Focal GREEN | 254 aprovados | 0 |
+| Suíte sem integração | 8.379 aprovados, 16 pulados, 261 subtestes aprovados | 0 |
+| mypy estrito | 157 arquivos de produção sem erros. Os dois testes também passaram | 0 |
+| Pyright | 0 erros, 0 avisos e 0 informações de análise | 0 |
+| Mutante de data em cópia temporária | 6 falhas ao retirar a comparação com `isoformat()` | 1 |
+| Demo sintética contra `11838cd` | `cmp` idêntico, 67.097 bytes em cada saída | 0 |
+
+Os seis casos do mutante cobrem vigência da série, vigência e publicação da evidência,
+nos modos padrão e `strict=False`. Os sete avisos de `copy` são afirmados com
+`pytest.warns`. O SHA-256 da demo macOS em ambas as árvores foi
+`a7d82699b47d31acec31995ccea3cf4149ebcb92311f980fb23390627b1de9c3`.
+O diff de produção contra a base do PR está restrito a `series_terms.py`, com 215 linhas
+das 400 admitidas. A conferência da referência B3 segue com Dots. Os números Linux abaixo
+pertencem à rodada anterior. Dots confere o remoto, publica a candidata e atualiza a
+descrição do draft com os gates desta rodada para a revalidação por Claude.
+
+## Primeira rodada de revisão do draft #142
 
 Head revisado `f36f644ef08c96e5309cbb36d5e841c9c1f7fd1e`, árvore `e55d17c`.
 Plano: congelar todos os casos no head, corrigir as fronteiras de entrada e cópia, publicar
@@ -86,7 +172,7 @@ ainda com a produção idêntica a `f36f644`. Os 86 testes anteriores foram pres
 | I2 | PR01 aceita mapping (incluindo somente leitura) e objeto JSON nas duas fronteiras. |
 | I3 | PR01 exige publicação até a vigência, inclusive, e correspondência exata da data. |
 | I4 | PR de cadastro/coleta de séries, dono da integração, resolve a identidade longitudinal. |
-| I5 | PR01 trava imports estáticos em todo o pacote de produção `backend`, por AST. |
+| I5 | Guarda AST revista em S2. Domínio puro pode consumir os termos. |
 | I6 | PR01 cobre imutabilidade, extras, precedência, fator e strike com testes tipados. |
 
 Em I1/I2, chave ausente ou nula resulta em `missing_contract_size`, `missing_quotation_form`,
@@ -103,9 +189,9 @@ preserva a caixa do ticker e retira espaços nas pontas. Antes de unir históric
 do cadastro deverá validar ISIN e vencimento e definir a normalização do identificador.
 Limites de plausibilidade para lotes e strikes extremos também cabem à homologação.
 
-Em I5, `issuer="B3"` declara o emissor e pode constar de uma fixture sintética. O dono do
-primeiro PR consumidor deverá definir e testar a procedência, autenticar a fonte e separar
-fixture de observação antes de liberar o import. Em I6, seis mutações em cópias temporárias
+Em I5, `issuer="B3"` declara o emissor e pode constar de uma fixture sintética. A autenticação
+da fonte cabe ao primeiro PR que conectar service, MCP, CLI ou adapters, conforme S2.
+Em I6, seis mutações em cópias temporárias
 de produção fizeram a focal correspondente falhar (rc 1 em cada uma):
 
 | Mutação isolada | Falhas observadas |
@@ -182,7 +268,8 @@ CLI padrão: `LIVE_NOT_ACTIVATED`, rc 3. Sem mudança em produção da Fase 01.
 <https://www.b3.com.br/data/files/CF/D0/64/95/753D0A105BF9020AAC094EA8/MPO de Negociacao da B3.pdf>
 [pyd-base]: https://docs.pydantic.dev/latest/api/base_model/#pydantic.BaseModel.model_copy
 [pyd-src]: https://github.com/pydantic/pydantic/blob/v2.13.3/pydantic/main.py
-[pyd-strict]: https://docs.pydantic.dev/latest/concepts/strict_mode/
+[pyd-adapter]: https://github.com/pydantic/pydantic/blob/v2.13.3/pydantic/type_adapter.py
+[pyd-strict]: https://pydantic.dev/docs/validation/latest/concepts/strict_mode/
 
 ## Histórico do primeiro candidato (até f36f644)
 
