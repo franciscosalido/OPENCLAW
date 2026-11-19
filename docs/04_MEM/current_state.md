@@ -4,7 +4,7 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-19 07:00 BRT · **Turno:** Claude (revisao + DL-PR08).
+**Última atualização:** 2026-11-19 09:00 BRT · **Turno:** Claude (correcoes do NO-GO).
 
 ## Fase 01 — revisada, rebaseada sobre a `main` nova e com CLI (estado A)
 
@@ -16,7 +16,27 @@ Estado da origem: `origin/main == aec9b8e` (PR #131 `bcb2188` e PR #130
 `aec9b8e` mergeados por Dots). A arvore da `main` foi conferida contra a
 simulacao previa: identica (`26fb46c`).
 
-### O que mudou neste turno
+### NO-GO da revisao independente e correcoes (2026-11-19)
+
+A revisao independente (Codex) deu **NO-GO** para fechar A: dois defeitos
+de produto, reproduzidos tambem nesta pilha. **Nenhum merge foi feito.**
+Corrigidos na branch nova `fix/dl-fase01-procedencia-taxa`, posicionada
+entre a conciliacao e o DL-PR08 (o CLI e opcional e nao deve segurar A):
+
+1. Transporte simulado carimbava `observed/production` -> agora
+   `REPLAY/test`, com trava de AST contra atribuicao de `OBSERVED` em A.
+2. Taxa composta `<= -100% a.a.` chegava a `log(0)` -> recusa
+   `invalid_rate`, linhas preservadas.
+3. Lacuna de teste na cauda da put -> oraculo `Decimal` em 4 caudas.
+
+Os 3 testes do revisor entraram sem alteracao e passam. 7 mutantes mortos.
+Precos inalterados (mesmo digest). O DL-PR08 foi rebaseado sobre a correcao
+(range-diff: 5 commits identicos). Detalhes: `SDD_correcoes_fase01.md`.
+
+**Pendente para levantar o NO-GO:** o revisor repetir a suite ampliada
+nesta ponta e Francisco repetir a validacao nativa no macOS.
+
+### O que mudou no turno anterior (revisao + DL-PR08)
 
 - **Revisao do delta `6892c82..c1cd172`:** aceito no essencial (guarda de
   `Host`/`Origin`, transporte HTTP so com `MockTransport`, excecoes fora do
@@ -35,18 +55,19 @@ simulacao previa: identica (`26fb46c`).
 
 | # | Branch | Ponta | Base antiga para `rebase --onto` |
 |---|---|---|---|
+| 0 | `chore/tests-hermetic-main-gates` (so testes) | `07bb7ba` | ja sobre `aec9b8e` |
 | 1 | `feat/dl-pr05a-oplab-routes-errors-budget` | `e8ea887` | ja sobre `aec9b8e` |
 | 2 | `feat/dl-pr05b-oplab-transport-client` | `d3af143` | `e8ea887` |
 | 3 | `feat/dl-pr06-chain-service` | `27cf097` | `d3af143` |
 | 4 | `feat/dl-pr07-mcp-server` | `cc2d3e1` | `27cf097` |
 | 5 | `review/fase01-claude-dots` (conciliacao + revisao) | `334f2e9` | `cc2d3e1` |
-| 6 | `feat/dl-pr08-cli` | ponta da branch | `334f2e9` |
+| 6 | `fix/dl-fase01-procedencia-taxa` (correcoes do NO-GO) | `daa5bfa` | `334f2e9` |
+| 7 | `feat/dl-pr08-cli` (opcional para A) | ponta da branch | `daa5bfa` |
 
-Fora da pilha, independente e pronto para PR: `chore/tests-hermetic-main-gates`
-(`07bb7ba`, so 2 arquivos de teste, sobre `aec9b8e`).
-
-O item 1 pode ir a PR agora. Depois de cada squash-merge:
+**A fila so anda depois de levantado o NO-GO.** O estado A fecha no item 6;
+o item 7 pode ficar para depois. Depois de cada squash-merge:
 `git fetch origin && git rebase --onto origin/main <base-antiga> <branch>`.
+A ponta anterior do DL-PR08 ficou em `backup/dl-pr08-pre-correcoes`.
 
 **Testes hermeticos.** O patch de portabilidade do Codex nunca chegou ao
 repo. Para nao segurar a fila, Claude escreveu a branch
@@ -69,18 +90,21 @@ Sem o JSON legado do Qwen3 e sem `docs/adr`; testes hermeticos aplicados.
 | + DL-PR06 | 7.966 passed, 0 failed | 163 |
 | + DL-PR07 | 8.030 passed, 0 failed | 205 |
 | + conciliacao e revisao | 8.059 passed, 0 failed | 300 |
-| + DL-PR08 | 8.083 passed, 0 failed | 70 |
+| + correcoes do NO-GO | 8.101 passed, 0 failed | 48 |
+| + DL-PR08 | 8.125 passed, 0 failed | 70 |
 
 - Ponta final: mesma contagem em ordem natural, invertida e embaralhada;
   `mypy backend/ --strict` 0 (156 arquivos); `pyright backend/` 0; digest
   bit a bit de precos, gregas e IVs inalterado; arvore limpa apos a suite.
 - Sonda HTTP real em loopback com cliente FastMCP: sessao sobrevive a
   chamadas rejeitadas; `Host`/`Origin` externos -> 403; sem banner/PyPI.
-- Ainda nao executado nativamente em macOS neste turno.
+- macOS nativo: a ponta anterior (`0fb4f6a`) foi validada por Francisco
+  (8.081 passed, mypy 0, pyright 0, CLI 0/3). **A ponta nova ainda nao.**
 
 ### Proximo turno
 
-1. Owner (ou Dots com `gh`): abrir o PR do item 1 e seguir a fila.
+1. Revisor: repetir a suite ampliada na ponta nova. Francisco: validacao
+   nativa no macOS. So entao o owner (ou Dots com `gh`) segue a fila.
 2. Quem pegar o turno: **anotar aqui o inicio antes de mexer em branches**;
    o checkout principal ficou em `feat/dl-pr08-cli`, arvore limpa. O clone
    `OPENCLAW-fase01-dots` ficou intocado em `c1cd172`; para alinhar:
