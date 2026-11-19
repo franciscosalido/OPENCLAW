@@ -2,6 +2,56 @@
 
 Base `11838cdafae0e3de0ed339a2acca736f480967fb`, branch `feat/dl2-pr01-series-terms`.
 
+## Terceira rodada: GO da revisão adversária (Claude, 2026-11-19)
+
+Head revisado `36cd5f2f62ab9717fc1ac132d3d07c3000247faa`, árvore `c9d60e9`. Estado: MERGEADO
+pelo PR #142. Tudo abaixo foi executado pelo revisor em clone limpo, Linux aarch64,
+Python 3.12, Pydantic 2.13.3, sem reaproveitar saídas do autor.
+
+| Verificação | Resultado |
+|---|---|
+| Focal (unidade + arquitetura) | 254 aprovados |
+| Suíte sem integração | 8.379 aprovados, 16 pulados, 261 subtestes, 0 falhas |
+| mypy estrito / Pyright | 157 arquivos sem erros / 0 erros |
+| Produção da Fase 01 | intacta; 215 linhas novas em `series_terms.py` |
+| Demo sintética e CLI padrão | idêntica à base no Linux (`f4f8003f…`) / rc 3 |
+| Digest numérico da Fase 01 (Linux) | `840770d25be12b8602c614bd`, inalterado |
+| RED da rodada | 71 falhas e 183 aprovações dos testes finais contra a produção de `a8f6ea3` |
+| Ataques da 2ª rodada com `strict=False` | 13 de 13 recusados |
+| Mutação na produção final | 16 de 16 mutantes mortos |
+
+O RED medido pelo revisor (71) difere do registrado pelo autor (77) porque as seis falhas de
+S2 eram dos testes da guarda contra a guarda anterior, que vive no próprio arquivo de teste.
+
+### Referência B3 conferida pelo revisor
+
+Manual de Procedimentos Operacionais de Negociação da B3, edição de 01/07/2026, 210 páginas,
+SHA-256 do PDF `35df8963b85b36774f431ae3c9b04c867a8ea7b863621307a45f3812e8b250ec`.
+
+- §3.2.9, p. 171: o ajuste do preço de exercício por proventos está escrito para séries de
+  opções referenciadas em **ações**. O texto não menciona cotas de ETF. Para o BOVA11 a
+  política segue `UNKNOWN` (L5) até haver documento que cubra a classe.
+- §3.2.9, III: bonificação ajusta também o lote-padrão. Lote é termo por série e vigência.
+- §3.3.1, p. 172: em ações, BDRs e ETFs, calls podem ser americanas ou europeias e
+  **puts são apenas europeias**. Opções sobre índices são apenas europeias.
+- §3.3.1, VI: a B3 pode reaproveitar o código de uma série excluída. Confirma I4.
+
+Consequência para o marco: o caso à mão do critério 1 do SDD (put americana) exercita o
+núcleo binomial, mas não corresponde a instrumento listado nessas classes. O ganho prático do
+CRR na B3 fica nas calls americanas. Vai para adendo do ADR-0025, fora deste PR.
+
+### Limitações aceitas, com dono
+
+- A guarda de import vê só imports estáticos diretos. Um módulo de `domain/` que consuma os
+  termos e seja importado por `service/` não é barrado. O cartão do DL2-PR02 exigirá a
+  guarda por alcance transitivo antes de qualquer ligação a superfície.
+- `Decimal("180").normalize()` vira `1.8E+2` e é recusado pelo expoente positivo. Quem
+  normaliza valores antes de construir os termos precisa quantizar. Dono: adaptador.
+- `model_construct`, chamada direta à superclasse e escrita em atributos internos seguem
+  como caminhos de chamador confiável. O DL2-PR02 revalida os termos na entrada.
+- Lote e strike sem limite de plausibilidade; identidade sem ISIN nem vencimento (I4);
+  procedência não distingue fixture de observação (I5). Donos já registrados acima.
+
 ## Segunda rodada do draft #142
 
 Head revisado `a8f6ea348d97f203d2d7fef33015061c5393c0b4`. O worktree isolado começou

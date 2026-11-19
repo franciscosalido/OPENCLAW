@@ -4,27 +4,26 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-19 · **Turno:** Codex (segunda rodada do DL2-PR01).
+**Última atualização:** 2026-11-19 · **Turno:** Claude (GO e merge do DL2-PR01).
 
 ## Fase 02 — Marco 2A
 
-DL2-PR01, estado A, ADR-0025 aceito. Candidata local no worktree
-`OPENCLAW-dl2-pr01`, branch `feat/dl2-pr01-series-terms`, sobre `a8f6ea3` do draft #142.
-O RED sobre esse head registrou 77 falhas e 177 aprovações. A correção verifica tipos por
-campo inclusive com `strict=False`, preserva a escala do strike no JSON fixo e permite
-imports estáticos dos termos no domínio puro. A guarda cobre o restante de backend e scripts.
+PR atual: DL2-PR01 — MERGEADO (PR #142, GO na terceira rodada de revisão). Estado A.
+Base: `main` após o squash do #142. ADR-0025 aceito, L1..L5 vigentes.
+Entregue: `backend/derivatives/domain/series_terms.py` (215 linhas), isolado; termos por série
+e vigência, recusas tipadas, cópia e JSON validados, tipos exatos mesmo com `strict=False`.
+Gate do head aprovado, Linux aarch64 limpo: 8.379 aprovados, 16 pulados, 261 subtestes.
+[Cartão, três rodadas de revisão e evidências](../specs/derivatives/fase2/DL2-PR01.md).
 
-macOS arm64 passou com 254 testes focais, 8.379 globais, 16 pulados e 261 subtestes.
-mypy estrito e Pyright sem erros. Seis testes detectaram o mutante de data compacta.
-Demo sintética idêntica à base `11838cd` no Mac. Saídas locais em `/tmp/q142-r2.OMtOQZ/`.
-[Cartão do DL2-PR01, comandos e decisões S1–S3](../specs/derivatives/fase2/DL2-PR01.md).
+Riscos abertos:
+- Manual B3 de 01/07/2026, §3.3.1: puts de ações, BDRs e ETFs são só europeias. O CRR
+  americano vale, na prática, para calls. Adendo ao ADR-0025 pendente (Claude).
+- §3.2.9 do mesmo manual cobre opções sobre ações; BOVA11 segue com ajuste `UNKNOWN` (L5).
+- Guarda de import dos termos não vê alcance transitivo; o DL2-PR02 deve fechá-la.
+- Tolerância CRR × BSM do par 200/201: adendo antes do GREEN do DL2-PR03.
+- Verificador do digest numérico da Fase 01 ainda fora do repositório (PR do Claude).
 
-Dots confere o remoto, faz o commit e publica a candidata com os números da segunda rodada
-na descrição do draft. Claude revalida esse head. A conferência do PDF B3 segue com Dots.
-O PR02 deverá revalidar termos na entrada. Autenticação da fonte e distinção entre fixture
-e observação cabem ao primeiro PR que conectar service, MCP, CLI ou adapters.
-O verificador do digest histórico fica em PR separado do Claude. A tolerância CRR × BSM do
-par 200/201 continua pendente de adendo antes do GREEN do PR03.
+Próxima ação (uma só): Claude escreve o cartão do DL2-PR02 (carry e dupla contagem).
 
 ## Fase 01 do Lab de Derivativos — CONCLUIDA e integrada na `main` (estado A)
 
