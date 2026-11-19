@@ -35,3 +35,5 @@ Comando (uv offline, ambiente existente, sem sincronização):
 
 Saída: `Failed: DID NOT RAISE <class 'backend.derivatives.domain.series_terms.TermsRefusal'>`.
 `1 failed in 0.07s`, rc 1. O teste foi coletado e o construtor aceitou a ausência do lote.
+
+Commit do RED: e0f4664595d7fa4464783b9a7b983f6e045a3ba2.
