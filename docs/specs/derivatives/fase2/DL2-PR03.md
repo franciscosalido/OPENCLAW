@@ -508,3 +508,24 @@ O rótulo entre parênteses diz o peso da fonte.
 
 Quant Stack Exchange: o site está bloqueado para as ferramentas de leitura desta sessão e não
 apareceu nas buscas. Nenhuma afirmação deste cartão se apoia nele.
+
+## Evidências do autor no clone isolado
+
+### RED 1 — exercício no nó intermediário de H1
+
+macOS 15.8.1 arm64, Python 3.12.13. O núcleo descontava os payoffs até a raiz.
+Comando (o executor usa o ambiente existente e `uv run --offline --frozen --no-sync`):
+
+```sh
+/private/tmp/dl2-pr03.2Ue7tX/mac-run python -m pytest -q tests/unit/derivatives/test_binomial.py::test_h1_american_put
+```
+
+Trecho do stdout, rc 1. Log integral em `/private/tmp/dl2-pr03.2Ue7tX/mac-red1.log`.
+
+```text
+E       assert 4.1926542806038585 == 5.089632 ± 5.0e-05
+E         Obtained: 4.1926542806038585
+E         Expected: 5.089632 ± 5.0e-05
+FAILED tests/unit/derivatives/test_binomial.py::test_h1_american_put - assert...
+1 failed in 0.07s
+```
