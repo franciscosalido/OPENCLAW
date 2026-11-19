@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import json
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
@@ -11,6 +12,7 @@ import httpx
 import pytest
 
 from backend.derivatives.oplab.budget import RequestBudget, credential_key
+from backend.derivatives.oplab.client import OplabMarketClient
 from backend.derivatives.oplab.errors import (
     AuthError,
     BudgetExceededError,
@@ -33,7 +35,7 @@ from backend.derivatives.oplab.transport import (
     Transport,
     redact,
 )
-from backend.derivatives.provenance import Provenance
+from backend.derivatives.provenance import Provenance, Purpose
 from config.derivatives_config_model import Budget, Oplab
 
 NOW = datetime(2026, 11, 18, 15, 0, tzinfo=UTC)
@@ -96,7 +98,7 @@ async def test_success_sends_one_get_with_the_token_header_only() -> None:
     assert request.url.query == b""
     assert response.status == 200
     assert response.json == {"market_status": "N"}
-    assert response.provenance is Provenance.OBSERVED
+    assert response.provenance is Provenance.REPLAY
     assert response.received_at == NOW
     assert response.route == "/market/stocks/PETR4"
     assert set(response.headers_safe) <= set(SAFE_HEADERS)
@@ -382,3 +384,29 @@ async def test_explicit_zero_network_flag_cannot_enable_io(monkeypatch) -> None:
     transport = HttpTransport(Oplab(), RequestBudget(Budget(), key="teste"), env=env)
     with pytest.raises(NetworkForbiddenError):
         await _status(transport)
+
+
+async def test_phase_a_mock_response_is_replay_with_test_purpose() -> None:
+    # NO-GO de 19/11: uma unica resposta em memoria saia carimbada observed/production.
+    recorder = Recorder(_json(200, {"market_status": "A"}))
+    client = OplabMarketClient(_http(recorder), stamp_source="teste:")
+    _model, stamp = await client.market_status(now=NOW)
+    assert len(recorder.requests) == 1
+    assert (stamp.provenance, stamp.purpose) == (Provenance.REPLAY, Purpose.TEST)
+
+
+def test_phase_a_production_code_never_assigns_observed() -> None:
+    """Em A, ``OBSERVED`` so aparece em comparacoes (recusas), nunca como valor atribuido.
+
+    Este teste e a trava de homologacao: quem implementar a aquisicao real do estado B
+    tera de altera-lo de proposito, junto com o ADR-0023.
+    """
+    offenders: list[str] = []
+    for path in sorted(Path("backend/derivatives").rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        compared = {id(operand) for node in ast.walk(tree) if isinstance(node, ast.Compare)
+                    for operand in (node.left, *node.comparators)}
+        offenders += [f"{path}:{node.lineno}" for node in ast.walk(tree)
+                      if isinstance(node, ast.Attribute) and node.attr == "OBSERVED"
+                      and id(node) not in compared]
+    assert offenders == []
