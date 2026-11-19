@@ -2,7 +2,7 @@
 
 Branch: `docs/dl2-pr00-adr-0025-fase2a`
 Base: `main` em `1421116`
-Status: EM_REVISAO
+Status: MERGEADO (PR #141; aprovado em 2026-11-19)
 
 ## Escopo
 
@@ -73,7 +73,43 @@ Leitura: 0.03 tem folga em `N >= 1000`, mas nao serviria para o par
 200/201, cuja tolerancia segue pendente no SDD. Estes numeros nao
 substituem a medicao do DL2-PR04 nem a referencia independente.
 
+## Revisao adversaria (Claude, 2026-11-19)
+
+Resultado: **GO**, com duas correcoes aplicadas no proprio PR.
+
+Conferido de forma independente, sem reaproveitar a conta do autor:
+
+- Diff so sob `docs/`; `git diff --check` vazio; nenhuma linha nova acima
+  de 100 colunas.
+- Caso a mao recalculado em `Decimal` com 50 digitos: `p = 0.6281777409`,
+  europeia `4.19265428`, americana `5.08963247`. Batem com o SDD. Os
+  valores 4.1923 e 5.0894 do prompt estavam errados para a tolerancia de
+  5e-5 (vinham de `p` arredondado); o erro era do prompt, nao do autor.
+- Afirmacoes sobre o repo conferidas no codigo: `dividend_yield = 0.0` e
+  `strike_adjusted_by_exchange_assumed = true` em `config/derivatives.yaml`;
+  schema `quimera-derivatives-chain-v1`; decisao 4 e "nunca assumir 100"
+  no ADR-0023; ADR-011 em `docs/04_MEM/decisions.md`.
+- Nenhuma regra da B3, do BOVA11 ou de proventos afirmada como fato.
+- Gate em Linux aarch64, clone limpo do commit aprovado: registrado no
+  corpo do PR.
+
+Correcoes aplicadas:
+
+1. O ADR dizia que carry nao informado e recusa, mas nao dava o
+   identificador. Entrou `missing_carry_assumption` no ADR e no criterio 6.
+2. Status do ADR passou a Accepted, e o do SDD a aprovado.
+
+Pontos que seguem abertos, sem bloquear:
+
+- Tolerancia do par 200/201 (criterio 2): tem de vir da referencia
+  independente, por adendo, antes do GREEN do DL2-PR03. Nao pode ser
+  calibrada pela medicao exploratoria acima.
+- O DL2-PR02 precisa dizer como a hipotese da Fase 01 (`q = 0` em YAML)
+  vira premissa de carry com fonte e data, sem mudar as europeias.
+- Autor e revisor deste PR sao o mesmo modelo. A revisao independente de
+  fato e a do Codex, a posteriori.
+
 ## Proxima acao
 
-Francisco revisa o PR. Aprovado, o ADR-0025 passa a Accepted e o DL2-PR01
-pode ter sua SPEC escrita.
+Codex abre o PR do DL2-PR01 (termos da serie e recusas) sobre a `main`
+nova, com o cartao `DL2-PR01.md` e o RED mostrado antes do GREEN.

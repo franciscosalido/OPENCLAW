@@ -2,7 +2,7 @@
 
 Autoridade: [ADR-0025](../../../ADR/ADR-0025-laboratorio-derivativos-fase2a.md)
 Base: `main` em `1421116` (Fase 01 fechada em estado A)
-Status: SPEC do marco; em revisao junto com o ADR-0025
+Status: SPEC do marco; aprovada com o ADR-0025 em 2026-11-19 (PR #141)
 
 ## Objetivo
 
@@ -129,8 +129,8 @@ fora de `[1, 5000]` ou nao inteiros; `sigma = 0`; entrada nao finita.
 ### 6. Recusas de serie e de carry (DL2-PR01 e DL2-PR02)
 
 100% das linhas sem lote, sem fator de cotacao, com estilo desconhecido,
-ou com ajuste desconhecido e dividendo > 0, recusadas com motivo
-especifico. Nenhum valor padrao para lote.
+sem premissa de carry, ou com ajuste desconhecido e dividendo > 0,
+recusadas com motivo especifico. Nenhum valor padrao para lote.
 
 | Condicao | Motivo |
 |---|---|
@@ -138,6 +138,7 @@ especifico. Nenhum valor padrao para lote.
 | fator de cotacao ausente | `missing_quotation_form` |
 | estilo de exercicio desconhecido | `unknown_exercise_style` |
 | moeda desconhecida | `unknown_currency` |
+| premissa de carry nao informada | `missing_carry_assumption` |
 | provento no strike e no rendimento | `dividend_double_count` |
 | ajuste `UNKNOWN` com dividendo > 0 | `strike_adjustment_unknown` |
 | dividendo discreto informado | `discrete_dividends_not_supported` |

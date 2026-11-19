@@ -2,8 +2,9 @@
 
 ## Status
 
-Proposed (2026-11-19). Vira Accepted quando Francisco aprovar o PR do
-DL2-PR00. Enquanto Proposed, nenhum PR de codigo do Marco 2A pode ser aberto.
+Accepted (2026-11-19). Aprovado por Francisco no PR #141 (DL2-PR00), apos a
+revisao adversaria registrada em `docs/specs/derivatives/fase2/DL2-PR00.md`.
+Os PRs de codigo do Marco 2A ficam liberados a partir do merge desse PR.
 
 ## Contexto
 
@@ -65,6 +66,8 @@ lote (ADR-0023: "nunca assumir 100").
 A premissa de carry e explicita: **nenhum** ou **rendimento continuo**,
 sempre com fonte e data. Dado ausente nao e zero: carry nao informado e
 recusa, nao `q = 0`.
+
+Carry nao informado tem recusa propria: `missing_carry_assumption`.
 
 Trava de dupla contagem, com recusas tipadas: `dividend_double_count`
 (provento contado no strike ajustado e tambem no rendimento),
