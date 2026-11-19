@@ -111,8 +111,13 @@ async def test_protocol_validation_never_echoes_supplied_input(monkeypatch, capl
                 "jsonrpc": "2.0", "id": i, "method": "tools/call", "params": params,
             })
             bodies.append(result.text)
-            if i == 2:
-                assert result.status_code == 200 and result.json()["result"]["isError"] is True
+            if isinstance(params["arguments"], dict) and "_meta" not in params:
+                # Chamada bem formada fora do contrato: erro de tool em HTTP 200, para a
+                # sessao do agente sobreviver; nome e argumentos originais nao voltam.
+                assert result.status_code == 200
+                payload = result.json()["result"]
+                assert payload["isError"] is True
+                assert payload["content"] == [{"type": "text", "text": "INVALID_TOOL_CALL"}]
                 continue
             assert result.status_code == 400
             assert result.json() == {
@@ -156,3 +161,109 @@ def test_invalid_startup_fails_before_serving(monkeypatch, capsys, caplog):
     assert server.main() == 2
     output = capsys.readouterr()
     assert marker not in output.out + output.err + caplog.text
+
+
+async def _session(app, port=8814):
+    """Abre uma sessao MCP em memoria e devolve (cliente, headers) ja inicializados."""
+    client = httpx.AsyncClient(transport=httpx.ASGITransport(app=app),
+                               base_url=f"http://127.0.0.1:{port}")
+    headers = {"Accept": "application/json, text/event-stream"}
+    init = await client.post("/mcp", headers=headers, json={
+        "jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
+            "protocolVersion": "2025-11-25", "capabilities": {},
+            "clientInfo": {"name": "revisao", "version": "1"}}})
+    assert init.status_code == 200
+    headers["Mcp-Session-Id"] = init.headers["mcp-session-id"]
+    headers["MCP-Protocol-Version"] = "2025-11-25"
+    await client.post("/mcp", headers=headers, json={
+        "jsonrpc": "2.0", "method": "notifications/initialized"})
+    return client, headers
+
+
+def _entrypoint_app(monkeypatch, context):
+    monkeypatch.setenv("QUIMERA_DERIV_CONTEXT", context)
+    monkeypatch.setenv("QUIMERA_DERIV_FIXTURE_DIR", "tests/fixtures/derivatives/synthetic")
+    args = {}
+    monkeypatch.setattr(FastMCP, "run", lambda instance, **kw: args.update(
+        instance=instance, **kw))
+    assert server.main() == 0
+    assert args["show_banner"] is False, "o banner do FastMCP consulta o PyPI"
+    return args["instance"].http_app(path=args["path"], middleware=args["middleware"],
+                                     json_response=True)
+
+
+@pytest.mark.parametrize("context", ["prod", "test"])
+async def test_rejected_tool_call_keeps_the_session_alive(monkeypatch, context):
+    """Um erro de chamada do agente nao pode derrubar a sessao (HTTP 400 derruba)."""
+    app = _entrypoint_app(monkeypatch, context)
+    rejected = [
+        {"name": PROD, "arguments": {"symbol": "BOVA11", "due_date": "2026-11-19",
+                                     "mode": "offline_fixture"}},
+        {"name": PROD, "arguments": {"symbol": 11, "due_date": "2026-11-19"}},
+        {"name": PROD, "arguments": {"symbol": "BOVA11"}},
+        {"name": "ferramenta_que_nao_existe", "arguments": {}},
+        {"name": "derivatives_health", "arguments": {"x": "1"}},
+    ]
+    if context == "prod":
+        rejected.append({"name": "derivatives_chain_demo",
+                         "arguments": {"symbol": "BOVA11", "due_date": "2026-11-19"}})
+    async with app.router.lifespan_context(app):
+        client, headers = await _session(app)
+        answers = []
+        try:
+            for i, params in enumerate(rejected, 2):
+                result = await client.post("/mcp", headers=headers, json={
+                    "jsonrpc": "2.0", "id": i, "method": "tools/call", "params": params})
+                assert result.status_code == 200, params
+                answers.append(result.json()["result"])
+                alive = await client.post("/mcp", headers=headers, json={
+                    "jsonrpc": "2.0", "id": 100 + i, "method": "tools/call",
+                    "params": {"name": PROD, "arguments": {"symbol": "BOVA11",
+                                                           "due_date": "2026-11-19"}}})
+                assert alive.status_code == 200 and "LIVE_NOT_ACTIVATED" in alive.text
+        finally:
+            await client.aclose()
+    expected = {"isError": True, "content": [{"type": "text", "text": "INVALID_TOOL_CALL"}]}
+    for answer in answers:
+        assert {key: answer[key] for key in expected} == expected
+    # A demo desabilitada e indistinguivel de uma tool inexistente.
+    assert all(answer == answers[0] for answer in answers)
+
+
+async def test_request_id_is_echoed_only_when_short(monkeypatch):
+    app = _entrypoint_app(monkeypatch, "prod")
+    async with app.router.lifespan_context(app):
+        client, headers = await _session(app)
+        try:
+            for request_id, echoed in (("abc", "abc"), (7, 7), ("Z" * 64, "Z" * 64),
+                                       ("Z" * 65, None), ("Z" * 5000, None), (1.5, None)):
+                result = await client.post("/mcp", headers=headers, json={
+                    "jsonrpc": "2.0", "id": request_id, "method": 5})
+                assert result.status_code == 400
+                assert result.json()["id"] == echoed
+                assert len(result.content) < 400
+        finally:
+            await client.aclose()
+
+
+@pytest.mark.parametrize("context", ["prod", "test"])
+async def test_guard_contract_matches_the_registered_tools(monkeypatch, context):
+    """A guarda repete o schema das tools: este teste acusa qualquer divergencia."""
+    from backend.derivatives.mcp.http_guard import _valid_call
+
+    app = _entrypoint_app(monkeypatch, context)
+    del app
+    demo = context == "test"
+    instance = server.create_derivatives_server(
+        server.load_derivatives_mcp_config({"QUIMERA_DERIV_CONTEXT": context}))
+    tools = {tool.name: tool.parameters for tool in await instance.list_tools()}
+    assert ("derivatives_chain_demo" in tools) is demo
+    for name, schema in tools.items():
+        arguments = {field: "x" for field in schema.get("properties", {})}
+        assert set(schema.get("required", [])) == set(arguments)
+        assert all(spec == {"type": "string"} for spec in schema["properties"].values())
+        assert _valid_call(name, arguments or None, demo), name
+        assert not _valid_call(name, {**arguments, "extra": "x"}, demo), name
+    assert not _valid_call("derivatives_chain_demo", {"symbol": "x", "due_date": "x"},
+                           False)
+    assert not _valid_call("outra", {}, demo)

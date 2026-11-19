@@ -240,8 +240,9 @@ async def test_demo_refuses_without_test_context_or_valid_fixture(
 
 async def test_demo_unknown_symbol_is_a_sanitized_error() -> None:
     response = await demo_tool("VALE3", "2026-11-19", config=TEST, root=Path.cwd())
-    assert response["ok"] is False
-    assert response["error"] == "DEMO_UNAVAILABLE"
+    assert response["ok"] is False and response["data"] == {}
+    assert response["error"] == "DEMO_SYMBOL_NOT_IN_FIXTURE"
+    assert "VALE3" not in str(response)
 
 
 async def test_fixture_never_reaches_the_production_tool_even_when_forged_live() -> None:
@@ -337,6 +338,7 @@ def test_main_binds_loopback_with_configured_port_and_never_passes_a_live_servic
     assert (captured["transport"], captured["host"], captured["port"], captured["path"]) == (
         "streamable-http", "127.0.0.1", 8814, "/mcp")
     assert captured["uvicorn_config"] == {"access_log": False, "proxy_headers": False}
+    assert captured["show_banner"] is False
 
 
 async def test_phase_a_blocks_combined_promotion() -> None:
