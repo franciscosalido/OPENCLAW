@@ -50,6 +50,8 @@ from evaluation.compare_qdrant_113_vs_118 import (
     _QWEN3_SCENARIOS,
     build_summary,
     decide_qwen3_embedding,
+    load_benchmark_runs,
+    write_json,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -241,28 +243,94 @@ def test_qdrant_upgrade_decision_not_affected_by_missing_qwen3() -> None:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-def test_qwen3_summary_does_not_leak_query_payload_vectors() -> None:
-    summary_path = ROOT / "evaluation/results/qdrant_118_qwen3_benchmark_summary.json"
-    assert summary_path.exists(), "Qwen3 summary artifact must exist"
-    text = summary_path.read_text(encoding="utf-8")
-    for forbidden in (
-        '"query_text"',
-        '"chunk_text"',
-        '"dense_vector"',
-        '"sparse_vector"',
-        '"payload"',
-        '"embedding"',
-        '"vector"',
-        '"prompt"',
-        '"answer"',
-    ):
+FORBIDDEN_JSON_KEYS = (
+    '"query_text"',
+    '"chunk_text"',
+    '"dense_vector"',
+    '"sparse_vector"',
+    '"payload"',
+    '"embedding"',
+    '"vector"',
+    '"prompt"',
+    '"answer"',
+)
+LEAK_CANARY = "CANARIO_SINTETICO_Q18"
+LOCAL_QWEN3_SUMMARY = ROOT / "evaluation/results/qdrant_118_qwen3_benchmark_summary.json"
+
+
+def _synthetic_run(profile_name: str) -> dict[str, object]:
+    """Run sintetico valido que tambem carrega, de proposito, campos proibidos."""
+    return {
+        "profile_name": profile_name,
+        "scenario": "synthetic",
+        "quality": {"precision_at_5": 0.5, "recall_at_10": 0.5, "mrr": 0.5, "ndcg_at_5": 0.5},
+        "latency": {"p50_ms": 10.0, "p95_ms": 20.0},
+        "query_text": LEAK_CANARY,
+        "chunk_text": LEAK_CANARY,
+        "dense_vector": [0.1, 0.2],
+        "sparse_vector": {"indices": [1], "values": [0.5]},
+        "payload": {"text": LEAK_CANARY},
+        "embedding": [0.3],
+        "vector": [0.4],
+        "prompt": LEAK_CANARY,
+        "answer": LEAK_CANARY,
+    }
+
+
+def _assert_no_forbidden_keys(text: str) -> None:
+    for forbidden in FORBIDDEN_JSON_KEYS:
         assert forbidden not in text.lower(), (
             f"Qwen3 summary leaks forbidden token: {forbidden!r}"
         )
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Qwen3 profiles: dimensions are correct
+def test_qwen3_summary_does_not_leak_query_payload_vectors(tmp_path: Path) -> None:
+    """Hermetico: o resumo sai do serializador real, a partir de runs sinteticos.
+
+    Os runs de entrada carregam os campos proibidos; se o serializador os deixasse
+    passar, o teste falharia. Nao depende de artefato ignorado pelo Git.
+    """
+    specs = [spec for spec in COMPARISONS if spec.scenario.value in _QWEN3_SCENARIOS]
+    profiles = sorted({name for spec in specs for name in (spec.profile_a, spec.profile_b)})
+    assert len(specs) == len(_QWEN3_SCENARIOS) and profiles
+    runs_path = tmp_path / "runs.json"
+    runs_path.write_text(
+        json.dumps({"runs": [_synthetic_run(name) for name in profiles]}), encoding="utf-8"
+    )
+    assert LEAK_CANARY in runs_path.read_text(encoding="utf-8")
+
+    summary = build_summary(
+        runs=load_benchmark_runs(runs_path), generated_at_utc="2026-01-01T00:00:00Z"
+    )
+    by_scenario = {result.scenario: result for result in summary.scenarios}
+    for scenario in _QWEN3_SCENARIOS:
+        assert by_scenario[scenario].evidence_complete, scenario
+
+    summary_path = tmp_path / "qdrant_118_qwen3_benchmark_summary.json"
+    write_json(summary, summary_path)
+    text = summary_path.read_text(encoding="utf-8")
+    _assert_no_forbidden_keys(text)
+    assert LEAK_CANARY not in text
+    assert all(profile in text for profile in profiles), "comparacao deve sair preenchida"
+
+
+def test_forbidden_key_inside_run_metadata_is_rejected(tmp_path: Path) -> None:
+    run = _synthetic_run("qualquer_perfil")
+    run["metadata"] = {"query_text": LEAK_CANARY}
+    runs_path = tmp_path / "runs.json"
+    runs_path.write_text(json.dumps([run]), encoding="utf-8")
+    with pytest.raises(ValueError, match="forbidden output key"):
+        load_benchmark_runs(runs_path)
+
+
+@pytest.mark.skipif(
+    not LOCAL_QWEN3_SUMMARY.exists(),
+    reason="artefato local ignorado pelo Git; so existe na maquina que rodou o benchmark",
+)
+def test_local_qwen3_summary_artifact_does_not_leak() -> None:
+    _assert_no_forbidden_keys(LOCAL_QWEN3_SUMMARY.read_text(encoding="utf-8"))
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 
 
