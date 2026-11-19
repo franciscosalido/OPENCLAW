@@ -50,4 +50,7 @@ class DemoFixture(FixtureTransport):
                            for name, entry in manifest["files"].items()}
 
     def _payload(self, name: str) -> object:
+        if name not in self._files:
+            # Mesmo contrato do transporte base: fixture ausente vira ``NotFoundError``.
+            raise FileNotFoundError(name)
         return json.loads(self._files[name])

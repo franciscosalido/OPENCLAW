@@ -39,6 +39,10 @@ def guard_tool_dispatch(server: FastMCP[Any], *, demo_enabled: bool) -> None:
     handlers[CallToolRequest] = guarded
 
 
+REJECTED_CALL = {"name": "rejected_tool_call", "arguments": {}}
+MAX_ECHOED_ID_CHARS = 64
+
+
 def _reject_json_constant(_: str) -> None:
     raise ValueError("invalid_json")
 
@@ -83,7 +87,8 @@ class LoopbackHeaders:
             if not isinstance(raw, dict):
                 raise ValueError("invalid_envelope")
             raw_id = raw.get("id")
-            if type(raw_id) in (int, str):
+            if type(raw_id) is int or (type(raw_id) is str
+                                       and len(raw_id) <= MAX_ECHOED_ID_CHARS):
                 request_id = raw_id
             envelope = JSONRPCMessage.model_validate(raw).root
             if "method" in raw and "id" in raw:
@@ -92,13 +97,14 @@ class LoopbackHeaders:
                 ClientRequest.model_validate(raw)
                 if raw["method"] == "tools/call":
                     params = CallToolRequestParams.model_validate(raw.get("params"))
-                    if params.name not in ("derivatives_chain", "derivatives_health",
-                                            "derivatives_chain_demo"):
-                        # O SDK responde à ferramenta desconhecida sem receber o nome original.
-                        raw["params"] = {"name": "unknown_tool", "arguments": {}}
+                    if not _valid_call(params.name, params.arguments, self.demo_enabled):
+                        # Chamada bem formada, mas fora do contrato (tool inexistente neste
+                        # contexto, argumento a mais ou de tipo errado): troca por uma chamada
+                        # neutra, que o dispatcher guardado responde com INVALID_TOOL_CALL em
+                        # HTTP 200. O SDK nunca ve o nome nem os argumentos originais, e a
+                        # sessao do agente sobrevive ao erro (um 400 derruba o cliente MCP).
+                        raw["params"] = REJECTED_CALL
                         body = bytearray(json.dumps(raw).encode())
-                    elif not _valid_call(params.name, params.arguments, self.demo_enabled):
-                        raise ValueError("invalid_tool_call")
             elif "method" in raw:
                 if not isinstance(envelope, JSONRPCNotification):
                     raise ValueError("invalid_notification")

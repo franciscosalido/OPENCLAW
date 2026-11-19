@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Never
 
 from fastmcp import FastMCP
+from loguru import logger
 from starlette.middleware import Middleware as ASGIMiddleware
 
 from backend.derivatives.config import (DerivativesConfigError, DerivativesMcpConfig,
@@ -18,7 +19,7 @@ from backend.derivatives.config import (DerivativesConfigError, DerivativesMcpCo
 from backend.derivatives.mcp.http_guard import LoopbackHeaders, guard_tool_dispatch
 from backend.derivatives.oplab.demo_fixture import REPO_ROOT, DemoFixture
 from backend.derivatives.oplab.client import OplabMarketClient
-from backend.derivatives.oplab.errors import OplabError
+from backend.derivatives.oplab.errors import NotFoundError, OplabError
 from backend.derivatives.oplab.routes import MarketRoute, render_route
 from backend.derivatives.pricing.calendar import load_calendars
 from backend.derivatives.pricing.quote_iv import PRICE_SOURCE_NOTE, IvResultModel
@@ -100,9 +101,9 @@ def _inputs(symbol: str, due_date: str) -> tuple[str, date]:
     render_route(MarketRoute.OPTIONS_CHAIN, symbol=clean)
     return clean, date.fromisoformat(validate_non_empty_text(due_date, "due_date"))
 
-def _failure(*, invalid_arguments: bool = False) -> dict[str, object]:
-    error = "INVALID_ARGUMENTS" if invalid_arguments else "DEMO_UNAVAILABLE"
-    return ToolResponse(ok=False, error=error).model_dump()
+def _failure(code: str = "DEMO_UNAVAILABLE") -> dict[str, object]:
+    """Erro constante, sem eco de entrada: o codigo e tudo o que o cliente recebe."""
+    return ToolResponse(ok=False, error=code).model_dump()
 
 async def chain_tool(
     symbol: str, due_date: str, *, config: DerivativesMcpConfig, clock: Clock,
@@ -128,7 +129,7 @@ async def demo_tool(
     try:
         clean, expiry = _inputs(symbol, due_date)
     except (OplabError, ValueError):
-        return _failure(invalid_arguments=True)
+        return _failure("INVALID_ARGUMENTS")
     try:
         fixture = DemoFixture(Path(config.fixture_dir))
         cfg = load_derivatives_config()
@@ -137,7 +138,11 @@ async def demo_tool(
                                calendars=load_calendars(cfg.conventions, root=REPO_ROOT))
         priced = await service.build(clean, expiry, now=fixture.valuation)
         data = _demo_view(priced, as_of=fixture.valuation)
-    except Exception:
+    except NotFoundError:
+        return _failure("DEMO_SYMBOL_NOT_IN_FIXTURE")
+    except (OplabError, ValueError, KeyError, OSError, ProvenanceBarrierError) as exc:
+        # So o nome da classe vai para o log: sem entrada do cliente e sem payload.
+        logger.warning("demonstracao de derivativos indisponivel: {}", type(exc).__name__)
         return _failure()
     return ToolResponse(ok=True, degraded=True, data=data).model_dump()
 
@@ -176,12 +181,17 @@ def main() -> int:
     try:
         config = load_derivatives_mcp_config()
     except DerivativesConfigError:
+        # Nomes das variaveis, nunca os valores: nada do ambiente e ecoado.
+        logger.error("configuracao invalida do servidor de derivativos; confira "
+                     "QUIMERA_DERIV_CONTEXT, QUIMERA_DERIV_PROVIDER_MODE e "
+                     "QUIMERA_DERIV_MCP_PORT")
         return 2
     server = create_derivatives_server(config)
     server.run(transport="streamable-http", host=config.host, port=config.port,
                path=config.path, middleware=[ASGIMiddleware(
                    LoopbackHeaders, port=config.port, demo_enabled=config.context == "test")],
-               uvicorn_config={"access_log": False, "proxy_headers": False}, log_level="warning")
+               uvicorn_config={"access_log": False, "proxy_headers": False}, log_level="warning",
+               show_banner=False)  # o banner consulta o PyPI por atualizacoes: sem rede aqui
     return 0
 
 if __name__ == "__main__":
