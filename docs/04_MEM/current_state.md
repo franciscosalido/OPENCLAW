@@ -5,26 +5,80 @@
 > meaningful sessions.
 
 **Last updated: 2026-11-18
-**Updated by: Claude (turno autonomo Fase 1, coordenado com Dots) — DL-PR06
+**Updated by: Claude (turno autonomo Fase 1, coordenado com Dots) — DL-PR07 / fechamento da Fase 1
 
 ---
 
 ## TURNO / COORDENACAO — Fase 1 do Lab (Claude x Dots)
 
-- Turno atual: **Claude**, iniciado em 2026-11-18 a pedido de Francisco
-  (encadear DL-PR05 -> fim da Fase 1 sem confirmacao a cada passo).
-- Nenhuma tarefa do Dots em andamento foi encontrada no inicio do turno:
-  checkout limpo em `feat/dl-pr04-implied-vol` (`629df7e`), sem branches
-  novas na origem e sem `openclaw-main-gates.patch` no repo.
-- Claude trabalha em clone isolado e so publica **branches locais** neste
-  repo (sem trocar a branch do checkout enquanto o turno durar). Claude
-  **nao tem credencial de push nem de merge**: abrir PR e mergear sao acoes
-  humanas (ou do Dots, se autorizado).
-- Fila de integracao, em ordem: PR #131 (DL-PR04, local `629df7e`, falta
-  push) -> PR #130 (Codex) -> patch de hermeticidade do Codex (dois testes;
-  o arquivo ainda nao chegou ao repo) -> DL-PR05a -> DL-PR05b -> DL-PR06 ->
-  DL-PR07. As branches do Lab estao **empilhadas**; apos cada squash-merge,
-  rebasear a seguinte com `git rebase --onto origin/main <base-antiga>`.
+- **Turno do Claude encerrado em 2026-11-18.** Fase 1 implementada ate o
+  DL-PR07 em branches locais empilhadas; nada foi enviado a origem.
+- **Proximo turno: humano ou Dots**, pela fila abaixo. Claude **nao tem
+  credencial de push nem de merge**; por isso nenhum PR foi aberto.
+- Inicio do turno: nenhuma tarefa do Dots em andamento (checkout limpo em
+  `feat/dl-pr04-implied-vol` `629df7e`, sem branches novas na origem). O
+  `openclaw-main-gates.patch` do Codex (hermeticidade de dois testes) **nao
+  esta no repo**; continua pendente de entrega.
+- Checkout deixado em `feat/dl-pr07-mcp-server` (ponta da pilha), arvore
+  limpa, para que este arquivo reflita o estado mais recente.
+
+Fila de integracao (cada item: push -> PR -> revisao -> squash-merge):
+
+1. PR #131 — `feat/dl-pr04-implied-vol` (`629df7e`): falta so o push dos 3
+   commits do Adendo 2. Validado em Linux e macOS.
+2. PR #130 — `chore/tests-no-tracked-artifacts` (Codex).
+3. Patch de hermeticidade do Codex (2 testes) — precisa chegar ao repo.
+4. `feat/dl-pr05a-oplab-routes-errors-budget`
+5. `feat/dl-pr05b-oplab-transport-client`
+6. `feat/dl-pr06-chain-service`
+7. `feat/dl-pr07-mcp-server`
+
+As branches 4-7 estao **empilhadas** sobre a 1. Depois de cada squash-merge,
+rebasear a seguinte: `git rebase --onto origin/main <ponta-da-anterior>
+<branch>`. Sem conflito esperado: cada PR toca modulos proprios; os pontos
+comuns sao `current_state.md`, ADR-0023, `BACKLOG.md` e o teste de
+fronteiras, sempre em ordem de pilha.
+
+Pendencias que so um humano resolve: push/PR/merge; assinatura e token da
+OpLab (estado B); medicao de latencia nativa em macOS; assinatura do
+ADR-0024 (so para a Fase 3).
+
+---
+
+## READY FOR PR — Lab de Derivativos DL-PR07 (servidor MCP + fechamento da Fase 1)
+
+Current branch: `feat/dl-pr07-mcp-server`
+
+Base: `feat/dl-pr06-chain-service` (empilhada).
+
+Scope:
+
+- Added `backend/derivatives/mcp/derivatives_server.py`: servidor
+  `quimera-derivatives` (loopback, 8814) com `derivatives_health`,
+  `derivatives_chain` (sempre `LIVE_NOT_ACTIVATED` na Fase 1) e
+  `derivatives_chain_demo` (so com `QUIMERA_DERIV_CONTEXT=test`);
+  `production_view` como barreira unica; `chain_view` compacta.
+- `backend/derivatives/config.py`: `fixture_dir`
+  (`QUIMERA_DERIV_FIXTURE_DIR`).
+- Tests: `test_derivatives_mcp.py` (61) + fronteiras: `backend.mcp` e
+  `fastmcp` so em `mcp/`; relogio real so em `system_clock`.
+- Docs: `SDD_DL-PR07.md` (com tabela de fechamento CS1-CS11), ADR-0023,
+  BACKLOG.
+
+Validation (Linux aarch64, Python 3.12.16, deps do `uv.lock`):
+
+- `pytest tests/ --ignore=tests/integration` rc 0 (8.028 passed, 15
+  skipped); Lab + arquitetura 5.891 passed (3 ordens).
+- `mypy backend/ --strict` 0 (153 arquivos); `pyright backend/` 0.
+- Producao 205 linhas (<= 400); protegidos intocados; sem dependencia nova.
+- Fumaca HTTP real em loopback (contextos `test` e `prod`): ok.
+
+Scope intentionally unchanged:
+
+- Sem provedor ao vivo, sem token, sem chamada real, sem escrita, sem
+  ordens; DL-PR08 (CLI opcional) nao foi feito.
+- Next: integrar a fila acima; depois, homologacao (estado B) quando houver
+  assinatura OpLab.
 
 ---
 
