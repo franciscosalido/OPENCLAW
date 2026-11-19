@@ -8,15 +8,15 @@
 
 ## Fase 02 — Marco 2A
 
-PR atual: DL2-PR02 — MERGEADO (PR #143, GO na primeira rodada de revisão). Estado A.
-Base: `main` após o squash do #143. ADR-0025 aceito, L1..L5 vigentes.
-Entregue: `backend/derivatives/domain/carry.py` (131 linhas), isolado. `resolve_carry` revalida
-termos e premissa, exige série e data iguais e só devolve `q > 0` com ajuste `UNPROTECTED`.
-Premissa ausente é recusa, nunca `q = 0`. A guarda de imports cobre alcance transitivo,
-literais e uma prova em interpretador novo.
-Gate do head aprovado, Linux aarch64 limpo: 8.539 aprovados, 16 pulados, 261 subtestes.
-Mutação do revisor: 28 de 28, depois de dois testes acrescentados na revisão.
-[Cartão, REDs, evidências e revisão](../specs/derivatives/fase2/DL2-PR02.md).
+PR atual: DL2-PR03 — EM_REVISAO. Estado A.
+Base: `ad86380` (DL2-PR02, PR #143). ADR-0025 e Adendo 1 do SDD vigentes.
+O núcleo isolado recebe a árvore pronta; a parametrização CRR e a entrada composta
+validam domínio, probabilidade e representabilidade. O exercício americano inclui a raiz.
+REDs comportamentais `c81fdb4` e `e4c2db0`; implementação `78a90fe`.
+Gates do autor em clones limpos macOS arm64 e Linux aarch64: 9.085 aprovados,
+16 pulados, 261 subtestes em cada um. Mypy estrito e Pyright em zero.
+Mutação do autor: 18 mortos em 18. Demo idêntica à base em cada plataforma.
+[Cartão, comandos e evidências do autor](../specs/derivatives/fase2/DL2-PR03.md).
 
 Riscos abertos:
 - Manual B3 de 01/07/2026, §3.3.1: puts de ações, BDRs e ETFs são só europeias. O CRR
@@ -24,11 +24,9 @@ Riscos abertos:
 - §3.2.9 do mesmo manual cobre opções sobre ações; BOVA11 segue com ajuste `UNKNOWN` (L5).
 - Guarda por alcance não vê salto por `config/` a partir de `scripts/`, nem import dinâmico
   relativo dentro de função. Dono: PR da ponte (Marco 2B).
-- Tolerância CRR × BSM do par 200/201 e identificadores das recusas do critério 5: têm de
-  entrar no cartão do DL2-PR03, antes do GREEN.
 - Verificador do digest numérico da Fase 01 ainda fora do repositório (PR do Claude).
 
-Próxima ação (uma só): Claude escreve o cartão do DL2-PR03 (núcleo binomial e CRR).
+Próxima ação: o orquestrador publica o rascunho para a revisão independente de Claude.
 
 ## Fase 01 do Lab de Derivativos — CONCLUIDA e integrada na `main` (estado A)
 

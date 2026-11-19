@@ -549,3 +549,116 @@ FAILED tests/unit/derivatives/test_binomial.py::test_h1_american_put - assert...
 FAILED tests/unit/derivatives/test_binomial.py::test_crr_refuses_inadmissible_probability
 2 failed in 0.06s
 ```
+
+Commit do RED 2: `e4c2db0`. Ambos os REDs são ancestrais do GREEN `78a90fe`.
+
+### GREEN e resultados numéricos
+
+O núcleo percorre colunas de igual número de altas. Em cada coluna, desconta os dois filhos
+e compara com o exercício em cada nó americano. A coluna da raiz parte do spot recebido.
+O armazenamento cresce linearmente com o número de passos. A implementação tem 153 linhas.
+
+| Verificação no Mac | Resultado | Limite do cartão |
+|---|---:|---:|
+| Maior erro absoluto contra BSM, N = 200/201 | 0.02914340214 | 0.15 |
+| Maior erro absoluto contra BSM, N = 1000/1001 | 0.00583161654 | 0.03 |
+| Maior fração do limite individual de (b) | 0.799790 | 1 |
+| Razão entre as somas dos erros médios dos pares | 0.218538 | 0.30 |
+| Maior erro de paridade | 1.125e-11 (arredondado para cima) | 1e-9 |
+| Pico por tracemalloc, americana N = 1000 | 95.344 bytes | < 1 MiB |
+
+H1–H5 passaram com as três igualdades exatas. As 432 combinações passaram nas duas
+desigualdades exatas, incluindo as 72 calls e 144 puts nas regiões de igualdade aproximada.
+A call adicional com taxa negativa passou no teste de prêmio acima de 0.5. O focal deu
+576 aprovados (543 de contrato, três de isolamento do binomial e 30 da guarda já publicada).
+Os testes cobrem as três entradas públicas, os oito códigos, a mensagem e a precedência.
+
+### Mutação do autor
+
+Cada execução partiu de um clone temporário novo de `78a90fe`, com uma única alteração.
+O pytest parou na primeira falha (`-x`), com rc 1 e teste executado nos 18 casos.
+Os dois controles sem alteração deram 543 aprovados, rc 0, antes e depois da série.
+
+| Nº | Alteração única | Teste que detectou a alteração |
+|---:|---|---|
+| 1 | Suprimir exercício | `test_h1_american_put` |
+| 2 | Exercício só na raiz | `test_h1_american_put` |
+| 3 | Suprimir exercício na raiz | `test_hand_tree[H2]`, americana em 26.098353960057114 |
+| 4 | Exercício com o preço do filho de baixa | `test_h1_american_put` |
+| 5 | Trocar os pesos dos filhos | `test_hand_tree[H1]`, europeia em 8.83185492707931 |
+| 6 | Suprimir desconto | `test_h1_american_put` |
+| 7 | Trocar o sinal dos payoffs | `test_h1_american_put` |
+| 8 | Dividir o prazo por N + 1 | `test_european_bsm_and_parity`, erro 0.05651788 excede (b) |
+| 9 | Calcular up com dt no lugar da raiz de dt | `test_crr_formulas`, primeiro caso |
+| 10 | Calcular a probabilidade com r | `test_crr_formulas`, primeiro caso |
+| 11 | Descontar com r − q | `test_crr_formulas`, primeiro caso |
+| 12 | Aceitar p = 1.0 | `test_tree_refusals`, probabilidade igual a 1.0 |
+| 13 | Aceitar N = 5001 | `test_price_refusals`, passos acima do teto |
+| 14 | Construir árvore no vencimento | `test_expiry`, call americana no dinheiro |
+| 15 | Devolver zero para σ = 0 com prazo positivo | `test_price_refusals`, volatilidade zero |
+| 16 | Aplicar máximo também à europeia | `test_hand_tree[H1]` |
+| 17 | Recuperar o spot da raiz do preço acumulado de altas | `test_grid`, 29.999999999999986 < 30.0 |
+| 18 | Aceitar int nos campos float | `test_price_refusals`, spot inteiro |
+
+**18 mortos, zero sobreviventes.** O executor local é `mutate.py`. A pasta `mutations/`
+contém `m01.patch` a `m18.patch` e os respectivos logs com comando, SHA-256 do módulo,
+asserção e resultado. Os controles são `m00.log` e `m19.log`.
+
+### Regressão e CLI por plataforma
+
+Gates do autor em clones limpos da base `ad86380` e da implementação `78a90fe`.
+O diretório local de evidências dos comandos abaixo é `/private/tmp/dl2-pr03.2Ue7tX`.
+
+| Execução | macOS 15.8.1 arm64 | Linux aarch64 |
+|---|---:|---:|
+| Pytest na base | 8.539 aprovados | 8.539 aprovados |
+| Pytest na implementação | 9.085 aprovados | 9.085 aprovados |
+| Pulados / subtestes aprovados, nas duas árvores | 16 / 261 | 16 / 261 |
+| Mypy estrito em backend | 159 arquivos, zero erros | 159 arquivos, zero erros |
+| Pyright em backend | 0 erros, 0 avisos de análise | 0 erros, 0 avisos de análise |
+| Demo offline, base × implementação por cmp | rc 0, 67.097 bytes | rc 0, 67.101 bytes |
+| CLI padrão, base e implementação | LIVE_NOT_ACTIVATED, A, rc 3 | LIVE_NOT_ACTIVATED, A, rc 3 |
+
+SHA-256 da demo no Mac: `a7d82699b47d31acec31995ccea3cf4149ebcb92311f980fb23390627b1de9c3`.
+No Linux: `f4f8003f2021b2744202c782f6e5245872c09d7f9d1968a3356466a7e85ead08`.
+No JSON do CLI padrão, só o instante `as_of` variou entre a base e a implementação.
+A comparação byte a byte cobre a demo completa. O verificador separado do digest numérico
+histórico da Fase 01 segue com Claude.
+
+Ambas as plataformas usaram Python 3.12.13. O bootstrap do repositório declara uv mínimo
+0.4.0. No Mac, uv 0.12.1 usou o ambiente existente com bytecode desativado e cache
+temporário. No Linux, uv 0.11.20 usou a imagem ARM64 local `openclaw-sandbox`
+(`943825bb4a63`), sem rede, com clone em sistema de arquivos Linux. O Git veio da imagem
+local `node:22-bookworm`. A imagem do projeto trazia Click 8.3.3; o lock exige 8.4.1.
+O código e os metadados do Click 8.4.1 já instalado (`py3-none-any`) foram montados
+somente para leitura no contêiner descartável. A execução com Click 8.3.3 está identificada
+como diagnóstico. O confronto das versões ativas com `uv export --offline --frozen`
+confirmou 102 requisitos no Mac e 104 no Linux nas execuções válidas.
+
+Reprodução dos gates a partir deste clone, com os executores do diretório de evidências:
+
+```sh
+L=/private/tmp/dl2-pr03.2Ue7tX
+"$L/mac-gates" base "$L/base-mac"
+"$L/mac-gates" head "$L/head-mac"
+"$L/linux-run" base "$L/base-linux"
+"$L/linux-run" head "$L/head-mac"
+python3 "$L/compare.py" head
+python3 "$L/mutate.py" "$PWD"
+```
+
+`mac-run` e `gates.sh` registram o ambiente e os argumentos. O comando comum é
+`uv run --offline --frozen --no-sync --no-env-file`, seguido de
+`python -m pytest tests/ -q --ignore=tests/integration --timeout=120`,
+`python -m mypy backend/ --strict`, `pyright --pythonpath "$UV_PROJECT_ENVIRONMENT/bin/python" backend/`
+ou um dos dois comandos do CLI prescritos acima. A prova de isolamento usa AST e um
+interpretador novo com rede bloqueada. A revisão independente e sua lista de mutações
+cabem a Claude.
+
+Logs da implementação em `logs/mac-head/` e `logs/linux-head/`; bases em `logs/mac-base/`
+e `logs/linux-base/`. Cada diretório traz `pytest.log`, `gates.log` e os resultados
+individuais. As medições estão em `mac-metrics.log`; o focal, em `mac-focused.log`.
+O executor `scope.py` confere o prefixo de 26.633 bytes do cartão, o hash do adendo,
+os seis caminhos, os limites do bloco de memória e os diffs protegidos.
+
+**EM_REVISAO.** Entrega local ao orquestrador para publicação em rascunho e revisão de Claude.
