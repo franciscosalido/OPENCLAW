@@ -38,6 +38,16 @@ focal() {
 - `focal`, rc 1, **47 falhas e 39 aprovações**. A contagem inclui contratos e controles que já
   passavam no head. O congelamento precede todas as correções de produção.
 
+O primeiro congelamento ficou em `6078aac`. Na conferência das APIs públicas, o método
+legado `copy` do Pydantic também devolveu uma instância com emissor inválido. A pilha de
+entrega parte de um segundo commit exclusivamente de testes e cartão, filho de `6078aac`,
+ainda com a produção idêntica a `f36f644`. Os 86 testes anteriores foram preservados.
+
+- B1 complementar — `focal -k b1_legacy_copy`, rc 1, três falhas `DID NOT RAISE`.
+  Foram aceitos lote nulo, emissor inválido e remoção do campo obrigatório por projeção.
+  Houve três avisos de depreciação. Com os 89 testes congelados, `focal` devolveu rc 1,
+  **50 falhas e 39 aprovações**. As correções foram reaplicadas depois desse registro.
+
 ## Histórico do primeiro candidato (até f36f644)
 
 ## SPEC_PRONTA

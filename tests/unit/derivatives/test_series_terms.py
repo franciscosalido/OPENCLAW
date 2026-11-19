@@ -201,6 +201,30 @@ def test_b1_deep_update_rechecks_the_whole_record() -> None:
         complete.model_copy(update={"evidence": evidence(policy) | {"extra": 1}}, deep=True)
 
 
+def test_b1_legacy_copy_checks_terms() -> None:
+    original = terms()
+    with pytest.raises(TermsRefusal):
+        original.copy(update={"contract_size": None})
+    with pytest.raises(ValidationError):
+        original.copy(update={"adjustment_policy": AdjustmentPolicy.PROTECTED})
+    assert original.copy(update={"contract_size": 41}).contract_size == 41
+
+
+def test_b1_legacy_copy_checks_evidence() -> None:
+    doc = AdjustmentEvidence.model_validate(evidence(AdjustmentPolicy.PROTECTED))
+    with pytest.raises(ValidationError):
+        doc.copy(update={"issuer": "fixture"})
+    assert doc.copy(update={"version": " rev2 "}, deep=True).version == "rev2"
+
+
+def test_b1_legacy_copy_cannot_drop_required_fields() -> None:
+    original = terms()
+    with pytest.raises(ValueError, match="model_dump"):
+        original.copy(exclude={"contract_size"})
+    with pytest.raises(ValueError, match="model_dump"):
+        original.copy(include={"strike"})
+
+
 def test_b2_policy_description_in_public_schema() -> None:
     schema = SeriesTerms.model_json_schema()["$defs"]["AdjustmentPolicy"]
     description = schema.get("description", "").casefold()
