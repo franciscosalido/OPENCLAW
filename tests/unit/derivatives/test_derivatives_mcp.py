@@ -175,9 +175,12 @@ async def test_invalid_inputs_return_sanitized_errors_never_exceptions(
 ) -> None:
     response = await _call(create_derivatives_server(TEST, clock=clock), tool,
                            symbol=symbol, due_date=due_date)
-    assert response["ok"] is False
-    assert response["data"] == {}
-    assert isinstance(response["error"], str) and 0 < len(response["error"]) <= 240
+    if tool == "derivatives_chain":
+        assert response["data"]["status"] == LIVE_NOT_ACTIVATED
+        assert QUOTE_KEYS.isdisjoint(response["data"])
+    else:
+        assert response["ok"] is False and response["data"] == {}
+        assert response["error"] == "INVALID_ARGUMENTS"
 
 
 async def test_lowercase_symbol_is_normalized() -> None:
@@ -238,16 +241,16 @@ async def test_demo_refuses_without_test_context_or_valid_fixture(
 async def test_demo_unknown_symbol_is_a_sanitized_error() -> None:
     response = await demo_tool("VALE3", "2026-11-19", config=TEST, root=Path.cwd())
     assert response["ok"] is False
-    assert "fixture ausente" in str(response["error"])
+    assert response["error"] == "DEMO_UNAVAILABLE"
 
 
 async def test_fixture_never_reaches_the_production_tool_even_when_forged_live() -> None:
     transport = ProvenanceTransport({})
     response = await chain_tool("BOVA11", "2026-11-19", config=FORGED_LIVE, clock=clock,
                                 live_service=_service(transport))
-    assert transport.calls == 4
-    assert response["ok"] is False and response["data"] == {}
-    assert "dado de teste bloqueado" in str(response["error"])
+    assert transport.calls == 0
+    assert response["data"]["status"] == LIVE_NOT_ACTIVATED
+    assert QUOTE_KEYS.isdisjoint(response["data"])
     assert "150" not in json.dumps(response)
 
 
@@ -256,19 +259,12 @@ async def test_a_single_test_read_blocks_the_production_tool(
     fixture_route: MarketRoute,
 ) -> None:
     overrides = {route: Provenance.OBSERVED for route in MarketRoute if route != fixture_route}
+    transport = ProvenanceTransport(overrides)
     response = await chain_tool("BOVA11", "2026-11-19", config=FORGED_LIVE, clock=clock,
-                                live_service=_service(ProvenanceTransport(overrides)))
-    assert response["ok"] is False and response["data"] == {}
-
-
-async def test_only_fully_observed_data_passes_the_production_barrier() -> None:
-    response = await chain_tool("BOVA11", "2026-11-19", config=FORGED_LIVE, clock=clock,
-                                live_service=_service(ProvenanceTransport(ALL_OBSERVED)))
-    assert response["ok"] is True and response["degraded"] is False
-    data = response["data"]
-    assert (data["status"], data["purpose"], data["provenance"]) == (
-        "OK", "production", "observed")
-    assert data["row_count"] == 100 and data["as_of"] == CLOCK_NOW.isoformat()
+                                live_service=_service(transport))
+    assert transport.calls == 0
+    assert response["data"]["status"] == LIVE_NOT_ACTIVATED
+    assert QUOTE_KEYS.isdisjoint(response["data"])
 
 
 @pytest.mark.parametrize(
@@ -292,14 +288,14 @@ async def test_activated_without_live_service_is_still_not_activated() -> None:
     assert response["data"]["status"] == LIVE_NOT_ACTIVATED
 
 
-async def test_live_failure_is_an_error_and_never_falls_back_to_fixture() -> None:
+async def test_live_failure_is_unreachable_and_never_falls_back_to_fixture() -> None:
     failure = RateLimitedError("OpLab respondeu status 429", status=429)
     transport = ProvenanceTransport(ALL_OBSERVED, fail=failure)
     response = await chain_tool("BOVA11", "2026-11-19", config=FORGED_LIVE, clock=clock,
                                 live_service=_service(transport))
-    assert transport.calls == 1
-    assert response == {"schema_version": "quimera-mcp-response-v1", "ok": False,
-                        "degraded": False, "data": {}, "error": "OpLab respondeu status 429"}
+    assert transport.calls == 0
+    assert response["data"]["status"] == LIVE_NOT_ACTIVATED
+    assert QUOTE_KEYS.isdisjoint(response["data"])
 
 
 async def test_contamination_survives_model_copy_json_and_reuse() -> None:
@@ -338,5 +334,89 @@ def test_main_binds_loopback_with_configured_port_and_never_passes_a_live_servic
     monkeypatch.delenv("QUIMERA_DERIV_CONTEXT", raising=False)
     monkeypatch.delenv("QUIMERA_DERIV_PROVIDER_MODE", raising=False)
     assert main() == 0
-    assert captured == {"transport": "streamable-http", "host": "127.0.0.1", "port": 8814,
-                        "path": "/mcp"}
+    assert (captured["transport"], captured["host"], captured["port"], captured["path"]) == (
+        "streamable-http", "127.0.0.1", 8814, "/mcp")
+    assert captured["uvicorn_config"] == {"access_log": False, "proxy_headers": False}
+
+
+async def test_phase_a_blocks_combined_promotion() -> None:
+    from dataclasses import replace
+
+    priced = await _service(FixtureTransport(SYNTHETIC)).build(
+        "BOVA11", date(2026, 11, 19), now=CLOCK_NOW)
+    stamp = replace(priced.chain.stamp, provenance=Provenance.OBSERVED,
+                    purpose=Purpose.PRODUCTION)
+    promoted = priced.model_copy(update={"chain": priced.chain.model_copy(
+        update={"stamp": stamp, "purpose": Purpose.PRODUCTION})})
+    assert promoted.purpose is Purpose.PRODUCTION
+    with pytest.raises(ProvenanceBarrierError):
+        production_view(promoted, readiness=Readiness.C_PROMOTED, as_of=CLOCK_NOW)
+
+
+async def test_phase_a_precedes_input_and_service() -> None:
+    transport = ProvenanceTransport(ALL_OBSERVED)
+    server = create_derivatives_server(FORGED_LIVE, clock=clock, live_service=_service(transport))
+    for symbol in ("BOVA11", ""):
+        response = await _call(server, "derivatives_chain", symbol=symbol, due_date="2026-11-19")
+        assert response["data"]["status"] == LIVE_NOT_ACTIVATED
+        assert response["data"]["readiness"] == "A"
+        assert QUOTE_KEYS.isdisjoint(response["data"])
+    assert transport.calls == 0
+    assert (await _call(server, "derivatives_health"))["details"]["readiness"] == "A"
+
+
+async def test_demo_rejects_external_directory_before_read(monkeypatch, tmp_path) -> None:
+    def unexpected_read(*args, **kwargs):
+        pytest.fail("tentativa de ler diretorio externo")
+
+    from backend.derivatives.oplab import demo_fixture
+
+    monkeypatch.setattr(Path, "open", unexpected_read)
+    monkeypatch.setattr(demo_fixture.os, "open", unexpected_read)
+    config = DerivativesMcpConfig(context="test", fixture_dir=str(tmp_path / "synthetic"))
+    result = await demo_tool("BOVA11", "2026-11-19", config=config, root=Path.cwd())
+    assert not result["ok"] and result["data"] == {}
+
+
+async def test_demo_error_is_constant(caplog) -> None:
+    result = await _call(create_derivatives_server(TEST), "derivatives_chain_demo",
+                         symbol="BOVA11", due_date="MARCADOR_SINTETICO")
+    assert result["error"] == "INVALID_ARGUMENTS"
+    assert "MARCADOR_SINTETICO" not in caplog.text
+
+
+@pytest.mark.parametrize("changed", [
+    "manifest.json", "market_interest_rates.json", "market_options_BOVA11.json",
+    "market_status.json", "market_stocks_BOVA11.json",
+])
+async def test_demo_rejects_mismatched_manifest_or_payload(changed, monkeypatch) -> None:
+    from backend.derivatives.oplab import demo_fixture
+
+    original_open = demo_fixture.os.open
+    substituted = []
+
+    def changed_file(name, flags, *, dir_fd=None):
+        assert flags & demo_fixture.os.O_NOFOLLOW
+        if name == changed:
+            substituted.append(name)
+            # Apenas arquivos sintéticos do próprio diretório, inclusive para o manifesto.
+            name = "market_status.json" if name != "market_status.json" else "manifest.json"
+        return original_open(name, flags, dir_fd=dir_fd)
+
+    monkeypatch.setattr(demo_fixture.os, "open", changed_file)
+    response = await demo_tool("BOVA11", "2026-11-19", config=TEST, root=Path.cwd())
+    assert substituted == [changed]
+    assert response["error"] == "DEMO_UNAVAILABLE" and response["data"] == {}
+
+
+async def test_in_memory_invalid_tool_calls_have_fixed_errors(caplog) -> None:
+    import logging
+
+    caplog.set_level(logging.DEBUG)
+    marker = "MARCADOR_DE_ARGUMENTO"
+    async with Client(create_derivatives_server(TEST)) as client:
+        for name, args in ((marker, {}), ("derivatives_chain_demo", {marker: "x"})):
+            with pytest.raises(ToolError) as error:
+                await client.call_tool(name, args)
+            assert marker not in str(error.value)
+    assert marker not in caplog.text

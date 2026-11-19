@@ -5,7 +5,7 @@ from datetime import date, datetime
 from typing import Literal
 from pydantic import BaseModel, ConfigDict
 
-VENDOR_MODEL_CONFIG = ConfigDict(extra="allow", frozen=True)
+VENDOR_MODEL_CONFIG = ConfigDict(extra="allow", frozen=True, allow_inf_nan=False)
 
 class VendorPayloadError(ValueError):
     """Forma inesperada de payload; a mensagem nunca inclui o payload bruto."""

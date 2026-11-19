@@ -16,7 +16,7 @@
   NumPy/SciPy/pandas, Ruff/Black, qualquer dependencia nova.
 - Persistencia em PostgreSQL (snapshots duraveis entram na Fase 2 com
   migracao propria).
-- CLI alem de um wrapper fino opcional (DL-PR07).
+- CLI alem de um wrapper fino opcional (DL-PR08).
 - Alterar `CLAUDE.md`, `AGENTS.md`, `.claude/`.
 
 ## Itens nomeados (fora do Lab ou de fase futura)

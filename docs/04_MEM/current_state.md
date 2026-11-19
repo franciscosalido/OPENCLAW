@@ -4,12 +4,34 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Last updated: 2026-11-18
-**Updated by: Claude (turno autonomo Fase 1, coordenado com Dots) — DL-PR07 / fechamento da Fase 1
+**Atualizado em 2026-11-19 por Codex/Dots no clone dedicado do Mac.**
+
+## Candidata local de conciliação da Fase 01
+
+A candidata para revisão está no worktree de `review/fase01-claude-dots`,
+com HEAD `6892c82` (pilha Claude). As mudanças locais incorporam as guardas
+selecionadas de `847eb9c` (pilha Dots). O histórico da fila Claude está
+preservado abaixo. A próxima decisão é a revisão do diff desta candidata.
+
+- Saúde e produção informam A. A tool produtiva devolve LIVE_NOT_ACTIVATED
+  mesmo com C e serviço injetados. A demo serve a BOVA11 de 100 opções
+  a partir dos bytes sintéticos verificados.
+- O preflight ASGI protege o transporte Streamable HTTP local. O contrato
+  do cliente Market roda com MockTransport explícito e mantém o cooldown
+  de Retry-After. Os erros de schema têm respostas fixas.
+- Darwin arm64, Python 3.12.13, Lab + arquitetura com 5.915 testes aprovados.
+  Mypy strict passou nos 155 arquivos do backend. O gate global e o benchmark
+  nativo dedicado não foram executados neste checkout. A verificação nativa
+  da base Claude em cópia descartável ficou com o coordenador.
+- Os critérios CS1–11 continuam no DL-PR07. A revisão independente de Claude
+  e a decisão de integração permanecem pendentes. O trabalho ficou local,
+  sem commit, push, merge ou deploy.
+
+[Contrato, evidências e limites da candidata](../specs/derivatives/SDD_conciliacao_fase01.md)
 
 ---
 
-## TURNO / COORDENACAO — Fase 1 do Lab (Claude x Dots)
+## Histórico de coordenação — turno Claude de 2026-11-18
 
 - **Turno do Claude encerrado em 2026-11-18.** Fase 1 implementada ate o
   DL-PR07 em branches locais empilhadas; nada foi enviado a origem.

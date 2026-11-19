@@ -67,7 +67,7 @@ def _http(
     request_budget = RequestBudget(budget or Budget(), key=credential_key(TOKEN))
     return HttpTransport(
         cfg or Oplab(), request_budget, env=ENV if env is None else env,
-        client_factory=lambda: httpx.AsyncClient(transport=httpx.MockTransport(recorder)),
+        mock_transport=httpx.MockTransport(recorder),
     )
 
 
@@ -80,6 +80,7 @@ def _assert_no_token(error: BaseException) -> None:
     assert TOKEN not in repr(error)
     assert TOKEN not in repr(vars(error))
     assert error.__cause__ is None
+    assert error.__context__ is None
 
 
 async def test_success_sends_one_get_with_the_token_header_only() -> None:
@@ -251,15 +252,13 @@ def test_retries_are_refused_at_construction() -> None:
         HttpTransport(Oplab(), budget, env=ENV)
 
 
-async def test_default_client_never_follows_redirects_and_uses_the_yaml_timeout() -> None:
+async def test_mock_client_uses_the_yaml_timeout() -> None:
     budget = RequestBudget(Budget(timeout_s=3.5), key=credential_key(TOKEN))
-    transport = HttpTransport(Oplab(), budget, env=ENV)
-    client = transport._client_factory()  # inspecao do default do construtor
-    try:
-        assert client.follow_redirects is False
-        assert client.timeout == httpx.Timeout(3.5)
-    finally:
-        await client.aclose()
+    recorder = Recorder(_json())
+    transport = HttpTransport(Oplab(), budget, env=ENV, mock_transport=httpx.MockTransport(recorder))
+    await _status(transport)
+    request, = recorder.requests
+    assert request.extensions["timeout"] == httpx.Timeout(3.5).as_dict()
 
 
 async def test_default_environment_flag_blocks_real_transport() -> None:
@@ -338,3 +337,48 @@ def test_redact_replaces_every_occurrence_and_tolerates_absence() -> None:
     assert redact("sem segredo", TOKEN) == "sem segredo"
     assert redact("texto", None) == "texto"
     assert redact("texto", "") == "texto"
+
+
+async def test_phase_a_without_mock_refuses_before_reading_credentials() -> None:
+    class NoCredential(dict):
+        def get(self, key, default=None):
+            assert key != "OPLAB_TOKEN"
+            return super().get(key, default)
+
+    budget = RequestBudget(Budget(), key="teste")
+    with pytest.raises(NetworkForbiddenError):
+        await _status(HttpTransport(Oplab(), budget, env=NoCredential()))
+
+
+async def test_phase_a_refuses_unrecognised_transport() -> None:
+    class Unrecognised(httpx.AsyncBaseTransport):
+        async def handle_async_request(self, request):
+            pytest.fail("transporte fora do contrato de simulação")
+
+    budget = RequestBudget(Budget(), key="teste")
+    transport = HttpTransport(Oplab(), budget, env={}, mock_transport=Unrecognised())
+    with pytest.raises(NetworkForbiddenError):
+        await _status(transport)
+
+
+@pytest.mark.parametrize("delay", ["9" * 30, "9" * 400], ids=["beyond_datetime", "beyond_float"])
+async def test_unrepresentable_retry_after_still_blocks_without_retry(delay) -> None:
+    recorder = Recorder(_json(429, **{"Retry-After": delay}))
+    transport = _http(recorder)
+    with pytest.raises(RateLimitedError) as limited:
+        await _status(transport)
+    assert limited.value.next_eligible_at == datetime.max.replace(tzinfo=UTC)
+    with pytest.raises(BudgetExceededError):
+        await _status(transport)
+    assert len(recorder.requests) == 1
+
+
+async def test_explicit_zero_network_flag_cannot_enable_io(monkeypatch) -> None:
+    def unexpected_client(*args, **kwargs):
+        pytest.fail("construiu cliente antes da guarda de fase")
+
+    monkeypatch.setattr(httpx, "AsyncClient", unexpected_client)
+    env = {**ENV, "QUIMERA_DERIV_FORBID_NETWORK": "0"}
+    transport = HttpTransport(Oplab(), RequestBudget(Budget(), key="teste"), env=env)
+    with pytest.raises(NetworkForbiddenError):
+        await _status(transport)

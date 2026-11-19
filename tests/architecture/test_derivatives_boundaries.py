@@ -257,8 +257,14 @@ def test_mcp_server_never_reads_credentials_or_opens_http() -> None:
     assert 'host="127.0.0.1"' not in text, "host vem da configuracao, nao de literal"
 
 
-def test_production_tool_module_has_one_barrier_before_serialization() -> None:
-    text = MCP_SERVER.read_text(encoding="utf-8")
-    assert text.count("def production_view(") == 1
-    assert text.count("= production_view(priced") == 1, "tool produtiva so sai pela barreira"
-    assert text.count("chain_view(priced, status=") == 2, "barreira e demo; nenhuma outra saida"
+def test_only_demo_can_project_quotes_in_phase_a() -> None:
+    module = ast.parse(MCP_SERVER.read_text(encoding="utf-8"))
+    functions = {node.name: node for node in module.body
+                 if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
+    barrier = functions["production_view"].body
+    assert len(barrier) == 2 and isinstance(barrier[1], ast.Raise)
+    users = {name for name, function in functions.items() for node in ast.walk(function)
+             if isinstance(node, ast.Name) and node.id == "_demo_view"}
+    assert users == {"demo_tool"}
+    names = {node.id for node in ast.walk(functions["chain_tool"]) if isinstance(node, ast.Name)}
+    assert names.isdisjoint({"production_view", "config", "live_service", "_inputs", "demo_tool"})

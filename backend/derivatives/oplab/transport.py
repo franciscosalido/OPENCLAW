@@ -3,8 +3,7 @@ A procedencia e atribuida aqui, pelo adaptador; ``OPLAB_TOKEN`` so e lido neste 
 from __future__ import annotations
 
 import json
-import os
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -75,18 +74,22 @@ class FixtureTransport:
             status, retry_after = self._scripted.pop(0)
             if status != 200:
                 raise classify_status(status, retry_after=retry_after, now=now, route=rendered)
-        path = self._directory / f"{rendered.strip('/').replace('/', '_')}.json"
-        if not path.is_file():
-            raise NotFoundError("fixture ausente para a rota", status=404, route=rendered)
-        payload: object = json.loads(path.read_text(encoding="utf-8"))
+        name = f"{rendered.strip('/').replace('/', '_')}.json"
+        try:
+            payload = self._payload(name)
+        except FileNotFoundError:
+            raise NotFoundError("fixture ausente para a rota", status=404, route=rendered) from None
         return VendorResponse(200, payload, {}, now, rendered, self._provenance)
 
+    def _payload(self, name: str) -> object:
+        return json.loads((self._directory / name).read_bytes())
+
 class HttpTransport:
-    """GET HTTPS para a OpLab: allowlist, orcamento, sem redirecionamento e sem retry."""
+    """Contrato HTTP em A: cliente isolado com MockTransport e ambiente de teste explícitos."""
 
     def __init__(
-        self, cfg: Oplab, budget: RequestBudget, *, env: Mapping[str, str] | None = None,
-        client_factory: Callable[[], httpx.AsyncClient] | None = None,
+        self, cfg: Oplab, budget: RequestBudget, *, env: dict[str, str] | None = None,
+        mock_transport: httpx.MockTransport | None = None,
     ) -> None:
         """Nao le o token nem abre rede na construcao.
 
@@ -97,16 +100,16 @@ class HttpTransport:
             raise ValueError("max_retries deve ser 0: nao ha retry na Fase 1")
         self._cfg = cfg
         self._budget = budget
-        self._env: Mapping[str, str] = os.environ if env is None else env
-        self._client_factory = client_factory or (lambda: httpx.AsyncClient(
-            timeout=budget.cfg.timeout_s, follow_redirects=False))
+        self._env = env
+        self._mock_transport = mock_transport
 
     async def get(
         self, route: MarketRoute, *, params: Mapping[str, str], now: datetime,
     ) -> VendorResponse:
         """Envia exatamente uma requisicao; todo erro vira ``OplabError`` sem o token."""
         rendered = render_route(route, **params)
-        if forbid_network(dict(self._env)):
+        if (type(self._mock_transport) is not httpx.MockTransport or type(self._env) is not dict
+                or forbid_network(self._env)):
             raise NetworkForbiddenError("rede proibida neste processo", route=rendered)
         url = str(self._cfg.base_url).rstrip("/") + rendered
         assert_allowed(url, ALLOWED_METHOD, self._cfg)
@@ -114,15 +117,19 @@ class HttpTransport:
         if not token:
             raise AuthError("credencial OpLab ausente no ambiente", route=rendered)
         self._budget.acquire(now)
-        client = self._client_factory()
+        client = httpx.AsyncClient(
+            transport=self._mock_transport, timeout=self._budget.cfg.timeout_s,
+            follow_redirects=False, trust_env=False,
+        )
         client.headers[TOKEN_HEADER] = token
+        failure: str | None = None
         try:
             async with client:
                 response = await client.get(url, follow_redirects=False)
         except httpx.HTTPError as exc:
-            # ``from None``: a excecao httpx carrega a requisicao (e o header do token).
-            raise TransportError(f"falha de transporte: {type(exc).__name__}",
-                                 route=rendered) from None
+            failure = type(exc).__name__
+        if failure is not None:
+            raise TransportError(f"falha de transporte: {failure}", route=rendered)
         status = response.status_code
         if 300 <= status < 400:
             raise ForbiddenHostError("redirecionamento nao aprovado", status=status,
@@ -133,10 +140,11 @@ class HttpTransport:
             if error.next_eligible_at is not None:
                 self._budget.block_until(error.next_eligible_at)
             raise error
+        safe = {name: response.headers[name] for name in SAFE_HEADERS if name in response.headers}
         try:
             payload: object = response.json()
         except ValueError:
-            raise TransportError("corpo da resposta nao e JSON", status=status,
-                                 route=rendered) from None
-        safe = {name: response.headers[name] for name in SAFE_HEADERS if name in response.headers}
-        return VendorResponse(status, payload, safe, now, rendered, Provenance.OBSERVED)
+            pass
+        else:
+            return VendorResponse(status, payload, safe, now, rendered, Provenance.OBSERVED)
+        raise TransportError("corpo da resposta nao e JSON", status=status, route=rendered)

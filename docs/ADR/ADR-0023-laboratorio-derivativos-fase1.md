@@ -45,11 +45,11 @@ ambiente do processo.
 ```text
 backend/derivatives/
   __init__.py  config.py  provenance.py          (DL-PR00)
-  oplab/    routes, vendor_models, transport, budget, errors, client  (DL-PR01/04)
+  oplab/    routes, vendor_models, transport, budget, errors, client  (DL-PR01/05)
   domain/   models, normalize, quality                                (DL-PR01)
-  pricing/  conventions, bsm, implied_vol, position                   (DL-PR02/03)
-  service/  chain_service                                             (DL-PR05)
-  mcp/      derivatives_server                                        (DL-PR06)
+  pricing/  conventions, bsm, implied_vol                             (DL-PR02–04)
+  service/  chain_service                                             (DL-PR06)
+  mcp/      derivatives_server                                        (DL-PR07)
 config/derivatives.yaml + config/derivatives_config_model.py          (DL-PR00)
 tests/fixtures/derivatives/{documental,synthetic}/
 ```
@@ -300,3 +300,15 @@ assinado).
   2026-11-05).
 - `tests/fixtures/derivatives/documental/manifest.json` — hashes SHA-256 das
   fixtures documentais.
+
+## Adendo de implementação da candidata local em 2026-11-19
+
+Em A, a indisponibilidade produtiva é incondicional. A guarda também se
+aplica a configurações e serviços construídos em código. A projeção produtiva
+sempre recusa. O cálculo de propósito não autentica um objeto reconstruído.
+Isso substitui a descrição anterior de ativação por três condições na
+implementação da Fase 1. B e C exigem homologação e implementação próprias.
+
+A demo usa o manifesto sintético fixado da BOVA11. O cliente HTTP só opera
+por injeção explícita de mock e ambiente de teste. O registro de validação
+da candidata está no [SDD de conciliação](../specs/derivatives/SDD_conciliacao_fase01.md).

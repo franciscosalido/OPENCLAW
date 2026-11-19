@@ -26,27 +26,32 @@ class OplabMarketClient:
         self, route: MarketRoute, parse: Callable[[object], T], now: datetime, **params: str,
     ) -> tuple[T, ProvenanceStamp]:
         response: VendorResponse = await self._transport.get(route, params=params, now=now)
-        try:
-            parsed = parse(response.json)
-        except ValidationError as exc:
-            # ``from None``: o erro do pydantic carrega os valores do payload bruto.
-            raise VendorPayloadError(
-                f"{response.route}: {exc.error_count()} erro(s) de validacao") from None
         stamp = ProvenanceStamp(
             provenance=response.provenance, purpose=purpose_of(response.provenance),
             source=f"{self._stamp_source}{response.route}", captured_at=response.received_at)
-        return parsed, stamp
+        try:
+            return parse(response.json), stamp
+        except ValidationError as exc:
+            count = exc.error_count()
+        # Fora do except: a exceção pública não retém o payload via __context__.
+        raise VendorPayloadError(f"resposta OpLab: {count} erro(s) de validacao")
 
     async def options_chain(
         self, symbol: str, *, now: datetime,
     ) -> tuple[tuple[VendorOption, ...], ProvenanceStamp]:
         """Opcoes do subjacente (todas as series devolvidas pelo fornecedor)."""
-        return await self._read(MarketRoute.OPTIONS_CHAIN, parse_vendor_options, now,
-                                symbol=symbol)
+        options, stamp = await self._read(MarketRoute.OPTIONS_CHAIN, parse_vendor_options,
+                                          now, symbol=symbol)
+        if any(option.parent_symbol not in (None, symbol) for option in options):
+            raise VendorPayloadError("subjacente divergente")
+        return options, stamp
 
     async def stock(self, symbol: str, *, now: datetime) -> tuple[VendorStock, ProvenanceStamp]:
         """Cotacao e metadados do ativo-objeto (``quotation_form``, ``contract_size``)."""
-        return await self._read(MarketRoute.STOCK, parse_vendor_stock, now, symbol=symbol)
+        stock, stamp = await self._read(MarketRoute.STOCK, parse_vendor_stock, now, symbol=symbol)
+        if stock.symbol != symbol:
+            raise VendorPayloadError("subjacente divergente")
+        return stock, stamp
 
     async def interest_rates(
         self, *, now: datetime,

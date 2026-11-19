@@ -143,3 +143,23 @@ async def test_no_method_returns_raw_json() -> None:
     ]
     for result in results:
         assert not isinstance(result, dict | list | str)
+
+
+@pytest.mark.parametrize("value", [float("inf"), float("-inf"), float("nan"), "1e999"])
+async def test_client_refuses_nonfinite_market_fields(value) -> None:
+    stub = StubTransport({"symbol": "BOVA11", "close": value}, Provenance.SYNTHETIC)
+    with pytest.raises(VendorPayloadError) as error:
+        await OplabMarketClient(stub, stamp_source=SOURCE).stock("BOVA11", now=NOW)
+    assert error.value.__context__ is None
+
+
+@pytest.mark.parametrize("method,payload", [
+    ("stock", {"symbol": "OUTRO_ATIVO"}),
+    ("options_chain", [{"symbol": "TEST123", "category": "CALL", "strike": 1,
+                        "due_date": "2026-11-19", "parent_symbol": "OUTRO_ATIVO"}]),
+])
+async def test_client_refuses_conflicting_underlying(method, payload) -> None:
+    client = OplabMarketClient(StubTransport(payload, Provenance.SYNTHETIC), stamp_source=SOURCE)
+    with pytest.raises(VendorPayloadError) as error:
+        await getattr(client, method)("BOVA11", now=NOW)
+    assert "OUTRO_ATIVO" not in str(error.value)

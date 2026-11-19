@@ -5,6 +5,9 @@ Branches: `feat/dl-pr05a-oplab-routes-errors-budget` (Parte A) e
 GitHub Issue: pendente (card READ-DO `DL-PR05_CARD.md` de 2026-11-06)
 Status: Partes A e B implementadas; aguardam PR e revisao
 
+**Adendo local de 2026-11-19.** A candidata restringe o contrato HTTP a MockTransport explícito e verifica números e símbolos na entrada do cliente.
+[Conciliação da Fase 01](SDD_conciliacao_fase01.md)
+
 ## Objective
 
 Um cliente OpLab **somente Market, somente GET, somente HTTPS, somente host
