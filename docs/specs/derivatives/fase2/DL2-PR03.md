@@ -529,3 +529,23 @@ E         Expected: 5.089632 ± 5.0e-05
 FAILED tests/unit/derivatives/test_binomial.py::test_h1_american_put - assert...
 1 failed in 0.07s
 ```
+
+Commit do RED 1: `c81fdb4`.
+
+### RED 2 — probabilidade inadmissível na parametrização
+
+A parametrização devolvia a árvore diretamente para σ = 0.01, r = 0.5 e um passo.
+A execução inclui o primeiro RED, ainda presente.
+
+```sh
+/private/tmp/dl2-pr03.2Ue7tX/mac-run python -m pytest -q tests/unit/derivatives/test_binomial.py
+```
+
+Trecho do stdout, rc 1. Log integral em `/private/tmp/dl2-pr03.2Ue7tX/mac-red2.log`.
+
+```text
+E       Failed: DID NOT RAISE <class 'backend.derivatives.pricing.binomial.BinomialRefusal'>
+FAILED tests/unit/derivatives/test_binomial.py::test_h1_american_put - assert...
+FAILED tests/unit/derivatives/test_binomial.py::test_crr_refuses_inadmissible_probability
+2 failed in 0.06s
+```
