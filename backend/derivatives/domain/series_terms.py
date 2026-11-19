@@ -3,13 +3,14 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from datetime import date
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from enum import StrEnum
 from typing import Annotated, Literal, Self
 from warnings import warn
 
 from pydantic import (
     BaseModel,
+    BeforeValidator,
     ConfigDict,
     Field,
     StringConstraints,
@@ -60,6 +61,18 @@ def _input_mapping(data: object) -> dict[str, object]:
     return dict(data)
 
 
+def _json_date(value: object, info: ValidationInfo) -> object:
+    if info.mode == "json" and isinstance(value, str):
+        parsed = date.fromisoformat(value)
+        if parsed.isoformat() != value:
+            raise ValueError("data JSON deve estar no formato AAAA-MM-DD")
+        return parsed
+    return value
+
+
+_CivilDate = Annotated[date, BeforeValidator(_json_date)]
+
+
 class _TermsModel(BaseModel):
     model_config = TERMS_CONFIG
 
@@ -87,9 +100,9 @@ class AdjustmentEvidence(_TermsModel):
     issuer: Literal["B3"]
     document: Text
     version: Text
-    published_on: date
+    published_on: _CivilDate
     symbol: Text
-    effective_on: date
+    effective_on: _CivilDate
     policy: AdjustmentPolicy
     _require_mapping = model_validator(mode="before")(_input_mapping)
 
@@ -102,7 +115,7 @@ class SeriesTerms(_TermsModel):
     """
 
     symbol: Text
-    effective_on: date
+    effective_on: _CivilDate
     source: Text
     strike: Annotated[Decimal, Field(gt=0, allow_inf_nan=False)]
     contract_size: Annotated[int, Field(gt=0)]
@@ -140,8 +153,13 @@ class SeriesTerms(_TermsModel):
 
     @field_validator("strike", mode="before")
     @classmethod
-    def require_decimal(cls, value: object) -> Decimal:
-        """Exige strike decimal finito e preserva os dígitos informados."""
+    def require_decimal(cls, value: object, info: ValidationInfo) -> Decimal:
+        """Lê o texto decimal em JSON ou um Decimal em Python e preserva a precisão."""
+        if info.mode == "json" and isinstance(value, str):
+            try:
+                value = Decimal(value)
+            except InvalidOperation as exc:
+                raise ValueError("strike JSON deve conter um decimal") from exc
         if not isinstance(value, Decimal) or not value.is_finite():
             raise ValueError("strike deve ser Decimal finito")
         return value
