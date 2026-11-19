@@ -58,3 +58,11 @@
   DL-PR03 = BSM + gregas, DL-PR04 = IV, DL-PR05 = cliente OpLab,
   DL-PR06 = ChainService + latencia, DL-PR07 = servidor MCP,
   DL-PR08 = CLI (opcional).
+- Cache de capturas com TTL (Redis/Postgres) so se medicao exigir (PR06+).
+- Homologacao (estado B): checklist de campos, unidades, limites reais e
+  formato real de `Retry-After` e dos corpos de erro da OpLab.
+- Registro global de `RequestBudget` por credencial (hoje: uma instancia
+  criada pela raiz de composicao) — so se houver mais de um transporte HTTP
+  no mesmo processo.
+- `vendor_models.py` tem 1 linha > 100 colunas pre-existente do DL-PR01
+  (detectada no DL-PR05); so formatacao.

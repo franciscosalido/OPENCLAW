@@ -147,3 +147,40 @@ def test_no_wall_clock_in_derivatives() -> None:
         or "datetime.utcnow(" in path.read_text(encoding="utf-8")
     ]
     assert hits == [], "tempo e sempre injetado no Laboratorio (sem relogio interno)"
+
+
+def test_oplab_does_not_import_pricing_adapters_or_mcp() -> None:
+    forbidden_prefixes = (
+        "backend.derivatives.pricing",
+        "backend.derivatives.adapters",
+        "backend.derivatives.domain",
+        "backend.derivatives.service",
+        "backend.derivatives.mcp",
+        "backend.mcp",
+        "mcp",
+    )
+    offenders: dict[str, list[str]] = {}
+    for path in _python_files(DERIVATIVES / "oplab"):
+        bad = sorted(name for name in _imports(path) if name.startswith(forbidden_prefixes))
+        if bad:
+            offenders[str(path)] = bad
+    assert offenders == {}, "oplab/ so conhece o fornecedor: sem pricing, dominio ou MCP"
+
+
+def test_oplab_never_sleeps() -> None:
+    hits = [
+        str(path)
+        for path in _python_files(DERIVATIVES / "oplab")
+        if "sleep(" in path.read_text(encoding="utf-8")
+    ]
+    assert hits == [], "o cliente nunca dorme: quem decide esperar e o chamador (DL-PR05)"
+
+
+def test_no_token_query_parameter_in_lab() -> None:
+    needle = "access" + "_token"
+    hits = [
+        str(path)
+        for path in _python_files(DERIVATIVES)
+        if needle in path.read_text(encoding="utf-8")
+    ]
+    assert hits == [], "token so viaja no header; parametro de query e proibido (ADR-0023)"

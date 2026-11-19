@@ -5,11 +5,67 @@
 > meaningful sessions.
 
 **Last updated: 2026-11-18
-**Updated by: Codex CLI (Adendo 2) + Claude (validacao Linux) — DL-PR04 Lab de Derivativos
+**Updated by: Claude (turno autonomo Fase 1, coordenado com Dots) — DL-PR05a
 
 ---
 
-## IN PROGRESS — Lab de Derivativos DL-PR04
+## TURNO / COORDENACAO — Fase 1 do Lab (Claude x Dots)
+
+- Turno atual: **Claude**, iniciado em 2026-11-18 a pedido de Francisco
+  (encadear DL-PR05 -> fim da Fase 1 sem confirmacao a cada passo).
+- Nenhuma tarefa do Dots em andamento foi encontrada no inicio do turno:
+  checkout limpo em `feat/dl-pr04-implied-vol` (`629df7e`), sem branches
+  novas na origem e sem `openclaw-main-gates.patch` no repo.
+- Claude trabalha em clone isolado e so publica **branches locais** neste
+  repo (sem trocar a branch do checkout enquanto o turno durar). Claude
+  **nao tem credencial de push nem de merge**: abrir PR e mergear sao acoes
+  humanas (ou do Dots, se autorizado).
+- Fila de integracao, em ordem: PR #131 (DL-PR04, local `629df7e`, falta
+  push) -> PR #130 (Codex) -> patch de hermeticidade do Codex (dois testes;
+  o arquivo ainda nao chegou ao repo) -> DL-PR05a -> DL-PR05b -> DL-PR06 ->
+  DL-PR07. As branches do Lab estao **empilhadas**; apos cada squash-merge,
+  rebasear a seguinte com `git rebase --onto origin/main <base-antiga>`.
+
+---
+
+## READY FOR PR — Lab de Derivativos DL-PR05a (rotas, erros, orcamento)
+
+Current branch: `feat/dl-pr05a-oplab-routes-errors-budget`
+
+Base: `feat/dl-pr04-implied-vol` (`629df7e`, ainda nao mergeada).
+
+Scope:
+
+- Errata ao card DL-PR05: a implementacao completa mediu 444 linhas de
+  producao (> 400); dividida em Parte A (pura) e Parte B (transporte e
+  cliente). Detalhes no `SDD_DL-PR05.md`.
+- Added `backend/derivatives/oplab/errors.py`: `OplabError` + 11 subclasses,
+  `parse_retry_after`, `classify_status` (429 sem header -> 300 s; 503 -> 1 s).
+- Added `backend/derivatives/oplab/routes.py`: `MarketRoute` (4 rotas),
+  `render_route` (`symbol` em `[A-Z0-9]{4,12}`), `assert_allowed` (GET,
+  HTTPS, host exato, `/v3`, dupla lista enum + YAML, sem query).
+- Added `backend/derivatives/oplab/budget.py`: `credential_key`,
+  `RequestBudget` (50/s e 100/min deslizantes, `block_until`, `snapshot`).
+- Tests: `test_oplab_routes.py`, `test_oplab_errors.py`,
+  `test_oplab_budget.py` (106 testes) + 3 fronteiras de arquitetura.
+- Docs: `SDD_DL-PR05.md`, ADR-0023 secao "Cliente OpLab", BACKLOG.
+
+Validation (Linux aarch64, Python 3.12.16, deps do `uv.lock`):
+
+- `QUIMERA_DERIV_FORBID_NETWORK=1 pytest tests/ --ignore=tests/integration`
+  rc 0 (7.873 passed, 15 skipped); Lab + arquitetura 5.736 passed.
+- `mypy backend/ --strict` 0 (147 arquivos); `pyright backend/` 0.
+- Producao 242 linhas (<= 400); 0 linhas > 100 col; protegidos intocados.
+
+Scope intentionally unchanged:
+
+- Sem `httpx`, sem `OPLAB_TOKEN`, sem transporte nem cliente (Parte B), sem
+  `ChainService` (PR06), sem MCP (PR07), sem chamada real.
+- Next: DL-PR05b (`transport.py` + `client.py`).
+
+---
+
+## READY FOR MERGE — Lab de Derivativos DL-PR04 (PR #131; falta push de `629df7e`)
 
 Current branch: `feat/dl-pr04-implied-vol`
 
