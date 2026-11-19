@@ -4,17 +4,26 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-19 11:20 BRT · **Turno:** Claude (fechamento da Fase 01).
+**Última atualização:** 2026-11-19 · **Turno:** Claude (GO e merge do DL2-PR01).
 
 ## Fase 02 — Marco 2A
-Turno: Claude Code desde 2026-11-19 13:43 BRT
-PR atual: DL2-PR00 — MERGEADO (PR #141; ADR-0025 Accepted). Proximo: DL2-PR01.
-main: squash do PR #141 sobre 1421116 · gate: 8126 aprovados / 15 pulados / 0 falhas
-Decisoes: L1..L5 = padrao do ADR-0025
+
+PR atual: DL2-PR01 — MERGEADO (PR #142, GO na terceira rodada de revisão). Estado A.
+Base: `main` após o squash do #142. ADR-0025 aceito, L1..L5 vigentes.
+Entregue: `backend/derivatives/domain/series_terms.py` (215 linhas), isolado; termos por série
+e vigência, recusas tipadas, cópia e JSON validados, tipos exatos mesmo com `strict=False`.
+Gate do head aprovado, Linux aarch64 limpo: 8.379 aprovados, 16 pulados, 261 subtestes.
+[Cartão, três rodadas de revisão e evidências](../specs/derivatives/fase2/DL2-PR01.md).
+
 Riscos abertos:
-- Tolerancia CRR x BSM do par 200/201 nao fixada (adendo antes do GREEN do DL2-PR03).
-- Politica de ajuste de strike sem documento datado da B3: tudo `UNKNOWN` (L5).
-Proxima acao (uma so): Codex abre o PR do DL2-PR01 com cartao e RED mostrado.
+- Manual B3 de 01/07/2026, §3.3.1: puts de ações, BDRs e ETFs são só europeias. O CRR
+  americano vale, na prática, para calls. Adendo ao ADR-0025 pendente (Claude).
+- §3.2.9 do mesmo manual cobre opções sobre ações; BOVA11 segue com ajuste `UNKNOWN` (L5).
+- Guarda de import dos termos não vê alcance transitivo; o DL2-PR02 deve fechá-la.
+- Tolerância CRR × BSM do par 200/201: adendo antes do GREEN do DL2-PR03.
+- Verificador do digest numérico da Fase 01 ainda fora do repositório (PR do Claude).
+
+Próxima ação (uma só): Claude escreve o cartão do DL2-PR02 (carry e dupla contagem).
 
 ## Fase 01 do Lab de Derivativos — CONCLUIDA e integrada na `main` (estado A)
 
