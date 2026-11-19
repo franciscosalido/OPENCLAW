@@ -172,3 +172,55 @@ sincronismo de spot) seguem abertas e nao sao tocadas aqui.
 - Cox, Ross e Rubinstein (1979), *Option Pricing: A Simplified Approach*.
 - Hull, *Options, Futures, and Other Derivatives* - exemplo de put em
   arvore de dois passos, recalculado no SDD.
+
+## Adendo 1 (2026-11-19) - antes do DL2-PR04
+
+Autor: Claude. Entra no commit de SPEC do DL2-PR04. Nao reescreve o texto acima; onde houver
+conflito, vale este adendo. Francisco pode vetar qualquer item antes do primeiro teste do
+DL2-PR04.
+
+### L3 revisto - quem gera a referencia
+
+O texto de L3 nomeia o Codex como gerador da referencia do CRR. Na execucao do marco o Codex
+implementou `binomial.py` (DL2-PR03), e a metade de L3 que protege o resultado e a outra:
+quem implementa nao gera.
+
+Passa a valer: **a referencia e de quem nao escreveu o codigo que ela confere.** No
+DL2-PR04, Claude gera a referencia e o gerador; o Codex copia os dois sem editar e escreve os
+testes que os consomem.
+
+Limite declarado. Claude revisou `binomial.py` e escreveu as formulas do cartao do DL2-PR03.
+A independencia e de autoria e de metodo: outra aritmetica (`decimal` com 60 digitos), outro
+percurso da arvore (por niveis), outra conta para o preco de cada no (uma exponencial por
+no). Nao e independencia de formula. O Adendo 2 do SDD, item B1, diz o que cobre esse limite.
+
+### Dois fatos do manual da B3 que mudam o alcance do marco
+
+Fonte: Manual de Procedimentos Operacionais de Negociacao da B3, versao de 01/07/2026,
+210 paginas, SHA-256 do PDF
+`35df8963b85b36774f431ae3c9b04c867a8ea7b863621307a45f3812e8b250ec`. So os dois itens abaixo
+foram lidos e conferidos.
+
+**Item 3.3.1 (p. 172).** Em opcoes sobre acoes, BDRs e ETFs, a de compra pode ser americana
+ou europeia; a de venda e so europeia. Opcoes sobre indice sao so europeias.
+
+- Nessas classes, o CRR americano so tem uso pratico em call.
+- As puts americanas dos testes (o caso a mao do criterio 1, o exemplo de Hull, 22 dos 42
+  casos da referencia) exercitam o nucleo. Nenhuma delas e preco de instrumento listado nessas
+  classes, e ninguem deve le-las assim.
+
+**Item 3.2.9 (p. 171).** O ajuste do preco de exercicio por proventos esta escrito para
+opcoes referenciadas em acoes. ETF nao e mencionado nesse item.
+
+- `PROTECTED` so pode ser atribuido a serie sobre acao, com essa evidencia datada.
+- Para BOVA11 e demais ETFs a politica segue `UNKNOWN` (L5). Serie de ETF com dividendo > 0
+  segue recusada com `strike_adjustment_unknown`.
+- A ausencia de ETF no item nao prova que nao haja ajuste. Prova so que este documento nao o
+  estabelece.
+
+Efeito sobre as Pendencias deste ADR: "Estilo de exercicio por serie" fica atendida por
+classe de ativo, nao por serie. "Regra de ajuste de strike" fica atendida para acoes e segue
+aberta para ETF. As outras nao mudam.
+
+Vale para a versao de 01/07/2026. Versao posterior do manual exige nova leitura dos dois
+itens antes de qualquer mudanca de politica no codigo.

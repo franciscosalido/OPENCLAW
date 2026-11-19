@@ -244,3 +244,94 @@ intrinseco sao iguais em aritmetica exata, e o arredondamento decide qual deles 
 `S = 100`, `K = 40`, `sigma = 0.1`, `T = 0.05`, `N = 500` a diferenca absoluta foi 3.0e-12; em
 `S = 10000` chegou a 1.9e-10. Em termos relativos ao preco, o maior valor em 1.458 casos foi
 3.1e-14. Um limite absoluto de 1e-12 reprovaria uma implementacao correta.
+
+## Adendo 2 (2026-11-19) - antes do primeiro teste do DL2-PR04
+
+Autor: Claude. Entra no commit de SPEC do DL2-PR04. Nao reescreve o texto acima; onde houver
+conflito, vale este adendo. Francisco pode vetar qualquer item antes do primeiro teste.
+
+### B1. Criterio 3: o que e a referencia e quem a gera
+
+Quem gera e Claude, que nao implementou `binomial.py` (Adendo 1 do ADR-0025). Quem implementa
+copia os arquivos sem editar; os testes conferem o SHA-256 e regeneram o JSON byte a byte.
+
+O arquivo traz o **preco exato da arvore CRR finita** de cada caso, europeu e americano,
+calculado em `decimal` com 60 digitos de trabalho, 20 digitos publicados e conferencia a 90
+digitos. **Nao e o preco do modelo continuo.** O erro de discretizacao da arvore nao aparece
+nele, e nenhum criterio deste marco mede esse erro para americanas.
+
+O que a referencia pega: erro de implementacao na producao (indice, percurso, ordem das
+operacoes, arredondamento acumulado). O que ela nao pega: erro de formula comum aos dois
+lados. Contra esse valem os casos a mao do criterio 1, o BSM do criterio 2, a soma binomial
+fechada que o gerador confere para a europeia, e os parametros que Hull imprime para a
+arvore de 5 passos.
+
+Tolerancia: `|producao - referencia| <= 1e-11 * max(1, |referencia|)`.
+
+Medido antes do primeiro teste, nos 42 casos, em Linux x86_64 (Python 3.13) e Linux aarch64
+(Python 3.12): maior desvio de preco abaixo de 1.8e-13 nessa mesma escala.
+
+### B2. Criterio 4: como ler "0 excecao nao tipada", e dois acrescimos
+
+A grade inclui pontos em que a arvore e inadmissivel. Em cada ponto o resultado e um numero
+finito ou `BinomialRefusal`; qualquer outra excecao reprova. O minimo de 2000 conta so os
+pontos precificados. A igualdade da call segue A3.
+
+Acrescimos, os dois medidos antes do primeiro teste:
+
+- put com `r <= 0` e `q >= r` igual a europeia, com a tolerancia de A3;
+- simetria: `call(S, K, r, q) = put(K, S, q, r)` na mesma arvore, europeia e americana, com
+  a tolerancia de A3. So entra com `r >= 0`, porque a producao recusa rendimento negativo.
+
+O caso proprio de `r < 0` fica definido assim: call com `q = 0`, `r < 0`, dentro do dinheiro
+e `sigma >= 0.12` tem americana maior que a europeia por mais de 0.01.
+
+### B3. Criterio 7: regressao sem o digest
+
+Onde se le "digest das europeias inalterado: `840770d25be12b8602c614bd`", leia-se:
+**nenhum arquivo de producao que existia no fim da Fase 01 (`1421116`) foi alterado.** O
+comando abaixo so pode listar adicoes:
+
+```sh
+git diff --name-status 1421116 HEAD -- backend config scripts
+```
+
+Motivo: o valor do digest foi obtido em Linux aarch64 e o verificador nunca entrou no
+repositorio. Um criterio que so uma maquina consegue conferir nao e criterio. Arquivo
+inalterado prova o mesmo em qualquer plataforma, e os testes da Fase 01 contra o oraculo BSM
+seguem verdes sem edicao. Os outros tres itens do criterio 7 nao mudam.
+
+Conferido em `1dc7760`: o comando lista tres adicoes (`series_terms.py`, `carry.py` e
+`binomial.py`, 499 linhas) e nenhuma modificacao.
+
+Fecha a parte do digest da pendencia "Definicao exata do digest e do procedimento de
+comparacao da demo por plataforma". O comando da demo esta em cada cartao.
+
+### B4. Criterio 8: leitura dos itens 1, 2 e 5
+
+"Sem exercicio antecipado" (item 1) e "exercicio so no vencimento" (item 5) sao a mesma
+alteracao. Para o item 5 valer como mutante proprio, leia-se: **exercicio comparado so no
+ultimo passo antes do vencimento**.
+
+"Desconto errado" (item 2) tem duas formas e as duas entram: sem desconto, e desconto com
+`r - q` no lugar de `r`. A segunda so aparece com `q > 0`.
+
+Ficam sete mutantes. Os sete tem de morrer so com o arquivo de teste novo do DL2-PR04.
+
+### B5. Criterio 9: como se mostra a diferenca entre plataformas
+
+Cada plataforma fica a `1e-11` da mesma referencia (B1). Logo duas plataformas diferem entre
+si em no maximo `2e-11`, abaixo do `1e-9` do criterio.
+
+Alem disso, o autor registra em macOS e em Linux o SHA-256 da lista hexadecimal dos 84
+precos da referencia. SHA igual significa diferenca zero. Medido pelo revisor: lista
+identica em Linux x86_64 (Python 3.13.18) e Linux aarch64 (Python 3.12.16), SHA-256
+`773a2bcdf3a122bd6662cb4f6e5b26c015106e63b886f43e716243fcee418ef1`.
+
+### Errata do Adendo 2, item B5 (Claude, na revisao do PR #145)
+
+Onde se le "duas plataformas diferem entre si em no maximo `2e-11`", leia-se: no maximo
+`2e-11 * max(1, |referencia|)`. Para preco abaixo de 1 isso nao e erro relativo de `2e-11`.
+O menor preco da referencia e 0.098 (`crr_34`, europeia), o que da no maximo `2.1e-10` em
+termos relativos, ainda abaixo do `1e-9` do criterio 9. A conclusao de B5 nao muda, e a
+diferenca observada entre macOS arm64 e Linux aarch64 foi zero.

@@ -6,30 +6,37 @@
 
 **Última atualização:** 2026-11-19 · **Turno:** Claude (GO e merge do DL2-PR03).
 
-## Fase 02 — Marco 2A
+## Fase 02 — Marco 2A — FECHADO (estado A)
 
-PR atual: DL2-PR03 — MERGEADO (PR #144, GO na primeira rodada de revisão). Estado A.
-Base: `main` após o squash do #144. ADR-0025 e Adendo 1 do SDD vigentes.
-Entregue: `backend/derivatives/pricing/binomial.py` (153 linhas), isolado. Núcleo de indução
-com exercício americano em todos os nós, parametrização CRR separada e oito recusas tipadas.
-Nada em produção importa o módulo; a americana segue recusada na chain, no MCP e no CLI.
-Gate do head aprovado, Linux aarch64 limpo: 9.094 aprovados, 16 pulados, 261 subtestes.
-Revisão: valores de Hull reproduzidos, 6.000 casos iguais à implementação do revisor,
-120.000 entradas inválidas sem exceção não tipada, 30 de 33 mutantes mortos (3 equivalentes).
-[Cartão, REDs, evidências e revisão](../specs/derivatives/fase2/DL2-PR03.md).
+PR atual: DL2-PR04 — MERGEADO (PR #145, GO na primeira rodada de revisão). Marco fechado.
+Os dez critérios do SDD têm a prova apontada em
+[DL2-PR04.md](../specs/derivatives/fase2/DL2-PR04.md), na tabela "Provas dos dez critérios".
 
-Riscos abertos:
-- L3 do ADR-0025 ficou contraditório: manda o Codex gerar a referência americana do
-  DL2-PR04, mas o Codex implementou o DL2-PR03. Francisco decide quem gera.
-- Manual B3 de 01/07/2026, §3.3.1: puts de ações, BDRs e ETFs são só europeias. O CRR
-  americano vale, na prática, para calls. Adendo ao ADR-0025 pendente (Claude).
-- §3.2.9 do mesmo manual cobre opções sobre ações; BOVA11 segue com ajuste `UNKNOWN` (L5).
-- Guarda por alcance não vê salto por `config/` a partir de `scripts/`, nem import dinâmico
-  relativo dentro de função. Dono: PR da ponte (Marco 2B).
-- Verificador do digest numérico da Fase 01 ainda fora do repositório (PR do Claude).
+Entregue no marco, sem nenhum consumidor em produção:
+- `domain/series_terms.py` (215 linhas), `domain/carry.py` (131) e `pricing/binomial.py`
+  (153). Nenhum arquivo de produção da Fase 01 foi alterado.
+- Referência CRR de 42 casos em decimal de 60 dígitos, com gerador versionado e fixado por
+  SHA-256, e grade de 2.880 pontos com seis invariantes.
+- Portão do head, Linux aarch64 limpo: 9.184 aprovados, 16 pulados, 261 subtestes. O autor
+  registrou 9.183 em macOS arm64 e em Linux aarch64, antes do teste que o revisor somou.
+- Os 84 preços da referência coincidem bit a bit entre macOS arm64 e Linux.
+- Custo no Mac, Python puro: 0,047 s por preço com 1.000 passos e 1,23 s com 5.000.
 
-Próxima ação (uma só): Claude escreve o cartão do DL2-PR04 (referência independente,
-invariantes em grade, mutação do critério 8 e medição), depois da decisão sobre L3.
+O que o marco não prova:
+- O erro da americana contra o modelo contínuo. A referência é o preço da árvore finita.
+- Nada com dado real. Sem OpLab, sem token; a americana segue recusada na chain, no MCP e
+  no CLI, e o CLI padrão devolve `LIVE_NOT_ACTIVATED`.
+
+Pendências que passam para o Marco 2B:
+- Ponte com a chain, valor de `PricingModel` e pontos cegos da guarda (salto por `config/`
+  a partir de `scripts/`; import dinâmico relativo dentro de função).
+- Decisão de NumPy (L4 do ADR-0025), com a medição acima.
+- Ajuste de strike em ETF segue `UNKNOWN` até haver documento datado da B3 (L5).
+- Simplificação de `crr_parameters`, sugerida no piloto da skill de revisão.
+- A `main` segue sem proteção de branch (Francisco).
+
+Próxima ação (uma só): Francisco define o recorte do Marco 2B. Antes de qualquer código,
+SDD próprio.
 
 ## Fase 01 do Lab de Derivativos — CONCLUIDA e integrada na `main` (estado A)
 
