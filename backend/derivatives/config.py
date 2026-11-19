@@ -34,6 +34,7 @@ class DerivativesMcpConfig:
     context: DerivContext = "prod"
     provider_mode: ProviderMode = "offline_fixture"
     readiness: Readiness = Readiness.A_OFFLINE_VERIFIED
+    fixture_dir: str | None = None
 
 
 def load_derivatives_mcp_config(
@@ -71,6 +72,7 @@ def load_derivatives_mcp_config(
         port=port,
         context=cast("DerivContext", context_raw),
         provider_mode=cast("ProviderMode", mode_raw),
+        fixture_dir=env_map.get("QUIMERA_DERIV_FIXTURE_DIR") or None,
     )
 
 

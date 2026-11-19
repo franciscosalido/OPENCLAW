@@ -74,3 +74,9 @@
   falha inteira; avaliar chain com spot da propria opcao e flag.
 - `sigma_source` configuravel por chamada (hoje: mid) e leitura paralela das
   quatro rotas — so com medicao que justifique.
+- DL-PR08 (CLI fino, opcional) nao foi feito na Fase 1.
+- Fase 1 fechada em estado A. Proximos passos fora da fase: assinatura
+  OpLab e homologacao (estado B); promocao (estado C); registrar o servidor
+  nos clientes MCP dos agentes consultores.
+- Resposta da demonstracao tem ~67 KB para 100 linhas: avaliar filtro por
+  faixa de strike ou paginacao antes de expor chains reais maiores.

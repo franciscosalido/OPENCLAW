@@ -235,6 +235,24 @@ declaradas, com flag, ate homologacao:
   arvore alvo, e "testes de contaminacao (DL-PR06)", leia-se DL-PR06
   (servico) e DL-PR07 (MCP), conforme a renumeracao de 2026-11-06.
 
+## Servidor MCP `quimera-derivatives` (DL-PR07)
+
+- **Superficie:** `derivatives_health`, `derivatives_chain` (produtiva) e
+  `derivatives_chain_demo` (so com `QUIMERA_DERIV_CONTEXT=test` no ambiente
+  do processo). Bind fixo em `127.0.0.1`, porta 8814.
+- **Ativacao da tool produtiva exige tres condicoes simultaneas:**
+  `provider_mode = live_homologated`, `readiness = C` e servico ao vivo
+  injetado. Na Fase 1 nenhuma e alcancavel; a resposta e sempre
+  `LIVE_NOT_ACTIVATED`, sem campos de cotacao, e o servico nem e chamado.
+- **Barreira unica (`production_view`):** a tool produtiva so serializa
+  chain com proposito efetivo `production`; uma leitura de teste na captura
+  bloqueia (worst-of). Falha ao vivo e erro, nunca fallback para fixture.
+- **Parametros:** exatamente `symbol` e `due_date`; provedor, contexto e
+  diretorio de fixture vem do ambiente do processo, nunca da chamada.
+- **Demonstracao:** avalia no instante registrado no manifesto da fixture;
+  a resposta e reprodutivel e sempre rotulada `DEMO_TEST_DATA`/`test`.
+- **Relogio real:** entra apenas por `system_clock`, na raiz de composicao.
+
 ## Barreira deterministica anti-fixture
 
 - `Provenance` e `Purpose` atribuidos pelo adaptador de transporte; payload
