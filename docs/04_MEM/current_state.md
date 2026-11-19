@@ -4,8 +4,8 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Last updated: 2026-11-06
-**Updated by: Claude Code — DL-PR04 Lab de Derivativos (IV por bissecao protegida)
+**Last updated: 2026-11-18
+**Updated by: Codex CLI (Adendo 2) + Claude (validacao Linux) — DL-PR04 Lab de Derivativos
 
 ---
 
@@ -59,6 +59,18 @@ Validation:
   passo do teste subiu para h = 1e-4*S (ruido eps/h^2 cai ~100x; residuo
   vira truncatura O(h^2) estavel, pior erro 1.0e-6 vs tol 1e-5 mantida).
   Justificativa numerica no SDD_DL-PR04; bsm.py intocado.
+- Adendo 2 (2026-11-18, Codex CLI): em Linux aarch64 `bsm.price` devolvia
+  preco negativo (~-6e-15) em put muito OTM por cancelamento em
+  `0.5*(1+erf)` e `1-N(d)`. `bsm.py` passa a usar `erfc` e `N(-d)` direto
+  na put, com piso zero para residuo subnormal; novo `test_bsm_tails.py`
+  (4.704 pontos de nao negatividade/paridade + 3 pinados). Producao do PR:
+  399 adicoes (<= 400). Validado em Linux aarch64 (Claude): Lab +
+  arquitetura 5.627 passed; mypy/pyright 0; mpmath 40.000 precos sem
+  negativos. Detalhes no SDD_DL-PR04.
+- Fora deste PR (existem em `main`): em clone limpo no Linux,
+  `test_qwen3_summary_does_not_leak_query_payload_vectors` depende de JSON
+  ignorado pelo Git e `test_pr10_sdd_and_adr_contracts_exist` abre
+  `docs/adr/` em minusculas; no checkout do Mac ambos passam.
 
 Scope intentionally unchanged:
 

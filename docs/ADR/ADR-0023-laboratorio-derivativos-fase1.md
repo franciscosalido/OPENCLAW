@@ -129,6 +129,16 @@ declaradas, com flag, ate homologacao:
   call-put, diferencas finitas centrais e o oraculo mpmath do Codex
   (`tests/fixtures/derivatives/reference/`, 92 casos a 50 dps, paridade
   interna < 1e-30 declarada no proprio arquivo).
+- **Emenda 2026-11-18 — caudas numericas (DL-PR04, Adendo 2):** a CDF
+  passa de `0.5*(1+erf)` para `0.5*erfc(-x/sqrt(2))`, ainda sem
+  dependencias novas. Preco, delta, carry e rho da put usam `N(-d1)` e
+  `N(-d2)` diretamente, nunca `1-N(d)`, evitando cancelamento observado
+  em Linux aarch64 (`S=100`, `K=70`, `T=2`, `r=0.10`, `sigma=0.05`).
+  O sinal call/put orienta tambem a saturacao em `zero_vol`, preservando
+  o limite ATM-forward `n=0.5`. Depois das CDFs diretas, o preco recebe
+  piso zero para eventual residuo subnormal (~`1e-322`). O SDD_DL-PR04
+  registra grade de nao negatividade/paridade, resultados e limites
+  da validacao; testes existentes e tolerancias permanecem intactos.
 
 ## IV por bissecao protegida (DL-PR04)
 
