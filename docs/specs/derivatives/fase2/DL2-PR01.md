@@ -2,6 +2,44 @@
 
 Base `11838cdafae0e3de0ed339a2acca736f480967fb`, branch `feat/dl2-pr01-series-terms`.
 
+## Correção da revisão do draft #142
+
+Head revisado `f36f644ef08c96e5309cbb36d5e841c9c1f7fd1e`, árvore `e55d17c`.
+Plano: congelar todos os casos no head, corrigir as fronteiras de entrada e cópia, publicar
+a semântica no modelo e validar a leitura do próprio JSON. Repetir os gates macOS e a demo.
+
+### RED observado antes de editar produção
+
+Ambiente macOS arm64, Python 3.12.13, Pydantic 2.13.3. Para reproduzir os comandos abaixo,
+usar o ambiente já instalado e executar a partir da raiz do clone. O shell usado foi zsh.
+
+```sh
+unset HTTP_PROXY HTTPS_PROXY ALL_PROXY NO_PROXY FTP_PROXY
+unset http_proxy https_proxy all_proxy no_proxy ftp_proxy
+export UV_PROJECT_ENVIRONMENT="$HOME/projetos/OPENCLAW/.venv"
+export UV_CACHE_DIR="$(mktemp -d)" PYTHONDONTWRITEBYTECODE=1 UV_NO_ENV_FILE=1
+u() { uv run --offline --no-sync "$@"; }
+focal() {
+  u python -m pytest tests/unit/derivatives/test_series_terms.py -q --tb=short -p no:cacheprovider "$@"
+}
+```
+
+- B1 — `focal -k b1`, rc 1, 13 falhas. Para os três exemplos do parecer,
+  `DID NOT RAISE` ao promover UNKNOWN, inverter PROTECTED ou remover o lote.
+  A cópia de evidência aceitou emissor inválido e a fronteira aceitou a instância inválida pronta.
+- B2/I1 — `focal -k b2_unsupported_fatcot`, rc 1, uma falha. A entrada com FATCOT 100 lançou
+  `TermsRefusal: missing_quotation_form`; o fator estava presente. Este é o RED de comportamento
+  do recorte FATCOT. A parte documental tem verificação própria:
+  `focal -k 'b2_policy_description or b2_public_docstrings'`, rc 1, duas falhas, incluindo
+  `AssertionError: JSON Schema sem 'proventos': ''`. O teste de docstrings/largura é de contrato.
+- B3 — `focal -k b3_json_round_trip`, rc 1, três falhas. O JSON de UNKNOWN produziu
+  `Input should be a valid date [type=date_type]` e `strike deve ser Decimal finito`.
+  Os casos PROTECTED e UNPROTECTED também rejeitaram as duas datas do documento.
+- `focal`, rc 1, **47 falhas e 39 aprovações**. A contagem inclui contratos e controles que já
+  passavam no head. O congelamento precede todas as correções de produção.
+
+## Histórico do primeiro candidato (até f36f644)
+
 ## SPEC_PRONTA
 
 Um registro imutável identifica a série e sua vigência civil explícita. Guarda fonte,
