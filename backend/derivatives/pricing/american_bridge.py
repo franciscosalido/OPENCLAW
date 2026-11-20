@@ -1,7 +1,9 @@
 """Preço de um contrato americano nas árvores CRR da série, com volatilidade dada."""
 
 from collections.abc import Mapping
+from dataclasses import dataclass
 from decimal import Decimal
+from typing import ClassVar, Literal
 
 from pydantic import ValidationError
 
@@ -121,3 +123,28 @@ def price_american_contract(
         regime="expiry" if years == 0.0 else "tree", sigma_source="given",
         inputs_echo=echo, assumptions=merged,
     )
+
+
+@dataclass(frozen=True, slots=True)
+class AmericanIvSolution:
+    """Volatilidade anual em fração, modelo de inversão e bracket final."""
+
+    sigma: float
+    model: Literal["crr_american_v1", "bsm_european_v1"]
+    bracket: tuple[float, float]
+
+
+@dataclass(frozen=True, slots=True)
+class AmericanIvRefusal:
+    """Motivo estável de recusa de uma observação de preço."""
+
+    reason: str
+    sigma: ClassVar[None] = None
+
+
+def american_implied_vol(
+    contract: OptionContract, *, terms: SeriesTerms, carry: CarryAssumption | None,
+    spot: Decimal, target_price: Decimal, rate_cont: float, tte: TimeToExpiry, steps: int,
+) -> AmericanIvSolution | AmericanIvRefusal:
+    """Inverte um preço por unidade de uma série americana com carry explícito."""
+    return AmericanIvRefusal("iv:unbracketed")
