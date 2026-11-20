@@ -9,10 +9,10 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any, TypedDict, cast
 
-import yaml
 from unittest.mock import patch
 
 import pytest
+import yaml
 from pydantic import ValidationError
 
 from fastmcp import Client
@@ -20,7 +20,9 @@ from fastmcp.exceptions import ToolError
 
 from backend.derivatives.cli import FIXTURE_DIR, main, run_chain
 from backend.derivatives.config import DerivativesMcpConfig
-from backend.derivatives.mcp.derivatives_server import create_derivatives_server, demo_tool, system_clock
+from backend.derivatives.mcp.derivatives_server import (
+    create_derivatives_server, demo_tool, system_clock,
+)
 from backend.derivatives.oplab import demo_fixture
 from backend.derivatives.oplab.demo_fixture import REPO_ROOT, DemoFixture
 from backend.derivatives.domain.models import ExerciseStyle, OptionKind
@@ -39,11 +41,13 @@ OPTIONS = ["--american-demo", "--steps", "32", "--series-registry", "synthetic-v
 
 
 def invoke(args: list[str], capsys: pytest.CaptureFixture[str]) -> tuple[int, dict[str, Any]]:
+    """Executa a entrada da CLI e lê sua saída JSON."""
     rc = main(args)
     return rc, json.loads(capsys.readouterr().out)
 
 
 def test_default_cli_still_refuses(capsys: pytest.CaptureFixture[str]) -> None:
+    """O modo padrão nunca publica a fixture."""
     rc, reply = invoke(ARGS, capsys)
     assert rc == 3 and reply["data"]["status"] == "LIVE_NOT_ACTIVATED"
     assert "rows" not in reply["data"]
@@ -52,6 +56,7 @@ def test_default_cli_still_refuses(capsys: pytest.CaptureFixture[str]) -> None:
 def test_opt_in_preserves_each_european_and_prices_or_explains_every_american(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
+    """Conserva europeias e explica cada americana no formato v1."""
     rc, plain = invoke(DEMO, capsys)
     assert rc == 0
     rc, mixed = invoke([*DEMO, *OPTIONS], capsys)
@@ -89,10 +94,13 @@ def test_invalid_crr_config_refuses_only_opt_in(
     payload: str | None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
+    """Configuração inválida não afeta a demo padrão."""
     path = tmp_path / "american_iv.yaml"
     if payload is not None:
         path.write_text(payload, encoding="utf-8")
-    monkeypatch.setattr(demo_chain, "load_american_iv_config", lambda: load_american_iv_config(path))
+    monkeypatch.setattr(
+        demo_chain, "load_american_iv_config", lambda: load_american_iv_config(path),
+    )
     assert invoke(DEMO, capsys)[0] == 0
     rc, reply = invoke([*DEMO, *OPTIONS], capsys)
     assert rc == 1 and reply["error"] == "DEMO_UNAVAILABLE" and reply["data"] == {}
@@ -105,15 +113,19 @@ def test_invalid_crr_config_refuses_only_opt_in(
 def test_partial_or_invalid_selection_refuses_without_quotes(
     selection: list[str], capsys: pytest.CaptureFixture[str],
 ) -> None:
+    """Combinações inválidas recusam antes de publicar dados."""
     rc, reply = invoke([*DEMO, *selection], capsys)
     assert rc == 1 and reply["error"] == "INVALID_ARGUMENTS" and reply["data"] == {}
 
 
-def substitute_read(monkeypatch: pytest.MonkeyPatch, file: str, change: Callable[[Any], Any]) -> None:
+def substitute_read(
+    monkeypatch: pytest.MonkeyPatch, file: str, change: Callable[[Any], Any],
+) -> None:
     """Altera uma leitura já autenticada só na memória do teste."""
     original = DemoFixture._payload
 
     def read(fixture: DemoFixture, name: str) -> object:
+        """Substitui só a leitura selecionada no teste."""
         payload = original(fixture, name)
         return change(payload) if name == file else payload
 
@@ -121,7 +133,9 @@ def substitute_read(monkeypatch: pytest.MonkeyPatch, file: str, change: Callable
 
 
 def quote_change(fields: dict[str, object]) -> Callable[[Any], Any]:
+    """Cria uma alteração somente na CALL sintética suportada."""
     def change(options: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Aplica o conjunto de campos à linha alvo."""
         return [row | fields if row["symbol"] == "SYNAC150" and row["strike"] == 150 else row
                 for row in options]
     return change
@@ -148,6 +162,7 @@ def test_unusable_observation_preserves_refused_row(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
     file: str, change: Callable[[Any], Any], reason: str,
 ) -> None:
+    """Preserva a linha e explica por que a observação não serve."""
     substitute_read(monkeypatch, file, change)
     rc, reply = invoke([*DEMO, *OPTIONS], capsys)
     assert rc == 0 and reply["data"]["row_count"] == 103
@@ -157,6 +172,7 @@ def test_unusable_observation_preserves_refused_row(
 
 
 def test_missing_spot(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    """Sem spot, toda a chain permanece sem preço ou IV."""
     substitute_read(monkeypatch, STOCK, lambda s: s | {"close": None})
     substitute_read(monkeypatch, OPTIONS_FILE, lambda rs: [r | {"spot_price": None} for r in rs])
     rc, reply = invoke([*DEMO, *OPTIONS], capsys)
@@ -177,6 +193,7 @@ def test_each_side_is_independent_and_only_mid_can_price(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
     bid: float | None, ask: float | None, bad: str, reason: str | None,
 ) -> None:
+    """Preserva cada lado observável sem inferir o mid."""
     substitute_read(monkeypatch, OPTIONS_FILE, quote_change({"bid": bid, "ask": ask}))
     _, reply = invoke([*DEMO, *OPTIONS], capsys)
     row = next(r for r in reply["data"]["rows"] if r["symbol"] == "SYNAC150")
@@ -197,7 +214,9 @@ CONFIG = DerivativesMcpConfig(context="test", fixture_dir=FIXTURE_DIR)
 
 
 async def test_mixed_mcp_matches_cli_and_rejects_call_options() -> None:
+    """Confere equivalência MCP/CLI e ausência de flags por chamada."""
     class Selection(TypedDict):
+        """Seleção fixa no servidor durante a inicialização."""
         american_demo: bool
         steps: int
         series_registry: str
@@ -210,7 +229,9 @@ async def test_mixed_mcp_matches_cli_and_rejects_call_options() -> None:
             assert set(schemas[name]["properties"]) == {"symbol", "due_date"}
         args = {"symbol": "BOVA11", "due_date": "2026-11-19"}
         demo = await client.call_tool("derivatives_chain_demo", args)
-        expected = await run_chain("BOVA11", "2026-11-19", "offline_fixture", system_clock, **selection)
+        expected = await run_chain(
+            "BOVA11", "2026-11-19", "offline_fixture", system_clock, **selection,
+        )
         assert demo.data == expected and len(json.dumps(expected)) < 80_000
         live = await client.call_tool("derivatives_chain", args)
         assert live.data["data"]["status"] == "LIVE_NOT_ACTIVATED"
@@ -224,17 +245,20 @@ async def test_mixed_mcp_matches_cli_and_rejects_call_options() -> None:
     replace(CONFIG, readiness=Readiness.C_PROMOTED), replace(CONFIG, fixture_dir="mixed"),
 ])
 async def test_forged_configuration_never_returns_prices(config: DerivativesMcpConfig) -> None:
+    """Configuração adulterada não libera a demo."""
     reply = await demo_tool("BOVA11", "2026-11-19", config=config, root=REPO_ROOT,
                             american_demo=True, steps=32, series_registry="synthetic-v1")
     assert not reply["ok"] and reply["error"] == "DEMO_UNAVAILABLE" and reply["data"] == {}
 
 
 @pytest.mark.parametrize(("name", "symlink"), [
-    ("registry.json", False), ("options.json", False), ("registry.json", True), ("options.json", True),
+    ("registry.json", False), ("options.json", False),
+    ("registry.json", True), ("options.json", True),
 ])
 def test_mixed_files_are_pinned_and_refuse_symlinks(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str, symlink: bool,
 ) -> None:
+    """Valida a identidade e a origem dos dois arquivos mistos."""
     root = Path(FIXTURE_DIR)
     shutil.copytree(REPO_ROOT / root, tmp_path / root)
     source = tmp_path / root / "mixed" / name
@@ -283,9 +307,11 @@ async def test_price_and_each_iv_use_the_observed_unit_price(steps: int) -> None
 async def test_mixed_chain_rejects_forged_stamps(
     forgery: str, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Recusa alterações de propósito, procedência e relógio."""
     original = ChainService.acquire
 
     async def forged(service: ChainService, symbol: str, *, now: datetime) -> Capture:
+        """Produz captura adulterada em memória."""
         cap = await original(service, symbol, now=now)
         if forgery == "captured_at":
             stamp = replace(cap.stamp, captured_at=now - timedelta(days=1))
@@ -311,6 +337,7 @@ async def test_mixed_chain_rejects_forged_stamps(
 
 @pytest.mark.parametrize("steps", [True, 32.0, "32"])
 async def test_constructor_refuses_coerced_steps(steps: Any) -> None:
+    """Aceita apenas passos inteiros reais, não valores coercíveis."""
     reply = await demo_tool("BOVA11", "2026-11-19", config=CONFIG, root=REPO_ROOT,
                             american_demo=True, steps=steps, series_registry="synthetic-v1")
     assert reply["error"] == "INVALID_ARGUMENTS" and reply["data"] == {}
@@ -323,6 +350,7 @@ async def test_constructor_refuses_coerced_steps(steps: Any) -> None:
 async def test_malformed_direct_calls_fail_closed(
     symbol: Any, config: DerivativesMcpConfig, error: str,
 ) -> None:
+    """Entradas Python inválidas não escapam como exceção."""
     reply = await demo_tool(symbol, "2026-11-19", config=config, root=REPO_ROOT,
                             american_demo=True, steps=32, series_registry="synthetic-v1")
     assert reply["error"] == error and reply["data"] == {}
@@ -336,6 +364,7 @@ async def _capture_before_american_projection() -> tuple[PricedChain, datetime]:
 
 
 async def test_mixed_projection_independently_refuses_replay_test_stamp() -> None:
+    """Replay não satisfaz a barreira sintética."""
     priced, _ = await _capture_before_american_projection()
     fixture = DemoFixture(Path(FIXTURE_DIR), mixed=True)
     cfg, iv_config = load_derivatives_config(), load_american_iv_config()
@@ -404,7 +433,8 @@ async def test_factor_1000_preserves_unit_targets_with_nonstandard_lot(q: float)
             "rate_cont": 0.05, "dividend_yield": q, "cfg": shadow_config,
         }
         assert outcome.supported and outcome.price is not None and outcome.iv is not None
-        assert outcome.iv.bid is not None and outcome.iv.ask is not None and outcome.iv.mid is not None
+        assert outcome.iv.bid is not None and outcome.iv.ask is not None
+        assert outcome.iv.mid is not None
         result = outcome.price, outcome.iv.bid.sigma, outcome.iv.ask.sigma, outcome.iv.mid.sigma
         assert all(sigma is not None for sigma in result[1:])
         if baseline is None:
@@ -433,6 +463,7 @@ async def test_r1_default_steps_match_explicit_200() -> None:
 async def test_r1_shadow_is_diagnostic_only(monkeypatch: pytest.MonkeyPatch) -> None:
     """B5: sombra auditável e falha isolada do preço, das IVs e das recusas."""
     async def demo() -> PricedChain:
+        """Executa a demo com o perfil de passos explícito."""
         priced, _ = await build_demo_chain(
             "BOVA11", date(2026, 11, 19), directory=Path(FIXTURE_DIR), american_demo=True,
             steps=200, series_registry="synthetic-v1",
@@ -452,6 +483,7 @@ async def test_r1_shadow_is_diagnostic_only(monkeypatch: pytest.MonkeyPatch) -> 
     assert gap == sigma - shadow_sigma and abs(gap) > 1e-9
 
     def broken(*_args: object, **_kwargs: object) -> None:
+        """Simula falha interna do cálculo auxiliar."""
         raise RuntimeError("shadow unavailable")
 
     monkeypatch.setattr(american_demo, "implied_vol", broken)
@@ -538,6 +570,7 @@ async def test_r1_default_steps_come_from_the_profile(monkeypatch: pytest.Monkey
     monkeypatch.setattr(demo_chain, "load_american_iv_config", lambda: custom)
 
     async def price(steps: int | None) -> PricedChain:
+        """Executa a demo com argumento de passos opcional."""
         chain, _ = await build_demo_chain(
             "BOVA11", date(2026, 11, 19), directory=Path(FIXTURE_DIR), american_demo=True,
             steps=steps, series_registry="synthetic-v1",
@@ -557,6 +590,7 @@ async def test_r1_default_steps_come_from_the_profile(monkeypatch: pytest.Monkey
 async def test_r1_shadow_chain_aggregate(monkeypatch: pytest.MonkeyPatch) -> None:
     """B6: só linhas comparadas contam; um agregado vazio não publica máximo."""
     async def demo() -> PricedChain:
+        """Executa a demo com o perfil de passos explícito."""
         priced, _ = await build_demo_chain(
             "BOVA11", date(2026, 11, 19), directory=Path(FIXTURE_DIR), american_demo=True,
             steps=32, series_registry="synthetic-v1",

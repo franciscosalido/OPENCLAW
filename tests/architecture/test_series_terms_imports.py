@@ -243,6 +243,7 @@ def test_dynamic_import_in_parent_initializer(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize("via_facade", [False, True])
 def test_registry_cannot_be_loaded_by_a_surface(tmp_path: Path, via_facade: bool) -> None:
+    """Bloqueia alcance ao registro por import direto ou fachada."""
     surface = tmp_path / _SERVICE
     surface.parent.mkdir(parents=True)
     statement = 'import_module("backend.derivatives.domain.series_registry")'
@@ -263,6 +264,7 @@ def test_registry_cannot_be_loaded_by_a_surface(tmp_path: Path, via_facade: bool
 ])
 def test_only_exact_demo_edges(tmp_path: Path, consumer: Path, target: str) -> None:
     # Materializa a aresta legítima para exercitar também a tentativa de contorná-la.
+    """Limita as exceções a arestas explícitas da composição offline."""
     demo = tmp_path / DEMO_PATH
     demo.parent.mkdir(parents=True)
     demo.write_text(f"import {BRIDGE}\n")
@@ -277,6 +279,7 @@ def test_only_exact_demo_edges(tmp_path: Path, consumer: Path, target: str) -> N
 def test_config_hop_and_relative_dynamic_import_in_function(
     tmp_path: Path, consumer: str, target: str,
 ) -> None:
+    """Detecta import dinâmico relativo via configuração."""
     module, _, name = target.rpartition(".")
     indirect = tmp_path / "config/facade.py"
     indirect.parent.mkdir()
@@ -292,7 +295,9 @@ def test_config_hop_and_relative_dynamic_import_in_function(
     (BUILDER_PATH, "_price_mixed_demo", "build_demo_chain"),
 ])
 def test_only_demo_calls_offline_builder(source: Path, target: str, caller: str) -> None:
+    """Restringe cada chamada ao ponto de composição autorizado."""
     tree = ast.parse((ROOT / source).read_text())
-    users = [fn.name for fn in ast.walk(tree) if isinstance(fn, (ast.AsyncFunctionDef, ast.FunctionDef))
+    users = [fn.name for fn in ast.walk(tree)
+             if isinstance(fn, (ast.AsyncFunctionDef, ast.FunctionDef))
              if any(isinstance(n, ast.Name) and n.id == target for n in ast.walk(fn))]
     assert users == [caller]

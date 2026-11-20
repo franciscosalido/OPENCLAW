@@ -5,6 +5,7 @@ from importlib.util import resolve_name
 
 
 def local_targets(node: ast.AST, package: str) -> Iterator[str]:
+    """Resolve alvos locais e seus prefixos a partir de imports literais."""
     names = []
     if isinstance(node, ast.Import):
         names = [alias.name for alias in node.names]

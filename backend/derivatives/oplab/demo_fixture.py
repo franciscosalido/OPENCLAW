@@ -54,7 +54,7 @@ class DemoFixture(FixtureTransport):
                 mixed_fd = os.open("mixed", flags, dir_fd=fd)
                 stack.callback(os.close, mixed_fd)
                 additional = _verified_bytes(mixed_fd, "options.json",
-                    "a70428916579c5c280e35b5e6cfc64fbcb7e74a4c910051c98587b4b60d14dea")
+                    "76fe6c540cebfdbb929aeab0b681f5b900236de4f702dfa3e0623f75b71cdaae")
                 self.registry_json = _verified_bytes(mixed_fd, "registry.json",
                     "a68417b465fa9dcc8edc7a5e13b9ac2b66930e8dd6bec039ad00c79a6188a51f")
                 name = "market_options_BOVA11.json"

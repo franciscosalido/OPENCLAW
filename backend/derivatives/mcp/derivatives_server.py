@@ -162,6 +162,7 @@ def create_derivatives_server(
 
     @server.tool
     async def derivatives_health() -> dict[str, object]:
+        """Descreve o estado offline e a disponibilidade da ferramenta de demo."""
         return HealthResponse(status="ok", backend=SERVER_NAME, details={
             "readiness": Readiness.A_OFFLINE_VERIFIED.value, "provider_mode": "offline_fixture",
             "context": resolved.context, "demo_tool_registered": demo_enabled,
@@ -169,12 +170,14 @@ def create_derivatives_server(
 
     @server.tool
     async def derivatives_chain(symbol: str, due_date: str) -> dict[str, object]:
+        """Responde pelo caminho padrão, sem habilitar a projeção sintética."""
         return await chain_tool(symbol, due_date, config=resolved, clock=clock,
                                 live_service=live_service)
 
     if demo_enabled:
         @server.tool
         async def derivatives_chain_demo(symbol: str, due_date: str) -> dict[str, object]:
+            """Retorna a demonstração selecionada na configuração de teste."""
             return await demo_tool(symbol, due_date, config=resolved,
                                    root=root or REPO_ROOT, american_demo=american_demo,
                                    steps=steps, series_registry=series_registry)

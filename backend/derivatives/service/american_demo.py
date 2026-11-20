@@ -55,6 +55,7 @@ def _price_row(item: PricedRow, priced: PricedChain, registry: SeriesRegistry, *
     quote, contract = row.quote, row.contract
 
     def refused(reason: str, iv: QuoteIv | None = None) -> PricingOutcome:
+        """Guarda o motivo de recusa e eventuais diagnósticos por lado."""
         return PricingOutcome(
             supported=False, reason=reason, model=None, price=None, greeks=None, regime=None,
             inputs_echo={"symbol": contract.symbol}, assumptions={}, iv=iv)
@@ -83,6 +84,7 @@ def _price_row(item: PricedRow, priced: PricedChain, registry: SeriesRegistry, *
     spot = chain.spot.price
 
     def invert(price: Decimal | None) -> IvResultModel | None:
+        """Inverte um lado em preço por unidade sem inventar uma cotação ausente."""
         if price is None:
             return None
         return _iv_side(american_implied_vol(
@@ -115,7 +117,9 @@ def _price_row(item: PricedRow, priced: PricedChain, registry: SeriesRegistry, *
         )
         assumptions["shadow_iv_status"] = shadow.diagnostic.status.value
         if shadow.sigma is not None:
-            assumptions.update(shadow_iv_mid=shadow.sigma, shadow_iv_gap=iv.mid.sigma - shadow.sigma)
+            assumptions.update(
+                shadow_iv_mid=shadow.sigma, shadow_iv_gap=iv.mid.sigma - shadow.sigma,
+            )
     except Exception:
         assumptions["shadow_iv_status"] = "error"
     return outcome.model_copy(update={"assumptions": assumptions})

@@ -26,7 +26,8 @@ def _binomial_consumers(root: Path) -> list[str]:
             for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
                 if not isinstance(node, (ast.Import, ast.ImportFrom, ast.Call, ast.Constant)):
                     continue
-                literal = isinstance(node, ast.Constant) and isinstance(node.value, str) and TARGET in node.value
+                literal = (isinstance(node, ast.Constant) and isinstance(node.value, str)
+                           and TARGET in node.value)
                 if literal or TARGET in local_targets(node, package):
                     offenders.append(f"{path.relative_to(root)}:{node.lineno}")
     return offenders
@@ -91,7 +92,10 @@ if loaded:
 
 
 def test_config_cannot_load_binomial_inside_function(tmp_path: Path) -> None:
+    """Impede acesso ao binomial por import local dentro de função."""
     path = tmp_path / "config/consumer.py"
     path.parent.mkdir()
-    path.write_text('def load():\n    return import_module(".binomial", "backend.derivatives.pricing")\n')
+    path.write_text(
+        'def load():\n    return import_module(".binomial", "backend.derivatives.pricing")\n',
+    )
     assert _binomial_consumers(tmp_path) == ["config/consumer.py:2"]

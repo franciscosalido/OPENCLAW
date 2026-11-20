@@ -32,6 +32,7 @@ DEMO = ["chain", "BOVA11", "2026-11-19", "--provider", "offline_fixture"]
 
 
 def clock() -> datetime:
+    """Retorna o instante determinístico usado pelos testes."""
     return CLOCK_NOW
 
 
@@ -46,6 +47,7 @@ def _run(capsys: pytest.CaptureFixture[str], argv: list[str]) -> tuple[int, dict
 def test_offline_fixture_prints_the_labelled_demo_chain(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
+    """Confere a resposta offline rotulada como sintética."""
     code, document = _run(capsys, DEMO)
     assert code == EXIT_OK == 0
     data = document["data"]
@@ -58,6 +60,7 @@ def test_offline_fixture_prints_the_labelled_demo_chain(
 async def test_cli_output_is_exactly_the_mcp_demo_response(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
+    """A CLI partilha a resposta da ferramenta de demo."""
     config = DerivativesMcpConfig(context="test", fixture_dir=FIXTURE_DIR)
     expected = await demo_tool("BOVA11", "2026-11-19", config=config, root=REPO_ROOT)
     import asyncio
@@ -70,6 +73,7 @@ async def test_cli_output_is_exactly_the_mcp_demo_response(
 def test_default_provider_is_live_and_never_serves_quotes(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
+    """O caminho padrão inativo não apresenta cotações."""
     code, document = _run(capsys, ["chain", "BOVA11", "2026-11-19"])
     assert code == EXIT_NOT_ACTIVATED == 3, "sem cotacao nunca e exit 0"
     assert document["data"] == {
@@ -93,6 +97,7 @@ def test_default_provider_is_live_and_never_serves_quotes(
 def test_refusals_exit_one_with_a_constant_code(
     capsys: pytest.CaptureFixture[str], argv: list[str], error: str,
 ) -> None:
+    """Recusas conhecidas preservam códigos constantes."""
     code, document = _run(capsys, argv)
     assert code == EXIT_REFUSED == 1
     assert document["ok"] is False and document["data"] == {}
@@ -102,12 +107,14 @@ def test_refusals_exit_one_with_a_constant_code(
 
 
 def test_unknown_expiry_is_an_empty_demo_chain(capsys: pytest.CaptureFixture[str]) -> None:
+    """Vencimento sem contratos conserva uma chain vazia."""
     code, document = _run(capsys, ["chain", "BOVA11", "2026-12-18", "--provider",
                                    "offline_fixture"])
     assert code == 0 and document["data"]["row_count"] == 0
 
 
 def test_lowercase_symbol_is_normalized(capsys: pytest.CaptureFixture[str]) -> None:
+    """Símbolo minúsculo identifica o mesmo ativo na fixture."""
     code, document = _run(capsys, ["chain", "bova11", "2026-11-19", "--provider",
                                    "offline_fixture"])
     assert code == 0 and document["data"]["underlying"] == "BOVA11"
@@ -128,6 +135,7 @@ def test_lowercase_symbol_is_normalized(capsys: pytest.CaptureFixture[str]) -> N
 def test_argparse_refuses_anything_outside_the_contract(
     capsys: pytest.CaptureFixture[str], argv: list[str],
 ) -> None:
+    """A CLI recusa opções e argumentos fora do contrato."""
     with pytest.raises(SystemExit) as stopped:
         main(argv, clock=clock)
     assert stopped.value.code == 2
@@ -135,6 +143,7 @@ def test_argparse_refuses_anything_outside_the_contract(
 
 
 def test_indent_only_changes_formatting(capsys: pytest.CaptureFixture[str]) -> None:
+    """A indentação não altera o conteúdo JSON."""
     main([*DEMO, "--indent", "2"], clock=clock)
     pretty = capsys.readouterr().out
     main(DEMO, clock=clock)
@@ -144,6 +153,7 @@ def test_indent_only_changes_formatting(capsys: pytest.CaptureFixture[str]) -> N
 
 
 def test_exit_code_table() -> None:
+    """Os códigos de saída distinguem os resultados da CLI."""
     assert exit_code({"ok": True, "data": {"status": "DEMO_TEST_DATA"}}) == 0
     assert exit_code({"ok": True, "data": {"status": "LIVE_NOT_ACTIVATED"}}) == 3
     assert exit_code({"ok": True, "data": {}}) == 3
@@ -153,13 +163,16 @@ def test_exit_code_table() -> None:
 
 
 def test_parser_offers_only_the_contract_options() -> None:
-    chain = build_parser()._subparsers._group_actions[0].choices["chain"]  # type: ignore[union-attr]
+    """Verifica a lista exata de opções de chain."""
+    options = build_parser()._subparsers
+    chain = options._group_actions[0].choices["chain"]  # type: ignore[union-attr]
     options = sorted(option for action in chain._actions for option in action.option_strings)
     assert options == ["--american-demo", "--help", "--indent", "--provider",
                        "--series-registry", "--steps", "-h"]
 
 
 def test_console_script_points_at_an_importable_entry() -> None:
+    """Confere que o entrypoint declarado pode ser importado."""
     project = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))["project"]
     assert project["scripts"] == {"quimera": "backend.derivatives.cli:run"}
     module_name, _, attribute = project["scripts"]["quimera"].partition(":")
@@ -168,6 +181,7 @@ def test_console_script_points_at_an_importable_entry() -> None:
 
 
 def test_subprocess_writes_pure_json_to_stdout_and_logs_to_stderr() -> None:
+    """Separa o JSON da saída de diagnóstico."""
     env = {**os.environ, "PYTHONPATH": str(REPO_ROOT), "PYTHONDONTWRITEBYTECODE": "1"}
     done = subprocess.run(
         [sys.executable, "-m", "backend.derivatives.cli", *DEMO],

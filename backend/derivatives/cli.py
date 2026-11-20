@@ -35,9 +35,11 @@ def build_parser() -> argparse.ArgumentParser:
     chain.add_argument("due_date", help="vencimento em ISO 8601, ex.: 2026-11-19")
     chain.add_argument("--provider", choices=("live", "offline_fixture"), default="live",
                        help="offline_fixture serve dados sinteticos (nunca mercado)")
-    chain.add_argument("--american-demo", action="store_true", help="habilita a ponte americana na demo")
     chain.add_argument(
-        "--steps", type=int, help="passos CRR opcionais na demo americana (1 a 4999; padrão no YAML)",
+        "--american-demo", action="store_true", help="habilita a ponte americana na demo",
+    )
+    chain.add_argument(
+        "--steps", type=int, help="passos CRR opcionais (1 a 4999; padrão no YAML)",
     )
     chain.add_argument("--series-registry", help="registro explícito da demo: synthetic-v1")
     chain.add_argument("--indent", type=int, default=None, help="indentacao do JSON")
@@ -51,7 +53,8 @@ async def run_chain(
     if provider == "offline_fixture":
         config = DerivativesMcpConfig(context="test", fixture_dir=FIXTURE_DIR)
         return await demo_tool(symbol, due_date, config=config, root=REPO_ROOT,
-                               american_demo=american_demo, steps=steps, series_registry=series_registry)
+                               american_demo=american_demo, steps=steps,
+                               series_registry=series_registry)
     return await chain_tool(symbol, due_date, config=DerivativesMcpConfig(), clock=clock)
 
 def exit_code(response: dict[str, object]) -> int:

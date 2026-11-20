@@ -11,7 +11,8 @@ class AmericanIvConfig(BaseModel):
     """Faixa e tolerâncias da inversão CRR, fornecidas no YAML sem defaults locais."""
 
     model_config = ConfigDict(
-        extra="forbid", frozen=True, strict=True, allow_inf_nan=False, revalidate_instances="always",
+        extra="forbid", frozen=True, strict=True, allow_inf_nan=False,
+        revalidate_instances="always",
     )
 
     bracket_lo: float = Field(gt=0)
