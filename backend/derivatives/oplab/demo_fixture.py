@@ -31,10 +31,11 @@ def _verified_bytes(directory_fd: int, name: str, digest: str) -> bytes:
 class DemoFixture(FixtureTransport):
     """Serve apenas os bytes cobertos pelo manifesto fixado nesta versão."""
 
-    def __init__(self, directory: Path) -> None:
+    def __init__(self, directory: Path, *, mixed: bool = False) -> None:
         if directory not in (_DIRECTORY, REPO_ROOT / _DIRECTORY):
             raise ValueError("fixture_directory")
         super().__init__(directory, provenance=Provenance.SYNTHETIC)
+        self.registry_json: bytes | None = None
         with ExitStack() as stack:
             flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
             fd = os.open(REPO_ROOT, flags)
@@ -48,6 +49,17 @@ class DemoFixture(FixtureTransport):
             self.valuation = datetime.fromisoformat(manifest["valuation"])
             self._files = {name: _verified_bytes(fd, name, entry["sha256"])
                            for name, entry in manifest["files"].items()}
+
+            if mixed:
+                mixed_fd = os.open("mixed", flags, dir_fd=fd)
+                stack.callback(os.close, mixed_fd)
+                additional = _verified_bytes(mixed_fd, "options.json",
+                    "76fe6c540cebfdbb929aeab0b681f5b900236de4f702dfa3e0623f75b71cdaae")
+                self.registry_json = _verified_bytes(mixed_fd, "registry.json",
+                    "a68417b465fa9dcc8edc7a5e13b9ac2b66930e8dd6bec039ad00c79a6188a51f")
+                name = "market_options_BOVA11.json"
+                options = json.loads(self._files[name]) + json.loads(additional)
+                self._files[name] = json.dumps(options, separators=(",", ":")).encode()
 
     def _payload(self, name: str) -> object:
         if name not in self._files:
