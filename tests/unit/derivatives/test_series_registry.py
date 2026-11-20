@@ -3,6 +3,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 from itertools import permutations
+from types import SimpleNamespace
 from typing import cast
 
 import pytest
@@ -219,3 +220,27 @@ def test_round_trip_keeps_versions_decimal_scale_and_sources(record: SeriesRecor
     restored = SeriesRegistry.model_validate_json(original.model_dump_json())
     assert restored == original
     assert str(restored.records[0].terms.strike) == "12.50"
+
+
+def test_query_requires_a_domain_contract(contract: OptionContract, record: SeriesRecord) -> None:
+    lookalike = SimpleNamespace(**contract.model_dump())
+    with pytest.raises(TypeError):
+        registry(record).resolve(cast(OptionContract, lookalike), as_of=day(6))
+
+
+@pytest.mark.parametrize("change", [
+    {"purpose": "production"}, {"volume": 1}, {"valid_through": None}, {"expiry": None},
+])
+def test_record_does_not_infer_dates_or_grant_permissions(record: SeriesRecord,
+                                                          change: dict[str, object]) -> None:
+    with pytest.raises(ValidationError):
+        record.model_copy(update=change)
+
+
+def test_revalidates_bypassed_record(contract: OptionContract, record: SeriesRecord) -> None:
+    raw = {**record.model_dump(), "valid_through": "2026-04-08"}
+    bypassed = SeriesRegistry.model_construct(
+        version="SYNTHETIC", records=(SeriesRecord.model_construct(**raw),),
+    )
+    with pytest.raises(ValidationError):
+        bypassed.resolve(contract, as_of=day(5))

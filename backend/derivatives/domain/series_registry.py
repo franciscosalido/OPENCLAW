@@ -29,6 +29,8 @@ class RegistryRefusal(Exception):
 
 
 class SeriesRecord(_TermsModel):
+    """Versão fornecida de termos e carry, com último dia de validade declarado."""
+
     version: _Identifier
     underlying: _Identifier
     kind: Annotated[OptionKind, _input_type(OptionKind, json=str)]
@@ -48,19 +50,42 @@ class SeriesRecord(_TermsModel):
 
 @dataclass(frozen=True, slots=True)
 class SeriesResolution:
+    """Evidência selecionada e premissa validada à data da consulta."""
+
     as_of: date
     registry_version: str
     record: SeriesRecord
     carry: ResolvedCarry
 
 
+def _applicable_record(records: list[SeriesRecord], as_of: date) -> SeriesRecord:
+    """Seleciona dentro de uma única identidade, respeitando a disponibilidade histórica."""
+    known = [row for row in records if row.available_on <= as_of]
+    if len({row.version for row in known}) != len(known):
+        raise RegistryRefusal(RegistryRefusalCode.CONFLICT)
+    started = [row for row in known if row.terms.effective_on <= as_of]
+    if not started:
+        raise RegistryRefusal(RegistryRefusalCode.FUTURE)
+    valid = [row for row in started if as_of <= row.valid_through]
+    if not valid:
+        raise RegistryRefusal(RegistryRefusalCode.EXPIRED)
+    if len(valid) != 1:
+        raise RegistryRefusal(RegistryRefusalCode.CONFLICT)
+    return valid[0]
+
+
 class SeriesRegistry(_TermsModel):
+    """Conjunto versionado fornecido pelo chamador, sem seleção de fonte ou prazo padrão."""
+
     version: _Identifier
     records: tuple[SeriesRecord, ...]
 
     def resolve(self, contract: OptionContract, *, as_of: date) -> SeriesResolution:
+        """Confere identidade, vigência e metadados antes de resolver o rendimento."""
         if type(as_of) is not date:
             raise ValueError("as_of deve ser data civil")
+        if not isinstance(contract, OptionContract):
+            raise TypeError("a consulta exige OptionContract")
         # OptionContract permite model_copy(update=...) sem validação.
         contract = OptionContract.model_validate(
             {name: getattr(contract, name) for name in OptionContract.model_fields}, strict=True,
@@ -76,18 +101,7 @@ class SeriesRegistry(_TermsModel):
         ]
         if not matches:
             raise RegistryRefusal(RegistryRefusalCode.MISMATCH)
-        known = [row for row in matches if row.available_on <= as_of]
-        if len({row.version for row in known}) != len(known):
-            raise RegistryRefusal(RegistryRefusalCode.CONFLICT)
-        started = [row for row in known if row.terms.effective_on <= as_of]
-        if not started:
-            raise RegistryRefusal(RegistryRefusalCode.FUTURE)
-        valid = [row for row in started if as_of <= row.valid_through]
-        if not valid:
-            raise RegistryRefusal(RegistryRefusalCode.EXPIRED)
-        if len(valid) != 1:
-            raise RegistryRefusal(RegistryRefusalCode.CONFLICT)
-        row = valid[0]
+        row = _applicable_record(matches, as_of)
         terms = row.terms
         if (
             contract.exercise_style != terms.exercise_style
