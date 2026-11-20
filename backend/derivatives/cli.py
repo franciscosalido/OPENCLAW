@@ -36,7 +36,9 @@ def build_parser() -> argparse.ArgumentParser:
     chain.add_argument("--provider", choices=("live", "offline_fixture"), default="live",
                        help="offline_fixture serve dados sinteticos (nunca mercado)")
     chain.add_argument("--american-demo", action="store_true", help="habilita a ponte americana na demo")
-    chain.add_argument("--steps", type=int, help="passos CRR fornecidos para a demo (1 a 4999)")
+    chain.add_argument(
+        "--steps", type=int, help="passos CRR opcionais na demo americana (1 a 4999; padrão no YAML)",
+    )
     chain.add_argument("--series-registry", help="registro explícito da demo: synthetic-v1")
     chain.add_argument("--indent", type=int, default=None, help="indentacao do JSON")
     return parser

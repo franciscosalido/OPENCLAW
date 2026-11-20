@@ -1,6 +1,7 @@
 """Ligação do registro e da ponte às linhas americanas da captura sintética."""
 from datetime import datetime
 from decimal import Decimal
+from typing import Literal
 
 from backend.derivatives.domain.models import ExerciseStyle
 from backend.derivatives.domain.carry import CarryRefusal
@@ -12,12 +13,14 @@ from backend.derivatives.pricing.american_bridge import (
 )
 from backend.derivatives.pricing.contract_pricing import PricingOutcome
 from backend.derivatives.pricing.conventions import continuous_rate
-from backend.derivatives.pricing.implied_vol import IvStatus
+from backend.derivatives.pricing.implied_vol import IvStatus, implied_vol
 from backend.derivatives.pricing.quote_iv import IvDiagnosticModel, IvResultModel, QuoteIv
 from backend.derivatives.provenance import Provenance, Purpose
 from backend.derivatives.service.chain_service import B3_TIMEZONE, PricedChain, PricedRow
 from config.american_iv_config_model import AmericanIvConfig
-from config.derivatives_config_model import Conventions
+from config.derivatives_config_model import Conventions, Iv
+
+SHADOW_ENGINE = "bsm_european_v1"
 
 
 def _iv_side(result: AmericanIvSolution | AmericanIvRefusal) -> IvResultModel:
@@ -46,7 +49,7 @@ def _iv_side(result: AmericanIvSolution | AmericanIvRefusal) -> IvResultModel:
 
 def _price_row(item: PricedRow, priced: PricedChain, registry: SeriesRegistry, *,
                valuation: datetime, steps: int, rate: float,
-               iv_config: AmericanIvConfig) -> PricingOutcome:
+               iv_config: AmericanIvConfig, shadow_config: Iv) -> PricingOutcome:
     chain, tte = priced.chain, priced.time_to_expiry
     row = item.row
     quote, contract = row.quote, row.contract
@@ -71,7 +74,8 @@ def _price_row(item: PricedRow, priced: PricedChain, registry: SeriesRegistry, *
     if row.quality.spot_not_synchronous:
         return refused("quality:spot_not_synchronous")
     try:
-        record = registry.resolve(contract, as_of=valuation.astimezone(B3_TIMEZONE).date()).record
+        resolved = registry.resolve(contract, as_of=valuation.astimezone(B3_TIMEZONE).date())
+        record = resolved.record
     except RegistryRefusal as exc:
         return refused(f"registry:{exc.code.value}")
     except CarryRefusal as exc:
@@ -94,11 +98,32 @@ def _price_row(item: PricedRow, priced: PricedChain, registry: SeriesRegistry, *
     outcome = price_american_contract(
         contract, terms=record.terms, carry=record.carry, spot=spot, rate_cont=rate,
         sigma=iv.mid.sigma, tte=tte, steps=steps, assumptions=chain.model_assumptions)
-    return outcome.model_copy(update={"iv": iv, "sigma_source": "mid" if outcome.supported else None})
+    outcome = outcome.model_copy(
+        update={"iv": iv, "sigma_source": "mid" if outcome.supported else None},
+    )
+    if not outcome.supported:
+        return outcome
+
+    mid = quote.mid
+    assert mid is not None
+    assumptions = dict(outcome.assumptions, shadow_engine=SHADOW_ENGINE)
+    try:
+        shadow = implied_vol(
+            float(mid / record.terms.quotation_form), kind=contract.kind, spot=float(spot),
+            strike=float(contract.strike), time_years=tte.year_fraction, rate_cont=rate,
+            dividend_yield=resolved.carry.dividend_yield, cfg=shadow_config,
+        )
+        assumptions["shadow_iv_status"] = shadow.diagnostic.status.value
+        if shadow.sigma is not None:
+            assumptions.update(shadow_iv_mid=shadow.sigma, shadow_iv_gap=iv.mid.sigma - shadow.sigma)
+    except Exception:
+        assumptions["shadow_iv_status"] = "error"
+    return outcome.model_copy(update={"assumptions": assumptions})
 
 
 def _price_mixed_demo(priced: PricedChain, *, fixture: DemoFixture, steps: int,
-                     conventions: Conventions, iv_config: AmericanIvConfig) -> PricedChain:
+                     conventions: Conventions, iv_config: AmericanIvConfig, shadow_config: Iv,
+                     steps_source: Literal["config", "argument"]) -> PricedChain:
     """Conserva a ordem da captura. Só a raiz de composição da demo chama esta função."""
     chain = priced.chain
     if (chain.purpose is not Purpose.TEST or chain.stamp.purpose is not Purpose.TEST
@@ -115,12 +140,19 @@ def _price_mixed_demo(priced: PricedChain, *, fixture: DemoFixture, steps: int,
     rate = continuous_rate(chain.rate.value_pct_aa, compounding=conventions.rate_compounding)
     rows = tuple(
         PricedRow(row=item.row, pricing=_price_row(item, priced, registry,
-                  valuation=fixture.valuation, steps=steps, rate=rate, iv_config=iv_config))
+                  valuation=fixture.valuation, steps=steps, rate=rate, iv_config=iv_config,
+                  shadow_config=shadow_config))
         if item.row.contract.exercise_style is ExerciseStyle.AMERICAN else item
         for item in priced.rows)
     # Preserve as chaves v1 da Fase 1; a linha americana usa somente o carry resolvido.
     assumptions = dict(chain.model_assumptions)
     assumptions.update(american_pricing_model=AMERICAN_MODEL, american_crr_steps=steps,
                        american_series_registry=registry.version)
+    gaps = [abs(float(item.pricing.assumptions["shadow_iv_gap"])) for item in rows
+            if "shadow_iv_gap" in item.pricing.assumptions]
+    assumptions.update(american_crr_steps_source=steps_source,
+                       american_shadow_engine=SHADOW_ENGINE, american_shadow_rows=len(gaps))
+    if gaps:
+        assumptions["american_shadow_max_abs_gap"] = max(gaps)
     return priced.model_copy(update={
         "rows": rows, "chain": chain.model_copy(update={"model_assumptions": assumptions})})

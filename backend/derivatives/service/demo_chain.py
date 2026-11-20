@@ -11,7 +11,7 @@ from config.derivatives_config_model import load_derivatives_config
 
 
 class InvalidDemoSelection(ValueError):
-    """A seleção offline exige flag, passos e identificador em conjunto."""
+    """A seleção offline exige a flag e o identificador; passos são opcionais."""
 
 
 async def build_demo_chain(
@@ -20,7 +20,7 @@ async def build_demo_chain(
 ) -> tuple[PricedChain, datetime]:
     """A mesma fixture fornece as quatro leituras, o relógio e o registro da seleção."""
     if american_demo is True:
-        if (type(steps) is not int or not 1 <= steps <= 4999
+        if ((steps is not None and (type(steps) is not int or not 1 <= steps <= 4999))
                 or type(series_registry) is not str or series_registry != "synthetic-v1"):
             raise InvalidDemoSelection
     elif american_demo is not False or steps is not None or series_registry is not None:
@@ -30,10 +30,13 @@ async def build_demo_chain(
     service = ChainService(OplabMarketClient(fixture, stamp_source="fixture:"), cfg=cfg,
                            calendars=load_calendars(cfg.conventions, root=REPO_ROOT))
     priced = await service.build(symbol, expiry, now=fixture.valuation)
-    if steps is not None:
+    if american_demo:
         from backend.derivatives.service.american_demo import _price_mixed_demo
 
+        iv_config = load_american_iv_config()
         priced = _price_mixed_demo(
-            priced, fixture=fixture, steps=steps, conventions=cfg.conventions,
-            iv_config=load_american_iv_config())
+            priced, fixture=fixture, steps=iv_config.default_steps if steps is None else steps,
+            steps_source="config" if steps is None else "argument",
+            conventions=cfg.conventions, iv_config=iv_config, shadow_config=cfg.iv,
+        )
     return priced, fixture.valuation

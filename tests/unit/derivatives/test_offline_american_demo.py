@@ -8,9 +8,12 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, TypedDict, cast
+
+import yaml
 from unittest.mock import patch
 
 import pytest
+from pydantic import ValidationError
 
 from fastmcp import Client
 from fastmcp.exceptions import ToolError
@@ -27,7 +30,7 @@ from backend.derivatives.provenance import Provenance, Purpose, Readiness
 from backend.derivatives.service import american_demo, demo_chain
 from backend.derivatives.service.chain_service import Capture, ChainService, PricedChain
 from backend.derivatives.service.demo_chain import build_demo_chain
-from config.american_iv_config_model import load_american_iv_config
+from config.american_iv_config_model import AmericanIvConfig, load_american_iv_config
 from config.derivatives_config_model import load_derivatives_config
 
 ARGS = ["chain", "BOVA11", "2026-11-19"]
@@ -64,6 +67,7 @@ def test_opt_in_preserves_each_european_and_prices_or_explains_every_american(
     assert {key: assumptions[key] for key in plain_assumptions} == plain_assumptions
     assert "european_dividend_yield" not in assumptions
     assert "european_strike_adjusted_by_exchange_assumed" not in assumptions
+    assert not any(key.startswith("shadow_") for row in rows for key in row)
     assert data["row_count"] == len(rows) == len(europeans) + 3
     supported, absent, wrong = [row for row in rows if row["exercise_style"] == "AMERICAN"]
     assert [row["symbol"] for row in (supported, absent, wrong)] == [
@@ -246,10 +250,12 @@ def test_mixed_files_are_pinned_and_refuse_symlinks(
     assert DemoFixture(root).registry_json is None
 
 
-async def test_price_and_each_iv_use_the_observed_unit_price() -> None:
+@pytest.mark.parametrize("steps", [3, 32, 200])
+async def test_price_and_each_iv_use_the_observed_unit_price(steps: int) -> None:
+    """B4: preço e três IVs são do mesmo par CRR e reproduzem as cotações."""
     priced, valuation = await build_demo_chain(
         "BOVA11", date(2026, 11, 19), directory=Path(FIXTURE_DIR), american_demo=True,
-        steps=32, series_registry="synthetic-v1")
+        steps=steps, series_registry="synthetic-v1")
     row = next(item for item in priced.rows if item.row.contract.symbol == "SYNAC150")
     result = row.pricing
     assert result.model == "crr_american_v1" and result.sigma_source == "mid"
@@ -265,7 +271,7 @@ async def test_price_and_each_iv_use_the_observed_unit_price() -> None:
         assert iv is not None and iv.sigma is not None
         pair = [crr_price(kind=OptionKind.CALL, style=ExerciseStyle.AMERICAN, spot=150.,
                           strike=150., time_years=tte.year_fraction, rate_cont=rate,
-                          dividend_yield=0., sigma=iv.sigma, steps=n) for n in (32, 33)]
+                          dividend_yield=0., sigma=iv.sigma, steps=n) for n in (steps, steps + 1)]
         assert sum(pair) / 2 == pytest.approx(observed, abs=1e-7, rel=0)
         assert iv.diagnostic.message == result.model
         assert iv.diagnostic.iterations > 0
@@ -334,7 +340,8 @@ async def test_mixed_projection_independently_refuses_replay_test_stamp() -> Non
     fixture = DemoFixture(Path(FIXTURE_DIR), mixed=True)
     cfg, iv_config = load_derivatives_config(), load_american_iv_config()
     control = american_demo._price_mixed_demo(priced, fixture=fixture, steps=32,
-                                             conventions=cfg.conventions, iv_config=iv_config)
+                                             conventions=cfg.conventions, iv_config=iv_config,
+            shadow_config=cfg.iv, steps_source="argument")
     assert any(row.pricing.supported for row in control.rows
                if row.row.contract.symbol == "SYNAC150")
     chain = priced.chain
@@ -343,10 +350,13 @@ async def test_mixed_projection_independently_refuses_replay_test_stamp() -> Non
     with pytest.raises(ValueError, match="^fixture_provenance$"):
         american_demo._price_mixed_demo(
             priced.model_copy(update={"chain": replay}), fixture=fixture, steps=32,
-            conventions=cfg.conventions, iv_config=iv_config)
+            conventions=cfg.conventions, iv_config=iv_config,
+            shadow_config=cfg.iv, steps_source="argument")
 
 
-async def test_factor_1000_preserves_unit_targets_with_nonstandard_lot() -> None:
+@pytest.mark.parametrize("q", [0.0, 0.04])
+async def test_factor_1000_preserves_unit_targets_with_nonstandard_lot(q: float) -> None:
+    """CRR e sombra recebem mid por unidade, e a sombra recebe o carry do registro."""
     priced, valuation = await _capture_before_american_projection()
     fixture = DemoFixture(Path(FIXTURE_DIR), mixed=True)
     assert fixture.registry_json is not None and priced.time_to_expiry is not None
@@ -358,10 +368,19 @@ async def test_factor_1000_preserves_unit_targets_with_nonstandard_lot() -> None
     item = next(row for row in priced.rows if row.row.contract.symbol == "SYNAC150")
     iv_config = load_american_iv_config()
     baseline = None
+    shadow_config = load_derivatives_config().iv
     for factor in (1, 1000):
         payload = json.loads(fixture.registry_json)
         payload["records"][0]["terms"].update(strike="90", contract_size=37,
                                              quotation_form=factor)
+        if q:
+            record = payload["records"][0]
+            record["carry"].update(kind="CONTINUOUS_YIELD", dividend_yield=str(q))
+            record["terms"].update(adjustment_policy="UNPROTECTED", evidence={
+                "issuer": "B3", "document": "synthetic-v1 fixture", "version": "test",
+                "published_on": "2026-11-05", "symbol": "SYNAC150",
+                "effective_on": "2026-11-05", "policy": "UNPROTECTED",
+            })
         registry = SeriesRegistry.model_validate_json(json.dumps(payload))
         contract = item.row.contract.model_copy(update={
             "strike": Decimal("90"), "contract_size": 37, "quotation_form": factor,
@@ -371,11 +390,19 @@ async def test_factor_1000_preserves_unit_targets_with_nonstandard_lot() -> None
         row = item.row.model_copy(update={"contract": contract, "quote": quote})
         assert quote.mid == mid * factor
         with patch.object(american_demo, "american_implied_vol",
-                          wraps=american_demo.american_implied_vol) as solve:
+                          wraps=american_demo.american_implied_vol) as solve, patch.object(
+            american_demo, "implied_vol", wraps=american_demo.implied_vol,
+        ) as shadow:
             outcome = american_demo._price_row(
                 item.model_copy(update={"row": row}), priced, registry, valuation=valuation,
-                steps=32, rate=0.05, iv_config=iv_config)
+                steps=32, rate=0.05, iv_config=iv_config, shadow_config=shadow_config)
         assert [call.kwargs["target_price"] for call in solve.call_args_list] == [bid, ask, mid]
+        shadow.assert_called_once()
+        assert shadow.call_args.args == (float(mid),)
+        assert shadow.call_args.kwargs == {
+            "kind": OptionKind.CALL, "spot": 100.0, "strike": 90.0, "time_years": 0.25,
+            "rate_cont": 0.05, "dividend_yield": q, "cfg": shadow_config,
+        }
         assert outcome.supported and outcome.price is not None and outcome.iv is not None
         assert outcome.iv.bid is not None and outcome.iv.ask is not None and outcome.iv.mid is not None
         result = outcome.price, outcome.iv.bid.sigma, outcome.iv.ask.sigma, outcome.iv.mid.sigma
@@ -436,3 +463,117 @@ async def test_r1_shadow_is_diagnostic_only(monkeypatch: pytest.MonkeyPatch) -> 
         assert left.pricing.model_dump(exclude=exclude) == right.pricing.model_dump(exclude=exclude)
         if left.row.contract.exercise_style is ExerciseStyle.EUROPEAN or not left.pricing.supported:
             assert not any(key.startswith("shadow_") for key in left.pricing.assumptions)
+
+
+@pytest.mark.parametrize(
+    ("scenario", "reason", "mid_status"),
+    [
+        ("missing_ask", "iv_unavailable:missing_quote", None),
+        ("stale", "quality:stale_quote", None),
+        ("lower_bound", "iv:not_identifiable", "not_applicable"),
+        ("control", None, "ok"),
+    ],
+)
+def test_b7_mid_volatility_requires_an_identifiable_quote(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+    scenario: str, reason: str | None, mid_status: str | None,
+) -> None:
+    """Publica a IV do meio só para cotação bilateral, atual e identificável."""
+    if scenario == "missing_ask":
+        quote_fields: dict[str, object] = {"ask": None}
+    elif scenario == "stale":
+        quote_fields = {"time": TIME - 61_000}
+    elif scenario == "lower_bound":
+        from asyncio import run
+
+        captured, _ = run(_capture_before_american_projection())
+        tte = captured.time_to_expiry
+        assert tte is not None
+        # CALL sintética ATM, sem carry; o piso é S - K exp(-rT), não zero.
+        floor = -150.0 * math.expm1(-math.log1p(14.9 / 100) * tte.year_fraction)
+        quote_fields = {"bid": floor, "ask": floor}
+    else:
+        quote_fields = {}
+    substitute_read(monkeypatch, OPTIONS_FILE, quote_change(quote_fields))
+
+    rc, reply = invoke([*DEMO, *OPTIONS], capsys)
+    assert rc == 0
+    row = next(r for r in reply["data"]["rows"] if r["symbol"] == "SYNAC150")
+    iv = row["iv"]
+    assert row["reason"] == reason and row["supported"] == (reason is None)
+    if reason is None:
+        assert row["model_price"] is not None
+        assert 0 < iv["bid"]["sigma"] < iv["mid"]["sigma"] < iv["ask"]["sigma"]
+        assert {side["status"] for side in iv.values()} == {"ok"}
+    else:
+        assert row["model_price"] is None
+        mid = None if iv is None else iv["mid"]
+        if mid_status is None:
+            assert mid is None
+        else:
+            assert mid == {"sigma": None, "status": mid_status}
+    if scenario == "missing_ask":
+        assert iv["ask"] is None and iv["bid"]["status"] == "ok"
+
+
+@pytest.mark.parametrize("bad", [None, 0, 5000, True, 200.0, "200"])
+@pytest.mark.parametrize("strict", [True, False])
+def test_r1_default_steps_config_contract(bad: Any, strict: bool) -> None:
+    """B1: valor ausente e coerções são rejeitados pelo modelo, não substituídos."""
+    yaml_data = yaml.safe_load((REPO_ROOT / "config/american_iv.yaml").read_text(encoding="utf-8"))
+    assert yaml_data["default_steps"] == 200
+    assert load_american_iv_config().default_steps == 200
+    if bad is None:
+        del yaml_data["default_steps"]
+    else:
+        yaml_data["default_steps"] = bad
+    with pytest.raises(ValidationError, match="default_steps"):
+        AmericanIvConfig.model_validate(yaml_data, strict=strict)
+
+
+async def test_r1_default_steps_come_from_the_profile(monkeypatch: pytest.MonkeyPatch) -> None:
+    """B2/B3: 37 no perfil muda as linhas; 32 explícito ignora o padrão."""
+    cfg = load_american_iv_config()
+    custom = AmericanIvConfig.model_validate(dict(cfg.model_dump(), default_steps=37))
+    monkeypatch.setattr(demo_chain, "load_american_iv_config", lambda: custom)
+
+    async def price(steps: int | None) -> PricedChain:
+        chain, _ = await build_demo_chain(
+            "BOVA11", date(2026, 11, 19), directory=Path(FIXTURE_DIR), american_demo=True,
+            steps=steps, series_registry="synthetic-v1",
+        )
+        return chain
+
+    defaulted = await price(None)
+    explicit = await price(37)
+    other = await price(32)
+    assert defaulted.chain.model_assumptions["american_crr_steps"] == 37
+    assert defaulted.rows == explicit.rows
+    assert other.chain.model_assumptions["american_crr_steps"] == 32
+    assert other.chain.model_assumptions["american_crr_steps_source"] == "argument"
+    assert other.rows != defaulted.rows
+
+
+async def test_r1_shadow_chain_aggregate(monkeypatch: pytest.MonkeyPatch) -> None:
+    """B6: só linhas comparadas contam; um agregado vazio não publica máximo."""
+    async def demo() -> PricedChain:
+        priced, _ = await build_demo_chain(
+            "BOVA11", date(2026, 11, 19), directory=Path(FIXTURE_DIR), american_demo=True,
+            steps=32, series_registry="synthetic-v1",
+        )
+        return priced
+
+    mixed = await demo()
+    gaps = [
+        abs(float(r.pricing.assumptions["shadow_iv_gap"])) for r in mixed.rows
+        if "shadow_iv_gap" in r.pricing.assumptions
+    ]
+    summary = mixed.chain.model_assumptions
+    assert summary["american_shadow_engine"] == "bsm_european_v1"
+    assert summary["american_shadow_rows"] == len(gaps) == 1
+    assert summary["american_shadow_max_abs_gap"] == max(gaps)
+
+    substitute_read(monkeypatch, OPTIONS_FILE, quote_change({"ask": None}))
+    empty = (await demo()).chain.model_assumptions
+    assert empty["american_shadow_rows"] == 0
+    assert "american_shadow_max_abs_gap" not in empty
