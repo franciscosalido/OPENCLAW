@@ -10,8 +10,11 @@ import pytest
 
 from backend.derivatives.domain.carry import CarryAssumption
 from backend.derivatives.domain.models import ExerciseStyle, OptionContract, OptionKind
+from backend.derivatives.domain.series_terms import SeriesTerms
 from backend.derivatives.pricing import american_bridge as bridge
+from backend.derivatives.pricing.binomial import BinomialRefusal, BinomialRefusalCode
 from backend.derivatives.pricing.bsm import BsmInputs, price
+from backend.derivatives.pricing.conventions import TimeToExpiry
 from backend.derivatives.pricing.implied_vol import IvStatus, implied_vol
 from config.derivatives_config_model import Iv
 from tests.unit.derivatives.test_american_bridge import (
@@ -23,10 +26,15 @@ CRR = "crr_american_v1"
 BSM = "bsm_european_v1"
 
 
-def _invert(target: Decimal, contract: OptionContract = CALL, **changes: Any
-            ) -> bridge.AmericanIvSolution | bridge.AmericanIvRefusal:
-    args = dict(terms=A1_TERMS, carry=YIELD, spot=SPOT, rate_cont=0.05, tte=TTE, steps=50)
-    return bridge.american_implied_vol(contract, target_price=target, **(args | changes))
+def _invert(
+    target: Decimal, contract: OptionContract = CALL, *, terms: SeriesTerms = A1_TERMS,
+    carry: CarryAssumption | None = YIELD, spot: Decimal = SPOT, rate_cont: float = 0.05,
+    tte: TimeToExpiry = TTE, steps: int = 50,
+) -> bridge.AmericanIvSolution | bridge.AmericanIvRefusal:
+    return bridge.american_implied_vol(
+        contract, terms=terms, carry=carry, spot=spot, target_price=target,
+        rate_cont=rate_cont, tte=tte, steps=steps,
+    )
 
 
 def _assert_refused(result: bridge.AmericanIvSolution | bridge.AmericanIvRefusal,
@@ -203,8 +211,6 @@ def test_solver_exhaustion() -> None:
 
 def test_tree_refusal_stops_search() -> None:
     """A recusa do próprio motor exige o código original e encerra a inversão."""
-    from backend.derivatives.pricing.binomial import BinomialRefusal, BinomialRefusalCode
-
     exc = BinomialRefusal(BinomialRefusalCode.TREE_NOT_REPRESENTABLE)
     with patch.object(bridge, "crr_price", side_effect=exc) as tree:
         _assert_refused(_invert(Decimal("8")), "binomial:tree_not_representable")
