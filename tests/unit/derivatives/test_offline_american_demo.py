@@ -625,3 +625,111 @@ def test_r1_cli_allows_mixed_demo_without_steps(capsys: pytest.CaptureFixture[st
     assumptions = reply["data"]["model_assumptions"]
     assert assumptions["american_crr_steps"] == 200
     assert assumptions["american_crr_steps_source"] == "config"
+
+
+async def test_refused_rows_carry_no_shadow_and_aggregate_uses_modulus(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Sombra acima da principal dá diferença negativa; o agregado publica o módulo."""
+    original = american_demo.implied_vol
+
+    def higher(*args: Any, **kwargs: Any) -> Any:
+        """Devolve a volatilidade da Fase 1 deslocada um ponto para cima."""
+        result = original(*args, **kwargs)
+        return replace(result, sigma=cast(float, result.sigma) + 0.01)
+
+    monkeypatch.setattr(american_demo, "implied_vol", higher)
+    priced, _ = await build_demo_chain(
+        "BOVA11", date(2026, 11, 19), directory=Path(FIXTURE_DIR), american_demo=True,
+        steps=32, series_registry="synthetic-v1",
+    )
+    american = [item for item in priced.rows
+                if item.row.contract.exercise_style is ExerciseStyle.AMERICAN]
+    refused = [item for item in american if not item.pricing.supported]
+    priced_rows = [item for item in american if item.pricing.supported]
+    assert len(refused) == 2 and len(priced_rows) == 1
+    assert all(item.pricing.assumptions == {} for item in refused)
+    gap = cast(float, priced_rows[0].pricing.assumptions["shadow_iv_gap"])
+    assert gap == pytest.approx(-0.01, abs=1e-4)
+    assert priced.chain.model_assumptions["american_shadow_max_abs_gap"] == -gap
+
+
+async def test_r1_shadow_aggregate_uses_the_larger_second_row_gap() -> None:
+    """B6: duas séries admitidas contam; o maior desvio pode vir da segunda."""
+    priced, _ = await _capture_before_american_projection()
+    fixture = DemoFixture(Path(FIXTURE_DIR), mixed=True)
+    assert fixture.registry_json is not None
+    payload = json.loads(fixture.registry_json)
+    record = json.loads(fixture.registry_json)["records"][0]
+    symbol = "SYNAC150B"
+    record["terms"]["symbol"] = record["carry"]["symbol"] = symbol
+    payload["records"].append(record)
+    fixture.registry_json = json.dumps(payload).encode("utf-8")
+
+    first = next(r for r in priced.rows if r.row.contract.symbol == "SYNAC150")
+    contract = first.row.contract.model_copy(update={"symbol": symbol})
+    quote = first.row.quote.model_copy(update={"bid": Decimal("11.9"), "ask": Decimal("12.1")})
+    second = first.model_copy(update={"row": first.row.model_copy(
+        update={"contract": contract, "quote": quote},
+    )})
+    capture = priced.model_copy(update={"rows": (first, second)})
+    cfg = load_derivatives_config()
+    mixed = american_demo._price_mixed_demo(
+        capture, fixture=fixture, steps=32, conventions=cfg.conventions,
+        iv_config=load_american_iv_config(), shadow_config=cfg.iv, steps_source="argument",
+    )
+
+    assert [r.row.contract.symbol for r in mixed.rows] == ["SYNAC150", symbol]
+    assert all(r.pricing.supported for r in mixed.rows)
+    first_gap, second_gap = (
+        abs(float(r.pricing.assumptions["shadow_iv_gap"])) for r in mixed.rows
+    )
+    assert second_gap > first_gap
+    summary = mixed.chain.model_assumptions
+    assert summary["american_shadow_rows"] == 2
+    assert summary["american_shadow_max_abs_gap"] == second_gap
+
+
+async def test_r1_shadow_preserves_real_bsm_status_without_sigma(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """B5: recusa do BSM não cria números nem altera o resultado principal."""
+    from backend.derivatives.pricing.implied_vol import IvResult, IvStatus
+
+    async def demo() -> PricedChain:
+        """Executa a mesma captura após alterar apenas o alvo auxiliar."""
+        priced, _ = await build_demo_chain(
+            "BOVA11", date(2026, 11, 19), directory=Path(FIXTURE_DIR), american_demo=True,
+            steps=32, series_registry="synthetic-v1",
+        )
+        return priced
+
+    normal = await demo()
+    real_solver = american_demo.implied_vol
+
+    def below_bound(_target: float, **kwargs: Any) -> IvResult:
+        """Força alvo zero no solver real, abaixo do piso da CALL ATM com juros."""
+        result = real_solver(0.0, **kwargs)
+        assert result.diagnostic.status is IvStatus.BELOW_INTRINSIC
+        assert result.sigma is None
+        return result
+
+    monkeypatch.setattr(american_demo, "implied_vol", below_bound)
+    failed = await demo()
+
+    original = next(r.pricing for r in normal.rows if r.pricing.model == "crr_american_v1")
+    refused = next(r.pricing for r in failed.rows if r.pricing.model == "crr_american_v1")
+    assert original.assumptions["shadow_iv_status"] == "ok"
+    assert refused.assumptions["shadow_iv_status"] == "below_intrinsic"
+    assert "shadow_iv_mid" not in refused.assumptions
+    assert "shadow_iv_gap" not in refused.assumptions
+    for left, right in zip(normal.rows, failed.rows, strict=True):
+        assert left.row == right.row
+        assert left.pricing.model_dump(exclude={"assumptions"}) == right.pricing.model_dump(
+            exclude={"assumptions"},
+        )
+        assert {
+            k: v for k, v in left.pricing.assumptions.items() if not k.startswith("shadow_")
+        } == {
+            k: v for k, v in right.pricing.assumptions.items() if not k.startswith("shadow_")
+        }

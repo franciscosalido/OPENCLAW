@@ -93,8 +93,12 @@ def _price_row(item: PricedRow, priced: PricedChain, registry: SeriesRegistry, *
             cfg=iv_config))
 
     iv = QuoteIv(bid=invert(quote.bid), ask=invert(quote.ask), mid=invert(quote.mid))
-    if iv.mid is None:
+    if iv.bid is None or iv.ask is None or iv.mid is None:
         return refused("iv_unavailable:missing_quote", iv)
+    if iv.bid.sigma is None:
+        return refused(f"iv_unavailable:bid:{iv.bid.diagnostic.message}", iv)
+    if iv.ask.sigma is None:
+        return refused(f"iv_unavailable:ask:{iv.ask.diagnostic.message}", iv)
     if iv.mid.sigma is None:
         return refused(iv.mid.diagnostic.message, iv)
     outcome = price_american_contract(
