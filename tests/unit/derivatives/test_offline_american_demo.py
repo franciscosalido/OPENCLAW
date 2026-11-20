@@ -401,3 +401,38 @@ async def test_r1_default_steps_match_explicit_200() -> None:
     assert defaulted.chain.model_assumptions["american_crr_steps_source"] == "config"
     assert explicit.chain.model_assumptions["american_crr_steps_source"] == "argument"
     assert defaulted.rows == explicit.rows
+
+
+async def test_r1_shadow_is_diagnostic_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    """B5: sombra auditável e falha isolada do preço, das IVs e das recusas."""
+    async def demo() -> PricedChain:
+        priced, _ = await build_demo_chain(
+            "BOVA11", date(2026, 11, 19), directory=Path(FIXTURE_DIR), american_demo=True,
+            steps=200, series_registry="synthetic-v1",
+        )
+        return priced
+
+    normal = await demo()
+    supported = next(r.pricing for r in normal.rows if r.pricing.model == "crr_american_v1")
+    shadow = supported.assumptions
+    assert shadow["shadow_engine"] == "bsm_european_v1"
+    assert shadow["shadow_iv_status"] == "ok"
+    assert supported.iv is not None and supported.iv.mid is not None
+    sigma = supported.iv.mid.sigma
+    shadow_sigma = shadow["shadow_iv_mid"]
+    gap = shadow["shadow_iv_gap"]
+    assert sigma is not None and type(shadow_sigma) is float and type(gap) is float
+    assert gap == sigma - shadow_sigma and abs(gap) > 1e-9
+
+    def broken(*_args: object, **_kwargs: object) -> None:
+        raise RuntimeError("shadow unavailable")
+
+    monkeypatch.setattr(american_demo, "implied_vol", broken)
+    failed = await demo()
+    failed_supported = next(r.pricing for r in failed.rows if r.pricing.model == "crr_american_v1")
+    assert failed_supported.assumptions["shadow_iv_status"] == "error"
+    exclude = {"assumptions"}
+    for left, right in zip(normal.rows, failed.rows, strict=True):
+        assert left.pricing.model_dump(exclude=exclude) == right.pricing.model_dump(exclude=exclude)
+        if left.row.contract.exercise_style is ExerciseStyle.EUROPEAN or not left.pricing.supported:
+            assert not any(key.startswith("shadow_") for key in left.pricing.assumptions)
