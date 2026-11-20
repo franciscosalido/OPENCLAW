@@ -50,8 +50,13 @@ def _offenders(root: Path) -> list[str]:
             for node in ast.walk(ast.parse(source.read_text(encoding="utf-8"), filename=str(path))):
                 if not isinstance(node, (ast.Import, ast.ImportFrom, ast.Call, ast.Constant)):
                     continue
+                exception_only = (
+                    path == DEMO_PATH and isinstance(node, ast.ImportFrom)
+                    and [alias.name for alias in node.names] == ["CarryRefusal"]
+                )
                 for target in local_targets(node, package):
-                    consumers[target].add((path, node.lineno))
+                    if not (exception_only and target == CARRY):
+                        consumers[target].add((path, node.lineno))
                 if isinstance(node, ast.Constant) and isinstance(node.value, str):
                     for match in _LITERAL.finditer(node.value):
                         consumers[match.group()].add((path, node.lineno))
@@ -81,6 +86,9 @@ def test_only_domain_consumes_series_terms() -> None:
 @pytest.mark.parametrize(("path", "statement", "allowed"), [
     (BRIDGE_PATH, f"from {TERMS} import SeriesTerms", True),
     (BRIDGE_PATH, f"from {CARRY} import resolve_carry", True),
+    (DEMO_PATH, f"from {CARRY} import CarryRefusal", True),
+    (DEMO_PATH, f"from {CARRY} import CarryRefusal, resolve_carry", False),
+    (DEMO_PATH, f"from {CARRY} import resolve_carry as CarryRefusal", False),
     (BRIDGE_PATH.with_name("other_bridge.py"), f"import {TERMS}", False),
     (BRIDGE_PATH.with_name("other_bridge.py"), f"import {CARRY}", False),
     (DOMAIN / "intruder.py", f"import {BRIDGE}", False),
