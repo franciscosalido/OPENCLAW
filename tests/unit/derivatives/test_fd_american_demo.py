@@ -13,7 +13,9 @@ import pytest
 from backend.derivatives.cli import FIXTURE_DIR
 from backend.derivatives.domain.models import ExerciseStyle, OptionKind
 from backend.derivatives.domain.series_registry import SeriesRegistry
+from backend.derivatives.mcp.derivatives_server import _row_view
 from backend.derivatives.oplab.demo_fixture import DemoFixture
+from backend.derivatives.pricing.american_bridge import AMERICAN_MODEL, AmericanIvSolution
 from backend.derivatives.pricing.contract_pricing import PricingOutcome
 from backend.derivatives.pricing.fd_american import FdGrid, FdIvResult, fd_price
 from backend.derivatives.service import american_demo, demo_chain
@@ -138,7 +140,9 @@ def test_u6_alert_preserves_cli_and_model_and_aggregates_modulus(
     with patch.object(american_demo, "fd_implied_vol", return_value=FdIvResult("ok", sigma + .01)):
         rc, alerted = invoke(args, capsys)
     assert rc == control_rc == 0
-    assert alerted["data"]["rows"] == control["data"]["rows"]
+    assert _without_diagnostics(alerted["data"]["rows"]) == _without_diagnostics(
+        control["data"]["rows"],
+    )
     assumptions = alerted["data"]["model_assumptions"]
     assert assumptions["american_fd_engine"] == "fd_cn_os_v1"
     assert assumptions["american_fd_grid"] == "400x200"
@@ -321,25 +325,31 @@ async def test_u13_low_sensitivity_retains_gap_but_suppresses_alert() -> None:
     _assert_same_primary(normal, priced)
 
 
-async def test_u14_strict_alert_threshold_exactly_equal_then_above() -> None:
-    """Fixa igualdade binária exata e um valor representável abaixo no limiar."""
-    cfg = load_american_fd_config()
-    normal = await _demo()
-    primary = _primary_sigma(normal)
-    shadow = primary + cfg.divergence_vol
-    exact_gap = abs(primary - shadow)
-    for limit, expected in ((exact_gap, False), (math.nextafter(exact_gap, 0.), True)):
-        with (
-            patch.object(american_demo, "fd_implied_vol", return_value=FdIvResult("ok", shadow)),
-            patch.object(demo_chain, "load_american_fd_config",
-                         return_value=cfg.model_copy(update={"divergence_vol": limit})),
-        ):
-            altered = await _demo()
-        diag = _main_row(altered).pricing.assumptions
-        assert abs(float(diag["fd_iv_gap"])) == exact_gap
-        assert diag["fd_iv_comparison"] == "informative"
-        assert diag["fd_iv_alert"] is expected
-        _assert_same_primary(normal, altered)
+@pytest.mark.parametrize("primary,boundary", [(.20, .2005), (.2005, .20)])
+@pytest.mark.parametrize("relative", ["below", "equal", "above"])
+async def test_u14_strict_nominal_threshold_in_both_directions(
+    primary: float, boundary: float, relative: str,
+) -> None:
+    """Exemplo do ADR e floats imediatamente adjacentes, sem folga artificial."""
+    fd_sigma = boundary
+    if relative == "below":
+        fd_sigma = math.nextafter(boundary, primary)
+    if relative == "above":
+        direction = math.inf if boundary > primary else -math.inf
+        fd_sigma = math.nextafter(boundary, direction)
+    assert load_american_fd_config().divergence_vol == .0005
+    solved = AmericanIvSolution(primary, AMERICAN_MODEL, (.19, .21))
+    with (
+        patch.object(american_demo, "american_implied_vol", return_value=solved),
+        patch.object(american_demo, "fd_implied_vol", return_value=FdIvResult("ok", fd_sigma)),
+    ):
+        priced = await _demo()
+    diag = _main_row(priced).pricing.assumptions
+    expected = relative == "above"
+    assert diag["fd_iv_gap"] == primary - fd_sigma
+    assert diag["fd_iv_comparison"] == "informative"
+    assert diag["fd_iv_alert"] is expected
+    assert priced.chain.model_assumptions["american_fd_alert_rows"] == int(expected)
 
 
 async def test_u15_price_gap_uses_primary_sigma_and_one_fixed_grid() -> None:
@@ -382,3 +392,65 @@ async def test_u3_primary_final_refusal_skips_fd_even_with_three_ivs() -> None:
     assert not row.supported and row.reason == "synthetic_refusal"
     assert "fd_engine" not in row.assumptions
     spy.assert_not_called()
+
+
+def _without_diagnostics(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [{name: value for name, value in row.items() if name != "diagnostics"} for row in rows]
+
+
+async def test_v1_public_view_serializes_exactly_fd_diagnostics() -> None:
+    """A projeção inclui só os dados FD, preservando a ordem anterior dos campos."""
+    main = _main_row(await _demo())
+    row = _row_view(main)
+    fd_only = {key: value for key, value in main.pricing.assumptions.items()
+               if key.startswith("fd_")}
+    assert fd_only and row["diagnostics"] == fd_only
+    assert list(row)[-1] == "diagnostics"
+    assert json.loads(json.dumps(row, allow_nan=False)) == row
+
+
+async def test_v2_refused_european_and_default_rows_do_not_gain_diagnostics() -> None:
+    """Mesmo hipóteses adulteradas na memória não vazam por uma linha não elegível."""
+    from backend.derivatives.cli import run_chain
+
+    priced = await _demo()
+    european = next(row for row in priced.rows
+                    if row.row.contract.exercise_style is ExerciseStyle.EUROPEAN)
+    refused = next(row for row in priced.rows if not row.pricing.supported)
+    for row in (european, refused):
+        contaminated = row.pricing.model_copy(update={"assumptions": {"fd_iv_status": "error"}})
+        assert "diagnostics" not in _row_view(row.model_copy(update={"pricing": contaminated}))
+    plain = await run_chain("BOVA11", "2026-11-19", "offline_fixture", lambda: priced.chain.acquired_at)
+    assert plain["ok"] is True
+    assert all("diagnostics" not in row for row in plain["data"]["rows"])
+
+
+def test_v3_fd_error_projects_status_but_no_legacy_difference(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Erro auxiliar é diagnóstico JSON, nunca altera a linha anterior."""
+    args = [*DEMO, *OPTIONS]
+    rc, normal = invoke(args, capsys)
+    assert rc == 0
+    with patch.object(american_demo, "fd_price", side_effect=RuntimeError("synthetic FD failure")):
+        rc, failed = invoke(args, capsys)
+    assert rc == 0
+    rows = failed["data"]["rows"]
+    canonical = next(row for row in rows if row["symbol"] == "SYNAC150" and row["supported"])
+    assert canonical["diagnostics"]["fd_iv_status"] == "error"
+    assert "fd_iv_gap" not in canonical["diagnostics"]
+    assert _without_diagnostics(rows) == _without_diagnostics(normal["data"]["rows"])
+
+
+def test_v4_removing_diagnostics_reproduces_legacy_mixed_rows_byte_for_byte(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Só a chave aditiva muda; os valores e a ordem legada da CLI são preservados."""
+    args = [*DEMO, *OPTIONS]
+    with patch.object(demo_chain, "load_american_fd_config", return_value=None):
+        base_rc, base = invoke(args, capsys)
+    new_rc, candidate = invoke(args, capsys)
+    assert base_rc == new_rc == 0
+    old_rows, new_rows = base["data"]["rows"], candidate["data"]["rows"]
+    assert sum("diagnostics" in row for row in new_rows) == 1
+    assert json.dumps(_without_diagnostics(new_rows)) == json.dumps(old_rows)
