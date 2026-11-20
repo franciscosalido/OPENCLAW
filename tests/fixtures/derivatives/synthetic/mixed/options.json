@@ -1,0 +1,5 @@
+[
+  {"symbol":"SYNAC150","parent_symbol":"BOVA11","category":"CALL","maturity_type":"AMERICAN","due_date":"2026-11-19","strike":150,"contract_size":100,"bid":2.9,"ask":3.1,"time":1793908800000},
+  {"symbol":"SYNABS151","parent_symbol":"BOVA11","category":"CALL","maturity_type":"AMERICAN","due_date":"2026-11-19","strike":151,"contract_size":100,"bid":2.4,"ask":2.6,"time":1793908800000},
+  {"symbol":"SYNAC150","parent_symbol":"BOVA11","category":"CALL","maturity_type":"AMERICAN","due_date":"2026-11-19","strike":152,"contract_size":100,"bid":2.0,"ask":2.1,"time":1793908800000}
+]

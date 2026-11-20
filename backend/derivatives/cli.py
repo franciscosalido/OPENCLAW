@@ -35,14 +35,21 @@ def build_parser() -> argparse.ArgumentParser:
     chain.add_argument("due_date", help="vencimento em ISO 8601, ex.: 2026-11-19")
     chain.add_argument("--provider", choices=("live", "offline_fixture"), default="live",
                        help="offline_fixture serve dados sinteticos (nunca mercado)")
+    chain.add_argument("--american-demo", action="store_true", help="habilita a ponte americana na demo")
+    chain.add_argument("--steps", type=int, help="passos CRR fornecidos para a demo (1 a 4999)")
+    chain.add_argument("--series-registry", help="registro explícito da demo: synthetic-v1")
     chain.add_argument("--indent", type=int, default=None, help="indentacao do JSON")
     return parser
 
-async def run_chain(symbol: str, due_date: str, provider: str, clock: Clock) -> dict[str, object]:
+async def run_chain(
+    symbol: str, due_date: str, provider: str, clock: Clock, *, american_demo: bool = False,
+    steps: int | None = None, series_registry: str | None = None,
+) -> dict[str, object]:
     """Despacha para a mesma funcao que atende a tool MCP correspondente."""
     if provider == "offline_fixture":
         config = DerivativesMcpConfig(context="test", fixture_dir=FIXTURE_DIR)
-        return await demo_tool(symbol, due_date, config=config, root=REPO_ROOT)
+        return await demo_tool(symbol, due_date, config=config, root=REPO_ROOT,
+                               american_demo=american_demo, steps=steps, series_registry=series_registry)
     return await chain_tool(symbol, due_date, config=DerivativesMcpConfig(), clock=clock)
 
 def exit_code(response: dict[str, object]) -> int:
@@ -56,7 +63,9 @@ def exit_code(response: dict[str, object]) -> int:
 def main(argv: Sequence[str] | None = None, *, clock: Clock = system_clock) -> int:
     """Executa o comando e escreve exatamente um documento JSON em stdout."""
     args = build_parser().parse_args(argv)
-    response = asyncio.run(run_chain(args.symbol, args.due_date, args.provider, clock))
+    response = asyncio.run(run_chain(args.symbol, args.due_date, args.provider, clock,
+                                     american_demo=args.american_demo, steps=args.steps,
+                                     series_registry=args.series_registry))
     sys.stdout.write(json.dumps(response, indent=args.indent, ensure_ascii=False) + "\n")
     return exit_code(response)
 

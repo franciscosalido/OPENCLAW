@@ -1,0 +1,29 @@
+{
+  "version": "synthetic-v1",
+  "records": [{
+    "version": "demo-1",
+    "underlying": "BOVA11",
+    "kind": "CALL",
+    "expiry": "2026-11-19",
+    "isin": null,
+    "available_on": "2026-11-05",
+    "valid_through": "2026-11-05",
+    "terms": {
+      "source": "fixture synthetic-v1, termos fictícios",
+      "symbol": "SYNAC150",
+      "effective_on": "2026-11-05",
+      "strike": "150.0",
+      "contract_size": 100,
+      "quotation_form": 1,
+      "exercise_style": "AMERICAN",
+      "currency": "BRL",
+      "adjustment_policy": "UNKNOWN"
+    },
+    "carry": {
+      "symbol": "SYNAC150",
+      "source": "fixture synthetic-v1, premissa fictícia explícita",
+      "effective_on": "2026-11-05",
+      "kind": "NONE"
+    }
+  }]
+}

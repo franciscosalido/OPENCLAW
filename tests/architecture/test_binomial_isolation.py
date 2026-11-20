@@ -3,10 +3,11 @@
 import ast
 import subprocess
 import sys
-from importlib.util import resolve_name
 from pathlib import Path
 
 import pytest
+
+from tests.architecture.derivatives_imports import local_targets
 
 ROOT = Path(__file__).resolve().parents[2]
 TARGET = "backend.derivatives.pricing.binomial"
@@ -17,24 +18,16 @@ BRIDGE_PATH = Path("backend/derivatives/pricing/american_bridge.py")
 
 def _binomial_consumers(root: Path) -> list[str]:
     offenders = []
-    for directory in ("backend", "scripts"):
+    for directory in ("backend", "scripts", "config"):
         for path in (root / directory).rglob("*.py"):
             if path.relative_to(root) in (SOURCE.relative_to(ROOT), BRIDGE_PATH):
                 continue
             package = ".".join(path.relative_to(root).parent.parts)
             for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
-                if isinstance(node, ast.Import):
-                    targets = [alias.name for alias in node.names]
-                elif isinstance(node, ast.ImportFrom):
-                    module = resolve_name("." * node.level + (node.module or ""), package)
-                    targets = [module, *(f"{module}.{alias.name}" for alias in node.names)]
-                elif isinstance(node, ast.Constant) and isinstance(node.value, str):
-                    if TARGET in node.value:
-                        offenders.append(f"{path.relative_to(root)}:{node.lineno}")
+                if not isinstance(node, (ast.Import, ast.ImportFrom, ast.Call, ast.Constant)):
                     continue
-                else:
-                    continue
-                if any(name == TARGET or name.startswith(TARGET + ".") for name in targets):
+                literal = isinstance(node, ast.Constant) and isinstance(node.value, str) and TARGET in node.value
+                if literal or TARGET in local_targets(node, package):
                     offenders.append(f"{path.relative_to(root)}:{node.lineno}")
     return offenders
 
@@ -90,8 +83,15 @@ if loaded:
 """
     result = subprocess.run(
         [sys.executable, "-I", "-B", "-c", probe, TARGET, BRIDGE,
-         *sorted(modules - {TARGET, BRIDGE})],
+         *sorted(modules - {TARGET, BRIDGE, "backend.derivatives.service.american_demo"})],
         cwd=ROOT, env={"QUIMERA_DERIV_FORBID_NETWORK": "1", "FASTMCP_CHECK_FOR_UPDATES": "off"},
         capture_output=True, text=True, timeout=60, check=False,
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_config_cannot_load_binomial_inside_function(tmp_path: Path) -> None:
+    path = tmp_path / "config/consumer.py"
+    path.parent.mkdir()
+    path.write_text('def load():\n    return import_module(".binomial", "backend.derivatives.pricing")\n')
+    assert _binomial_consumers(tmp_path) == ["config/consumer.py:2"]

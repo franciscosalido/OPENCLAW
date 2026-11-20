@@ -155,7 +155,8 @@ def test_exit_code_table() -> None:
 def test_parser_offers_only_the_contract_options() -> None:
     chain = build_parser()._subparsers._group_actions[0].choices["chain"]  # type: ignore[union-attr]
     options = sorted(option for action in chain._actions for option in action.option_strings)
-    assert options == ["--help", "--indent", "--provider", "-h"]
+    assert options == ["--american-demo", "--help", "--indent", "--provider",
+                       "--series-registry", "--steps", "-h"]
 
 
 def test_console_script_points_at_an_importable_entry() -> None:

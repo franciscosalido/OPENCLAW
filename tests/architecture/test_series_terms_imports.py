@@ -5,11 +5,11 @@ import re
 import subprocess
 import sys
 from collections import defaultdict
-from collections.abc import Iterator
-from importlib.util import resolve_name
 from pathlib import Path
 
 import pytest
+
+from tests.architecture.derivatives_imports import local_targets
 
 ROOT = Path(__file__).resolve().parents[2]
 DOMAIN = Path("backend/derivatives/domain")
@@ -29,34 +29,30 @@ def _module(path: Path) -> str:
     return ".".join(parts[:-1] if parts[-1] == "__init__" else parts)
 
 
-def _targets(node: ast.Import | ast.ImportFrom, package: str) -> Iterator[str]:
-    if isinstance(node, ast.Import):
-        names = [alias.name for alias in node.names]
-    else:
-        module = resolve_name("." * node.level + (node.module or ""), package)
-        names = [module, *(f"{module}.{alias.name}" for alias in node.names)]
-    for name in names:
-        if name.partition(".")[0] not in {"backend", "scripts"}:
-            continue
-        # Python inicializa cada pacote pai antes de carregar o módulo pedido.
-        while name:
-            yield name
-            name = name.rpartition(".")[0]
+DEMO_PATH = Path("backend/derivatives/service/american_demo.py")
+BUILDER_PATH = DEMO_PATH.with_name("demo_chain.py")
+MCP_PATH = Path("backend/derivatives/mcp/derivatives_server.py")
+CLI_PATH = Path("backend/derivatives/cli.py")
+DEMO_EDGES = {
+    (DEMO_PATH, BRIDGE), (DEMO_PATH, REGISTRY), (BUILDER_PATH, _module(DEMO_PATH)),
+    (MCP_PATH, _module(BUILDER_PATH)), (CLI_PATH, _module(MCP_PATH)),
+}
 
 
 def _offenders(root: Path) -> list[str]:
     # Arestas invertidas permitem propagar alcance até os consumidores, mesmo em ciclos.
     consumers: dict[str, set[tuple[Path, int]]] = defaultdict(set)
     offenders: set[str] = set()
-    for tree in ("backend", "scripts"):
+    for tree in ("backend", "scripts", "config"):
         for source in (root / tree).rglob("*.py"):
             path = source.relative_to(root)
             package = ".".join(path.parent.parts)
             for node in ast.walk(ast.parse(source.read_text(encoding="utf-8"), filename=str(path))):
-                if isinstance(node, (ast.Import, ast.ImportFrom)):
-                    for target in _targets(node, package):
-                        consumers[target].add((path, node.lineno))
-                elif isinstance(node, ast.Constant) and isinstance(node.value, str):
+                if not isinstance(node, (ast.Import, ast.ImportFrom, ast.Call, ast.Constant)):
+                    continue
+                for target in local_targets(node, package):
+                    consumers[target].add((path, node.lineno))
+                if isinstance(node, ast.Constant) and isinstance(node.value, str):
                     for match in _LITERAL.finditer(node.value):
                         consumers[match.group()].add((path, node.lineno))
 
@@ -64,8 +60,11 @@ def _offenders(root: Path) -> list[str]:
         reached = protected.copy()
         pending = list(reached)
         while pending:
-            for path, line in consumers[pending.pop()]:
-                if protected == {BRIDGE} or (DOMAIN not in path.parents and path != BRIDGE_PATH):
+            target = pending.pop()
+            for path, line in consumers[target]:
+                domain_edge = protected != {BRIDGE} and DOMAIN in path.parents
+                bridge_edge = path == BRIDGE_PATH and target in (CARRY, TERMS)
+                if not (domain_edge or bridge_edge or (path, target) in DEMO_EDGES):
                     offenders.add(f"{path}:{line}")
                 module = _module(path)
                 if module not in reached:
@@ -75,7 +74,7 @@ def _offenders(root: Path) -> list[str]:
 
 
 def test_only_domain_consumes_series_terms() -> None:
-    """Somente domínio e ponte alcançam termos e carry; nenhum módulo alcança a ponte."""
+    """Confere as arestas da composição offline e as fronteiras existentes do domínio."""
     assert _offenders(ROOT) == []
 
 
@@ -205,7 +204,7 @@ def _probe(root: Path) -> subprocess.CompletedProcess[str]:
                .rglob("*.py")}
     return subprocess.run(
         [sys.executable, "-I", "-B", "-c", _PROBE, ",".join(sorted(PROTECTED)),
-         *sorted(modules - PROTECTED - {BRIDGE})],
+         *sorted(modules - PROTECTED - {BRIDGE, _module(DEMO_PATH)})],
         cwd=root, env={"QUIMERA_DERIV_FORBID_NETWORK": "1", "FASTMCP_CHECK_FOR_UPDATES": "off"},
         capture_output=True, text=True, timeout=60, check=False,
     )
@@ -246,3 +245,46 @@ def test_registry_cannot_be_loaded_by_a_surface(tmp_path: Path, via_facade: bool
         statement = "from ..domain import facade"
     surface.write_text(statement, encoding="utf-8")
     assert _offenders(tmp_path) == [f"{_SERVICE}:1"]
+
+
+@pytest.mark.parametrize(("consumer", "target"), [
+    (MCP_PATH, BRIDGE), (CLI_PATH, REGISTRY), (CLI_PATH, _module(DEMO_PATH)),
+    (DEMO_PATH, TERMS), (DEMO_PATH, CARRY), (MCP_PATH, _module(DEMO_PATH)),
+    (DEMO_PATH.with_name("other_demo.py"), BRIDGE),
+    (BRIDGE_PATH, REGISTRY), (Path("config/facade.py"), BRIDGE),
+])
+def test_only_exact_demo_edges(tmp_path: Path, consumer: Path, target: str) -> None:
+    # Materializa a aresta legítima para exercitar também a tentativa de contorná-la.
+    demo = tmp_path / DEMO_PATH
+    demo.parent.mkdir(parents=True)
+    demo.write_text(f"import {BRIDGE}\n")
+    path = tmp_path / consumer
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(f"import {target}\n")
+    assert _offenders(tmp_path) == [f"{consumer}:1"]
+
+
+@pytest.mark.parametrize("consumer", [_TOOL, "backend/other/consumer.py"])
+@pytest.mark.parametrize("target", [CARRY, REGISTRY, BRIDGE])
+def test_config_hop_and_relative_dynamic_import_in_function(
+    tmp_path: Path, consumer: str, target: str,
+) -> None:
+    module, _, name = target.rpartition(".")
+    indirect = tmp_path / "config/facade.py"
+    indirect.parent.mkdir()
+    indirect.write_text(f'def load():\n    return import_module(".{name}", package="{module}")\n')
+    path = tmp_path / consumer
+    path.parent.mkdir(parents=True)
+    path.write_text("def run():\n    from config.facade import load\n")
+    assert _offenders(tmp_path) == sorted(["config/facade.py:2", f"{consumer}:2"])
+
+
+@pytest.mark.parametrize(("source", "target", "caller"), [
+    (MCP_PATH, "build_demo_chain", "demo_tool"),
+    (BUILDER_PATH, "_price_mixed_demo", "build_demo_chain"),
+])
+def test_only_demo_calls_offline_builder(source: Path, target: str, caller: str) -> None:
+    tree = ast.parse((ROOT / source).read_text())
+    users = [fn.name for fn in ast.walk(tree) if isinstance(fn, (ast.AsyncFunctionDef, ast.FunctionDef))
+             if any(isinstance(n, ast.Name) and n.id == target for n in ast.walk(fn))]
+    assert users == [caller]

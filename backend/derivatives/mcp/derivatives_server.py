@@ -17,17 +17,15 @@ from starlette.middleware import Middleware as ASGIMiddleware
 from backend.derivatives.config import (DerivativesConfigError, DerivativesMcpConfig,
                                         load_derivatives_mcp_config)
 from backend.derivatives.mcp.http_guard import LoopbackHeaders, guard_tool_dispatch
-from backend.derivatives.oplab.demo_fixture import REPO_ROOT, DemoFixture
-from backend.derivatives.oplab.client import OplabMarketClient
+from backend.derivatives.oplab.demo_fixture import REPO_ROOT
 from backend.derivatives.oplab.errors import NotFoundError, OplabError
 from backend.derivatives.oplab.routes import MarketRoute, render_route
-from backend.derivatives.pricing.calendar import load_calendars
 from backend.derivatives.pricing.quote_iv import PRICE_SOURCE_NOTE, IvResultModel
 from backend.derivatives.provenance import Provenance, Purpose, Readiness
 from backend.derivatives.service.chain_service import ChainService, PricedChain, PricedRow
+from backend.derivatives.service.demo_chain import InvalidDemoSelection, build_demo_chain
 from backend.mcp.mcp_models import HealthResponse, ToolResponse
 from backend.mcp.mcp_safety import validate_non_empty_text
-from config.derivatives_config_model import load_derivatives_config
 
 SERVER_NAME = "quimera-derivatives"
 CHAIN_SCHEMA = "quimera-derivatives-chain-v1"
@@ -69,7 +67,8 @@ def _row_view(item: PricedRow) -> dict[str, object]:
 def _demo_view(priced: PricedChain, *, as_of: datetime) -> dict[str, Any]:
     """Visao compacta e serializavel da chain: precos como texto decimal, modelo em float."""
     chain, tte = priced.chain, priced.time_to_expiry
-    if priced.purpose is not Purpose.TEST or chain.stamp.provenance is not Provenance.SYNTHETIC:
+    if (chain.purpose is not Purpose.TEST or chain.stamp.purpose is not Purpose.TEST
+            or chain.stamp.provenance is not Provenance.SYNTHETIC):
         raise ProvenanceBarrierError("fixture_provenance")
     return {
         "schema_version": CHAIN_SCHEMA, "status": DEMO_TEST_DATA,
@@ -97,6 +96,8 @@ def production_view(priced: PricedChain, *, readiness: Readiness,
     raise ProvenanceBarrierError(LIVE_NOT_ACTIVATED)
 
 def _inputs(symbol: str, due_date: str) -> tuple[str, date]:
+    if type(symbol) is not str or type(due_date) is not str:
+        raise ValueError("invalid_arguments")
     clean = validate_non_empty_text(symbol, "symbol").upper()
     render_route(MarketRoute.OPTIONS_CHAIN, symbol=clean)
     return clean, date.fromisoformat(validate_non_empty_text(due_date, "due_date"))
@@ -118,26 +119,28 @@ async def chain_tool(
 
 async def demo_tool(
     symbol: str, due_date: str, *, config: DerivativesMcpConfig, root: Path,
+    american_demo: bool = False, steps: int | None = None, series_registry: str | None = None,
 ) -> dict[str, object]:
     """Tool de demonstracao: serve a fixture configurada, sempre rotulada como teste.
 
     O instante de avaliacao e o do ``manifest.json`` da fixture, nao o relogio: a
     resposta e reprodutivel e nunca envelhece ate "vencer".
     """
-    if config.context != "test" or config.fixture_dir is None or root != REPO_ROOT:
+    if (config.context != "test" or config.provider_mode != "offline_fixture"
+            or config.readiness is not Readiness.A_OFFLINE_VERIFIED
+            or not isinstance(config.fixture_dir, (str, Path)) or root != REPO_ROOT):
         return _failure()
     try:
         clean, expiry = _inputs(symbol, due_date)
     except (OplabError, ValueError):
         return _failure("INVALID_ARGUMENTS")
     try:
-        fixture = DemoFixture(Path(config.fixture_dir))
-        cfg = load_derivatives_config()
-        client = OplabMarketClient(fixture, stamp_source="fixture:")
-        service = ChainService(client, cfg=cfg,
-                               calendars=load_calendars(cfg.conventions, root=REPO_ROOT))
-        priced = await service.build(clean, expiry, now=fixture.valuation)
-        data = _demo_view(priced, as_of=fixture.valuation)
+        priced, valuation = await build_demo_chain(
+            clean, expiry, directory=Path(config.fixture_dir), american_demo=american_demo,
+            steps=steps, series_registry=series_registry)
+        data = _demo_view(priced, as_of=valuation)
+    except InvalidDemoSelection:
+        return _failure("INVALID_ARGUMENTS")
     except NotFoundError:
         return _failure("DEMO_SYMBOL_NOT_IN_FIXTURE")
     except (OplabError, ValueError, KeyError, OSError, ProvenanceBarrierError) as exc:
@@ -149,6 +152,7 @@ async def demo_tool(
 def create_derivatives_server(
     config: DerivativesMcpConfig | None = None, *, clock: Clock = system_clock,
     live_service: ChainService | None = None, root: Path | None = None,
+    american_demo: bool = False, steps: int | None = None, series_registry: str | None = None,
 ) -> FastMCP[Any]:
     """Monta o servidor; a tool de demonstracao so existe se ``config.context == "test"``."""
     resolved = config or load_derivatives_mcp_config()
@@ -172,7 +176,8 @@ def create_derivatives_server(
         @server.tool
         async def derivatives_chain_demo(symbol: str, due_date: str) -> dict[str, object]:
             return await demo_tool(symbol, due_date, config=resolved,
-                                   root=root or REPO_ROOT)
+                                   root=root or REPO_ROOT, american_demo=american_demo,
+                                   steps=steps, series_registry=series_registry)
 
     return server
 
