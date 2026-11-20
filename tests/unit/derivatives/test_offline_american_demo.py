@@ -549,6 +549,7 @@ def test_b7_mid_volatility_requires_an_identifiable_quote(
         else:
             assert mid == {"sigma": None, "status": mid_status}
     if scenario == "missing_ask":
+        assert iv is not None
         assert iv["ask"] is None and iv["bid"]["status"] == "ok"
 
 
