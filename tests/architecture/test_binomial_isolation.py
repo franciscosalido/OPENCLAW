@@ -77,8 +77,6 @@ def test_fresh_interpreter() -> None:
 import sys
 from importlib import import_module
 from pathlib import Path
-
-import pytest
 def offline(event, args):
     if event in {"socket.connect", "socket.getaddrinfo", "socket.sendto", "socket.bind"}:
         raise RuntimeError(event)

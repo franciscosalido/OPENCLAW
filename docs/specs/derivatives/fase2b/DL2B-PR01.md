@@ -503,3 +503,70 @@ duas guardas. O estado de prontidão continua A.
 `SHA256SUMS.txt`, os patches de mutação e os logs novos. Em `logs/{mac,linux}/green/` ficam
 as provas do commit de código. Em `logs/{mac,linux}/final/` ficam os portões repetidos para
 o head de entrega, identificado por `git rev-parse HEAD` em `head.gates.log`.
+
+## Revisão independente: GO (Claude, 2026-11-19)
+
+Head revisado: `0883138baedd721f667c0133eb2e3fed286ea301`. Parecer: **GO**, sem defeito de
+produção. Uma lacuna de teste fechada no commit desta seção e um resíduo retirado.
+
+### Conferências
+
+- **Primeiro commit (`515f0cf`).** Três arquivos e nada mais, com os SHA-256 do cartão. ADR
+  e SDD não mudaram depois; o cartão só recebeu texto no fim.
+- **Produção.** Um arquivo novo, `american_bridge.py`, com 109 linhas. `git diff
+  --exit-code` com rc 0 para o resto de `backend`, `config`, `scripts`, arquivos protegidos
+  e `tests/fixtures`. Em `tests/architecture`, só as duas guardas.
+- **Ponte, lida linha a linha contra o contrato.** Ordem das sete conferências, eco,
+  hipóteses e resultado conferem. Dois cuidados além do cartão, ambos corretos: `spot` com
+  NaN sinalizador vira NaN comum e é recusado pelo binomial; a média do par não estoura
+  quando a soma passa do maior `float`.
+- **Guardas.** A exceção é o caminho fixo. Importar a ponte é infração em qualquer lugar,
+  inclusive no domínio e por intermediário. O texto literal do nome dos módulos passou a
+  propagar alcance, o que deixa a guarda mais estrita que antes.
+- **REDs.** Reproduzidos em `609a2cd` (A1 com `6.537469676838961`) e em `c799efa` (T3 com
+  `dividend_yield` ao lado de `carry_dividend_yield`).
+- **Portão, clone limpo, Linux aarch64, Python 3.12.16.** 9.244 aprovados, 16 pulados, 261
+  subtestes no head do autor; `mypy --strict` em 160 arquivos e `pyright` sem erro. Demo
+  com o mesmo SHA-256 da base; CLI padrão com `LIVE_NOT_ACTIVATED`, rc 3.
+- **Não reproduzido pelo revisor:** macOS. Os números do Mac são do autor.
+
+### Ataques
+
+- **Entradas hostis.** 70.000 chamadas com tipos válidos e valores extremos (NaN, infinito,
+  `Decimal` fora de faixa, passos de `-1` a `10**400`, prazo negativo, série, estilo e
+  carry divergentes): nenhuma exceção escapou, nenhuma recusa trouxe número e todo
+  resultado suportado teve preço finito e não negativo.
+- **Mutação do revisor.** 32 trocas próprias, rodando o arquivo novo e as duas guardas. O
+  controle passou; 30 morreram; 2 ficaram vivas.
+
+### Lacuna fechada neste commit
+
+**Uma chave recebida podia, em tese, sobrescrever uma chave resolvida sem teste perceber.**
+O mutante que põe as hipóteses do carry antes das recebidas sobreviveu: com ele, um chamador
+que mandasse `carry_dividend_yield = 0.0` nas hipóteses apagaria o valor resolvido, e
+voltaria a existir uma segunda fonte para o rendimento. A produção faz na ordem certa; o
+que faltava era o teste. `test_caller_cannot_override_resolved_keys` envia as nove chaves
+da ponte com valores falsos e exige o mesmo resultado de uma chamada limpa. O teste não foi
+revisto por outro agente.
+
+O outro mutante vivo é equivalente: comparar o contrato com os termos recebidos ou com os
+revalidados dá no mesmo, porque termos inválidos já foram recusados antes.
+
+### Resíduo retirado
+
+O texto do programa de sonda em `test_fresh_interpreter` trazia um `import pytest` sem uso.
+Retirado; o teste segue passando.
+
+### Portão final
+
+Com o teste do revisor, Linux aarch64 limpo: 9.245 aprovados, 16 pulados, 261 subtestes.
+
+### Observações sem ação
+
+- Quatro linhas das evidências passam de 100 colunas; são saída colada do pytest.
+- A ponte não confere a vigência dos termos contra a data de avaliação. Está no cartão como
+  não-objetivo e no SDD como pendência do DL2B-PR03.
+- `steps` com tipo errado (texto, por exemplo) levanta exceção antes de qualquer
+  conferência. O critério 2 do SDD cobre só tipo válido; o chamador da ponte, no DL2B-PR04,
+  terá de garantir o tipo.
+- Este parecer foi publicado antes de o revisor abrir o parecer da skill.

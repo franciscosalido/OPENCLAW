@@ -114,6 +114,20 @@ def test_t3_single_yield_source() -> None:
     assert assumptions == original
 
 
+def test_caller_cannot_override_resolved_keys() -> None:
+    """Chave recebida com o mesmo nome de uma chave resolvida não vira segunda fonte."""
+    forged: dict[str, str | float | bool] = {
+        "carry_kind": "NONE", "carry_dividend_yield": 0.0, "carry_source": "forged",
+        "carry_effective_on": "1900-01-01", "strike_adjustment_policy": "PROTECTED",
+        "pricing_model": "bsm_european_v1", "crr_steps": 1.0, "crr_pair_average": False,
+        "early_exercise_premium": -1.0, "calendar_id": "test_calendar",
+    }
+    outcome = _price(assumptions=forged)
+    clean = _price(assumptions={"calendar_id": "test_calendar"})
+    assert outcome.supported and outcome.assumptions == clean.assumptions
+    assert outcome.assumptions["carry_dividend_yield"] == 0.08
+
+
 _ECHO_FIELDS = (
     "symbol", "kind", "exercise_style", "spot", "strike", "time_years",
     "rate_cont", "sigma", "dividend_yield", "steps",

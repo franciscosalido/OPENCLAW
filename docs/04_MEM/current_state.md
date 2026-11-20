@@ -8,20 +8,23 @@
 
 ## Fase 02 — Marco 2B
 
-PR atual: DL2B-PR01 — EM_REVISAO. Estado de prontidão A.
+PR atual: DL2B-PR01 — MERGEADO (PR #146, GO na primeira rodada). Estado de prontidão A.
+ADR-0026 aceito e `SDD_FASE2B.md` vigentes.
 
-A ponte pura calcula a média das árvores americanas de N e N + 1 passos com volatilidade
-dada e carry resolvido. O GREEN local é `522fa89`, após os REDs `609a2cd` (árvore única)
-e `c799efa` (duas fontes de rendimento).
+Entregue: `backend/derivatives/pricing/american_bridge.py` (109 linhas). Recebe contrato
+americano, termos, carry e volatilidade; devolve a média das árvores CRR de N e N + 1
+passos, ou recusa com o código de origem. Chain, MCP e CLI ainda não chamam a ponte, e a
+americana segue recusada neles com `american_not_supported_phase1`.
+Portão do head, Linux aarch64 limpo: 9.245 aprovados, 16 pulados, 261 subtestes.
+[Cartão, REDs, evidências e revisão](../specs/derivatives/fase2b/DL2B-PR01.md).
 
-Mac arm64 e Linux aarch64 em clones limpos: 9.244 aprovados, 16 pulados, 261 subtestes
-aprovados em cada plataforma. Mypy strict e Pyright com zero erros. Os 16 mutantes do
-cartão falharam. A demo coincidiu com a base byte a byte em cada plataforma.
-ChainService, MCP e CLI recusaram as mesmas dez americanas sintéticas com
-`american_not_supported_phase1`. O CLI padrão devolveu `LIVE_NOT_ACTIVATED`, rc 3.
+Decisões abertas do ADR-0026, todas de Francisco:
+- D1 (para o DL2B-PR02): call com `q = 0` e `r >= 0` reusa a IV europeia da Fase 01?
+- D2 (DL2B-PR04): número de passos padrão. D3 (DL2B-PR03): origem e vigência dos termos.
+- D4: NumPy, depois da medição do DL2B-PR02.
 
-Dots publica o draft e inicia o piloto isolado sobre o head remoto.
-[Evidências do DL2B-PR01](../specs/derivatives/fase2b/DL2B-PR01.md#evidências-da-implementação--em_revisao).
+Próxima ação (uma só): Francisco decide D1; em seguida Claude escreve o cartão do DL2B-PR02
+(volatilidade implícita americana, com custo medido).
 
 ## Fase 02 — Marco 2A — FECHADO (estado A)
 
