@@ -4,7 +4,7 @@ import math
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import ClassVar, Literal
+from typing import ClassVar, Final, Literal
 
 from pydantic import ValidationError
 
@@ -16,10 +16,10 @@ from backend.derivatives.domain.series_terms import SeriesTerms, TermsRefusal
 from backend.derivatives.pricing.binomial import BinomialRefusal, crr_price
 from backend.derivatives.pricing.contract_pricing import PricingOutcome
 from backend.derivatives.pricing.conventions import TimeToExpiry
-from backend.derivatives.pricing.implied_vol import IvStatus, implied_vol, price_bounds
-from config.derivatives_config_model import Iv
+from backend.derivatives.pricing.implied_vol import price_bounds
+from config.derivatives_config_model import AmericanIvConfig
 
-AMERICAN_MODEL = "crr_american_v1"
+AMERICAN_MODEL: Final = "crr_american_v1"
 
 
 def _resolve_series(
@@ -144,8 +144,10 @@ class AmericanIvSolution:
     """Volatilidade anual em fração, modelo de inversão e bracket final."""
 
     sigma: float
-    model: Literal["crr_american_v1", "bsm_european_v1"]
+    model: Literal["crr_american_v1"]
     bracket: tuple[float, float]
+    iterations: int = 0
+    expansions: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -154,6 +156,8 @@ class AmericanIvRefusal:
 
     reason: str
     sigma: ClassVar[None] = None
+    iterations: int = 0
+    expansions: int = 0
 
 
 _IV_RESOLUTION = 1e-6
@@ -161,8 +165,9 @@ _IV_RESOLUTION = 1e-6
 
 def _bisect_pair(
     pair: Callable[[float], float], target: float, tol: float, floor: float,
+    cfg: AmericanIvConfig,
 ) -> AmericanIvSolution | AmericanIvRefusal:
-    ceiling = 2.0
+    ceiling = cfg.bracket_hi
     if floor >= ceiling:
         return AmericanIvRefusal("iv:unbracketed")
     lo, hi = floor, ceiling
@@ -172,44 +177,28 @@ def _bisect_pair(
     if not low_price < target < high_price:
         return AmericanIvRefusal("iv:unbracketed")
 
-    for _ in range(64):
+    for iteration in range(1, cfg.max_iterations + 1):
         mid = (lo + hi) / 2
         residual = pair(mid) - target
         if residual > 0:
             hi = mid
         else:
             lo = mid
-        if hi - lo <= 1e-8 and abs(residual) <= tol:
+        if hi - lo <= cfg.tol_vol and abs(residual) <= tol:
             left, right = mid - _IV_RESOLUTION, mid + _IV_RESOLUTION
-            if left < floor or right > ceiling:
-                return AmericanIvRefusal("iv:not_identifiable")
-            if target - pair(left) <= tol or pair(right) - target <= tol:
-                return AmericanIvRefusal("iv:not_identifiable")
-            return AmericanIvSolution(mid, "crr_american_v1", (lo, hi))
-    return AmericanIvRefusal("iv:no_convergence")
-
-
-def _phase_one_iv(
-    target: float, spot: float, strike: float, years: float, rate: float, tol: float,
-) -> AmericanIvSolution | AmericanIvRefusal:
-    result = implied_vol(target, kind=OptionKind.CALL, spot=spot, strike=strike,
-                         time_years=years, rate_cont=rate, dividend_yield=0.0, cfg=Iv())
-    diag = result.diagnostic
-    if result.sigma is None:
-        return AmericanIvRefusal(f"phase1:{diag.status.value}")
-    if (diag.status is IvStatus.LOW_VEGA or diag.vega_at_solution is None
-            or not math.isfinite(diag.vega_at_solution)
-            or diag.vega_at_solution * _IV_RESOLUTION <= tol):
-        return AmericanIvRefusal("iv:not_identifiable")
-    assert diag.bracket_lo is not None and diag.bracket_hi is not None
-    return AmericanIvSolution(result.sigma, "bsm_european_v1", (diag.bracket_lo, diag.bracket_hi))
+            if (left < floor or right > ceiling
+                    or target - pair(left) <= tol or pair(right) - target <= tol):
+                return AmericanIvRefusal("iv:not_identifiable", iteration)
+            return AmericanIvSolution(mid, AMERICAN_MODEL, (lo, hi), iteration)
+    return AmericanIvRefusal("iv:no_convergence", cfg.max_iterations)
 
 
 def american_implied_vol(
     contract: OptionContract, *, terms: SeriesTerms, carry: CarryAssumption | None,
     spot: Decimal, target_price: Decimal, rate_cont: float, tte: TimeToExpiry, steps: int,
+    cfg: AmericanIvConfig,
 ) -> AmericanIvSolution | AmericanIvRefusal:
-    """Inverte um preço por unidade de uma série americana com carry explícito."""
+    """Inverte o par CRR de uma série americana com carry e configuração explícitos."""
     resolved = _resolve_series(contract, terms, carry)
     if isinstance(resolved, str):
         return AmericanIvRefusal(resolved)
@@ -235,7 +224,7 @@ def american_implied_vol(
     if years == 0:
         return AmericanIvRefusal("iv:expiry")
     target = float(target_price)
-    tol = 1e-10 * max(1.0, target)
+    tol = cfg.tol_price_rel * max(1.0, target)
     is_call = contract.kind is OptionKind.CALL
     try:
         lower, european_upper = price_bounds(contract.kind, spot_value, strike, years, rate_cont, q)
@@ -250,8 +239,6 @@ def american_implied_vol(
             return AmericanIvRefusal("iv:above_upper_bound")
         if target - lower <= tol or upper - target <= tol:
             return AmericanIvRefusal("iv:not_identifiable")
-        if is_call and q == 0.0 and rate_cont > 0.0:
-            return _phase_one_iv(target, spot_value, strike, years, rate_cont, tol)
     except (ArithmeticError, ValueError):
         return AmericanIvRefusal("iv:not_representable")
 
@@ -264,8 +251,8 @@ def american_implied_vol(
         return _pair_average(american(steps), american(steps + 1))
 
     # CRR exige down < exp((r-q) dt) < up. N fixa o maior dt do par.
-    floor = max(0.0001, abs(rate_cont - q) * math.sqrt(years / steps) + 1e-8)
+    floor = max(cfg.bracket_lo, abs(rate_cont - q) * math.sqrt(years / steps) + 1e-8)
     try:
-        return _bisect_pair(pair, target, tol, floor)
+        return _bisect_pair(pair, target, tol, floor, cfg)
     except BinomialRefusal as exc:
         return AmericanIvRefusal(f"binomial:{exc.code.value}")

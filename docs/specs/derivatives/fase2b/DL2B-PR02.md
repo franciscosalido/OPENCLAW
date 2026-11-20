@@ -1,8 +1,9 @@
 # DL2B-PR02 — IV americana por preço observado
 
-**Candidato local, pendente de revisão por Claude. Estado A.** Francisco autorizou o
-empilhamento sobre o PR01A local `f848b199aee3bf01bd3923a24b4b4abb41811ee3`.
-A sequência de integração do ADR-0026 continua a depender do coordenador e dos pareceres.
+**Candidato local, pendente de revisão por Claude. Estado A.** Proposta corretiva para a revisão adversarial, sobre a base local `8ec256d`. O
+PR01A local `f848b199aee3bf01bd3923a24b4b4abb41811ee3` é o predecessor técnico
+do candidato inicial. Nenhum empilhamento local substitui o rito de integração do
+ADR-0026. Este cartão não homologa nem integra o candidato.
 
 ## Autoridade e alcance
 
@@ -12,27 +13,25 @@ erro absoluto de IV até 1e-6 e orçamento fixado no Mac antes do código. Os cr
 O preço da ponte é a média aritmética das árvores americanas CRR de N e N+1 passos.
 A IV vive em `american_bridge.py` e recebe os termos e o carry da série.
 
-Francisco decidiu D1. CALL com q resolvido exatamente zero e r estritamente positivo
-usa a IV europeia da Fase 1. Em r=0 a função inverte o par CRR. PUT, taxa negativa
-e CALL com rendimento positivo também passam pelo par. O caminho é escolhido antes da
-busca. Cada falha encerra o caminho escolhido.
+O candidato corretivo usa o mesmo par CRR N/N+1 para preço e IV, inclusive CALL sem
+carry e com taxa positiva. Substitui a ideia inicial de reaproveitar só a IV europeia;
+o ADR e o critério 6 vigentes permanecem intactos. Qualquer opção de usar BSM nos dois
+é uma decisão de governança posterior, fora desta proposta.
 
-**Ajuste de redação proposto para o critério 6, sujeito a Claude e Francisco.** Exigir
-pelo menos 40 idas e voltas identificáveis pelo mesmo par CRR e, separadamente, paridade
-do atalho com o oráculo BSM da Fase 1. Com S=K=100, T=1, r=0,05, q=0, sigma=0,20,
-o par 200/201 precifica a 10,449949594185 e o BSM a 10,450583572186. A IV BSM do
-preço CRR é 0,199983104711, com desvio de 1,6895e-5 em relação a 0,20. Este alvo
-cruzado testa D1 e evidencia o erro de discretização. A grade CRR mantém 1e-6.
-A redação oficial encontra-se em [SDD_FASE2B.md](SDD_FASE2B.md).
+O caso de revisão ilustra por quê: com S=K=100, T=1, r=0,05, q=0 e sigma=0,20,
+o par 200/201 precifica a 10,449949594185 e o BSM a 10,450583572186. A inversão BSM
+do preço CRR dá cerca de 0,199983105 e não atende ao critério de 1e-6 em sigma.
 
 ## Contrato de engenharia proposto para revisão
 
-`american_implied_vol(contract, *, terms, carry, spot, target_price, rate_cont, tte, steps)`
+`american_implied_vol(contract, *, terms, carry, spot, target_price, rate_cont, tte, steps, cfg)`
 inverte um preço por unidade em Decimal. Bid e ask são duas chamadas independentes;
 cada uma devolve solução imutável (sigma anual em fração, modelo usado na inversão e
-bracket final) ou recusa imutável (motivo estável e sigma nulo). O chamador fornece N.
+bracket final) ou recusa imutável (motivo estável e sigma nulo). O chamador fornece N
+e a configuração validada. Os diagnósticos registram iterações quando aplicável; a
+faixa CRR não expande, portanto `expansions=0`.
 Estilo, termos, carry e identidade da série seguem a precedência da ponte de preço.
-As recusas dos isolados conservam o prefixo e o código. O atalho também exige
+As recusas dos isolados conservam o prefixo e o código. A inversão exige
 spot Decimal, taxa e prazo float finitos, 1 ≤ N ≤ 4999, S e K positivos.
 
 - T=0, alvo inválido, preço fora dos limites de arbitragem, proximidade dos limites,
@@ -40,21 +39,27 @@ spot Decimal, taxa e prazo float finitos, 1 ≤ N ≤ 4999, S e K positivos.
   O piso considera exercício imediato e valor europeu descontado. O teto é S na CALL
   e K vezes max(1, exp(-rT)) na PUT. Dentro da resolução de preço de um limite, a IV
   é indeterminada.
-- Na árvore, bracket de sigma inicial [max(0,0001, |r-q|√(T/N) + 1e-8), 2].
+- Na árvore, bracket inicial [max(cfg.bracket_lo, |r-q|√(T/N) + 1e-8), cfg.bracket_hi].
   O piso respeita a probabilidade estrita de CRR no par. Os resíduos extremos devem
   envolver o alvo estritamente. Coincidência dentro da resolução de um extremo da busca
   dá recusa conservadora, inclusive quando a raiz poderia coincidir com esse extremo.
-- Bisseção, até 64 iterações, largura ≤ 1e-8 e resíduo de preço ≤
-  1e-10 × max(1, alvo). Para publicar a solução, preços a ±1e-6 da candidata devem
+- Bisseção: até `cfg.max_iterations`, largura ≤ `cfg.tol_vol` e resíduo de preço ≤
+  `cfg.tol_price_rel × max(1, alvo)`. Para publicar a solução, preços a ±1e-6 da candidata devem
   separar o alvo por mais que essa resolução dos dois lados, dentro do bracket inicial.
   Esta sondagem testa identificabilidade local. Nenhuma grega americana entra na API.
-- D1 usa `implied_vol` com `Iv()` da Fase 1 e sua tolerância dupla original.
-  Apenas solução bem condicionada pode publicar sigma. A função preserva o bracket da
-  Fase 1 e devolve uma recusa quando a precisão de preço não distingue 1e-6 de sigma.
-- Estes intervalos, resolução, tipo de retorno e orçamento são escolhas provisórias de
-  engenharia. D2 e D3 pertencem aos cartões seguintes. D4 pertence a Francisco após a medição.
+- A seção `american_iv` de `config/derivatives.yaml` fornece a faixa (0,0001/2,0), o
+  limite (64) e as tolerâncias (1e-10 preço relativo, 1e-8 sigma) do perfil observado.
+  O contrato YAML validado rejeita campos indevidos, valores não finitos, texto/bool
+  no lugar de parâmetros numéricos, limites não positivos e faixa sem ordem estrita.
+  A seção ausente é compatível com consumidores legados da IV europeia; não existe um
+  default interno para ativar IV americana. O consumidor da ponte deve obter a seção
+  validada na composição e não ligar a precificação americana sem ela. Alterar
+  `american_iv` não altera `iv`. O solver recebe um `AmericanIvConfig` obrigatório
+  e não lê arquivos.
+- Os próximos cartões e a decisão de NumPy não são alterados aqui. Os novos tempos de
+  execução de CALL sem carry são evidência, não autorização de outro orçamento.
 
-## Orçamento medido antes de RED e GREEN
+## Orçamento histórico, medido antes do RED inicial
 
 Mac arm64, macOS 15.8.1, Darwin 24.6.0, CPython 3.12.13, pydantic 2.13.3,
 pytest 9.0.3. Microbenchmark local de referência sobre o PR01A, uma thread, um aquecimento
@@ -71,14 +76,17 @@ orçamento de CPU da sua linha, na mesma máquina. O tempo decorrido é descriti
 | PUT (0, 1, 0,37, 400) | 487,90 / 490,86 / 496,56 | 488,28 / 491,09 / 496,74 | 750 ms |
 | D1 CALL (0, 1, 0,20, 200) | 0,069 / 0,074 / 0,082 | 0,071 / 0,074 / 0,081 | 0,50 ms |
 
-Os tetos valem para esses cenários dimensionados. O custo de cada avaliação CRR cresce com
+Os tetos históricos valiam para os cenários/modelos indicados. O teto de 0,50 ms de
+D1 era para o atalho BSM anterior; não é critério para a CALL CRR. O custo de cada avaliação CRR cresce com
 o quadrado de N. O teto algorítmico por busca é de 68 pares (extremos, bisseção e sondagem).
 
 ## Provas exigidas
 
 1. RED comportamental e commit próprio. GREEN com 48 idas e voltas CRR identificáveis
-   (tipo/carry/taxa, prazo, moneyness e sigma variados), mais D1 contra o oráculo,
-   o caso cruzado e as fronteiras q positivo minúsculo, r nulo e r negativo.
+   (tipo/carry/taxa, prazo, moneyness e sigma variados), mais a CALL sem carry em
+   quatro tamanhos de árvore e as fronteiras q positivo minúsculo, r nulo e r negativo.
+   Confirmar que limites, tolerâncias e iterações propagam do YAML, e rejeitar entradas
+   de configuração inválidas (incluindo booleanos, textos, infinito e ordem imprópria).
 2. Precedência, arbítrio de exercício imediato, limites com juros negativos, platô,
    sensibilidade local, bracket, entradas inválidas, par N/N+1 e término delimitado.
    Um lado inválido de cotação deve poder coexistir com outro lado identificável.
@@ -86,9 +94,9 @@ o quadrado de N. O teto algorítmico por busca é de 68 pares (extremos, bisseç
    com timeout 120, mypy strict, pyright, demo contra base por cmp e CLI padrão rc 3 com
    LIVE_NOT_ACTIVATED. Conferir isolamento, diff, contagem e escopo dos arquivos.
 4. O coordenador mantém o índice de base/head. Claude emite parecer independente sobre o
-   candidato local, examina a evidência e leva a proposta de redação à decisão humana.
+   candidato local e examina a evidência antes de qualquer integração.
 
-## Evidência do candidato
+## Evidência histórica do candidato inicial (antes da revisão)
 
 O cartão e o orçamento entraram sozinhos em `a913a4a`. O RED em `4804841` expôs a
 interface com recusa provisória. Foram 93 falhas de comportamento e duas aprovações.
@@ -104,7 +112,7 @@ auxiliar dos testes. Em cópias desse ponto, o controle passou os 95 casos e os 
 detectaram 13 de 13 mutações. Inverter só N quebrou os 48 round-trips. Usar N+2 quebrou
 as quatro verificações do par. Retirar a sondagem local permitiu publicar uma IV ambígua.
 
-### Medição da API implementada
+### Medição histórica da API inicial, com atalho D1
 
 Mesmo Mac, cronômetros, alvos, N e nove amostras por linha da referência pré-RED.
 O maior tempo de CPU em cada cenário coube no orçamento fixado.
@@ -118,3 +126,32 @@ O maior tempo de CPU em cada cenário coube no orçamento fixado.
 
 O handoff local `curren_status.md` contém os resultados por plataforma e o índice de logs.
 Evidências em `~/.quimera-2b-pr02.QHwoQA/evidencias-dl2b-pr02/`.
+
+## Evidência da correção adversarial
+
+O RED comportamental `d75a8b2` falhou nos quatro tamanhos N=3,10,50,200 pelo
+erro de IV que excedia 1e-6. O RED `90d3bb3` expôs a ausência da seção YAML em nove
+testes. Não foram alterados ADR-0026, SDD_FASE2B, a IV europeia, a ponte de preço ou o
+consumidor CLI/MCP deste candidato. O PR04 deve injetar a configuração validada no
+local de composição, não implementar um segundo conjunto de defaults.
+
+### Medição da correção, macOS arm64
+
+Mac com Python 3.12.13. Cada alvo foi produzido pela própria ponte CRR antes da
+medição (S=K=100 e r=0,05). Um aquecimento, nove inversões; CPU por processo
+(`process_time`) e tempo decorrido (`perf_counter`).
+
+| Caso | CPU mín / med / máx (ms) | Decorrido mín / med / máx (ms) | Erro de sigma |
+|---|---:|---:|---:|
+| PUT q=0, T=0,25, sigma=0,275, N=50 | 9,604 / 9,771 / 9,821 | 9,607 / 9,773 / 9,822 | 2,23e-12 |
+| CALL q=0,08, T=1, sigma=0,23, N=200 | 145,703 / 146,094 / 146,743 | 145,720 / 146,103 / 146,752 | 5,37e-12 |
+| PUT q=0, T=1, sigma=0,37, N=400 | 520,571 / 521,553 / 522,466 | 520,607 / 521,988 / 522,628 | 2,97e-11 |
+| CALL q=0, T=1, sigma=0,20, N=200 | 143,145 / 143,867 / 144,286 | 143,152 / 143,882 / 144,337 | 1,54e-11 |
+
+Os três primeiros cenários permanecem dentro de seus tetos históricos. O teto
+anterior de 0,50 ms mediu BSM, não CRR, e não foi portado para o novo cenário.
+A medição da CALL sem carry não fixa novo orçamento; a definição é do rito de revisão.
+
+Referências operacionais consultadas: [Pydantic: modo estrito](https://docs.pydantic.dev/latest/concepts/strict_mode/),
+[validadores de modelo](https://docs.pydantic.dev/latest/concepts/validators/) e
+[PyYAML: SafeLoader](https://pyyaml.org/wiki/PyYAMLDocumentation).

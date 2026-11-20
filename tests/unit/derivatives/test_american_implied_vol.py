@@ -4,8 +4,8 @@ from dataclasses import replace
 from decimal import Decimal
 from itertools import product
 from typing import Any
-from unittest.mock import patch
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 import yaml
@@ -16,27 +16,32 @@ from backend.derivatives.domain.models import ExerciseStyle, OptionContract, Opt
 from backend.derivatives.domain.series_terms import SeriesTerms
 from backend.derivatives.pricing import american_bridge as bridge
 from backend.derivatives.pricing.binomial import BinomialRefusal, BinomialRefusalCode
-from backend.derivatives.pricing.bsm import BsmInputs, price
 from backend.derivatives.pricing.conventions import TimeToExpiry
-from backend.derivatives.pricing.implied_vol import IvStatus, implied_vol
-from config.derivatives_config_model import Iv, load_derivatives_config
+from config.derivatives_config_model import AmericanIvConfig, load_derivatives_config
 from tests.unit.derivatives.test_american_bridge import (
     A1_TERMS, A2_TERMS, CALL, NONE, PUT, TTE, YIELD, _carry, _price,
 )
 
 SPOT = Decimal("100")
 CRR = "crr_american_v1"
-BSM = "bsm_european_v1"
+
+def _settings() -> AmericanIvConfig:
+    cfg = load_derivatives_config().american_iv
+    assert cfg is not None
+    return cfg
+
+
+CFG = _settings()
 
 
 def _invert(
     target: Decimal, contract: OptionContract = CALL, *, terms: SeriesTerms = A1_TERMS,
     carry: CarryAssumption | None = YIELD, spot: Decimal = SPOT, rate_cont: float = 0.05,
-    tte: TimeToExpiry = TTE, steps: int = 50,
+    tte: TimeToExpiry = TTE, steps: int = 50, cfg: AmericanIvConfig = CFG,
 ) -> bridge.AmericanIvSolution | bridge.AmericanIvRefusal:
     return bridge.american_implied_vol(
         contract, terms=terms, carry=carry, spot=spot, target_price=target,
-        rate_cont=rate_cont, tte=tte, steps=steps,
+        rate_cont=rate_cont, tte=tte, steps=steps, cfg=cfg,
     )
 
 
@@ -66,47 +71,13 @@ def test_crr_round_trip(contract: OptionContract, carry: CarryAssumption, rate: 
     assert isinstance(result, bridge.AmericanIvSolution), result
     assert result.model == CRR and abs(result.sigma - vol) <= 1e-6
     lo, hi = result.bracket
-    assert hi - lo <= 1e-8 and lo <= result.sigma <= hi
+    assert hi - lo <= CFG.tol_vol and lo <= result.sigma <= hi
     assert lo - 1e-12 <= vol <= hi + 1e-12
 
 
-def _oracle(target: Decimal, rate: float = 0.05) -> float:
-    oracle = implied_vol(float(target), kind=OptionKind.CALL, spot=100., strike=100.,
-                         rate_cont=rate, dividend_yield=0., time_years=1., cfg=Iv())
-    assert oracle.sigma is not None and oracle.diagnostic.status is IvStatus.OK
-    return oracle.sigma
-
-
-@pytest.mark.parametrize(("rate", "vol"), [(0.05, 0.2), (0.13, 0.41), (1e-14, 0.19)])
-def test_d1_bsm_oracle(rate: float, vol: float) -> None:
-    """O atalho usa a IV da Fase 1 para cada preço BSM elegível."""
-    obs = Decimal(str(price(BsmInputs(OptionKind.CALL, 100., 100., 1., rate, vol),
-                            theta_basis=252).price))
-    with patch.object(bridge, "crr_price", side_effect=AssertionError("D1 chamou CRR")):
-        result = _invert(obs, carry=NONE, rate_cont=rate)
-    assert isinstance(result, bridge.AmericanIvSolution), result
-    assert (result.model, result.sigma) == (BSM, _oracle(obs, rate))
-    assert abs(result.sigma - vol) <= 1e-6
-
-
-def test_cross_model_discretization() -> None:
-    """O alvo cruzado mantém o preço do PR01A e a inversão estabelecida por D1."""
-    obs = _price(carry=NONE, steps=200)
-    assert obs.price is not None and abs(float(obs.price) - 10.449949594185) < 1e-11
-    bsm = price(BsmInputs(OptionKind.CALL, 100., 100., 1., .05, .2), theta_basis=252)
-    assert abs(bsm.price - 10.450583572186) < 1e-11
-    result = _invert(obs.price, carry=NONE, steps=200)
-    assert isinstance(result, bridge.AmericanIvSolution), result
-    assert result.sigma == _oracle(obs.price)
-    lo, hi = result.bracket
-    assert lo <= .199983104711 <= hi
-    ref = price(BsmInputs(OptionKind.CALL, 100., 100., 1., .05, .199983104711), theta_basis=252)
-    assert abs(ref.price - float(obs.price)) < 5e-11
-    assert 1.68e-5 < .2 - result.sigma < 1.70e-5
-
-
 @pytest.mark.parametrize(("contract", "carry", "rate"), [
-    (CALL, _carry("1e-16"), 0.05), (CALL, NONE, 0.0), (CALL, NONE, -0.03), (PUT, NONE, 0.05),
+    (CALL, _carry("1e-16"), 0.05), (CALL, NONE, 0.0), (CALL, NONE, -0.03),
+    (PUT, NONE, 0.05), (CALL, NONE, 0.05),
 ])
 def test_only_the_american_pair(contract: OptionContract, carry: CarryAssumption,
                                 rate: float) -> None:
@@ -116,7 +87,7 @@ def test_only_the_american_pair(contract: OptionContract, carry: CarryAssumption
     assert isinstance(result, bridge.AmericanIvSolution) and result.model == CRR
     evaluations = [(c.kwargs["style"], c.kwargs["steps"], c.kwargs["sigma"])
                    for c in tree.call_args_list]
-    assert 4 <= len(evaluations) <= 136 and len(evaluations) % 2 == 0
+    assert 4 <= len(evaluations) <= 2 * (CFG.max_iterations + 4) and len(evaluations) % 2 == 0
     for first, second in zip(evaluations[::2], evaluations[1::2], strict=True):
         assert first[:2] == (ExerciseStyle.AMERICAN, 50)
         assert second == (ExerciseStyle.AMERICAN, 51, first[2])
@@ -173,10 +144,11 @@ def test_bounds(target: str, changes: dict[str, Any], reason: str) -> None:
     _assert_refused(_invert(Decimal(target), **changes), reason)
 
 
-def test_low_local_sensitivity() -> None:
+@pytest.mark.parametrize("kind", [CALL, PUT])
+def test_low_local_sensitivity(kind: OptionContract) -> None:
     """Um preço interior mas insensível a um movimento de 1e-6 não determina IV."""
     spot = Decimal("0.000001")
-    contract = PUT.model_copy(update={"strike": spot})
+    contract = kind.model_copy(update={"strike": spot})
     terms = A1_TERMS.model_copy(update={"strike": spot})
     obs = _price(contract, terms=terms, spot=spot, carry=NONE, steps=50)
     assert obs.price is not None and obs.price > Decimal("1e-9")
@@ -192,7 +164,7 @@ def test_independent_sides() -> None:
 
 
 @pytest.mark.parametrize("endpoint", [
-    2.0,
+    CFG.bracket_hi,
     abs(.05 - .08) * (1 / 50) ** .5 + 1e-8,
 ])
 def test_bracket_endpoint(endpoint: float) -> None:
@@ -209,7 +181,7 @@ def test_solver_exhaustion() -> None:
 
     with patch.object(bridge, "crr_price", side_effect=discontinuous) as tree:
         _assert_refused(_invert(Decimal("7")), "iv:no_convergence")
-    assert tree.call_count <= 136
+    assert tree.call_count <= 2 * (CFG.max_iterations + 4)
 
 
 def test_tree_refusal_stops_search() -> None:
@@ -218,19 +190,6 @@ def test_tree_refusal_stops_search() -> None:
     with patch.object(bridge, "crr_price", side_effect=exc) as tree:
         _assert_refused(_invert(Decimal("8")), "binomial:tree_not_representable")
     tree.assert_called_once()
-
-
-def test_d1_ill_conditioned() -> None:
-    """Um oráculo europeu com LOW_VEGA não fornece número ao chamador americano."""
-    spot = Decimal("0.000001")
-    contract = CALL.model_copy(update={"strike": spot})
-    terms = A1_TERMS.model_copy(update={"strike": spot})
-    obs = price(BsmInputs(OptionKind.CALL, float(spot), float(spot), 1., .05, .2), theta_basis=252)
-    oracle = implied_vol(obs.price, kind=OptionKind.CALL, spot=float(spot), strike=float(spot),
-                         time_years=1., rate_cont=.05, dividend_yield=0., cfg=Iv())
-    assert oracle.diagnostic.status is IvStatus.LOW_VEGA
-    _assert_refused(_invert(Decimal(str(obs.price)), contract, carry=NONE, terms=terms, spot=spot),
-                    "iv:not_identifiable")
 
 
 @pytest.mark.parametrize("steps", [3, 10, 50, 200])
@@ -286,3 +245,42 @@ def test_american_iv_rejects_invalid_yaml(
     _change_yaml(american_iv_yaml, **changes)
     with pytest.raises(ValidationError):
         load_derivatives_config(american_iv_yaml)
+
+
+def test_yaml_iteration_budget_changes_solver(american_iv_yaml: Path) -> None:
+    _change_yaml(american_iv_yaml, max_iterations=1)
+    settings = load_derivatives_config(american_iv_yaml).american_iv
+    assert settings is not None
+    result = _invert(Decimal("7"), cfg=settings)
+    _assert_refused(result, "iv:no_convergence")
+    assert result.iterations == 1 and result.expansions == 0
+
+
+def test_yaml_price_tolerance_changes_identifiability(american_iv_yaml: Path) -> None:
+    _change_yaml(american_iv_yaml, tol_price_rel=.5)
+    settings = load_derivatives_config(american_iv_yaml).american_iv
+    assert settings is not None
+    _assert_refused(_invert(Decimal("7"), cfg=settings), "iv:not_identifiable")
+
+
+def test_yaml_vol_tolerance_changes_iteration_count(american_iv_yaml: Path) -> None:
+    _change_yaml(american_iv_yaml, tol_vol=1.0)
+    settings = load_derivatives_config(american_iv_yaml).american_iv
+    assert settings is not None
+    midpoint = (settings.bracket_lo + settings.bracket_hi) / 2
+    target = Decimal(str(2.0 + 10 * midpoint))
+    with patch.object(bridge, "crr_price", side_effect=lambda **k: 2.0 + 10 * k["sigma"]):
+        loose = _invert(target, carry=NONE, rate_cont=0.0, cfg=settings)
+        tight = _invert(target, carry=NONE, rate_cont=0.0)
+    assert isinstance(loose, bridge.AmericanIvSolution) and loose.iterations == 1
+    assert isinstance(tight, bridge.AmericanIvSolution) and tight.iterations > 1
+    assert abs(loose.sigma - tight.sigma) <= 1e-6
+
+
+def test_legacy_european_yaml_does_not_need_american_iv(american_iv_yaml: Path) -> None:
+    content = yaml.safe_load(american_iv_yaml.read_text(encoding="utf-8"))
+    del content["american_iv"]
+    american_iv_yaml.write_text(yaml.safe_dump(content), encoding="utf-8")
+    settings = load_derivatives_config(american_iv_yaml)
+    assert settings.american_iv is None
+    assert settings.iv == load_derivatives_config().iv

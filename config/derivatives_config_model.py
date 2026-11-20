@@ -9,10 +9,10 @@ declaradas ate homologacao (ADR-0023).
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal, cast
+from typing import Literal, Self, cast
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator, model_validator
 
 DayCount = Literal["business_252", "calendar_365"]
 RateCompounding = Literal["annual_exp_252", "continuous"]
@@ -105,6 +105,24 @@ class Iv(BaseModel):
     low_vega_threshold: float = Field(default=1e-4, gt=0)
 
 
+class AmericanIvConfig(BaseModel):
+    """Faixa e tolerâncias da inversão CRR, fornecidas no YAML sem defaults locais."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True, allow_inf_nan=False)
+
+    bracket_lo: float = Field(gt=0)
+    bracket_hi: float = Field(gt=0)
+    max_iterations: int = Field(gt=0)
+    tol_price_rel: float = Field(gt=0)
+    tol_vol: float = Field(gt=0)
+
+    @model_validator(mode="after")
+    def _check_bracket(self) -> Self:
+        if self.bracket_lo >= self.bracket_hi:
+            raise ValueError("american_iv exige bracket_lo menor que bracket_hi")
+        return self
+
+
 class DerivativesConfig(BaseModel):
     """Raiz do contrato ``config/derivatives.yaml``."""
 
@@ -115,6 +133,7 @@ class DerivativesConfig(BaseModel):
     budget: Budget = Field(default_factory=Budget)
     oplab: Oplab = Field(default_factory=Oplab)
     iv: Iv = Field(default_factory=Iv)
+    american_iv: AmericanIvConfig | None = None
 
 
 def load_derivatives_config(path: Path | None = None) -> DerivativesConfig:
@@ -137,6 +156,7 @@ def load_derivatives_config(path: Path | None = None) -> DerivativesConfig:
 
 
 __all__ = [
+    "AmericanIvConfig",
     "Budget",
     "Conventions",
     "DerivativesConfig",
