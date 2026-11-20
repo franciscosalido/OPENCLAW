@@ -84,3 +84,13 @@ vencimento, preencher volume nominal, inferir q=0, reclassificar proveniência,
 persistência, precificação, configuração, IV, consumidores da ponte e PR04.
 Não há meta de desempenho. A resolução prova consistência dos dados fornecidos.
 Autenticidade da fonte e completude do histórico dependem de evidência externa.
+
+## RED em macOS arm64
+
+Cartão prévio em `4bc1be8`. A API provisória devolve apenas a recusa MISSING.
+`python -m pytest -q tests/unit/derivatives/test_series_registry.py tests/architecture/test_series_terms_imports.py --tb=short`
+deu rc 1, **43 falhas e 51 aprovações** em 0,82 s. Para 2/abril o teste recebeu
+`missing_series_record` e exigia `future_series_record`. Para 4/abril recebeu
+a mesma recusa quando já esperava a versão `z-first`. A prova de carga em
+processo novo também falhou, assim como as duas provas de import dinâmico
+direto e indireto do registro. Log integral local em `reports/dl2b-pr03/mac/red.log`.

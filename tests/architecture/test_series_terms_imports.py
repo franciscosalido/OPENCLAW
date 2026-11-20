@@ -231,3 +231,17 @@ def test_dynamic_import_in_parent_initializer(tmp_path: Path) -> None:
     probe = _probe(tmp_path)
     assert probe.returncode == 1
     assert probe.stderr.strip() == f"módulos protegidos carregados: {CARRY}"
+
+
+@pytest.mark.parametrize("via_facade", [False, True])
+def test_registry_cannot_be_loaded_by_a_surface(tmp_path: Path, via_facade: bool) -> None:
+    surface = tmp_path / _SERVICE
+    surface.parent.mkdir(parents=True)
+    statement = 'import_module("backend.derivatives.domain.series_registry")'
+    if via_facade:
+        facade = tmp_path / DOMAIN / "facade.py"
+        facade.parent.mkdir(parents=True)
+        facade.write_text(statement, encoding="utf-8")
+        statement = "from ..domain import facade"
+    surface.write_text(statement, encoding="utf-8")
+    assert _offenders(tmp_path) == [f"{_SERVICE}:1"]
