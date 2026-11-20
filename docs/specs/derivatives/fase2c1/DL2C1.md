@@ -435,3 +435,69 @@ PR 1 (DL2C1-PR01), em rascunho, sem merge:
 Se uma âncora não reproduzir em 1e-6, pare e reporte a diferença.
 O PR 2 só começa depois do PR 1 integrado pelo Claude.
 ```
+
+## Adendo 1 (Claude, 2026-11-20) — critério 7 na malha padrão
+
+Vale sobre o texto acima onde houver conflito. Francisco pode vetar.
+
+O critério 7 pedia `americana >= BSM europeia - 3e-4` sem dizer a malha. O limite absoluto
+foi tirado dos nove casos das âncoras e não vale fora deles: é defeito do cartão, não da
+implementação. O erro do esquema é de truncamento de segunda ordem e escala com `S dx^2`,
+em que `dx` é o passo em `ln S` da seção "Método". Medido na revisão do PR 1:
+
+| Medida | 400 x 200 | 800 x 400 | 200 x 100 |
+|---|---:|---:|---:|
+| `|FD europeia - BSM| / (S dx^2)`, máximo | 0,52 | 0,36 | 0,52 |
+| `(BSM - FD americana) / (S dx^2)`, máximo | 0,17 | 0,17 | 0,04 |
+
+Os máximos vêm de 1.500 casos aleatórios (400 x 200), 300 (800 x 400), 600 (200 x 100) e da
+matriz de 1.000 preços do teste T7. A razão não muda quando a malha dobra.
+
+O critério 7 passa a ser, em qualquer malha, inclusive a padrão:
+
+- `|FD europeia - BSM| <= 0.8 * S * dx^2`;
+- `BSM europeia - FD americana <= 0.3 * S * dx^2`;
+- americana `>=` intrínseco, exato; preço não decrescente em sigma, com folga de 1e-9.
+
+O limite absoluto de 3e-4 continua valendo na malha 800 por 400 para a matriz do T7, como
+qualificação offline. Na malha padrão ele falha em 93 dos 1.000 preços dessa matriz, com
+desvio máximo de 9,06e-4; um teste prende esse número para a limitação não sumir.
+
+Consequência para a leitura do diagnóstico: com `sigma * sqrt(T)` acima de 1, o erro de preço
+da malha padrão chega a 1e-2 por unidade e o de volatilidade a 2e-4, da mesma ordem do erro
+da árvore com 200 passos. A vantagem de precisão medida nas âncoras não vale nesse regime.
+
+## PR 1 — revisão independente: GO (Claude, 2026-11-20)
+
+Head do autor: `4b34e61`.
+
+- Portão em clone limpo, Linux aarch64: 10.225 aprovados, 16 pulados, 261 subtestes;
+  `mypy --strict` (164 arquivos) e `pyright` sem erro. macOS não reproduzido pelo revisor.
+- ADR-0027 e cartão copiados sem alteração (SHA-256 conferidos).
+- Produção: três arquivos novos, 283 linhas. Nenhum arquivo de produção existente muda.
+- O motor do autor e o protótipo do revisor, escritos em separado, coincidem em 300 casos
+  aleatórios fora das âncoras, com diferença relativa máxima de 2e-13. É o mesmo esquema; não
+  é validação do esquema.
+- 20.818 chamadas com tipos e valores errados nas duas funções públicas: nenhuma exceção
+  fora de `FdRefusal`, nenhum estado `ok` sem sigma.
+- Mutação do revisor: 24 trocas, 19 mortas. Das cinco vivas, três eram lacunas de teste,
+  fechadas no commit do parecer (largura mínima por moneyness; borda europeia sem obstáculo;
+  parada da bisseção só por sigma). Duas são equivalentes: o `max(0, ...)` em `lambda` é
+  redundante, porque o ramo só é alcançado com o termo não negativo; e a borda americana sem
+  o payoff muda o preço em 4e-4 mesmo com a borda a um desvio do spot, porque a projeção
+  nos nós internos repõe o obstáculo.
+- Medição do autor, código final, M4 Pro: p95 de relógio de 340 ms e mediana de CPU de
+  336 ms em 22 inversões de B1. Orçamento provisório: 700 ms.
+- O protótipo foi aberto por outro colaborador na medição de D4, antes da implementação; a
+  sessão autora declara não ter aberto o código. O critério 3 fica como regressão do esquema.
+
+Parecer da skill sobre `4b34e61` (SHA-256 `08f04a16…cc42`), lido depois do veredito e antes
+do merge: sem bloqueante de código; pediu decisão sobre a malha do critério 7, com um
+contraexemplo reproduzido aqui. A decisão é o Adendo 1. O teste T7 do autor rodava em
+800 por 400 e dizia isso na docstring e na descrição do PR.
+
+Testes do revisor, não revistos por outro agente:
+`test_review_error_scales_with_the_mesh_on_the_default_grid`,
+`test_review_default_grid_misses_the_absolute_floor_and_says_so`,
+`test_review_narrow_grid_keeps_the_strike_and_the_european_edge` e
+`test_review_stop_needs_the_price_residual_too`.

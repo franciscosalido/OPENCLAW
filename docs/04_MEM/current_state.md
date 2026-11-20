@@ -4,7 +4,7 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-20 · **Turno:** Claude (integração do DL2B-PR04).
+**Última atualização:** 2026-11-20 · **Turno:** Claude (integração do DL2C1-PR01).
 
 ## Fase 02 — Marco 2C1 (estado A)
 
@@ -17,8 +17,19 @@ a sombra BSM continua até a revisão de fechamento da Fase 2C.
 Roteiro: 2C1 → 2C (QuantLib só como oráculo de teste) → Fase 3 → Fase 4 (Kronos).
 Nenhum passo deste roteiro autoriza dado real, OpLab ou token.
 
-Próxima ação: DL2C1-PR01, motor e inversão sem consumidor, em rascunho para
-revisão e sem merge. PR02 só depois de Claude integrar o PR01.
+PR atual: DL2C1-PR01 — MERGEADO (PR #151, GO na primeira rodada).
+Entregue: `pricing/fd_american.py` (230 linhas), `config/american_fd.yaml` e o modelo de
+configuração. Motor isolado, sem consumidor; nada muda na demo nem no CLI.
+Portão do head, Linux aarch64 limpo: 10.230 aprovados, 16 pulados, 261 subtestes.
+O critério 7 do cartão foi revisto no Adendo 1: o erro do esquema escala com `S dx^2`; o
+piso absoluto de 3e-4 não vale na malha padrão (93 de 1.000 preços, desvio máximo 9,06e-4).
+[Cartão, adendo e revisão](../specs/derivatives/fase2c1/DL2C1.md).
+
+ADR-0024 (corretora) segue PROPOSED. Ele só muda de estado com commit assinado por
+Francisco alterando `CLAUDE.md`; mensagem em conversa não cumpre essa condição, e nenhum
+agente faz essa alteração. A proibição de corretora e de ordens segue em pleno efeito.
+
+Próxima ação (uma só): Codex publica o DL2C1-PR02 (ligação na demo mista), em rascunho.
 
 ## Fase 02 — Marco 2B — FECHADO (estado A)
 

@@ -187,3 +187,54 @@ def test_one_step_cn_uses_both_edge_times() -> None:
     actual = fd_price(kind=CALL, style=EUROPEAN, spot=spot, strike=strike, time_years=years,
                       rate_cont=rate, dividend_yield=q, sigma=sigma, grid=FdGrid(2, 1, 6., 0))
     assert actual == pytest.approx(expected, abs=1e-12, rel=0.)
+
+
+def _mesh_scale(spot: float, strike: float, years: float, rate: float, q: float, sigma: float,
+                grid: FdGrid) -> float:
+    """Escala do erro de truncamento: spot vezes o quadrado do passo em ln S."""
+    half = max(grid.width_stdevs * sigma * math.sqrt(years) + abs(rate - q - sigma**2 / 2) * years,
+               abs(math.log(spot / strike)) + sigma * math.sqrt(years))
+    return spot * (2 * half / grid.space_nodes) ** 2
+
+
+@pytest.mark.parametrize("grid", [GRID, FdGrid(200, 100, 6., 2)], ids=["400x200", "200x100"])
+def test_review_error_scales_with_the_mesh_on_the_default_grid(grid: FdGrid) -> None:
+    """Critério 7 revisto: na malha padrão o desvio cabe em múltiplos de S dx^2."""
+    rng = Random(151)
+    cases = [(PUT, 106., 100., 1.25, .01, .16, .18)]  # contraexemplo do parecer da skill
+    for _ in range(150 if grid is GRID else 60):
+        cases.append((rng.choice((CALL, PUT)), rng.uniform(50., 200.), rng.uniform(50., 200.),
+                      rng.choice((5/252, 21/252, .25, .5, 1., 2.)), rng.uniform(0., .16),
+                      rng.choice((0., .03, .08)), rng.uniform(.10, 1.)))
+    for kind, spot, strike, years, rate, q, sigma in cases:
+        args: dict[str, Any] = dict(kind=kind, spot=spot, strike=strike, time_years=years,
+                                    rate_cont=rate, dividend_yield=q, sigma=sigma, grid=grid)
+        reference = _bsm(kind, spot, strike, years, rate, q, sigma)
+        scale = _mesh_scale(spot, strike, years, rate, q, sigma, grid)
+        american = fd_price(style=AMERICAN, **args)
+        assert abs(fd_price(style=EUROPEAN, **args) - reference) <= .8 * scale, args
+        assert reference - american <= .3 * scale, args
+        assert american >= max(0., (1 if kind is CALL else -1) * (spot - strike)), args
+
+
+def test_review_default_grid_misses_the_absolute_floor_and_says_so() -> None:
+    """O piso absoluto de 3e-4 não vale em 400x200; o teste prende o limite conhecido."""
+    args: dict[str, Any] = dict(kind=PUT, style=AMERICAN, spot=106., strike=100.,
+                                time_years=1.25, rate_cont=.01, dividend_yield=.16, sigma=.18)
+    reference = _bsm(PUT, 106., 100., 1.25, .01, .16, .18)
+    assert reference - fd_price(grid=GRID, **args) == pytest.approx(9.057e-4, abs=2e-6)
+    assert reference - fd_price(grid=FdGrid(800, 400, 6., 2), **args) <= 3e-4
+
+
+def test_review_narrow_grid_keeps_the_strike_and_the_european_edge() -> None:
+    """Largura mínima por moneyness e borda europeia sem obstáculo, em malha estreita."""
+    narrow = FdGrid(40, 20, .01, 2)
+    european = fd_price(kind=PUT, style=EUROPEAN, spot=100., strike=100., time_years=1.,
+                        rate_cont=R, dividend_yield=0., sigma=.25, grid=narrow)
+    assert abs(european - _bsm(PUT, 100., 100., 1., R, 0., .25)) <= .6
+    carried = fd_price(kind=CALL, style=EUROPEAN, spot=100., strike=100., time_years=1.,
+                       rate_cont=.01, dividend_yield=.16, sigma=.25, grid=narrow)
+    assert abs(carried - _bsm(CALL, 100., 100., 1., .01, .16, .25)) <= .6
+    far = fd_price(kind=CALL, style=EUROPEAN, spot=100., strike=150., time_years=1.,
+                   rate_cont=R, dividend_yield=0., sigma=.2, grid=FdGrid(40, 20, 1., 2))
+    assert abs(far - _bsm(CALL, 100., 150., 1., R, 0., .2)) <= .2

@@ -132,3 +132,15 @@ def test_t18_delivered_profile() -> None:
     assert (config.bracket_lo, config.bracket_hi, config.max_iterations) == (.001, 2., 64)
     assert (config.tol_price_rel, config.tol_vol) == (1e-10, 1e-8)
     assert (config.divergence_vol, config.low_sensitivity_price) == (5e-4, 1e-4)
+
+
+def test_review_stop_needs_the_price_residual_too() -> None:
+    """Com tolerância de sigma frouxa, quem segura a precisão é o resíduo de preço."""
+    grid = FdGrid(100, 50, 6., 2)
+    target = fd_price(kind=OptionKind.CALL, style=ExerciseStyle.AMERICAN, spot=100., strike=100.,
+                      time_years=1., rate_cont=R, dividend_yield=.06, sigma=.25, grid=grid)
+    solved = fd_implied_vol(kind=OptionKind.CALL, spot=100., strike=100., time_years=1.,
+                            rate_cont=R, dividend_yield=.06, target_price=target, grid=grid,
+                            bracket_lo=.001, bracket_hi=2., max_iterations=64,
+                            tol_price_rel=1e-10, tol_vol=1.)
+    assert solved.status == "ok" and solved.sigma == pytest.approx(.25, abs=1e-8)
