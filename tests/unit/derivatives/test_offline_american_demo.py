@@ -488,7 +488,11 @@ async def test_r1_shadow_is_diagnostic_only(monkeypatch: pytest.MonkeyPatch) -> 
 
     monkeypatch.setattr(american_demo, "implied_vol", broken)
     failed = await demo()
-    failed_supported = next(r.pricing for r in failed.rows if r.pricing.model == "crr_american_v1")
+    failed_supported = next(
+        r.pricing for r in failed.rows
+        if r.row.contract.symbol == "SYNAC150" and r.row.contract.strike == Decimal("150")
+    )
+    assert failed_supported.supported, failed_supported.reason
     assert failed_supported.assumptions["shadow_iv_status"] == "error"
     exclude = {"assumptions"}
     for left, right in zip(normal.rows, failed.rows, strict=True):
@@ -611,3 +615,12 @@ async def test_r1_shadow_chain_aggregate(monkeypatch: pytest.MonkeyPatch) -> Non
     empty = (await demo()).chain.model_assumptions
     assert empty["american_shadow_rows"] == 0
     assert "american_shadow_max_abs_gap" not in empty
+
+
+def test_r1_cli_allows_mixed_demo_without_steps(capsys: pytest.CaptureFixture[str]) -> None:
+    """O opt-in público aplica o padrão sem exigir que o usuário informe passos."""
+    rc, reply = invoke([*DEMO, "--american-demo", "--series-registry", "synthetic-v1"], capsys)
+    assert rc == 0
+    assumptions = reply["data"]["model_assumptions"]
+    assert assumptions["american_crr_steps"] == 200
+    assert assumptions["american_crr_steps_source"] == "config"
