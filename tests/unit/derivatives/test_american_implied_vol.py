@@ -236,7 +236,7 @@ def test_american_iv_limits_come_from_yaml(american_iv_yaml: Path) -> None:
 @pytest.mark.parametrize("changes", [
     {"bracket_hi": .00005}, {"bracket_lo": 0}, {"bracket_hi": float("inf")},
     {"tol_vol": float("nan")}, {"tol_price_rel": "1.0e-10"},
-    {"max_iterations": True}, {"max_iterations": 0},
+    {"max_iterations": True}, {"max_iterations": 0}, {"max_iterations": 65},
     {"unknown": 1},
 ])
 def test_american_iv_rejects_invalid_yaml(
@@ -284,3 +284,21 @@ def test_legacy_european_yaml_does_not_need_american_iv(american_iv_yaml: Path) 
     settings = load_derivatives_config(american_iv_yaml)
     assert settings.american_iv is None
     assert settings.iv == load_derivatives_config().iv
+
+
+@pytest.mark.parametrize("unsafe", [
+    None,
+    {"bracket_hi": 2.0},
+    CFG.model_copy(update={"tol_vol": float("nan")}),
+    AmericanIvConfig.model_construct(**{**CFG.model_dump(), "max_iterations": 65}),
+])
+def test_forged_configuration_cannot_enter_solver(unsafe: Any) -> None:
+    """A configuração deve ser exata, validada e com teto de 68 pares."""
+    with patch.object(bridge, "crr_price", side_effect=AssertionError("CRR indevido")):
+        _assert_refused(_invert(Decimal("7"), cfg=unsafe), "iv:invalid_config")
+
+
+def test_invalid_target_precedes_invalid_config() -> None:
+    """Config inválida não mascara recusa já definida para o alvo."""
+    unsafe: Any = None
+    _assert_refused(_invert(Decimal("-1"), cfg=unsafe), "iv:invalid_target")
