@@ -5,8 +5,11 @@ from decimal import Decimal
 from itertools import product
 from typing import Any
 from unittest.mock import patch
+from pathlib import Path
 
 import pytest
+import yaml
+from pydantic import ValidationError
 
 from backend.derivatives.domain.carry import CarryAssumption
 from backend.derivatives.domain.models import ExerciseStyle, OptionContract, OptionKind
@@ -16,7 +19,7 @@ from backend.derivatives.pricing.binomial import BinomialRefusal, BinomialRefusa
 from backend.derivatives.pricing.bsm import BsmInputs, price
 from backend.derivatives.pricing.conventions import TimeToExpiry
 from backend.derivatives.pricing.implied_vol import IvStatus, implied_vol
-from config.derivatives_config_model import Iv
+from config.derivatives_config_model import Iv, load_derivatives_config
 from tests.unit.derivatives.test_american_bridge import (
     A1_TERMS, A2_TERMS, CALL, NONE, PUT, TTE, YIELD, _carry, _price,
 )
@@ -240,3 +243,46 @@ def test_zero_carry_positive_rate_keeps_same_model(steps: int) -> None:
     assert isinstance(result, bridge.AmericanIvSolution)
     assert abs(result.sigma - sigma) <= 1e-6
     assert result.model == CRR
+
+
+@pytest.fixture
+def american_iv_yaml(tmp_path: Path) -> Path:
+    """Cópia da fonte real de configuração, sem tocar o YAML padrão."""
+    config_path = tmp_path / "derivatives.yaml"
+    source = Path("config/derivatives.yaml")
+    config_path.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+    return config_path
+
+
+def _change_yaml(config_path: Path, **changes: object) -> None:
+    content = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    content["american_iv"].update(changes)
+    config_path.write_text(yaml.safe_dump(content), encoding="utf-8")
+
+
+def test_american_iv_limits_come_from_yaml(american_iv_yaml: Path) -> None:
+    """As regras de busca vêm de uma única seção YAML e chegam ao solver."""
+    _change_yaml(american_iv_yaml, bracket_hi=0.15)
+    settings = load_derivatives_config(american_iv_yaml).american_iv
+    assert settings is not None
+    obs = _price(carry=NONE, sigma=.2, steps=50)
+    assert obs.price is not None
+    result = bridge.american_implied_vol(
+        CALL, terms=A1_TERMS, carry=NONE, spot=SPOT, target_price=obs.price,
+        rate_cont=.05, tte=TTE, steps=50, cfg=settings,
+    )
+    _assert_refused(result, "iv:unbracketed")
+
+
+@pytest.mark.parametrize("changes", [
+    {"bracket_hi": .00005}, {"bracket_lo": 0}, {"bracket_hi": float("inf")},
+    {"tol_vol": float("nan")}, {"tol_price_rel": "1.0e-10"},
+    {"max_iterations": True}, {"max_iterations": 0},
+    {"unknown": 1},
+])
+def test_american_iv_rejects_invalid_yaml(
+    american_iv_yaml: Path, changes: dict[str, object],
+) -> None:
+    _change_yaml(american_iv_yaml, **changes)
+    with pytest.raises(ValidationError):
+        load_derivatives_config(american_iv_yaml)
