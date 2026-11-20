@@ -186,8 +186,8 @@ def test_missing_spot(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFix
 @pytest.mark.parametrize(("bid", "ask", "bad", "reason"), [
     (None, 3.1, "bid", "iv_unavailable:missing_quote"),
     (2.9, None, "ask", "iv_unavailable:missing_quote"),
-    (2.9, 350, "ask", "iv:above_upper_bound"),
-    (0.01, 3.1, "bid", None),
+    (2.9, 350, "ask", "iv_unavailable:ask:iv:above_upper_bound"),
+    (0.01, 3.1, "bid", "iv_unavailable:bid:iv:below_intrinsic"),
 ])
 def test_each_side_is_independent_and_only_mid_can_price(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
@@ -207,7 +207,7 @@ def test_each_side_is_independent_and_only_mid_can_price(
     else:
         status = "below_intrinsic" if bad == "bid" else "above_upper_bound"
         assert iv[bad] == {"status": status, "sigma": None}
-        assert (iv["mid"]["sigma"] is None) == (reason is not None)
+        assert (iv["mid"]["sigma"] is None) == (bad == "ask")
 
 
 CONFIG = DerivativesMcpConfig(context="test", fixture_dir=FIXTURE_DIR)
