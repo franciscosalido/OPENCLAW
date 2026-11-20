@@ -6,6 +6,26 @@
 
 **Última atualização:** 2026-11-19 · **Turno:** Claude (GO e merge do DL2-PR03).
 
+## Fase 02 — Marco 2B
+
+PR atual: DL2B-PR01 — MERGEADO (PR #146, GO na primeira rodada). Estado de prontidão A.
+ADR-0026 aceito e `SDD_FASE2B.md` vigentes.
+
+Entregue: `backend/derivatives/pricing/american_bridge.py` (109 linhas). Recebe contrato
+americano, termos, carry e volatilidade; devolve a média das árvores CRR de N e N + 1
+passos, ou recusa com o código de origem. Chain, MCP e CLI ainda não chamam a ponte, e a
+americana segue recusada neles com `american_not_supported_phase1`.
+Portão do head, Linux aarch64 limpo: 9.245 aprovados, 16 pulados, 261 subtestes.
+[Cartão, REDs, evidências e revisão](../specs/derivatives/fase2b/DL2B-PR01.md).
+
+Decisões abertas do ADR-0026, todas de Francisco:
+- D1 (para o DL2B-PR02): call com `q = 0` e `r >= 0` reusa a IV europeia da Fase 01?
+- D2 (DL2B-PR04): número de passos padrão. D3 (DL2B-PR03): origem e vigência dos termos.
+- D4: NumPy, depois da medição do DL2B-PR02.
+
+Próxima ação (uma só): Francisco decide D1; em seguida Claude escreve o cartão do DL2B-PR02
+(volatilidade implícita americana, com custo medido).
+
 ## Fase 02 — Marco 2A — FECHADO (estado A)
 
 PR atual: DL2-PR04 — MERGEADO (PR #145, GO na primeira rodada de revisão). Marco fechado.
