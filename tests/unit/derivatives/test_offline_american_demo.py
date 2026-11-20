@@ -384,3 +384,20 @@ async def test_factor_1000_preserves_unit_targets_with_nonstandard_lot() -> None
             baseline = result
         else:
             assert result == baseline
+
+
+async def test_r1_default_steps_match_explicit_200() -> None:
+    """B2: a composição usa 200 do perfil e distingue o argumento explícito."""
+    args = ("BOVA11", date(2026, 11, 19))
+    defaulted, _ = await build_demo_chain(
+        *args, directory=Path(FIXTURE_DIR), american_demo=True,
+        series_registry="synthetic-v1", steps=None,
+    )
+    explicit, _ = await build_demo_chain(
+        *args, directory=Path(FIXTURE_DIR), american_demo=True,
+        series_registry="synthetic-v1", steps=200,
+    )
+    assert defaulted.chain.model_assumptions["american_crr_steps"] == 200
+    assert defaulted.chain.model_assumptions["american_crr_steps_source"] == "config"
+    assert explicit.chain.model_assumptions["american_crr_steps_source"] == "argument"
+    assert defaulted.rows == explicit.rows
