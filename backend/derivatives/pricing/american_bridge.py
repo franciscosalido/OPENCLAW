@@ -1,18 +1,42 @@
-"""Preço de um contrato americano nas árvores CRR da série, com volatilidade dada."""
+"""Preço CRR e inversão de um preço observado de uma série americana."""
 
-from collections.abc import Mapping
+import math
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from decimal import Decimal
+from typing import ClassVar, Final, Literal
 
 from pydantic import ValidationError
 
-from backend.derivatives.domain.carry import CarryAssumption, CarryRefusal, resolve_carry
-from backend.derivatives.domain.models import ExerciseStyle, OptionContract
+from backend.derivatives.domain.carry import (
+    CarryAssumption, CarryRefusal, ResolvedCarry, resolve_carry,
+)
+from backend.derivatives.domain.models import ExerciseStyle, OptionContract, OptionKind
 from backend.derivatives.domain.series_terms import SeriesTerms, TermsRefusal
 from backend.derivatives.pricing.binomial import BinomialRefusal, crr_price
 from backend.derivatives.pricing.contract_pricing import PricingOutcome
 from backend.derivatives.pricing.conventions import TimeToExpiry
+from backend.derivatives.pricing.implied_vol import price_bounds
+from config.american_iv_config_model import AmericanIvConfig
 
-AMERICAN_MODEL = "crr_american_v1"
+AMERICAN_MODEL: Final = "crr_american_v1"
+
+
+def _resolve_series(
+    contract: OptionContract, terms: SeriesTerms, carry: CarryAssumption | None,
+) -> ResolvedCarry | str:
+    if contract.exercise_style is ExerciseStyle.UNKNOWN:
+        return "unknown_exercise_style"
+    if contract.exercise_style is not ExerciseStyle.AMERICAN:
+        return "american_bridge:not_american"
+    try:
+        return resolve_carry(terms, carry)
+    except TermsRefusal as exc:
+        return f"terms:{exc.code.value}"
+    except CarryRefusal as exc:
+        return f"carry:{exc.code.value}"
+    except ValidationError:
+        return "american_bridge:invalid_terms_or_carry"
 
 
 def _matches(contract: OptionContract, terms: SeriesTerms) -> bool:
@@ -32,7 +56,9 @@ def _pair_average(first: float, second: float) -> float:
     return total / 2
 
 
-def _numeric_echo(value: Decimal | float | int, expected: type[Decimal | float | int]) -> float | str:
+def _numeric_echo(
+    value: Decimal | float | int, expected: type[Decimal | float | int],
+) -> float | str:
     if type(value) is not expected:
         return "invalid"
     if type(value) is Decimal and value.is_snan():
@@ -73,19 +99,9 @@ def price_american_contract(
             inputs_echo=echo, assumptions=dict(assumptions),
         )
 
-    if contract.exercise_style is ExerciseStyle.UNKNOWN:
-        return refused("unknown_exercise_style")
-    if contract.exercise_style is not ExerciseStyle.AMERICAN:
-        return refused("american_bridge:not_american")
-    try:
-        resolved = resolve_carry(terms, carry)
-    except TermsRefusal as exc:
-        return refused(f"terms:{exc.code.value}")
-    except CarryRefusal as exc:
-        return refused(f"carry:{exc.code.value}")
-    except ValidationError:
-        return refused("american_bridge:invalid_terms_or_carry")
-
+    resolved = _resolve_series(contract, terms, carry)
+    if isinstance(resolved, str):
+        return refused(resolved)
     q = resolved.dividend_yield
     echo["dividend_yield"] = q
     if not _matches(contract, resolved.terms):
@@ -121,3 +137,128 @@ def price_american_contract(
         regime="expiry" if years == 0.0 else "tree", sigma_source="given",
         inputs_echo=echo, assumptions=merged,
     )
+
+
+@dataclass(frozen=True, slots=True)
+class AmericanIvSolution:
+    """Volatilidade anual em fração, modelo de inversão e bracket final."""
+
+    sigma: float
+    model: Literal["crr_american_v1"]
+    bracket: tuple[float, float]
+    iterations: int = 0
+    expansions: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class AmericanIvRefusal:
+    """Motivo estável de recusa de uma observação de preço."""
+
+    reason: str
+    sigma: ClassVar[None] = None
+    iterations: int = 0
+    expansions: int = 0
+
+
+_IV_RESOLUTION = 1e-6
+
+
+def _bisect_pair(
+    pair: Callable[[float], float], target: float, tol: float, floor: float,
+    cfg: AmericanIvConfig,
+) -> AmericanIvSolution | AmericanIvRefusal:
+    ceiling = cfg.bracket_hi
+    if floor >= ceiling:
+        return AmericanIvRefusal("iv:unbracketed")
+    lo, hi = floor, ceiling
+    low_price, high_price = pair(lo), pair(hi)
+    if abs(low_price - target) <= tol or abs(high_price - target) <= tol:
+        return AmericanIvRefusal("iv:not_identifiable")
+    if not low_price < target < high_price:
+        return AmericanIvRefusal("iv:unbracketed")
+
+    for iteration in range(1, cfg.max_iterations + 1):
+        mid = (lo + hi) / 2
+        residual = pair(mid) - target
+        if residual > 0:
+            hi = mid
+        else:
+            lo = mid
+        if hi - lo <= cfg.tol_vol and abs(residual) <= tol:
+            left, right = mid - _IV_RESOLUTION, mid + _IV_RESOLUTION
+            if (left < floor or right > ceiling
+                    or target - pair(left) <= tol or pair(right) - target <= tol):
+                return AmericanIvRefusal("iv:not_identifiable", iteration)
+            return AmericanIvSolution(mid, AMERICAN_MODEL, (lo, hi), iteration)
+    return AmericanIvRefusal("iv:no_convergence", cfg.max_iterations)
+
+
+def american_implied_vol(
+    contract: OptionContract, *, terms: SeriesTerms, carry: CarryAssumption | None,
+    spot: Decimal, target_price: Decimal, rate_cont: float, tte: TimeToExpiry, steps: int,
+    cfg: AmericanIvConfig,
+) -> AmericanIvSolution | AmericanIvRefusal:
+    """Inverte o par CRR de uma série americana com carry e configuração explícitos."""
+    resolved = _resolve_series(contract, terms, carry)
+    if isinstance(resolved, str):
+        return AmericanIvRefusal(resolved)
+    if not _matches(contract, resolved.terms):
+        return AmericanIvRefusal("american_bridge:series_terms_mismatch")
+    spot_value = _numeric_echo(spot, Decimal)
+    if isinstance(spot_value, str):
+        return AmericanIvRefusal("american_bridge:invalid_spot_type")
+    years = tte.year_fraction
+    if (type(rate_cont) is not float or type(years) is not float
+            or type(contract.kind) is not OptionKind):
+        return AmericanIvRefusal("binomial:invalid_input_type")
+    strike, q = float(contract.strike), resolved.dividend_yield
+    if not all(map(math.isfinite, (spot_value, strike, years, rate_cont))):
+        return AmericanIvRefusal("binomial:non_finite_input")
+    if type(steps) is not int or not 1 <= steps <= 4999:
+        return AmericanIvRefusal("binomial:invalid_steps")
+    if spot_value <= 0 or strike <= 0 or years < 0:
+        return AmericanIvRefusal("binomial:input_out_of_domain")
+    if (type(target_price) is not Decimal or not target_price.is_finite() or target_price < 0
+            or not math.isfinite(float(target_price))):
+        return AmericanIvRefusal("iv:invalid_target")
+    if years == 0:
+        return AmericanIvRefusal("iv:expiry")
+    if type(cfg) is not AmericanIvConfig:
+        return AmericanIvRefusal("iv:invalid_config")
+    try:
+        cfg = AmericanIvConfig.model_validate(cfg)
+    except ValidationError:
+        return AmericanIvRefusal("iv:invalid_config")
+    target = float(target_price)
+    tol = cfg.tol_price_rel * max(1.0, target)
+    is_call = contract.kind is OptionKind.CALL
+    try:
+        lower, european_upper = price_bounds(contract.kind, spot_value, strike, years, rate_cont, q)
+        intrinsic = spot_value - strike if is_call else strike - spot_value
+        lower = max(lower, intrinsic)
+        upper = spot_value if is_call else max(strike, european_upper)
+        if not math.isfinite(upper) or not math.isfinite(lower):
+            return AmericanIvRefusal("iv:not_representable")
+        if lower - target > tol:
+            return AmericanIvRefusal("iv:below_intrinsic")
+        if target - upper > tol:
+            return AmericanIvRefusal("iv:above_upper_bound")
+        if target - lower <= tol or upper - target <= tol:
+            return AmericanIvRefusal("iv:not_identifiable")
+    except (ArithmeticError, ValueError):
+        return AmericanIvRefusal("iv:not_representable")
+
+    def pair(sigma: float) -> float:
+        def american(count: int) -> float:
+            return crr_price(
+                kind=contract.kind, style=ExerciseStyle.AMERICAN, spot=spot_value, strike=strike,
+                time_years=years, rate_cont=rate_cont, dividend_yield=q, sigma=sigma, steps=count,
+            )
+        return _pair_average(american(steps), american(steps + 1))
+
+    # CRR exige down < exp((r-q) dt) < up. N fixa o maior dt do par.
+    floor = max(cfg.bracket_lo, abs(rate_cont - q) * math.sqrt(years / steps) + 1e-8)
+    try:
+        return _bisect_pair(pair, target, tol, floor, cfg)
+    except BinomialRefusal as exc:
+        return AmericanIvRefusal(f"binomial:{exc.code.value}")
