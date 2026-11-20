@@ -4,11 +4,11 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-20 · **Turno:** Claude (GO e merge do DL2B-PR03).
+**Última atualização:** 2026-11-20 · **Turno:** Codex/Dots (DL2B-R1, PR 4).
 
 ## Fase 02 — Marco 2B
 
-PR atual: DL2B-PR03 — MERGEADO (PR #149, GO). Estado de prontidão A.
+PR atual: DL2B-PR04 — EM_REVISAO. Base integrada: `23f5cef` (#149). Estado A.
 [ADR-0026](../ADR/ADR-0026-laboratorio-derivativos-fase2b.md) aceito, com a Revisão 1.
 [Cartão DL2B-R1](../specs/derivatives/fase2b/DL2B-R1.md) e Adendo 1 do SDD vigentes.
 
@@ -39,8 +39,12 @@ Integrado também o registro versionado de termos e carry por identidade e vigê
 (`domain/series_registry.py`, #149), ainda sem consumidor. Portão do head, Linux aarch64
 limpo: 9.461 aprovados, 16 pulados, 261 subtestes.
 
-Próxima ação (uma só): Codex publica o DL2B-PR04 em rascunho sobre a `main` integrada,
-com a Parte B do cartão DL2B-R1.
+Em revisão: ligação americana na demo sintética, seleção de passos do YAML e
+sombra BSM sem influência sobre os números CRR. Nada muda no caminho de mercado.
+[Contrato e evidências do PR04](../specs/derivatives/fase2b/DL2B-PR04.md).
+
+Próxima ação (uma só): Claude revisa e integra o DL2B-PR04 para fechar o Marco 2B.
+O oráculo QuantLib permanece condicionado ao ADR e ao cartão do marco seguinte.
 
 ## Fase 02 — Marco 2A — FECHADO (estado A)
 

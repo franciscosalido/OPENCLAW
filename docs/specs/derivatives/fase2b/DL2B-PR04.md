@@ -1,8 +1,28 @@
 # DL2B-PR04 — Ponte americana na chain de demonstração offline
 
-Candidato local a revisão por Claude, estado A. Base do PR03 conferida nas duas
-branches em `4c76d146155a2eaccea5f776b1d2f1a56cdf1f05`. O empilhamento é apenas
-local e não satisfaz o rito do ADR-0026. Revisão independente permanece pendente.
+Rascunho para Claude, estado A. Passo 4 do [DL2B-R1](DL2B-R1.md), sobre a
+`main` integrada em `23f5cef` (#149). Contém a demo revisada e a Parte B.
+A tool de mercado continua inativa; nenhum dado real ou token é autorizado.
+
+## Execução da Revisão 1
+
+- `78c97f4` reaplica o restante de `8a9a391`. A base integrada mantém as melhorias de
+  documentação do registro #149 e os dois testes da IV #148. O domínio não muda.
+  Em vez de reexportar pelo registro, a demo importa só `CarryRefusal` de carry;
+  a guarda de arquitetura mantém vedados os demais imports diretos desse módulo
+  na demo. A formatação posterior preserva os valores da fixture e reajusta seu hash.
+- REDs independentes: B2 em `3ad4005` (`InvalidDemoSelection`), B5 em `a69d3e1`
+  (ausência de `shadow_engine`). GREEN em `e01a429`: 60 linhas novas de produção
+  para a Parte B antes do ajuste de estilo, contadas por numstat.
+- Com opt-in e registro válido, `--steps` é opcional. O YAML fornece 200 se o
+  argumento for omitido. A origem e os agregados seguem o cartão; a sombra
+  europeia não substitui preço, IV ou recusa CRR e não altera as chaves de linha v1.
+- B1 a B8 e os nove mutantes seguem o contrato R1. Evidências da suíte, das
+  mutações e da medição Mac com N=200, vinculadas ao head, na descrição do PR.
+- O roteiro após a revisão permanece o do `current_state.md`. Este PR não inicia
+  o marco do oráculo QuantLib.
+
+## Histórico do candidato antes da Parte B
 
 ## Correção após revisão adversarial
 
@@ -24,7 +44,7 @@ abaixo são o registro histórico da versão anterior, não evidência deste del
 Leitura dos ADRs 0025 (incluindo Adendo 1) e 0026, SDD_FASE2B e cartões PR01,
 01A, 02 e 03. Aplicam-se os critérios 5, 7, 8, 9 e 10 e o contrato de IV por
 observação do PR02. Preço CRR médio de N/N+1, carry resolvido exclusivamente pelo
-registro da série, D1 somente em CALL com q=0 resolvido e r>0. A cotação de
+registro da série. O atalho D1 original foi substituído por CRR/CRR. A cotação de
 entrada da inversão é por unidade. Gregas americanas continuam ausentes.
 
 - A CLI requer `--provider offline_fixture --american-demo --steps N
@@ -77,12 +97,19 @@ comportamento e uma aprovação em macOS. Para repeti-lo a partir deste worktree
 em diretório temporário e executa apenas `test_offline_american_demo.py`.
 O log da primeira execução e o da reprodução estão em `reports/dl2b-pr04/mac/`.
 
-| Commit | Alteração e prova |
-|---|---|
-| `7e7c3ff` | GREEN do RED original. Foram aproveitados o despacho da CLI/MCP e a leitura da fixture mista do diff interrompido. Os dois hashes conferiram. A ligação da ponte e as guardas passaram em 96 testes focais. |
-| `653ae2c` | A composição abre uma única fixture verificada para opções, spot, taxa, status, relógio e registro. A entrada do serviço de demo exige a seleção completa. O registro reexporta a exceção de carry que seu resolvedor pode levantar. Isso dispensa autorizar a demo a importar o módulo de carry. |
-| `aedc1e5` | A chamada Python direta da demo deixava escapar exceção para símbolo nulo e diretório de tipo inválido. Duas falhas reproduzidas em `mac/red-forged.log`; a fronteira agora devolve o erro constante correspondente. |
-| `848f030` | A suíte completa expôs uma asserção que enumerava as opções da CLI da Fase 1. A lista exata passou a incluir as três flags deste cartão. Os testes de flags e caminhos proibidos continuam no gate. |
+- `7e7c3ff`: GREEN do RED original. Foram aproveitados o despacho da CLI/MCP e a leitura da
+  fixture mista do diff interrompido. Os dois hashes conferiram. A ligação da ponte e as guardas
+  passaram em 96 testes focais.
+- `653ae2c`: A composição abre uma única fixture verificada para opções, spot, taxa, status,
+  relógio e registro. A entrada do serviço de demo exige a seleção completa. O registro reexporta
+  a exceção de carry que seu resolvedor pode levantar. Isso dispensa autorizar a demo a importar
+  o módulo de carry.
+- `aedc1e5`: A chamada Python direta da demo deixava escapar exceção para símbolo nulo e
+  diretório de tipo inválido. Duas falhas reproduzidas em `mac/red-forged.log`; a fronteira agora
+  devolve o erro constante correspondente.
+- `848f030`: A suíte completa expôs uma asserção que enumerava as opções da CLI da Fase 1. A
+  lista exata passou a incluir as três flags deste cartão. Os testes de flags e caminhos
+  proibidos continuam no gate.
 
 **Procedimento e alcance.** A autorização de imports segue as arestas entre
 `cli.py`, `mcp/derivatives_server.py`, `service/demo_chain.py` e
@@ -137,10 +164,10 @@ Os arquivos protegidos, dependências e lock coincidiram com a base.
 
 | Gate | macOS arm64 | Linux arm64 |
 |---|---|---|
-| Pytest completo, `--ignore=tests/integration --timeout=120` | 9.492 passaram, 16 pulados, 261 subtestes (43,67 s) | 9.492 passaram, 16 pulados, 261 subtestes (52,45 s) |
+| Pytest sem integração, timeout 120 s | 9.492 / 16 / 261 (43,67 s) | 9.492 / 16 / 261 (52,45 s) |
 | `python -m mypy backend/ --strict` | 0 erros, 163 arquivos | 0 erros, 163 arquivos |
-| Pyright de produção e Pyright nos cinco arquivos de testes/guardas alterados | 0 erros e avisos | 0 erros e avisos |
-| Pyright global, base e candidato | rc 1 em ambos, 131 erros, logs idênticos | rc 1 em ambos, 131 erros, logs idênticos |
+| Pyright de produção e testes/guardas alterados | 0 erros e avisos | 0 erros e avisos |
+| Pyright global | rc 1, 131 erros herdados | rc 1, 131 erros herdados |
 | Stdout da demo padrão contra `ff0c1be` | `cmp` 0, 67.097 bytes | `cmp` 0, 67.101 bytes |
 | `git diff --check`, escopo, memória e estado do checkout | rc 0 | rc 0 |
 
