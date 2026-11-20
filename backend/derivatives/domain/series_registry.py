@@ -9,12 +9,16 @@ from pydantic import StringConstraints, model_validator
 
 from backend.derivatives.domain.carry import CarryAssumption, ResolvedCarry, resolve_carry
 from backend.derivatives.domain.models import OptionContract, OptionKind
-from backend.derivatives.domain.series_terms import SeriesTerms, _CivilDate, _input_type, _TermsModel
+from backend.derivatives.domain.series_terms import (
+    SeriesTerms, _CivilDate, _input_type, _TermsModel,
+)
 
 _Identifier = Annotated[str, StringConstraints(pattern=r"\S"), _input_type(str)]
 
 
 class RegistryRefusalCode(StrEnum):
+    """Motivos estáveis de recusa da consulta ao registro."""
+
     MISSING = "missing_series_record"
     EXPIRED = "expired_series_record"
     FUTURE = "future_series_record"
@@ -23,6 +27,8 @@ class RegistryRefusalCode(StrEnum):
 
 
 class RegistryRefusal(Exception):
+    """Recusa tipada: nenhum registro único e vigente serve ao contrato."""
+
     def __init__(self, code: RegistryRefusalCode) -> None:
         self.code = code
         super().__init__(code.value)
@@ -103,10 +109,11 @@ class SeriesRegistry(_TermsModel):
             raise RegistryRefusal(RegistryRefusalCode.MISMATCH)
         row = _applicable_record(matches, as_of)
         terms = row.terms
+        size, form = contract.contract_size, contract.quotation_form
         if (
             contract.exercise_style != terms.exercise_style
-            or (contract.contract_size is not None and contract.contract_size != terms.contract_size)
-            or (contract.quotation_form is not None and contract.quotation_form != terms.quotation_form)
+            or (size is not None and size != terms.contract_size)
+            or (form is not None and form != terms.quotation_form)
         ):
             raise RegistryRefusal(RegistryRefusalCode.MISMATCH)
         return SeriesResolution(as_of, book.version, row, resolve_carry(terms, row.carry))

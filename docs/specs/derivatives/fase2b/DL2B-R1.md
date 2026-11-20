@@ -294,3 +294,25 @@ duas lacunas de teste na sondagem de identificabilidade (a condição do lado di
 distância de 1e-6). Procedem. Fechadas no commit do parecer com
 `test_right_probe_alone_can_refuse` e `test_probe_distance_is_one_millionth`, não revistos
 por outro agente. Portão final: 9.404 aprovados, 16 pulados, 261 subtestes.
+
+## PR 3 (DL2B-PR03) — revisão independente: GO (Claude, 2026-11-20)
+
+Head revisado: `cf7824a`.
+
+- Domínio e testes do registro idênticos aos de `4c76d14`, já revistos. Preço, serviço, MCP,
+  CLI, configuração, fixtures e protegidos sem diff. A guarda passou a proteger também o
+  registro: nenhuma superfície pode carregá-lo, nem por intermediário.
+- Portão em clone limpo, Linux aarch64: 9.461 aprovados, 16 pulados, 261 subtestes; `mypy
+  --strict` e `pyright` sem erro; demo idêntica à base; CLI padrão com `LIVE_NOT_ACTIVATED`.
+- 20.000 registros aleatórios: nenhuma seleção com informação futura ou fora da vigência,
+  nenhuma recusa indevida.
+- macOS não reproduzido pelo revisor.
+
+Parecer da skill, lido depois do veredito e antes do merge (SHA-256 `0c087921…d704`):
+
+- Bloqueante documental sobre a linha "Última atualização": mesmo ponto do PR 1, não
+  acompanhado. A instrução de publicação deste PR autorizava essa linha.
+- Nota de estilo: duas classes públicas sem docstring e três linhas acima de 100 colunas em
+  `series_registry.py`. Procede; são regras do repositório. Corrigido no commit do parecer,
+  sem mudança de comportamento: duas docstrings, um import quebrado em linhas e duas
+  variáveis locais na comparação de lote e fator. Portão repetido depois da edição.
