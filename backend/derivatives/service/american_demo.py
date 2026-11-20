@@ -2,6 +2,7 @@
 import math
 from datetime import datetime
 from decimal import Decimal
+from fractions import Fraction
 from typing import Literal, TypedDict
 
 from backend.derivatives.domain.models import ExerciseStyle, OptionKind
@@ -175,9 +176,11 @@ def _price_row(item: PricedRow, priced: PricedChain, registry: SeriesRegistry, *
                     raise ValueError("fd_sensitivity")
                 low = sensitivity < fd_config.low_sensitivity_price
                 gap = sigma - fd.sigma
+                # Compare exact nominal decimals; retain the signed float for diagnostics.
+                nominal_gap = Fraction(str(sigma)) - Fraction(str(fd.sigma))
                 assumptions.update(fd_iv_mid=fd.sigma, fd_iv_gap=gap,
                                    fd_iv_comparison="low_sensitivity" if low else "informative",
-                                   fd_iv_alert=not low and abs(gap) > shift)
+                                   fd_iv_alert=not low and abs(nominal_gap) > Fraction(str(shift)))
         except Exception:
             assumptions["fd_iv_status"] = "error"
     return outcome.model_copy(update={"assumptions": assumptions})

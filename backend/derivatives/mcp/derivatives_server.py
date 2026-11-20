@@ -52,7 +52,7 @@ def _row_view(item: PricedRow) -> dict[str, object]:
     contract, quote, pricing = item.row.contract, item.row.quote, item.pricing
     flags = item.row.quality.model_dump()
     iv = pricing.iv
-    return {
+    view: dict[str, object] = {
         "symbol": contract.symbol, "kind": contract.kind.value,
         "exercise_style": contract.exercise_style.value, "strike": str(contract.strike),
         "bid": _text(quote.bid), "ask": _text(quote.ask), "mid": _text(quote.mid),
@@ -63,6 +63,12 @@ def _row_view(item: PricedRow) -> dict[str, object]:
         "quality_flags": sorted(name for name, value in flags.items() if value is True),
         "missing_metadata": list(item.row.quality.missing_metadata),
     }
+    if pricing.supported and contract.exercise_style.value == "AMERICAN":
+        diagnostics = {key: value for key, value in pricing.assumptions.items()
+                       if key.startswith("fd_")}
+        if diagnostics:
+            view["diagnostics"] = diagnostics
+    return view
 
 def _demo_view(priced: PricedChain, *, as_of: datetime) -> dict[str, Any]:
     """Visao compacta e serializavel da chain: precos como texto decimal, modelo em float."""

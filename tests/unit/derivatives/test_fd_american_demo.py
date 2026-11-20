@@ -420,9 +420,13 @@ async def test_v2_refused_european_and_default_rows_do_not_gain_diagnostics() ->
     for row in (european, refused):
         contaminated = row.pricing.model_copy(update={"assumptions": {"fd_iv_status": "error"}})
         assert "diagnostics" not in _row_view(row.model_copy(update={"pricing": contaminated}))
-    plain = await run_chain("BOVA11", "2026-11-19", "offline_fixture", lambda: priced.chain.acquired_at)
+    plain = await run_chain(
+        "BOVA11", "2026-11-19", "offline_fixture", lambda: priced.chain.acquired_at,
+    )
     assert plain["ok"] is True
-    assert all("diagnostics" not in row for row in plain["data"]["rows"])
+    data = plain["data"]
+    assert isinstance(data, dict)
+    assert all("diagnostics" not in row for row in data["rows"])
 
 
 def test_v3_fd_error_projects_status_but_no_legacy_difference(

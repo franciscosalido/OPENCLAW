@@ -31,7 +31,8 @@ agente faz essa alteração. A proibição de corretora e de ordens segue em ple
 
 DL2C1-PR02: candidato em revisão, sem integração. Liga o segundo motor apenas à demo
 mista sintética; CRR e BSM anteriores não mudam. Os agregados são aditivos em
-`model_assumptions`; as chaves por linha são internas. [Provas dos critérios
+`model_assumptions`; por adendo, somente a linha americana suportada expõe as chaves
+`fd_*` no objeto aditivo `diagnostics` da demo. [Provas dos critérios
 1 a 19](../specs/derivatives/fase2c1/DL2C1-PR02.md).
 
 Próxima ação (uma só): revisar o DL2C1-PR02 em rascunho. Só após integração fechar o
