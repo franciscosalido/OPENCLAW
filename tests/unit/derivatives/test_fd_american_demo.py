@@ -458,3 +458,11 @@ def test_v4_removing_diagnostics_reproduces_legacy_mixed_rows_byte_for_byte(
     old_rows, new_rows = base["data"]["rows"], candidate["data"]["rows"]
     assert sum("diagnostics" in row for row in new_rows) == 1
     assert json.dumps(_without_diagnostics(new_rows)) == json.dumps(old_rows)
+
+
+async def test_review_fd_diagnostic_prices_the_american_contract() -> None:
+    """Os dois preços auxiliares saem no estilo americano; a série sintética não distingue."""
+    with patch.object(american_demo, "fd_price", wraps=fd_price) as price:
+        await _demo()
+    assert price.call_count == 2
+    assert all(call.kwargs["style"] is ExerciseStyle.AMERICAN for call in price.call_args_list)
