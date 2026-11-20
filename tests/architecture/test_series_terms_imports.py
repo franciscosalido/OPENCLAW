@@ -17,7 +17,8 @@ TERMS = "backend.derivatives.domain.series_terms"
 CARRY = "backend.derivatives.domain.carry"
 BRIDGE_PATH = Path("backend/derivatives/pricing/american_bridge.py")
 BRIDGE = "backend.derivatives.pricing.american_bridge"
-PROTECTED = {TERMS, CARRY}
+REGISTRY = "backend.derivatives.domain.series_registry"
+PROTECTED = {TERMS, CARRY, REGISTRY}
 _LITERAL = re.compile(
     r"(?<![\w.])(?:" + "|".join(map(re.escape, sorted(PROTECTED | {BRIDGE}))) + r")(?!\w)"
 )
@@ -191,9 +192,9 @@ def _forbid_network(event: str, args: tuple[object, ...]) -> None:
 
 sys.addaudithook(_forbid_network)
 sys.path.insert(0, str(Path.cwd()))
-for name in sys.argv[3:]:
+for name in sys.argv[2:]:
     import_module(name)
-loaded = sorted(set(sys.argv[1:3]).intersection(sys.modules))
+loaded = sorted(set(sys.argv[1].split(",")).intersection(sys.modules))
 if loaded:
     sys.exit(f"módulos protegidos carregados: {', '.join(loaded)}")
 """
@@ -203,7 +204,7 @@ def _probe(root: Path) -> subprocess.CompletedProcess[str]:
     modules = {_module(path.relative_to(root)) for path in (root / "backend/derivatives")
                .rglob("*.py")}
     return subprocess.run(
-        [sys.executable, "-I", "-B", "-c", _PROBE, *sorted(PROTECTED),
+        [sys.executable, "-I", "-B", "-c", _PROBE, ",".join(sorted(PROTECTED)),
          *sorted(modules - PROTECTED - {BRIDGE})],
         cwd=root, env={"QUIMERA_DERIV_FORBID_NETWORK": "1", "FASTMCP_CHECK_FOR_UPDATES": "off"},
         capture_output=True, text=True, timeout=60, check=False,
@@ -231,3 +232,17 @@ def test_dynamic_import_in_parent_initializer(tmp_path: Path) -> None:
     probe = _probe(tmp_path)
     assert probe.returncode == 1
     assert probe.stderr.strip() == f"módulos protegidos carregados: {CARRY}"
+
+
+@pytest.mark.parametrize("via_facade", [False, True])
+def test_registry_cannot_be_loaded_by_a_surface(tmp_path: Path, via_facade: bool) -> None:
+    surface = tmp_path / _SERVICE
+    surface.parent.mkdir(parents=True)
+    statement = 'import_module("backend.derivatives.domain.series_registry")'
+    if via_facade:
+        facade = tmp_path / DOMAIN / "facade.py"
+        facade.parent.mkdir(parents=True)
+        facade.write_text(statement, encoding="utf-8")
+        statement = "from ..domain import facade"
+    surface.write_text(statement, encoding="utf-8")
+    assert _offenders(tmp_path) == [f"{_SERVICE}:1"]
