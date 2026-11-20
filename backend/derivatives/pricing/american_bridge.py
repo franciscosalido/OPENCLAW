@@ -32,6 +32,17 @@ def _pair_average(first: float, second: float) -> float:
     return total / 2
 
 
+def _numeric_echo(value: Decimal | float | int, expected: type[Decimal | float | int]) -> float | str:
+    if type(value) is not expected:
+        return "invalid"
+    if type(value) is Decimal and value.is_snan():
+        return float("nan")
+    try:
+        return float(value)
+    except OverflowError:
+        return "invalid"
+
+
 def price_american_contract(
     contract: OptionContract,
     *,
@@ -45,14 +56,15 @@ def price_american_contract(
     assumptions: Mapping[str, str | float | bool],
 ) -> PricingOutcome:
     """Confere estilo, carry e identidade da série antes de aplicar as árvores CRR."""
-    spot_value = float("nan") if spot.is_snan() else float(spot)
+    spot_value = _numeric_echo(spot, Decimal)
     strike = float(contract.strike)
     years = tte.year_fraction
     echo: dict[str, str | float] = {
         "symbol": contract.symbol, "kind": contract.kind.value,
         "exercise_style": contract.exercise_style.value, "spot": spot_value, "strike": strike,
-        "time_years": years, "rate_cont": rate_cont, "sigma": sigma,
-        "dividend_yield": "unresolved", "steps": float(Decimal(steps)),
+        "time_years": _numeric_echo(years, float), "rate_cont": _numeric_echo(rate_cont, float),
+        "sigma": _numeric_echo(sigma, float), "dividend_yield": "unresolved",
+        "steps": _numeric_echo(steps, int),
     }
 
     def refused(reason: str) -> PricingOutcome:
@@ -78,6 +90,8 @@ def price_american_contract(
     echo["dividend_yield"] = q
     if not _matches(contract, resolved.terms):
         return refused("american_bridge:series_terms_mismatch")
+    if isinstance(spot_value, str):
+        return refused("american_bridge:invalid_spot_type")
 
     def tree(style: ExerciseStyle, count: int) -> float:
         return crr_price(

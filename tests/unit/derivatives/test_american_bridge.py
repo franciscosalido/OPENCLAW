@@ -292,3 +292,188 @@ def test_t9_discretization(kind: OptionKind, strike: int, rate: float, q: str | 
     )
     assert outcome.supported and outcome.price is not None
     assert abs(outcome.price - Decimal(reference)) <= Decimal("0.01")
+
+
+@pytest.mark.parametrize(("changes", "field", "reason"), [
+    ({"sigma": 10**400}, "sigma", "binomial:invalid_input_type"),
+    ({"sigma": None}, "sigma", "binomial:invalid_input_type"),
+    ({"rate_cont": 10**400}, "rate_cont", "binomial:invalid_input_type"),
+    ({"rate_cont": None}, "rate_cont", "binomial:invalid_input_type"),
+    ({"steps": None}, "steps", "binomial:invalid_steps"),
+    ({"steps": "a"}, "steps", "binomial:invalid_steps"),
+    ({"spot": 100.0}, "spot", "american_bridge:invalid_spot_type"),
+], ids=["sigma-huge", "sigma-none", "rate-huge", "rate-none", "steps-none", "steps-text",
+        "float-spot"])
+def test_f1_bad_input(changes: _Changes, field: str, reason: str) -> None:
+    outcome = _price(**changes)
+    _assert_refusal(outcome, reason, 0.08)
+    assert outcome.inputs_echo[field] == "invalid"
+
+
+class _BridgeChanges(_Changes, total=False):
+    tte: TimeToExpiry
+
+
+@pytest.mark.parametrize(("changes", "field", "reason"), [
+    ({"sigma": "0.2"}, "sigma", "binomial:invalid_input_type"),
+    ({"sigma": True}, "sigma", "binomial:invalid_input_type"),
+    ({"sigma": Decimal("0.2")}, "sigma", "binomial:invalid_input_type"),
+    ({"sigma": 1}, "sigma", "binomial:invalid_input_type"),
+    ({"steps": True}, "steps", "binomial:invalid_steps"),
+    ({"steps": 2.5}, "steps", "binomial:invalid_steps"),
+    ({"steps": 10**400}, "steps", "binomial:invalid_steps"),
+    ({"tte": replace(TTE, year_fraction=None)}, "time_years", "binomial:invalid_input_type"),
+    ({"spot": None}, "spot", "american_bridge:invalid_spot_type"),
+    ({"spot": "100"}, "spot", "american_bridge:invalid_spot_type"),
+], ids=["sigma-text", "sigma-bool", "sigma-decimal", "sigma-int", "steps-bool", "steps-float",
+        "steps-overflow", "years-none", "spot-none", "spot-text"])
+def test_f2_echo_requires_exact_type(changes: _BridgeChanges, field: str, reason: str) -> None:
+    outcome = _price(**changes)
+    _assert_refusal(outcome, reason, 0.08)
+    assert outcome.inputs_echo[field] == "invalid"
+
+
+class _HostileType(type):
+    def __eq__(self, other: object) -> bool:
+        raise AssertionError("comparou o tipo da entrada")
+
+    __hash__ = type.__hash__
+
+
+class _Hostile(metaclass=_HostileType):
+    def __float__(self) -> float:
+        raise AssertionError("converteu a entrada")
+
+    def __eq__(self, other: object) -> bool:
+        raise AssertionError("comparou a entrada")
+
+
+class _ForeignFloat(_Hostile, float):
+    pass
+
+
+class _ForeignInt(_Hostile, int):
+    def __add__(self, other: object) -> int:
+        raise AssertionError("somou antes da recusa do binomial")
+
+
+class _ForeignDecimal(_Hostile, Decimal):
+    def is_snan(self) -> bool:
+        raise AssertionError("consultou a subclasse de Decimal")
+
+
+@pytest.mark.parametrize(("changes", "field", "reason"), [
+    ({"sigma": _Hostile()}, "sigma", "binomial:invalid_input_type"),
+    ({"rate_cont": _ForeignFloat(0.05)}, "rate_cont", "binomial:invalid_input_type"),
+    ({"tte": replace(TTE, year_fraction=_ForeignFloat(1))}, "time_years",
+     "binomial:invalid_input_type"),
+    ({"steps": _ForeignInt(200)}, "steps", "binomial:invalid_steps"),
+    ({"spot": _ForeignDecimal("100")}, "spot", "american_bridge:invalid_spot_type"),
+], ids=["float-hook", "float-subclass", "years-subclass", "int-subclass", "decimal-subclass"])
+def test_f2_hostile_inputs(changes: _BridgeChanges, field: str, reason: str) -> None:
+    outcome = _price(**changes)
+    _assert_refusal(outcome, reason, 0.08)
+    assert outcome.inputs_echo[field] == "invalid"
+
+
+@pytest.mark.parametrize(("changes", "field", "expected"), [
+    ({"spot": Decimal("sNaN")}, "spot", "nan"),
+    ({"sigma": float("nan")}, "sigma", "nan"),
+    ({"rate_cont": float("-inf")}, "rate_cont", "-inf"),
+    ({"tte": replace(TTE, year_fraction=float("inf"))}, "time_years", "inf"),
+])
+def test_f2_exact_nonfinite_echo(changes: _BridgeChanges, field: str, expected: str) -> None:
+    outcome = _price(**changes)
+    _assert_refusal(outcome, "binomial:non_finite_input", 0.08)
+    value = outcome.inputs_echo[field]
+    assert type(value) is float and value.hex() == expected
+
+
+_INVALID_SIGMA = _Hostile()
+_INVALID_RATE = _ForeignFloat(0.05)
+_INVALID_YEARS = _ForeignFloat(1)
+_INVALID_STEPS = _ForeignInt(200)
+_INVALID_TYPE = "binomial:invalid_input_type"
+
+
+@pytest.mark.parametrize(("changes", "field", "sentinel", "reason"), [
+    ({"sigma": _INVALID_SIGMA}, "sigma", _INVALID_SIGMA, _INVALID_TYPE),
+    ({"rate_cont": _INVALID_RATE}, "rate_cont", _INVALID_RATE, _INVALID_TYPE),
+    ({"tte": replace(TTE, year_fraction=_INVALID_YEARS)},
+     "time_years", _INVALID_YEARS, _INVALID_TYPE),
+    ({"steps": _INVALID_STEPS}, "steps", _INVALID_STEPS, "binomial:invalid_steps"),
+], ids=["sigma", "rate", "years", "steps"])
+def test_f2_invalid_inputs_reach_binomial_once(monkeypatch: pytest.MonkeyPatch,
+                                               changes: _BridgeChanges, field: str,
+                                               sentinel: object, reason: str) -> None:
+    from unittest.mock import Mock
+
+    tree = Mock(wraps=crr_price)
+    monkeypatch.setattr("backend.derivatives.pricing.american_bridge.crr_price", tree)
+    _assert_refusal(_price(**changes), reason, 0.08)
+    tree.assert_called_once()
+    assert tree.call_args.kwargs[field] is sentinel
+
+
+@pytest.mark.parametrize(("changes", "reason", "q", "field"), [
+    ({"contract": _EURO, "sigma": None}, "american_bridge:not_american", _UNRESOLVED, "sigma"),
+    ({"carry": None, "spot": 100.0}, _MISSING_CARRY, _UNRESOLVED, "spot"),
+    ({"contract": _OTHER_STRIKE, "spot": 100.0}, _MISMATCH, 0.08, "spot"),
+    ({"sigma": None, "steps": None}, "binomial:invalid_input_type", 0.08, "sigma"),
+], ids=["style", "carry", "terms-mismatch", "binomial-type-before-steps"])
+def test_f3_first_refusal(changes: _Changes, reason: str, q: str | float, field: str) -> None:
+    outcome = _price(**changes)
+    _assert_refusal(outcome, reason, q)
+    assert outcome.inputs_echo[field] == "invalid"
+
+
+@pytest.mark.parametrize(("contract", "terms", "carry", "kind", "policy", "carry_kind", "q",
+                          "price", "first", "second", "european", "premium"), [
+    (CALL, A1_TERMS, YIELD, "CALL", "UNPROTECTED", "CONTINUOUS_YIELD", 0.08,
+     "6.543803959785978", 6.537469676838961, 6.550138242732996, 6.142744211943331,
+     0.4010597478426474),
+    (PUT, A2_TERMS, NONE, "PUT", "UNKNOWN", "NONE", 0.0,
+     "6.091951932388676", 6.086382749916067, 6.097521114861286, 5.572892044256312,
+     0.5190598881323645),
+], ids=["A1", "A2"])
+def test_f4_complete_anchor(contract: OptionContract, terms: SeriesTerms, carry: CarryAssumption,
+                            kind: str, policy: str, carry_kind: str, q: float, price: str,
+                            first: float, second: float, european: float, premium: float) -> None:
+    expected = PricingOutcome(
+        supported=True, reason=None, model="crr_american_v1", price=Decimal(price), greeks=None,
+        regime="tree", iv=None, sigma_source="given",
+        inputs_echo={
+            "symbol": "XPTO1", "kind": kind, "exercise_style": "AMERICAN",
+            "spot": 100.0, "strike": 100.0, "time_years": 1.0, "rate_cont": 0.05, "sigma": 0.2,
+            "dividend_yield": q, "steps": 200.0, "price_steps_n": first, "price_steps_n1": second,
+            "european_same_trees": european,
+        },
+        assumptions={
+            "carry_kind": carry_kind, "carry_dividend_yield": q, "carry_source": "test",
+            "carry_effective_on": "2026-11-19", "strike_adjustment_policy": policy,
+            "pricing_model": "crr_american_v1", "crr_steps": 200.0, "crr_pair_average": True,
+            "early_exercise_premium": premium,
+        },
+    )
+    outcome = _price(contract, terms=terms, carry=carry)
+    assert outcome == expected
+    assert outcome.model_dump_json() == expected.model_dump_json()
+
+
+@pytest.mark.parametrize(("lot", "quotation"), [(None, 1000), (1, None)])
+def test_f5_present_term_still_must_match(lot: int | None, quotation: int | None) -> None:
+    contract = CALL.model_copy(update={"contract_size": lot, "quotation_form": quotation})
+    _assert_refusal(_price(contract), _MISMATCH, 0.08)
+
+
+def test_f5_currency_precedes_missing_carry() -> None:
+    terms = SeriesTerms.model_construct(**{**A1_TERMS.model_dump(), "currency": None})
+    _assert_refusal(_price(terms=terms, carry=None), "terms:unknown_currency", _UNRESOLVED)
+
+
+def test_f5_steps_required() -> None:
+    with pytest.raises(TypeError, match="missing 1 required keyword-only argument: 'steps'"):
+        price_american_contract(
+            CALL, terms=A1_TERMS, carry=YIELD, spot=Decimal("100"), rate_cont=0.05,
+            sigma=0.2, tte=TTE, assumptions={},
+        )

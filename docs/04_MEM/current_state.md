@@ -4,27 +4,31 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-19 · **Turno:** Claude (GO e merge do DL2-PR03).
+**Última atualização:** 2026-11-20 · **Turno:** Claude (GO e merge do DL2B-PR01A).
 
 ## Fase 02 — Marco 2B
 
-PR atual: DL2B-PR01 — MERGEADO (PR #146, GO na primeira rodada). Estado de prontidão A.
-ADR-0026 aceito e `SDD_FASE2B.md` vigentes.
+PR atual: DL2B-PR01A — MERGEADO (PR #147, GO). Estado de prontidão A.
+[ADR-0026](../ADR/ADR-0026-laboratorio-derivativos-fase2b.md) aceito, com a Revisão 1.
+[Cartão DL2B-R1](../specs/derivatives/fase2b/DL2B-R1.md) e Adendo 1 do SDD vigentes.
 
-Entregue: `backend/derivatives/pricing/american_bridge.py` (109 linhas). Recebe contrato
-americano, termos, carry e volatilidade; devolve a média das árvores CRR de N e N + 1
-passos, ou recusa com o código de origem. Chain, MCP e CLI ainda não chamam a ponte, e a
-americana segue recusada neles com `american_not_supported_phase1`.
-Portão do head, Linux aarch64 limpo: 9.245 aprovados, 16 pulados, 261 subtestes.
-[Cartão, REDs, evidências e revisão](../specs/derivatives/fase2b/DL2B-PR01.md).
+Integrado até aqui: ponte americana pura (PR #146) e a correção de tipos e de eco (PR #147).
+Chain, MCP e CLI ainda não chamam a ponte; o modo padrão segue `LIVE_NOT_ACTIVATED`.
+Portão do head, Linux aarch64 limpo: 9.285 aprovados, 16 pulados, 261 subtestes.
 
-Decisões abertas do ADR-0026, todas de Francisco:
-- D1 (para o DL2B-PR02): call com `q = 0` e `r >= 0` reusa a IV europeia da Fase 01?
-- D2 (DL2B-PR04): número de passos padrão. D3 (DL2B-PR03): origem e vigência dos termos.
-- D4: NumPy, depois da medição do DL2B-PR02.
+Decisões da Revisão 1 (Francisco, 2026-11-20): árvore CRR no preço e na volatilidade da
+linha; BSM europeu só como sombra; 200 passos por padrão; teto de 210 ms de CPU por
+inversão com 200 passos no Mac. Sombra e passos padrão entram só no quarto PR.
 
-Próxima ação (uma só): Francisco decide D1; em seguida Claude escreve o cartão do DL2B-PR02
-(volatilidade implícita americana, com custo medido).
+Fila do marco, um PR por vez: DL2B-PR02 (volatilidade implícita pela árvore), DL2B-PR03
+(registro de termos e carry), DL2B-PR04 (ligação na demo offline, mais a Parte B).
+Abertas: D3 (origem dos termos de série real) e D4 (NumPy).
+
+Depois do quarto PR: QuantLib como oráculo de teste, gerado fora do repositório, com ADR
+próprio. Homologação com a OpLab (estado B) e qualquer outra frente só com decisão de
+Francisco; nada disso está autorizado por este marco.
+
+Próxima ação (uma só): Codex publica o DL2B-PR02 em rascunho sobre a `main` integrada.
 
 ## Fase 02 — Marco 2A — FECHADO (estado A)
 
