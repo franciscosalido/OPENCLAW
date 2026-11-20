@@ -8,23 +8,28 @@
 
 ## Fase 02 — Marco 2B
 
-PR atual: DL2B-PR01 — MERGEADO (PR #146, GO na primeira rodada). Estado de prontidão A.
-ADR-0026 aceito e `SDD_FASE2B.md` vigentes.
+PR atual: DL2B-PR01A — EM_REVISAO. Estado de prontidão A. ADR-0026 aceito e
+`SDD_FASE2B.md` vigente.
 
-Entregue: `backend/derivatives/pricing/american_bridge.py` (109 linhas). Recebe contrato
-americano, termos, carry e volatilidade; devolve a média das árvores CRR de N e N + 1
-passos, ou recusa com o código de origem. Chain, MCP e CLI ainda não chamam a ponte, e a
-americana segue recusada neles com `american_not_supported_phase1`.
-Portão do head, Linux aarch64 limpo: 9.245 aprovados, 16 pulados, 261 subtestes.
-[Cartão, REDs, evidências e revisão](../specs/derivatives/fase2b/DL2B-PR01.md).
+O PR01 (#146) entregou a média das árvores CRR de N e N + 1 passos. O PR01A corrige o
+eco de entradas inválidas e a recusa de spot de tipo errado nessa ponte. Chain, MCP e CLI
+continuam recusando a americana com `american_not_supported_phase1`. No Mac e no Linux
+aarch64 passaram 9.282 testes, com 16 pulados e 261 subtestes aprovados. As seis
+mutações foram detectadas. [Cartão, RED e evidências](../specs/derivatives/fase2b/DL2B-PR01A.md).
 
-Decisões abertas do ADR-0026, todas de Francisco:
-- D1 (para o DL2B-PR02): call com `q = 0` e `r >= 0` reusa a IV europeia da Fase 01?
-- D2 (DL2B-PR04): número de passos padrão. D3 (DL2B-PR03): origem e vigência dos termos.
-- D4: NumPy, depois da medição do DL2B-PR02.
+**D1 para o DL2B-PR02.** Francisco decidiu neste turno que CALL com `q = 0` e taxa
+positiva (`r > 0`) reusa a IV europeia da Fase 01. O caso `r = 0`, incluído na pergunta
+original do ADR-0026, permanece em aberto. A implementação de IV pertence ao PR02.
+Francisco ainda decide D2 (passos padrão, PR04), D3 (origem e vigência dos termos, PR03)
+e D4 (NumPy, após a medição do PR02).
 
-Próxima ação (uma só): Francisco decide D1; em seguida Claude escreve o cartão do DL2B-PR02
-(volatilidade implícita americana, com custo medido).
+**Lembrete para o início da Fase 4, se ela for aberta.** Projetar um motor Kronos dedicado
+à volatilidade, inverter a árvore para obter IV e avaliar modelos de volatilidade mais
+complexos e de maior custo computacional para venda de volatilidade.
+
+**Próxima ação.** O coordenador verifica o head local e publica o PR em rascunho.
+Claude forma seu parecer independente sobre o head publicado. Depois lê o parecer da
+skill, produzido por outro agente em sessão separada, antes de decidir a integração.
 
 ## Fase 02 — Marco 2A — FECHADO (estado A)
 
