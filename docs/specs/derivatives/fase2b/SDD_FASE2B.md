@@ -69,3 +69,59 @@ Homologacao com dado real (estado B). Ativacao para agentes (estado C). Ordens.
 - D1 a D4 do ADR-0026.
 - Vigencia dos termos frente a data de avaliacao: a ponte do DL2B-PR01 nao confere data.
   Fica para o DL2B-PR03.
+
+## Adendo 1 (2026-11-20) - depois da Revisao 1 do ADR-0026
+
+Autor: Claude, com as decisoes de Francisco de 2026-11-20. Nao reescreve o texto acima; onde
+houver conflito, vale este adendo.
+
+### A1. Criterio 6: teto de tempo
+
+O limite de tempo do criterio 6 fica fixado: **210 ms de CPU por inversao com 200 passos no
+Mac**. A medicao (nove inversoes depois de um aquecimento; minimo, mediana e maximo) e
+registrada no cartao de cada PR que tocar o solver. Nao e teste automatico.
+
+O resto do criterio 6 nao muda e vale para toda serie americana, sem caminho a parte para
+call sem rendimento.
+
+### A2. Criterio 8: o que e a chave
+
+A chave sao dois argumentos da demo offline, exigidos em conjunto: `american_demo` e
+`series_registry`. O numero de passos e opcional: ausente, vale o padrao de
+`config/american_iv.yaml`. Com a chave desligada, informar passos e erro de argumento.
+
+### A3. Criterio 11, novo: um motor por numero (DL2B-PR04)
+
+Em 100% das linhas americanas suportadas da demo mista:
+
+- o motor do preco e o de cada volatilidade implicita principal sao a arvore CRR, e o nome
+  dele esta no resultado;
+- o preco do modelo reproduz o mid por unidade com diferenca de ate 1e-7;
+- as hipoteses da chain trazem o numero de passos usado e a origem dele.
+
+E, na arvore de codigo: a ponte nao importa o solver de volatilidade da Fase 01 nem o BSM.
+
+### A4. Criterio 12, novo: passos padrao (DL2B-PR04)
+
+`config/american_iv.yaml` traz `default_steps: 200`. Campo ausente, nao inteiro ou fora de
+1 a 4999 recusa a demo mista sem dados, e nao afeta a demo padrao.
+
+### A5. Criterio 13, novo: motor de sombra (DL2B-PR04)
+
+Em 100% das linhas americanas suportadas da demo mista, o resultado interno da linha traz a
+volatilidade implicita do BSM europeu sobre o mesmo mid por unidade e o mesmo rendimento
+resolvido, ou o motivo de nao ter sido calculada. Com a sombra ligada ou desligada por
+mutacao, preco, volatilidades principais e motivo de recusa de toda linha sao identicos.
+
+As hipoteses da chain trazem o nome do motor de sombra, quantas linhas foram comparadas e a
+maior diferenca absoluta de volatilidade entre os dois motores.
+
+### A6. Criterio 14, novo: cotacao que nao sustenta uma volatilidade unica (DL2B-PR04)
+
+Linha americana com um lado da cotacao ausente, cotacao velha, ou preco que nao reage a
+volatilidade nao publica volatilidade unica: sai recusada com motivo proprio. Quando ha os
+dois lados, a linha publica as tres volatilidades (compra, meio e venda), nunca so a do meio.
+
+### A7. Pendencias
+
+D1 e D2 saem da lista. Ficam D3 e D4.
