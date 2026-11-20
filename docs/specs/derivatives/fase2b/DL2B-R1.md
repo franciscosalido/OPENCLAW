@@ -248,3 +248,28 @@ autor não integra. As evidências de cada PR entram abaixo deste cartão, em se
   scripts e testes idênticos ao que foi revisado em `f85e3af`.
 - Portões e evidência da revisão independente identificados na descrição do rascunho
   pelo head publicado; parecer da skill fora do Git.
+
+## PR 1 (DL2B-PR01A) — revisão independente: GO (Claude, 2026-11-20)
+
+Head revisado: `bd0ab9fea845d6dffd7194d416152cead3a3b7c6`.
+
+- Primeiro commit `21f3de3`: ADR-0026, Adendo 1 do SDD e cartão, com os SHA-256 de origem.
+- Produção: só `american_bridge.py`, idêntico ao de `f848b19`, já revisto. Nenhum teste
+  existente editado; resto de `backend`, `config`, `scripts`, protegidos e guardas sem diff.
+- Portão em clone limpo, Linux aarch64: 9.285 aprovados, 16 pulados, 261 subtestes;
+  `mypy --strict` e `pyright` sem erro; demo idêntica à base; CLI padrão com
+  `LIVE_NOT_ACTIVATED`, rc 3.
+- 60.000 chamadas com tipos arbitrários em `sigma`, taxa, passos, spot e prazo: nenhuma
+  exceção, nenhuma recusa com número.
+- macOS não reproduzido pelo revisor.
+
+Parecer da skill, lido depois deste veredito e antes do merge (SHA-256 `8e70ae78…b071`):
+
+- Apontou como bloqueante a troca da linha "Última atualização" de `current_state.md`, que
+  fica fora do bloco do marco. O revisor não acompanha: essa linha é atualizada em todo PR
+  integrado desde a Fase 1, e a restrição do cartão existe para proteger os outros blocos.
+- Nota sobre `Decimal("sNaN")` no spot: o eco é NaN e a recusa é do binomial, como na base.
+  Fica registrado como comportamento herdado e aceito.
+
+No commit do parecer, o bloco do marco em `current_state.md` foi reescrito: o texto do autor
+indicava a homologação com a OpLab como próxima prioridade, o que não foi decidido.
