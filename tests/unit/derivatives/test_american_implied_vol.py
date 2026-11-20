@@ -17,7 +17,7 @@ from backend.derivatives.domain.series_terms import SeriesTerms
 from backend.derivatives.pricing import american_bridge as bridge
 from backend.derivatives.pricing.binomial import BinomialRefusal, BinomialRefusalCode
 from backend.derivatives.pricing.conventions import TimeToExpiry
-from config.derivatives_config_model import AmericanIvConfig, load_derivatives_config
+from config.american_iv_config_model import AmericanIvConfig, load_american_iv_config
 from tests.unit.derivatives.test_american_bridge import (
     A1_TERMS, A2_TERMS, CALL, NONE, PUT, TTE, YIELD, _carry, _price,
 )
@@ -25,14 +25,7 @@ from tests.unit.derivatives.test_american_bridge import (
 SPOT = Decimal("100")
 CRR = "crr_american_v1"
 
-def _settings() -> AmericanIvConfig:
-    cfg = load_derivatives_config().american_iv
-    assert cfg is not None
-    return cfg
-
-
-CFG = _settings()
-
+CFG = load_american_iv_config()
 
 def _invert(
     target: Decimal, contract: OptionContract = CALL, *, terms: SeriesTerms = A1_TERMS,
@@ -207,23 +200,22 @@ def test_zero_carry_positive_rate_keeps_same_model(steps: int) -> None:
 @pytest.fixture
 def american_iv_yaml(tmp_path: Path) -> Path:
     """Cópia da fonte real de configuração, sem tocar o YAML padrão."""
-    config_path = tmp_path / "derivatives.yaml"
-    source = Path("config/derivatives.yaml")
+    config_path = tmp_path / "american_iv.yaml"
+    source = Path("config/american_iv.yaml")
     config_path.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
     return config_path
 
 
 def _change_yaml(config_path: Path, **changes: object) -> None:
     content = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-    content["american_iv"].update(changes)
+    content.update(changes)
     config_path.write_text(yaml.safe_dump(content), encoding="utf-8")
 
 
 def test_american_iv_limits_come_from_yaml(american_iv_yaml: Path) -> None:
     """As regras de busca vêm de uma única seção YAML e chegam ao solver."""
     _change_yaml(american_iv_yaml, bracket_hi=0.15)
-    settings = load_derivatives_config(american_iv_yaml).american_iv
-    assert settings is not None
+    settings = load_american_iv_config(american_iv_yaml)
     obs = _price(carry=NONE, sigma=.2, steps=50)
     assert obs.price is not None
     result = bridge.american_implied_vol(
@@ -244,13 +236,12 @@ def test_american_iv_rejects_invalid_yaml(
 ) -> None:
     _change_yaml(american_iv_yaml, **changes)
     with pytest.raises(ValidationError):
-        load_derivatives_config(american_iv_yaml)
+        load_american_iv_config(american_iv_yaml)
 
 
 def test_yaml_iteration_budget_changes_solver(american_iv_yaml: Path) -> None:
     _change_yaml(american_iv_yaml, max_iterations=1)
-    settings = load_derivatives_config(american_iv_yaml).american_iv
-    assert settings is not None
+    settings = load_american_iv_config(american_iv_yaml)
     result = _invert(Decimal("7"), cfg=settings)
     _assert_refused(result, "iv:no_convergence")
     assert result.iterations == 1 and result.expansions == 0
@@ -258,15 +249,13 @@ def test_yaml_iteration_budget_changes_solver(american_iv_yaml: Path) -> None:
 
 def test_yaml_price_tolerance_changes_identifiability(american_iv_yaml: Path) -> None:
     _change_yaml(american_iv_yaml, tol_price_rel=.5)
-    settings = load_derivatives_config(american_iv_yaml).american_iv
-    assert settings is not None
+    settings = load_american_iv_config(american_iv_yaml)
     _assert_refused(_invert(Decimal("7"), cfg=settings), "iv:not_identifiable")
 
 
 def test_yaml_vol_tolerance_changes_iteration_count(american_iv_yaml: Path) -> None:
     _change_yaml(american_iv_yaml, tol_vol=1.0)
-    settings = load_derivatives_config(american_iv_yaml).american_iv
-    assert settings is not None
+    settings = load_american_iv_config(american_iv_yaml)
     midpoint = (settings.bracket_lo + settings.bracket_hi) / 2
     target = Decimal(str(2.0 + 10 * midpoint))
     with patch.object(bridge, "crr_price", side_effect=lambda **k: 2.0 + 10 * k["sigma"]):
@@ -277,13 +266,23 @@ def test_yaml_vol_tolerance_changes_iteration_count(american_iv_yaml: Path) -> N
     assert abs(loose.sigma - tight.sigma) <= 1e-6
 
 
-def test_legacy_european_yaml_does_not_need_american_iv(american_iv_yaml: Path) -> None:
+def test_american_iv_without_file_has_no_fallback(tmp_path: Path) -> None:
+    with pytest.raises(FileNotFoundError):
+        load_american_iv_config(tmp_path / "missing.yaml")
+
+
+def test_american_iv_malformed_yaml_reports_safe_message(american_iv_yaml: Path) -> None:
+    american_iv_yaml.write_text("private-marker: [", encoding="utf-8")
+    with pytest.raises(ValueError, match="^YAML de IV americana inválido$"):
+        load_american_iv_config(american_iv_yaml)
+
+
+def test_american_iv_required_values_have_no_defaults(american_iv_yaml: Path) -> None:
     content = yaml.safe_load(american_iv_yaml.read_text(encoding="utf-8"))
-    del content["american_iv"]
+    del content["tol_vol"]
     american_iv_yaml.write_text(yaml.safe_dump(content), encoding="utf-8")
-    settings = load_derivatives_config(american_iv_yaml)
-    assert settings.american_iv is None
-    assert settings.iv == load_derivatives_config().iv
+    with pytest.raises(ValidationError, match="Field required"):
+        load_american_iv_config(american_iv_yaml)
 
 
 @pytest.mark.parametrize("unsafe", [

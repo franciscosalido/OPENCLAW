@@ -1,0 +1,6 @@
+# Busca no par CRR N/N+1. Não afeta o contrato YAML da Fase 1.
+bracket_lo: 1.0e-4
+bracket_hi: 2.0
+max_iterations: 64
+tol_price_rel: 1.0e-10
+tol_vol: 1.0e-8

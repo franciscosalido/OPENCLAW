@@ -47,17 +47,16 @@ spot Decimal, taxa e prazo float finitos, 1 ≤ N ≤ 4999, S e K positivos.
   `cfg.tol_price_rel × max(1, alvo)`. Para publicar a solução, preços a ±1e-6 da candidata devem
   separar o alvo por mais que essa resolução dos dois lados, dentro do bracket inicial.
   Esta sondagem testa identificabilidade local. Nenhuma grega americana entra na API.
-- A seção `american_iv` de `config/derivatives.yaml` fornece a faixa (0,0001/2,0), o
+- O arquivo exclusivo `config/american_iv.yaml` fornece a faixa (0,0001/2,0), o
   limite (64) e as tolerâncias (1e-10 preço relativo, 1e-8 sigma) do perfil observado.
   O contrato YAML validado rejeita campos indevidos, valores não finitos, texto/bool
   no lugar de parâmetros numéricos, limites não positivos e faixa sem ordem estrita.
   `max_iterations` aceita 1–64 para manter o teto de 68 pares. A ponte revalida
   o modelo recebido e devolve `iv:invalid_config` para objetos adulterados.
-  A seção ausente é compatível com consumidores legados da IV europeia; não existe um
-  default interno para ativar IV americana. O consumidor da ponte deve obter a seção
-  validada na composição e não ligar a precificação americana sem ela. Alterar
-  `american_iv` não altera `iv`. O solver recebe um `AmericanIvConfig` obrigatório
-  e não lê arquivos.
+  A Fase 1 mantém arquivo e modelo originais byte a byte. O consumidor da ponte deve
+  chamar `load_american_iv_config()` no ponto de composição da demo quando habilitada.
+  Arquivo ausente, YAML inválido ou campo ausente não têm fallback. O solver recebe um
+  `AmericanIvConfig` obrigatório e não lê arquivos.
 - Os próximos cartões e a decisão de NumPy não são alterados aqui. Os novos tempos de
   execução de CALL sem carry são evidência, não autorização de outro orçamento.
 
@@ -132,11 +131,12 @@ Evidências em `~/.quimera-2b-pr02.QHwoQA/evidencias-dl2b-pr02/`.
 ## Evidência da correção adversarial
 
 O RED comportamental `d75a8b2` falhou nos quatro tamanhos N=3,10,50,200 pelo
-erro de IV que excedia 1e-6. O RED `90d3bb3` expôs a ausência da seção YAML em nove
+erro de IV que excedia 1e-6. O RED `90d3bb3` expôs a ausência da configuração YAML em nove
 testes. O RED `22bf6d0` mostrou quatro configurações forjadas não recusadas na
 fronteira e um orçamento acima do teto. Não foram alterados ADR-0026, SDD_FASE2B, a IV europeia, a ponte de preço ou o
 consumidor CLI/MCP deste candidato. O PR04 deve injetar a configuração validada no
-local de composição, não implementar um segundo conjunto de defaults.
+local de composição, não implementar um segundo conjunto de defaults. Na revisão
+final, a configuração recebeu arquivos próprios; o critério 9 permanece efetivo.
 
 ### Medição da correção, macOS arm64
 

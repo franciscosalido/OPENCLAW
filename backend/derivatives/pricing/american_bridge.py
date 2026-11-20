@@ -17,7 +17,7 @@ from backend.derivatives.pricing.binomial import BinomialRefusal, crr_price
 from backend.derivatives.pricing.contract_pricing import PricingOutcome
 from backend.derivatives.pricing.conventions import TimeToExpiry
 from backend.derivatives.pricing.implied_vol import price_bounds
-from config.derivatives_config_model import AmericanIvConfig
+from config.american_iv_config_model import AmericanIvConfig
 
 AMERICAN_MODEL: Final = "crr_american_v1"
 
