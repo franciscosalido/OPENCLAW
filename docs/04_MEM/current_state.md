@@ -4,11 +4,11 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-20 · **Turno:** Claude (GO e merge do DL2B-PR01A).
+**Última atualização:** 2026-11-20 · **Turno:** Codex/Dots (DL2B-R1, PR 2).
 
 ## Fase 02 — Marco 2B
 
-PR atual: DL2B-PR01A — MERGEADO (PR #147, GO). Estado de prontidão A.
+PR atual: DL2B-PR02 — EM_REVISAO. Base integrada: `7cd845c`. Estado A.
 [ADR-0026](../ADR/ADR-0026-laboratorio-derivativos-fase2b.md) aceito, com a Revisão 1.
 [Cartão DL2B-R1](../specs/derivatives/fase2b/DL2B-R1.md) e Adendo 1 do SDD vigentes.
 
@@ -28,7 +28,12 @@ Depois do quarto PR: QuantLib como oráculo de teste, gerado fora do repositóri
 próprio. Homologação com a OpLab (estado B) e qualquer outra frente só com decisão de
 Francisco; nada disso está autorizado por este marco.
 
-Próxima ação (uma só): Codex publica o DL2B-PR02 em rascunho sobre a `main` integrada.
+Em revisão: inversão da IV com o mesmo par CRR da ponte e política de busca em
+YAML próprio, sem consumo pela chain ou mudança na Fase 1. Sem Parte B.
+[Contrato e evidências do PR02](../specs/derivatives/fase2b/DL2B-PR02.md).
+
+Próxima ação (uma só): Claude revisa e integra o DL2B-PR02. Só depois Codex publica
+o DL2B-PR03 sobre a `main` integrada.
 
 ## Fase 02 — Marco 2A — FECHADO (estado A)
 

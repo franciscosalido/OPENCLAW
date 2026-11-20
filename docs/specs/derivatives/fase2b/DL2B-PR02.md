@@ -1,9 +1,8 @@
 # DL2B-PR02 — IV americana por preço observado
 
-**Candidato local, pendente de revisão por Claude. Estado A.** Proposta corretiva para a revisão adversarial, sobre a base local `8ec256d`. O
-PR01A local `f848b199aee3bf01bd3923a24b4b4abb41811ee3` é o predecessor técnico
-do candidato inicial. Nenhum empilhamento local substitui o rito de integração do
-ADR-0026. Este cartão não homologa nem integra o candidato.
+**Rascunho para revisão por Claude. Estado A.** O candidato `9ea8fbd` foi reaplicado
+sobre a `main` integrada em `7cd845c` (PR01A, #147). Este PR só executa a Parte A,
+passo 2, do [DL2B-R1](DL2B-R1.md): sem padrão de passos, motor de sombra ou demo mista.
 
 ## Autoridade e alcance
 
@@ -15,8 +14,8 @@ A IV vive em `american_bridge.py` e recebe os termos e o carry da série.
 
 O candidato corretivo usa o mesmo par CRR N/N+1 para preço e IV, inclusive CALL sem
 carry e com taxa positiva. Substitui a ideia inicial de reaproveitar só a IV europeia;
-o ADR e o critério 6 vigentes permanecem intactos. Qualquer opção de usar BSM nos dois
-é uma decisão de governança posterior, fora desta proposta.
+a Revisão 1 do ADR-0026 fixa CRR no preço e na IV principal. A sombra BSM é apenas
+diagnóstica e será introduzida no quarto PR.
 
 O caso de revisão ilustra por quê: com S=K=100, T=1, r=0,05, q=0 e sigma=0,20,
 o par 200/201 precifica a 10,449949594185 e o BSM a 10,450583572186. A inversão BSM
@@ -158,3 +157,15 @@ A medição da CALL sem carry não fixa novo orçamento; a definição é do rit
 Referências operacionais consultadas: [Pydantic: modo estrito](https://docs.pydantic.dev/latest/concepts/strict_mode/),
 [validadores de modelo](https://docs.pydantic.dev/latest/concepts/validators/) e
 [PyYAML: SafeLoader](https://pyyaml.org/wiki/PyYAMLDocumentation).
+
+## Evidência da Parte A — PR 2 (DL2B-R1)
+
+O delta de implementação e os testes de `9ea8fbd` foram reaplicados sobre `7cd845c`;
+os testes da ponte entregues no PR01A permanecem intactos. A descrição do rascunho
+registra os portões sobre o head publicado e a medição da referência R1 no Mac:
+CALL, S=K=100, T=1, r=0,05, q=0, sigma=0,20, N=200, alvo da própria ponte,
+um aquecimento e nove inversões cronometradas com `time.process_time`.
+O teto de 210 ms é da mediana; eventual estouro deve ser comunicado, não vira teste.
+
+Reexecução dos REDs nesta base: o inicial corrigido está em `15b0403`; os REDs da
+revisão em `194a99f`, `d017766` e `480ee22`. Os commits originais acima são histórico.
