@@ -15,8 +15,12 @@ ROOT = Path(__file__).resolve().parents[2]
 DOMAIN = Path("backend/derivatives/domain")
 TERMS = "backend.derivatives.domain.series_terms"
 CARRY = "backend.derivatives.domain.carry"
+BRIDGE_PATH = Path("backend/derivatives/pricing/american_bridge.py")
+BRIDGE = "backend.derivatives.pricing.american_bridge"
 PROTECTED = {TERMS, CARRY}
-_LITERAL = re.compile(r"(?<![\w.])(?:" + "|".join(map(re.escape, sorted(PROTECTED))) + r")(?!\w)")
+_LITERAL = re.compile(
+    r"(?<![\w.])(?:" + "|".join(map(re.escape, sorted(PROTECTED | {BRIDGE}))) + r")(?!\w)"
+)
 
 
 def _module(path: Path) -> str:
@@ -51,29 +55,35 @@ def _offenders(root: Path) -> list[str]:
                 if isinstance(node, (ast.Import, ast.ImportFrom)):
                     for target in _targets(node, package):
                         consumers[target].add((path, node.lineno))
-                elif (isinstance(node, ast.Constant) and isinstance(node.value, str)
-                      and DOMAIN not in path.parents and _LITERAL.search(node.value)):
-                    offenders.add(f"{path}:{node.lineno}")
+                elif isinstance(node, ast.Constant) and isinstance(node.value, str):
+                    for match in _LITERAL.finditer(node.value):
+                        consumers[match.group()].add((path, node.lineno))
 
-    reached = PROTECTED.copy()
-    pending = list(reached)
-    while pending:
-        for path, line in consumers[pending.pop()]:
-            if DOMAIN not in path.parents:
-                offenders.add(f"{path}:{line}")
-            module = _module(path)
-            if module not in reached:
-                reached.add(module)
-                pending.append(module)
+    for protected in (PROTECTED, {BRIDGE}):
+        reached = protected.copy()
+        pending = list(reached)
+        while pending:
+            for path, line in consumers[pending.pop()]:
+                if protected == {BRIDGE} or (DOMAIN not in path.parents and path != BRIDGE_PATH):
+                    offenders.add(f"{path}:{line}")
+                module = _module(path)
+                if module not in reached:
+                    reached.add(module)
+                    pending.append(module)
     return sorted(offenders)
 
 
 def test_only_domain_consumes_series_terms() -> None:
-    """Nenhum import de backend ou scripts fora do domínio alcança os dois registros."""
+    """Somente domínio e ponte alcançam termos e carry; nenhum módulo alcança a ponte."""
     assert _offenders(ROOT) == []
 
 
 @pytest.mark.parametrize(("path", "statement", "allowed"), [
+    (BRIDGE_PATH, f"from {TERMS} import SeriesTerms", True),
+    (BRIDGE_PATH, f"from {CARRY} import resolve_carry", True),
+    (BRIDGE_PATH.with_name("other_bridge.py"), f"import {TERMS}", False),
+    (BRIDGE_PATH.with_name("other_bridge.py"), f"import {CARRY}", False),
+    (DOMAIN / "intruder.py", f"import {BRIDGE}", False),
     (DOMAIN / "pure.py", f"from {TERMS} import SeriesTerms", True),
     (DOMAIN / "sub/pure.py", "from .. import series_terms", True),
     ("scripts/tool.py", f"import {TERMS} as terms", False),
@@ -89,7 +99,7 @@ def test_only_domain_consumes_series_terms() -> None:
 ])
 def test_static_import_boundary(tmp_path: Path, path: Path | str, statement: str,
                                 allowed: bool) -> None:
-    """Preserva os doze casos diretos do DL2-PR01."""
+    """Testa os imports diretos e a exceção de caminho da ponte."""
     consumer = tmp_path / path
     consumer.parent.mkdir(parents=True)
     consumer.write_text(f"# import sintético\n{statement}\n", encoding="utf-8")
@@ -150,6 +160,26 @@ def test_transitive_boundary(
     assert _offenders(tmp_path) == expected
 
 
+@pytest.mark.parametrize("surface", [
+    _SERVICE, "backend/derivatives/mcp/s.py", _TOOL, "backend/derivatives/cli.py",
+])
+@pytest.mark.parametrize("via_facade", [False, True], ids=["direct", "indirect"])
+def test_t10_surface_cannot_reach_bridge(tmp_path: Path, surface: str, via_facade: bool) -> None:
+    """Acusa a superfície consumidora inclusive quando um intermediário importa a ponte."""
+    consumer = tmp_path / surface
+    consumer.parent.mkdir(parents=True)
+    target = BRIDGE
+    expected = [f"{surface}:1"]
+    if via_facade:
+        facade = DOMAIN / "facade.py"
+        (tmp_path / facade).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / facade).write_text(f"import {BRIDGE}\n", encoding="utf-8")
+        target = _module(facade)
+        expected.append(f"{facade}:1")
+    consumer.write_text(f"import {target}\n", encoding="utf-8")
+    assert _offenders(tmp_path) == sorted(expected)
+
+
 _PROBE = """
 import sys
 from importlib import import_module
@@ -174,7 +204,7 @@ def _probe(root: Path) -> subprocess.CompletedProcess[str]:
                .rglob("*.py")}
     return subprocess.run(
         [sys.executable, "-I", "-B", "-c", _PROBE, *sorted(PROTECTED),
-         *sorted(modules - PROTECTED)],
+         *sorted(modules - PROTECTED - {BRIDGE})],
         cwd=root, env={"QUIMERA_DERIV_FORBID_NETWORK": "1", "FASTMCP_CHECK_FOR_UPDATES": "off"},
         capture_output=True, text=True, timeout=60, check=False,
     )

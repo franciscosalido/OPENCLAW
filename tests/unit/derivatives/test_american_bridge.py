@@ -5,13 +5,17 @@ from dataclasses import replace
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
+from typing import TypedDict
 
 import pytest
 
 from backend.derivatives.domain.carry import CarryAssumption, CarryKind
 from backend.derivatives.domain.models import ExerciseStyle, OptionContract, OptionKind
-from backend.derivatives.domain.series_terms import AdjustmentEvidence, AdjustmentPolicy, SeriesTerms
+from backend.derivatives.domain.series_terms import (
+    AdjustmentEvidence, AdjustmentPolicy, SeriesTerms,
+)
 from backend.derivatives.pricing.american_bridge import price_american_contract
+from backend.derivatives.pricing.binomial import crr_price
 from backend.derivatives.pricing.contract_pricing import PricingOutcome
 from backend.derivatives.pricing.conventions import TimeToExpiry
 
@@ -19,7 +23,8 @@ DAY = date(2026, 11, 19)
 TTE = TimeToExpiry(252, 1.0, "synthetic", "test", 252, False)
 CALL = OptionContract(
     symbol="XPTO1", underlying="XPTO", kind=OptionKind.CALL, exercise_style=ExerciseStyle.AMERICAN,
-    strike=Decimal("100"), expiry=date(2027, 11, 19), contract_size=100, quotation_form=1, isin=None,
+    strike=Decimal("100"), expiry=date(2027, 11, 19),
+    contract_size=100, quotation_form=1, isin=None,
 )
 PUT = CALL.model_copy(update={"kind": OptionKind.PUT})
 REFERENCE = (Path(__file__).resolve().parents[2] / "fixtures/derivatives/reference"
@@ -87,7 +92,7 @@ def test_t1_anchors(contract: OptionContract, terms: SeriesTerms, carry: CarryAs
 
 def test_t3_single_yield_source() -> None:
     """Substitui as hipóteses da Fase 01 somente na resposta suportada."""
-    original = {
+    original: dict[str, str | float | bool] = {
         "dividend_yield": 0.0, "strike_adjusted_by_exchange_assumed": True,
         "calendar_id": "test_calendar",
     }
@@ -107,3 +112,169 @@ def test_t3_single_yield_source() -> None:
         "early_exercise_premium": outcome.assumptions["early_exercise_premium"],
     }
     assert assumptions == original
+
+
+_ECHO_FIELDS = (
+    "symbol", "kind", "exercise_style", "spot", "strike", "time_years",
+    "rate_cont", "sigma", "dividend_yield", "steps",
+)
+
+
+def test_t2_tree_pair() -> None:
+    """Confere cada árvore, o eco ordenado e a conversão decimal da média."""
+    outcome = _price()
+    echo = outcome.inputs_echo
+    assert tuple(echo) == (*_ECHO_FIELDS, "price_steps_n", "price_steps_n1", "european_same_trees")
+    assert tuple(echo.values())[:10] == (
+        "XPTO1", "CALL", "AMERICAN", 100.0, 100.0, 1.0, 0.05, 0.2, 0.08, 200.0,
+    )
+    assert type(echo["steps"]) is float
+    assert type(outcome.assumptions["crr_steps"]) is float
+    assert outcome.assumptions["crr_pair_average"] is True
+
+    def reference(style: ExerciseStyle, n: int) -> float:
+        return crr_price(
+            kind=OptionKind.CALL, style=style, spot=100.0, strike=100.0, time_years=1.0,
+            rate_cont=0.05, sigma=0.2, dividend_yield=0.08, steps=n,
+        )
+
+    first, second = echo["price_steps_n"], echo["price_steps_n1"]
+    assert isinstance(first, float) and first == reference(ExerciseStyle.AMERICAN, 200)
+    assert isinstance(second, float) and second == reference(ExerciseStyle.AMERICAN, 201)
+    assert outcome.price == Decimal(str((first + second) / 2))
+    assert echo["european_same_trees"] == (
+        reference(ExerciseStyle.EUROPEAN, 200) + reference(ExerciseStyle.EUROPEAN, 201)
+    ) / 2
+
+
+class _Changes(TypedDict, total=False):
+    contract: OptionContract
+    terms: SeriesTerms
+    carry: CarryAssumption | None
+    spot: Decimal
+    sigma: float
+    rate_cont: float
+    steps: int
+
+
+_EURO = CALL.model_copy(update={"exercise_style": ExerciseStyle.EUROPEAN})
+_OTHER_STRIKE = CALL.model_copy(update={"strike": Decimal("101")})
+_MISMATCH = "american_bridge:series_terms_mismatch"
+_MISSING_CARRY = "carry:missing_carry_assumption"
+_UNRESOLVED = "unresolved"
+_INVALID = SeriesTerms.model_construct(**{**A1_TERMS.model_dump(), "strike": Decimal("-1")})
+
+
+def _assert_refusal(outcome: PricingOutcome, reason: str, q: str | float) -> None:
+    assert outcome.supported is False and outcome.reason == reason
+    assert all(field is None for field in (
+        outcome.model, outcome.price, outcome.greeks, outcome.regime,
+        outcome.iv, outcome.sigma_source,
+    ))
+    assert tuple(outcome.inputs_echo) == _ECHO_FIELDS
+    assert outcome.inputs_echo["dividend_yield"] == q
+
+
+@pytest.mark.parametrize(("changes", "reason", "q"), [
+    ({"contract": _EURO}, "american_bridge:not_american", _UNRESOLVED),
+    ({"contract": CALL.model_copy(update={"exercise_style": ExerciseStyle.UNKNOWN})},
+     "unknown_exercise_style", _UNRESOLVED),
+    ({"carry": None}, _MISSING_CARRY, _UNRESOLVED),
+    ({"terms": _terms(AdjustmentPolicy.PROTECTED)}, "carry:dividend_double_count", _UNRESOLVED),
+    ({"terms": A2_TERMS}, "carry:strike_adjustment_unknown", _UNRESOLVED),
+    ({"carry": YIELD.model_copy(update={"symbol": "OUTRA"})}, _MISSING_CARRY, _UNRESOLVED),
+    ({"terms": _INVALID}, "american_bridge:invalid_terms_or_carry", _UNRESOLVED),
+    ({"contract": _OTHER_STRIKE}, _MISMATCH, 0.08),
+    ({"contract": CALL.model_copy(update={"symbol": "OUTRA"})}, _MISMATCH, 0.08),
+    ({"contract": CALL.model_copy(update={"contract_size": 1})}, _MISMATCH, 0.08),
+    ({"contract": CALL.model_copy(update={"quotation_form": 1000})}, _MISMATCH, 0.08),
+    ({"sigma": 0.0}, "binomial:zero_volatility", 0.08),
+    ({"sigma": 1}, "binomial:invalid_input_type", 0.08),
+    ({"sigma": float("nan")}, "binomial:non_finite_input", 0.08),
+    ({"steps": 0}, "binomial:invalid_steps", 0.08),
+    ({"steps": 5000}, "binomial:invalid_steps", 0.08),
+    ({"steps": 10**400}, "binomial:invalid_steps", 0.08),
+    ({"spot": Decimal("sNaN")}, "binomial:non_finite_input", 0.08),
+    ({"spot": Decimal("0")}, "binomial:input_out_of_domain", 0.08),
+    ({"sigma": 0.001, "rate_cont": 0.9}, "binomial:probability_out_of_range", 0.08),
+    ({"terms": SeriesTerms.model_construct(**{**A1_TERMS.model_dump(), "currency": None})},
+     "terms:unknown_currency", _UNRESOLVED),
+    ({"terms": A1_TERMS.model_copy(update={"exercise_style": ExerciseStyle.EUROPEAN})},
+     _MISMATCH, 0.08),
+], ids=[
+    "european", "unknown", "missing-carry", "double-count", "unknown-policy", "foreign-carry",
+    "invalid-terms", "strike", "symbol", "lot", "quotation", "zero-sigma", "int-sigma", "nan",
+    "zero-steps", "n1-limit", "huge-steps", "snan-spot", "zero-spot", "probability",
+    "terms-refusal", "terms-style",
+])
+def test_t4_refusal(changes: _Changes, reason: str, q: str | float) -> None:
+    """Uma linha por recusa, incluindo o motivo original e a etapa de resolução do carry."""
+    assumptions: dict[str, str | float | bool] = {"dividend_yield": 0.0, "calendar_id": "synthetic"}
+    outcome = _price(assumptions=assumptions.copy(), **changes)
+    _assert_refusal(outcome, reason, q)
+    assert outcome.assumptions == assumptions
+
+
+@pytest.mark.parametrize(("changes", "reason", "q"), [
+    ({"contract": _EURO, "carry": None}, "american_bridge:not_american", _UNRESOLVED),
+    ({"contract": _OTHER_STRIKE, "carry": None}, _MISSING_CARRY, _UNRESOLVED),
+    ({"contract": _OTHER_STRIKE, "sigma": 0.0}, _MISMATCH, 0.08),
+])
+def test_t5_precedence(changes: _Changes, reason: str, q: str | float) -> None:
+    """A primeira precondição que falha determina a recusa."""
+    _assert_refusal(_price(**changes), reason, q)
+
+
+def test_t6_optional_lot_and_quotation() -> None:
+    """Com lote e fator ausentes no contrato, os termos permitem o mesmo preço de A1."""
+    missing = CALL.model_copy(update={"contract_size": None, "quotation_form": None})
+    outcome = _price(missing)
+    assert outcome.supported and outcome == _price()
+
+
+@pytest.mark.parametrize(("spot", "expected", "steps"), [
+    (Decimal("120"), Decimal("20.0"), 200),
+    (Decimal("1e308"), Decimal("1e308"), 4999),
+])
+def test_t7_expiry(spot: Decimal, expected: Decimal, steps: int) -> None:
+    """No vencimento, as duas árvores e sua média devolvem o intrínseco."""
+    expiry = replace(TTE, business_days=0, year_fraction=0.0, is_expiry_day=True)
+    outcome = _price(spot=spot, steps=steps, tte=expiry)
+    assert outcome.supported and outcome.price == expected and outcome.regime == "expiry"
+    assert outcome.assumptions["early_exercise_premium"] == 0.0
+
+
+def test_t8_no_premium() -> None:
+    """Call protegida sem rendimento e com taxa positiva não tem prêmio de exercício."""
+    outcome = _price(terms=_terms(AdjustmentPolicy.PROTECTED), carry=NONE, rate_cont=0.13)
+    assert outcome.supported and outcome.price is not None
+    premium = outcome.assumptions["early_exercise_premium"]
+    assert isinstance(premium, float) and abs(premium) <= 1e-11 * max(1.0, float(outcome.price))
+
+
+@pytest.mark.parametrize(("kind", "strike", "rate", "q", "sigma", "years", "reference"), [
+    (OptionKind.CALL, 90, 0.13, "0.13", 0.25, 0.25, "11.0944"),
+    (OptionKind.CALL, 100, 0.13, "0.13", 0.25, 0.25, "4.8565"),
+    (OptionKind.CALL, 110, 0.13, "0.13", 0.25, 0.25, "1.6336"),
+    (OptionKind.CALL, 90, 0.05, "0.10", 0.20, 1.00, "11.3127"),
+    (OptionKind.CALL, 100, 0.05, "0.10", 0.20, 1.00, "5.9283"),
+    (OptionKind.CALL, 110, 0.05, "0.10", 0.20, 1.00, "2.8874"),
+    (OptionKind.CALL, 90, 0.13, "0.06", 0.40, 1.00, "22.5981"),
+    (OptionKind.CALL, 100, 0.13, "0.06", 0.40, 1.00, "17.8341"),
+    (OptionKind.CALL, 110, 0.13, "0.06", 0.40, 1.00, "13.9470"),
+    (OptionKind.PUT, 90, 0.13, None, 0.25, 0.25, "0.8434"),
+    (OptionKind.PUT, 100, 0.13, None, 0.25, 0.25, "3.7929"),
+    (OptionKind.PUT, 110, 0.13, None, 0.25, 0.25, "10.3163"),
+])
+def test_t9_discretization(kind: OptionKind, strike: int, rate: float, q: str | None,
+                           sigma: float, years: float, reference: str) -> None:
+    """Mede o erro a 400 passos contra os doze valores de alta resolução do cartão."""
+    policy = AdjustmentPolicy.UNKNOWN if q is None else AdjustmentPolicy.UNPROTECTED
+    terms = _terms(policy, Decimal(strike))
+    contract = CALL.model_copy(update={"kind": kind, "strike": Decimal(strike)})
+    outcome = _price(
+        contract, terms=terms, carry=_carry(q), rate_cont=rate, sigma=sigma,
+        tte=replace(TTE, year_fraction=years, business_days=int(252 * years)), steps=400,
+    )
+    assert outcome.supported and outcome.price is not None
+    assert abs(outcome.price - Decimal(reference)) <= Decimal("0.01")

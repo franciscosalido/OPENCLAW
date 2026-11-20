@@ -25,6 +25,13 @@ def _matches(contract: OptionContract, terms: SeriesTerms) -> bool:
     )
 
 
+def _pair_average(first: float, second: float) -> float:
+    total = first + second
+    if total == float("inf"):
+        return first / 2 + second / 2
+    return total / 2
+
+
 def price_american_contract(
     contract: OptionContract,
     *,
@@ -86,10 +93,12 @@ def price_american_contract(
     except BinomialRefusal as exc:
         return refused(f"binomial:{exc.code.value}")
 
-    price = (american_n + american_n1) / 2
-    european = (european_n + european_n1) / 2
+    price = _pair_average(american_n, american_n1)
+    european = _pair_average(european_n, european_n1)
     echo.update(price_steps_n=american_n, price_steps_n1=american_n1, european_same_trees=european)
     merged = dict(assumptions)
+    merged.pop("dividend_yield", None)
+    merged.pop("strike_adjusted_by_exchange_assumed", None)
     merged.update(resolved.assumptions())
     merged.update(pricing_model=AMERICAN_MODEL, crr_steps=float(steps), crr_pair_average=True,
                   early_exercise_premium=price - european)
