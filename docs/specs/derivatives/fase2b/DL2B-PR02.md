@@ -87,3 +87,34 @@ o quadrado de N. O teto algorítmico por busca é de 68 pares (extremos, bisseç
    LIVE_NOT_ACTIVATED. Conferir isolamento, diff, contagem e escopo dos arquivos.
 4. O coordenador mantém o índice de base/head. Claude emite parecer independente sobre o
    candidato local, examina a evidência e leva a proposta de redação à decisão humana.
+
+## Evidência do candidato
+
+O cartão e o orçamento entraram sozinhos em `a913a4a`. O RED em `4804841` expôs a
+interface com recusa provisória. Foram 93 falhas de comportamento e duas aprovações.
+Em `18c2c60`, duas fixtures de PUT passaram a explicitar carry NONE para testar o piso
+intrínseco. No alvo cruzado, o teste passou a exigir a igualdade exata com a Fase 1 e
+a presença da referência de alta precisão no bracket. O RED corrigido também deu 93/2.
+Com os padrões de `Iv()`, a Fase 1 devolveu 0,1999831051934045 com bracket
+[0,19998310286514465, 0,1999831051934045]. Esse intervalo contém 0,199983104711.
+
+O GREEN `5754803` aprovou os 95 testes novos e os 83 da ponte de preço. A grade de 48
+preços recuperou sigma com erro máximo de 4,24e-11. O commit `c422ba5` tipou a chamada
+auxiliar dos testes. Em cópias desse ponto, o controle passou os 95 casos e os testes
+detectaram 13 de 13 mutações. Inverter só N quebrou os 48 round-trips. Usar N+2 quebrou
+as quatro verificações do par. Retirar a sondagem local permitiu publicar uma IV ambígua.
+
+### Medição da API implementada
+
+Mesmo Mac, cronômetros, alvos, N e nove amostras por linha da referência pré-RED.
+O maior tempo de CPU em cada cenário coube no orçamento fixado.
+
+| Caso | CPU mín / med / máx (ms) | Decorrido mín / med / máx (ms) | Teto CPU (ms) |
+|---|---:|---:|---:|
+| PUT N=50 | 9,33 / 9,48 / 9,78 | 9,33 / 9,48 / 9,79 | 20 |
+| CALL N=200 | 138,48 / 139,90 / 141,88 | 138,52 / 139,91 / 141,89 | 210 |
+| PUT N=400 | 492,46 / 494,61 / 537,65 | 492,49 / 494,66 / 537,70 | 750 |
+| D1 | 0,074 / 0,080 / 0,093 | 0,074 / 0,080 / 0,092 | 0,50 |
+
+O handoff local `curren_status.md` contém os resultados por plataforma e o índice de logs.
+Evidências em `~/.quimera-2b-pr02.QHwoQA/evidencias-dl2b-pr02/`.
