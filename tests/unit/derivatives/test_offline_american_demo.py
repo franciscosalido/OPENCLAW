@@ -733,3 +733,18 @@ async def test_r1_shadow_preserves_real_bsm_status_without_sigma(
         } == {
             k: v for k, v in right.pricing.assumptions.items() if not k.startswith("shadow_")
         }
+
+
+def test_ask_refusal_reports_the_ask_reason_not_the_mid_reason(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Venda acima do teto com meio invertível: o motivo publicado é o da venda."""
+    substitute_read(monkeypatch, OPTIONS_FILE, quote_change({"bid": 2.9, "ask": 151}))
+    rc, reply = invoke([*DEMO, *OPTIONS], capsys)
+    assert rc == 0
+    row = next(r for r in reply["data"]["rows"] if r["symbol"] == "SYNAC150")
+    iv = row["iv"]
+    assert iv["ask"] == {"status": "above_upper_bound", "sigma": None}
+    assert iv["mid"]["status"] != "above_upper_bound"
+    assert row["reason"] == "iv_unavailable:ask:iv:above_upper_bound"
+    assert not row["supported"] and row["model_price"] is None

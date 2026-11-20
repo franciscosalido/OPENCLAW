@@ -316,3 +316,38 @@ Parecer da skill, lido depois do veredito e antes do merge (SHA-256 `0c087921…
   `series_registry.py`. Procede; são regras do repositório. Corrigido no commit do parecer,
   sem mudança de comportamento: duas docstrings, um import quebrado em linhas e duas
   variáveis locais na comparação de lote e fator. Portão repetido depois da edição.
+
+## PR 4 (DL2B-PR04 + Parte B) — revisão independente: GO na segunda rodada (Claude, 2026-11-20)
+
+Primeira rodada, head `4a612a4`: **NO-GO**. Com compra a 0,01 e venda a 3,10 a linha saía
+suportada, com preço e volatilidade do meio, embora a compra não tivesse volatilidade. Viola
+o item A6 do Adendo 1. O revisor ia para GO; quem achou foi o parecer da skill (SHA-256
+`0bdb2fc7…08c6`), lido antes de integrar. O pedido de correção previa uma única edição em
+teste existente e esqueceu o cenário do piso em B7; a segunda edição foi autorizada depois.
+
+Segunda rodada, head `208925a`:
+
+- Delta sobre `4a612a4`: seis linhas em `service/american_demo.py` e o arquivo de testes da
+  demo. A linha só é suportada com volatilidade nos três lados; precedência ausente, compra,
+  venda, meio; na recusa, preço nulo, diagnósticos dos três lados preservados, sem sombra.
+  RED em commit próprio (`c2ab6cc`).
+- Portão em clone limpo, Linux aarch64: 9.555 aprovados, 16 pulados, 261 subtestes; `mypy
+  --strict` e `pyright` sem erro. Aprovado na primeira rodada e sem diff desde então: demo
+  padrão idêntica à base, CLI padrão com `LIVE_NOT_ACTIVATED`, 200 passos vindos da
+  configuração, `--steps` só com a chave e o registro.
+- Mutação do revisor na regra nova: 8 trocas, 7 mortas. A viva trocava o motivo da venda
+  pelo do meio; no caso existente (2,90 e 350) os dois coincidem. Fechada no commit do
+  parecer com `test_ask_refusal_reports_the_ask_reason_not_the_mid_reason` (2,90 e 151),
+  não revisto por outro agente.
+- Medição do autor no Mac, 200 passos: 144,3 / 145,6 / 147,3 ms de CPU. Teto de 210 ms.
+- macOS não reproduzido pelo revisor.
+
+Parecer da skill sobre `208925a`, lido depois do veredito e antes do merge (SHA-256
+`aaf5dac2…98c3`): GO técnico, nenhum bloqueante, nenhuma proposta de enxugamento. As duas
+lacunas do primeiro parecer (agregado da sombra e sombra com status sem volatilidade)
+entraram como testes do autor. Notas da primeira rodada que ficam registradas: `--steps` é
+ignorado sem aviso quando o provedor é o de mercado, que devolve `LIVE_NOT_ACTIVATED`; a
+produção do PR passou da meta de 60 linhas da Parte B e ficou abaixo do teto de 400.
+
+A regra de três volatilidades é política do projeto (Francisco, 2026-11-20), mais
+conservadora que a literatura citada na correção.

@@ -4,47 +4,58 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-20 · **Turno:** Codex/Dots (DL2B-R1, PR 4).
+**Última atualização:** 2026-11-20 · **Turno:** Claude (integração do DL2B-PR04).
 
-## Fase 02 — Marco 2B
+## Fase 02 — Marco 2B — FECHADO (estado A)
 
-PR atual: DL2B-PR04 — EM_REVISAO. Base integrada: `23f5cef` (#149). Estado A.
+PR atual: DL2B-PR04 — MERGEADO (PR #150, NO-GO na primeira rodada, GO na segunda).
 [ADR-0026](../ADR/ADR-0026-laboratorio-derivativos-fase2b.md) aceito, com a Revisão 1.
-[Cartão DL2B-R1](../specs/derivatives/fase2b/DL2B-R1.md) e Adendo 1 do SDD vigentes.
+Revisões independentes dos quatro PRs em
+[DL2B-R1.md](../specs/derivatives/fase2b/DL2B-R1.md); contrato e evidências do último em
+[DL2B-PR04.md](../specs/derivatives/fase2b/DL2B-PR04.md).
 
-Integrado até aqui: ponte americana pura (#146), correção de tipos e de eco (#147) e
-volatilidade implícita pelo mesmo par de árvores CRR, com busca configurada em
-`config/american_iv.yaml` (#148). Chain, MCP e CLI ainda não chamam nada disso; o modo
-padrão segue `LIVE_NOT_ACTIVATED`.
-Portão do head, Linux aarch64 limpo: 9.404 aprovados, 16 pulados, 261 subtestes.
-Inversão com 200 passos no Mac: mediana de 138 ms de CPU, teto de 210 ms.
+Entregue no marco (#146 a #150), só na demo sintética offline:
+- Ponte americana (`pricing/american_bridge.py`): preço pela média do par de árvores CRR e
+  volatilidade implícita por bisseção no mesmo par, configurada em `config/american_iv.yaml`.
+- Registro versionado de termos e carry por identidade e vigência
+  (`domain/series_registry.py`).
+- Ligação na demo (`service/american_demo.py`, `service/demo_chain.py`), atrás da chave
+  `--american-demo` com `--series-registry synthetic-v1`. 200 passos por padrão; `--steps`
+  prevalece quando informado.
+- BSM europeu da Fase 1 como sombra: só diagnóstico, não altera preço, volatilidade nem
+  recusa da árvore. Primeira divergência observada: 5,0e-6 de volatilidade, uma linha.
+- Linha americana só é suportada com volatilidade na compra, na venda e no meio. Lado
+  ausente, cotação velha ou lado sem volatilidade: linha recusada com motivo próprio.
+- Portão do head, Linux aarch64 limpo: 9.556 aprovados, 16 pulados, 261 subtestes. O autor
+  registrou 9.555 em macOS arm64 e em Linux, antes do teste que o revisor somou.
+- Inversão com 200 passos no Mac: mediana de 146 ms de CPU, teto de 210 ms.
 
 Decisões da Revisão 1 (Francisco, 2026-11-20): árvore CRR no preço e na volatilidade da
-linha; BSM europeu só como sombra; 200 passos por padrão; teto de 210 ms. Sombra e passos
-padrão entram só no quarto PR.
+linha; BSM europeu só como sombra; 200 passos por padrão; teto de 210 ms; faixa de
+volatilidade entre compra e venda em vez de número único.
 
-Fila do marco, um PR por vez: DL2B-PR03 (registro de termos e carry) e DL2B-PR04 (ligação
-na demo offline, mais a Parte B). Abertas: D3 (origem dos termos de série real) e D4
-(NumPy).
+O que o marco não prova:
+- Nada com dado real. Sem OpLab, sem token; o caminho de mercado não mudou e o CLI padrão
+  devolve `LIVE_NOT_ACTIVATED`.
+- A árvore contra uma implementação independente. Fica para a Fase 2C.
+- Gregas americanas e dividendo discreto, fora do marco.
+
+Pendências com dono:
+- D3, origem e vigência dos termos de série real (Francisco).
+- D4, NumPy ou outro método de busca; só se o teto de 210 ms for ultrapassado (Francisco).
+- `--steps` é ignorado sem aviso quando o provedor é o de mercado.
+- A `main` segue sem proteção de branch (Francisco).
 
 Roteiro decidido por Francisco em 2026-11-20, na ordem: Fase 2C, QuantLib como oráculo de
-teste, com ADR próprio; Fase 3, como já definida; Fase 4, Kronos. Nenhuma delas começa
-antes de fechar o Marco 2B, e nenhuma autoriza dado real ou token por si só.
+teste, com ADR próprio; Fase 3, como já definida; Fase 4, Kronos. Nenhuma autoriza dado
+real ou token por si só.
 
 Regra de memória (Francisco, 2026-11-20): este arquivo é a única fonte de verdade entre
 os colaboradores. Decisão que apareça aqui sem registro de quem decidiu deve ser
 confirmada com Francisco antes de ser removida ou seguida.
 
-Integrado também o registro versionado de termos e carry por identidade e vigência
-(`domain/series_registry.py`, #149), ainda sem consumidor. Portão do head, Linux aarch64
-limpo: 9.461 aprovados, 16 pulados, 261 subtestes.
-
-Em revisão: ligação americana na demo sintética, seleção de passos do YAML e
-sombra BSM sem influência sobre os números CRR. Nada muda no caminho de mercado.
-[Contrato e evidências do PR04](../specs/derivatives/fase2b/DL2B-PR04.md).
-
-Próxima ação (uma só): Claude revisa e integra o DL2B-PR04 para fechar o Marco 2B.
-O oráculo QuantLib permanece condicionado ao ADR e ao cartão do marco seguinte.
+Próxima ação (uma só): Claude escreve o ADR e o cartão da Fase 2C. Nenhum código antes
+deles. O QuantLib não entra como dependência do repositório.
 
 ## Fase 02 — Marco 2A — FECHADO (estado A)
 
