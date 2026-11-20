@@ -1,9 +1,10 @@
 """Ligação do registro e da ponte às linhas americanas da captura sintética."""
+import math
 from datetime import datetime
 from decimal import Decimal
-from typing import Literal
+from typing import Literal, TypedDict
 
-from backend.derivatives.domain.models import ExerciseStyle
+from backend.derivatives.domain.models import ExerciseStyle, OptionKind
 from backend.derivatives.domain.carry import CarryRefusal
 from backend.derivatives.domain.series_registry import RegistryRefusal, SeriesRegistry
 from backend.derivatives.oplab.demo_fixture import DemoFixture
@@ -13,14 +14,30 @@ from backend.derivatives.pricing.american_bridge import (
 )
 from backend.derivatives.pricing.contract_pricing import PricingOutcome
 from backend.derivatives.pricing.conventions import continuous_rate
+from backend.derivatives.pricing.fd_american import FD_MODEL, FdGrid, fd_implied_vol, fd_price
 from backend.derivatives.pricing.implied_vol import IvStatus, implied_vol
 from backend.derivatives.pricing.quote_iv import IvDiagnosticModel, IvResultModel, QuoteIv
 from backend.derivatives.provenance import Provenance, Purpose
 from backend.derivatives.service.chain_service import B3_TIMEZONE, PricedChain, PricedRow
+from config.american_fd_config_model import AmericanFdConfig
 from config.american_iv_config_model import AmericanIvConfig
 from config.derivatives_config_model import Conventions, Iv
 
 SHADOW_ENGINE = "bsm_european_v1"
+
+
+class _FdInputs(TypedDict):
+    kind: OptionKind
+    spot: float
+    strike: float
+    time_years: float
+    rate_cont: float
+    dividend_yield: float
+    grid: FdGrid
+
+
+def _fd_grid_name(cfg: AmericanFdConfig) -> str:
+    return f"{cfg.space_nodes}x{cfg.time_steps}"
 
 
 def _iv_side(result: AmericanIvSolution | AmericanIvRefusal) -> IvResultModel:
@@ -49,7 +66,8 @@ def _iv_side(result: AmericanIvSolution | AmericanIvRefusal) -> IvResultModel:
 
 def _price_row(item: PricedRow, priced: PricedChain, registry: SeriesRegistry, *,
                valuation: datetime, steps: int, rate: float,
-               iv_config: AmericanIvConfig, shadow_config: Iv) -> PricingOutcome:
+               iv_config: AmericanIvConfig, shadow_config: Iv,
+               fd_config: AmericanFdConfig | None = None) -> PricingOutcome:
     chain, tte = priced.chain, priced.time_to_expiry
     row = item.row
     quote, contract = row.quote, row.contract
@@ -126,12 +144,49 @@ def _price_row(item: PricedRow, priced: PricedChain, registry: SeriesRegistry, *
             )
     except Exception:
         assumptions["shadow_iv_status"] = "error"
+    if fd_config is not None:
+        assumptions.update(fd_engine=FD_MODEL, fd_grid=_fd_grid_name(fd_config))
+        try:
+            grid = FdGrid(fd_config.space_nodes, fd_config.time_steps,
+                          fd_config.width_stdevs, fd_config.rannacher_steps)
+            inputs = _FdInputs(kind=contract.kind, spot=float(spot), strike=float(contract.strike),
+                               time_years=tte.year_fraction, rate_cont=rate,
+                               dividend_yield=resolved.carry.dividend_yield, grid=grid)
+            sigma, shift = iv.mid.sigma, fd_config.divergence_vol
+            assert outcome.price is not None
+            reference = fd_price(**inputs, style=ExerciseStyle.AMERICAN, sigma=sigma)
+            price_gap = float(outcome.price) - reference
+            if not math.isfinite(price_gap):
+                raise ValueError("fd_price_gap")
+            assumptions["fd_price_gap"] = price_gap
+            fd = fd_implied_vol(
+                **inputs, target_price=float(mid / record.terms.quotation_form),
+                bracket_lo=fd_config.bracket_lo, bracket_hi=fd_config.bracket_hi,
+                max_iterations=fd_config.max_iterations, tol_price_rel=fd_config.tol_price_rel,
+                tol_vol=fd_config.tol_vol,
+            )
+            assumptions["fd_iv_status"] = fd.status
+            if fd.status == "ok":
+                if fd.sigma is None or not math.isfinite(fd.sigma) or fd.sigma <= 0:
+                    raise ValueError("fd_sigma")
+                move = fd_price(**inputs, style=ExerciseStyle.AMERICAN, sigma=sigma + shift)
+                sensitivity = move - reference
+                if not math.isfinite(sensitivity):
+                    raise ValueError("fd_sensitivity")
+                low = sensitivity < fd_config.low_sensitivity_price
+                gap = sigma - fd.sigma
+                assumptions.update(fd_iv_mid=fd.sigma, fd_iv_gap=gap,
+                                   fd_iv_comparison="low_sensitivity" if low else "informative",
+                                   fd_iv_alert=not low and abs(gap) > shift)
+        except Exception:
+            assumptions["fd_iv_status"] = "error"
     return outcome.model_copy(update={"assumptions": assumptions})
 
 
 def _price_mixed_demo(priced: PricedChain, *, fixture: DemoFixture, steps: int,
                      conventions: Conventions, iv_config: AmericanIvConfig, shadow_config: Iv,
-                     steps_source: Literal["config", "argument"]) -> PricedChain:
+                     steps_source: Literal["config", "argument"],
+                     fd_config: AmericanFdConfig | None = None) -> PricedChain:
     """Conserva a ordem da captura. Só a raiz de composição da demo chama esta função."""
     chain = priced.chain
     if (chain.purpose is not Purpose.TEST or chain.stamp.purpose is not Purpose.TEST
@@ -149,7 +204,7 @@ def _price_mixed_demo(priced: PricedChain, *, fixture: DemoFixture, steps: int,
     rows = tuple(
         PricedRow(row=item.row, pricing=_price_row(item, priced, registry,
                   valuation=fixture.valuation, steps=steps, rate=rate, iv_config=iv_config,
-                  shadow_config=shadow_config))
+                  shadow_config=shadow_config, fd_config=fd_config))
         if item.row.contract.exercise_style is ExerciseStyle.AMERICAN else item
         for item in priced.rows)
     # Preserve as chaves v1 da Fase 1; a linha americana usa somente o carry resolvido.
@@ -162,5 +217,17 @@ def _price_mixed_demo(priced: PricedChain, *, fixture: DemoFixture, steps: int,
                        american_shadow_engine=SHADOW_ENGINE, american_shadow_rows=len(gaps))
     if gaps:
         assumptions["american_shadow_max_abs_gap"] = max(gaps)
+    if fd_config is not None:
+        fd_rows = [item.pricing.assumptions for item in rows]
+        fd_gaps = [abs(float(row["fd_iv_gap"])) for row in fd_rows if "fd_iv_gap" in row]
+        assumptions.update(
+            american_fd_engine=FD_MODEL, american_fd_grid=_fd_grid_name(fd_config),
+            american_fd_rows=len(fd_gaps),
+            american_fd_alert_rows=sum(row.get("fd_iv_alert") is True for row in fd_rows),
+            american_fd_low_sensitivity_rows=sum(
+                row.get("fd_iv_comparison") == "low_sensitivity" for row in fd_rows),
+        )
+        if fd_gaps:
+            assumptions["american_fd_max_abs_gap"] = max(fd_gaps)
     return priced.model_copy(update={
         "rows": rows, "chain": chain.model_copy(update={"model_assumptions": assumptions})})

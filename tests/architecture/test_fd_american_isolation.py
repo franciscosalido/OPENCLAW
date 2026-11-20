@@ -46,9 +46,11 @@ def test_t19_fd_dependencies() -> None:
             assert node.id != "__import__"
 
 
-def test_t19_no_fd_consumers() -> None:
-    """PR01 não habilita o motor em backend, scripts ou config."""
-    assert _consumers(ROOT) == []
+def test_u11_only_american_demo_consumes_fd() -> None:
+    """PR02 permite o motor FD só na demo americana, no caminho indicado no cartão."""
+    assert {entry.rsplit(":", 1)[0] for entry in _consumers(ROOT)} == {
+        "backend/derivatives/service/american_demo.py",
+    }
 
 
 @pytest.mark.parametrize("source", [

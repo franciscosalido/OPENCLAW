@@ -6,6 +6,7 @@ from backend.derivatives.oplab.client import OplabMarketClient
 from backend.derivatives.oplab.demo_fixture import REPO_ROOT, DemoFixture
 from backend.derivatives.pricing.calendar import load_calendars
 from backend.derivatives.service.chain_service import ChainService, PricedChain
+from config.american_fd_config_model import load_american_fd_config
 from config.american_iv_config_model import load_american_iv_config
 from config.derivatives_config_model import load_derivatives_config
 
@@ -38,5 +39,6 @@ async def build_demo_chain(
             priced, fixture=fixture, steps=iv_config.default_steps if steps is None else steps,
             steps_source="config" if steps is None else "argument",
             conventions=cfg.conventions, iv_config=iv_config, shadow_config=cfg.iv,
+            fd_config=load_american_fd_config(),
         )
     return priced, fixture.valuation

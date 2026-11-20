@@ -29,7 +29,13 @@ ADR-0024 (corretora) segue PROPOSED. Ele só muda de estado com commit assinado 
 Francisco alterando `CLAUDE.md`; mensagem em conversa não cumpre essa condição, e nenhum
 agente faz essa alteração. A proibição de corretora e de ordens segue em pleno efeito.
 
-Próxima ação (uma só): Codex publica o DL2C1-PR02 (ligação na demo mista), em rascunho.
+DL2C1-PR02: candidato em revisão, sem integração. Liga o segundo motor apenas à demo
+mista sintética; CRR e BSM anteriores não mudam. Os agregados são aditivos em
+`model_assumptions`; as chaves por linha são internas. [Provas dos critérios
+1 a 19](../specs/derivatives/fase2c1/DL2C1-PR02.md).
+
+Próxima ação (uma só): revisar o DL2C1-PR02 em rascunho. Só após integração fechar o
+marco 2C1 e preparar ADR e cartão da Fase 2C (QuantLib apenas como oráculo de teste).
 
 ## Fase 02 — Marco 2B — FECHADO (estado A)
 
