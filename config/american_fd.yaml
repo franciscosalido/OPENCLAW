@@ -1,0 +1,12 @@
+# Segundo motor americano (diagnóstico). Não afeta a árvore nem a Fase 1.
+space_nodes: 400  # Divisões espaciais: 401 nós incluindo as bordas.
+time_steps: 200
+width_stdevs: 6.0
+rannacher_steps: 2
+bracket_lo: 1.0e-3
+bracket_hi: 2.0
+max_iterations: 64
+tol_price_rel: 1.0e-10
+tol_vol: 1.0e-8
+divergence_vol: 5.0e-4          # alerta, não reprovação (provisório)
+low_sensitivity_price: 1.0e-4   # por unidade (provisório)
