@@ -506,7 +506,7 @@ async def test_r1_shadow_is_diagnostic_only(monkeypatch: pytest.MonkeyPatch) -> 
     [
         ("missing_ask", "iv_unavailable:missing_quote", None),
         ("stale", "quality:stale_quote", None),
-        ("lower_bound", "iv:not_identifiable", "not_applicable"),
+        ("lower_bound", "iv_unavailable:bid:iv:not_identifiable", "not_applicable"),
         ("control", None, "ok"),
     ],
 )
