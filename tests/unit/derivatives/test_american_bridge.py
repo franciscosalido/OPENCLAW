@@ -389,25 +389,42 @@ def test_f2_exact_nonfinite_echo(changes: _BridgeChanges, field: str, expected: 
     assert type(value) is float and value.hex() == expected
 
 
-def test_f2_invalid_steps_reach_binomial_once(monkeypatch: pytest.MonkeyPatch) -> None:
+_INVALID_SIGMA = _Hostile()
+_INVALID_RATE = _ForeignFloat(0.05)
+_INVALID_YEARS = _ForeignFloat(1)
+_INVALID_STEPS = _ForeignInt(200)
+_INVALID_TYPE = "binomial:invalid_input_type"
+
+
+@pytest.mark.parametrize(("changes", "field", "sentinel", "reason"), [
+    ({"sigma": _INVALID_SIGMA}, "sigma", _INVALID_SIGMA, _INVALID_TYPE),
+    ({"rate_cont": _INVALID_RATE}, "rate_cont", _INVALID_RATE, _INVALID_TYPE),
+    ({"tte": replace(TTE, year_fraction=_INVALID_YEARS)},
+     "time_years", _INVALID_YEARS, _INVALID_TYPE),
+    ({"steps": _INVALID_STEPS}, "steps", _INVALID_STEPS, "binomial:invalid_steps"),
+], ids=["sigma", "rate", "years", "steps"])
+def test_f2_invalid_inputs_reach_binomial_once(monkeypatch: pytest.MonkeyPatch,
+                                               changes: _BridgeChanges, field: str,
+                                               sentinel: object, reason: str) -> None:
     from unittest.mock import Mock
 
     tree = Mock(wraps=crr_price)
     monkeypatch.setattr("backend.derivatives.pricing.american_bridge.crr_price", tree)
-    steps = _ForeignInt(200)
-    _assert_refusal(_price(steps=steps), "binomial:invalid_steps", 0.08)
+    _assert_refusal(_price(**changes), reason, 0.08)
     tree.assert_called_once()
-    assert tree.call_args.kwargs["steps"] is steps
+    assert tree.call_args.kwargs[field] is sentinel
 
 
-@pytest.mark.parametrize(("changes", "reason", "q"), [
-    ({"contract": _EURO, "sigma": None}, "american_bridge:not_american", _UNRESOLVED),
-    ({"carry": None, "spot": 100.0}, _MISSING_CARRY, _UNRESOLVED),
-    ({"contract": _OTHER_STRIKE, "spot": 100.0}, _MISMATCH, 0.08),
-    ({"sigma": None, "steps": None}, "binomial:invalid_input_type", 0.08),
+@pytest.mark.parametrize(("changes", "reason", "q", "field"), [
+    ({"contract": _EURO, "sigma": None}, "american_bridge:not_american", _UNRESOLVED, "sigma"),
+    ({"carry": None, "spot": 100.0}, _MISSING_CARRY, _UNRESOLVED, "spot"),
+    ({"contract": _OTHER_STRIKE, "spot": 100.0}, _MISMATCH, 0.08, "spot"),
+    ({"sigma": None, "steps": None}, "binomial:invalid_input_type", 0.08, "sigma"),
 ], ids=["style", "carry", "terms-mismatch", "binomial-type-before-steps"])
-def test_f3_first_refusal(changes: _Changes, reason: str, q: str | float) -> None:
-    _assert_refusal(_price(**changes), reason, q)
+def test_f3_first_refusal(changes: _Changes, reason: str, q: str | float, field: str) -> None:
+    outcome = _price(**changes)
+    _assert_refusal(outcome, reason, q)
+    assert outcome.inputs_echo[field] == "invalid"
 
 
 @pytest.mark.parametrize(("contract", "terms", "carry", "kind", "policy", "carry_kind", "q",
