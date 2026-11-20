@@ -86,7 +86,7 @@ def price_american_contract(
     except BinomialRefusal as exc:
         return refused(f"binomial:{exc.code.value}")
 
-    price = american_n
+    price = (american_n + american_n1) / 2
     european = (european_n + european_n1) / 2
     echo.update(price_steps_n=american_n, price_steps_n1=american_n1, european_same_trees=european)
     merged = dict(assumptions)

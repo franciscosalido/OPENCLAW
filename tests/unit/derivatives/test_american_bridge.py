@@ -83,3 +83,27 @@ def test_t1_anchors(contract: OptionContract, terms: SeriesTerms, carry: CarryAs
         "crr_american_v1", "tree", "given",
     )
     assert outcome.greeks is None and outcome.iv is None
+
+
+def test_t3_single_yield_source() -> None:
+    """Substitui as hipóteses da Fase 01 somente na resposta suportada."""
+    original = {
+        "dividend_yield": 0.0, "strike_adjusted_by_exchange_assumed": True,
+        "calendar_id": "test_calendar",
+    }
+    assumptions = original.copy()
+    refused = _price(carry=None, assumptions=assumptions)
+    assert not refused.supported and refused.assumptions == original
+    outcome = _price(assumptions=assumptions)
+    assert outcome.supported and outcome.inputs_echo["dividend_yield"] == 0.08
+    assert outcome.assumptions["carry_dividend_yield"] == 0.08
+    assert "dividend_yield" not in outcome.assumptions, outcome.assumptions
+    assert "strike_adjusted_by_exchange_assumed" not in outcome.assumptions
+    assert outcome.assumptions == {
+        "calendar_id": "test_calendar", "carry_kind": "CONTINUOUS_YIELD",
+        "carry_dividend_yield": 0.08, "carry_source": "test", "carry_effective_on": DAY.isoformat(),
+        "strike_adjustment_policy": "UNPROTECTED", "pricing_model": "crr_american_v1",
+        "crr_steps": 200.0, "crr_pair_average": True,
+        "early_exercise_premium": outcome.assumptions["early_exercise_premium"],
+    }
+    assert assumptions == original
