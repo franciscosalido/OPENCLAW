@@ -501,3 +501,35 @@ Testes do revisor, não revistos por outro agente:
 `test_review_default_grid_misses_the_absolute_floor_and_says_so`,
 `test_review_narrow_grid_keeps_the_strike_and_the_european_edge` e
 `test_review_stop_needs_the_price_residual_too`.
+
+## PR 2 — revisão independente: GO (Claude, 2026-11-20)
+
+Head do autor: `02c97e9`. Duas autorizações escritas do revisor no caminho: a edição das três
+linhas do T19 (o cartão pedia zero importadores no PR 1 e um no PR 2) e a alteração pontual
+em `mcp/derivatives_server.py` (o cartão pedia a diferença publicada por linha e não listava
+o arquivo que monta a saída). As duas inconsistências eram do cartão.
+
+- Portão em clone limpo, Linux aarch64, no head do autor: 10.255 aprovados, 16 pulados, 261
+  subtestes; `mypy --strict` sem erro em 164 arquivos. macOS não reproduzido pelo revisor.
+- Produção: 84 inserções e 6 remoções em três arquivos. Passa da meta de 70 e fica abaixo
+  do teto de 400. Em `_row_view`, sete inserções.
+- Saída pública: a chave `diagnostics` só aparece em linha americana suportada e só traz as
+  chaves `fd_*`. A sombra BSM por linha continua fora da saída pública; fica para a revisão
+  de fechamento da Fase 2C (D3 do ADR-0027).
+- Mutação do revisor: 17 trocas, 16 mortas. A viva calculava os preços auxiliares no estilo
+  europeu; a série sintética é call sem rendimento, em que os dois estilos valem o mesmo.
+  Fechada no commit do parecer com `test_review_fd_diagnostic_prices_the_american_contract`,
+  não revisto por outro agente.
+- O alerta compara os decimais nominais das duas volatilidades; o desvio publicado é a
+  subtração dos floats. Diferença exatamente igual ao limiar não alerta.
+- Medição do autor, M4 Pro, 22 inversões de B1: p95 de relógio de 376 ms, mediana de CPU de
+  345 ms. Orçamento provisório: 700 ms.
+
+Parecer da skill sobre `02c97e9` (SHA-256 `5337afec…f42d`), lido depois do veredito e antes
+do merge: sem bloqueante; duas notas (classificação de um mutante no resumo automático e a
+meta de tamanho).
+
+Limite que fica registrado: a demo mista tem uma única linha americana suportada, call sem
+rendimento. Nela o prêmio de exercício antecipado é zero. O caso em que o segundo motor
+acrescenta informação (call com rendimento não compensado) é exercitado só por testes com
+registro sintético alterado, não pela fixture publicada.

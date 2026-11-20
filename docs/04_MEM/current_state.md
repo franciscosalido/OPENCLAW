@@ -4,32 +4,49 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-20 · **Turno:** Claude (integração do DL2C1-PR01).
+**Última atualização:** 2026-11-20 · **Turno:** Claude (integração do DL2C1-PR02).
 
-## Fase 02 — Marco 2C1 (estado A)
+## Fase 02 — Marco 2C1 — FECHADO (estado A)
 
-Francisco aprovou expressamente D1 a D5 em 2026-11-20, após a discussão
-exploratória. Aceite do [ADR-0027](../ADR/ADR-0027-laboratorio-derivativos-fase2c1.md)
-e do [cartão DL2C1](../specs/derivatives/fase2c1/DL2C1.md), com D4 e D5 provisórios.
-O motor de diferenças finitas é diagnóstico offline; CRR continua principal e
-a sombra BSM continua até a revisão de fechamento da Fase 2C.
+PR atual: DL2C1-PR02 — MERGEADO (PR #152, GO na primeira rodada). PR 1 em #151.
+[ADR-0027](../ADR/ADR-0027-laboratorio-derivativos-fase2c1.md) aceito por Francisco em
+2026-11-20, com D4 e D5 provisórios. Cartão, Adendo 1 e as duas revisões em
+[DL2C1.md](../specs/derivatives/fase2c1/DL2C1.md); provas dos critérios em
+[DL2C1-PR02.md](../specs/derivatives/fase2c1/DL2C1-PR02.md).
 
-Roteiro: 2C1 → 2C (QuantLib só como oráculo de teste) → Fase 3 → Fase 4 (Kronos).
-Nenhum passo deste roteiro autoriza dado real, OpLab ou token.
+Entregue, só na demo sintética offline:
+- Segundo motor americano por diferenças finitas (`pricing/fd_american.py`,
+  `config/american_fd.yaml`), só diagnóstico. A árvore CRR segue dona do preço, da
+  volatilidade e de toda recusa da linha.
+- Por linha americana suportada da demo mista: diferença de preço na mesma volatilidade,
+  volatilidade do segundo motor, diferença entre as duas, marca de baixa sensibilidade e
+  alerta acima de 0,0005. Saem na chave pública `diagnostics`. Agregados na chain.
+- O alerta não recusa linha nem muda o código de saída.
+- Portão do head, Linux aarch64 limpo: 10.256 aprovados, 16 pulados, 261 subtestes.
 
-PR atual: DL2C1-PR01 — MERGEADO (PR #151, GO na primeira rodada).
-Entregue: `pricing/fd_american.py` (230 linhas), `config/american_fd.yaml` e o modelo de
-configuração. Motor isolado, sem consumidor; nada muda na demo nem no CLI.
-Portão do head, Linux aarch64 limpo: 10.230 aprovados, 16 pulados, 261 subtestes.
-O critério 7 do cartão foi revisto no Adendo 1: o erro do esquema escala com `S dx^2`; o
-piso absoluto de 3e-4 não vale na malha padrão (93 de 1.000 preços, desvio máximo 9,06e-4).
-[Cartão, adendo e revisão](../specs/derivatives/fase2c1/DL2C1.md).
+O que o marco não prova:
+- Qual motor está certo quando divergem. Os dois são do projeto; o árbitro é a Fase 2C.
+- Nada com rendimento na fixture publicada: a única linha americana suportada é call sem
+  rendimento, em que americana e europeia valem o mesmo.
+- Precisão uniforme do segundo motor: o erro escala com `S dx^2` (Adendo 1); com
+  `sigma * sqrt(T)` acima de 1 ele fica na mesma ordem do erro da árvore com 200 passos.
+- Nada com dado real.
+
+Pendências com dono:
+- Revisão explícita da sombra BSM no fechamento da Fase 2C, inclusive se ela sai por linha
+  na saída pública (Francisco, D3 do ADR-0027).
+- Malha, orçamento de 700 ms e limiar de 0,0005 são provisórios (Francisco, D4 e D5).
+- Convenção de dias úteis `(D0,Dv]` ainda marcada como hipótese em `config/derivatives.yaml`.
+
+Roteiro (Francisco, 2026-11-20): 2C1 fechado → 2C (QuantLib só como oráculo de teste) →
+Fase 3 → Fase 4 (Kronos). Nenhum passo autoriza dado real, OpLab ou token.
 
 ADR-0024 (corretora) segue PROPOSED. Ele só muda de estado com commit assinado por
 Francisco alterando `CLAUDE.md`; mensagem em conversa não cumpre essa condição, e nenhum
 agente faz essa alteração. A proibição de corretora e de ordens segue em pleno efeito.
 
-Próxima ação (uma só): Codex publica o DL2C1-PR02 (ligação na demo mista), em rascunho.
+Próxima ação (uma só): Francisco aprova o ADR-0028 e o cartão da Fase 2C, escritos pelo
+Claude. Nenhum código antes disso. O QuantLib não entra como dependência do repositório.
 
 ## Fase 02 — Marco 2B — FECHADO (estado A)
 
