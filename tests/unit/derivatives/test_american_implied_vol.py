@@ -228,3 +228,15 @@ def test_d1_ill_conditioned() -> None:
     assert oracle.diagnostic.status is IvStatus.LOW_VEGA
     _assert_refused(_invert(Decimal(str(obs.price)), contract, carry=NONE, terms=terms, spot=spot),
                     "iv:not_identifiable")
+
+
+@pytest.mark.parametrize("steps", [3, 10, 50, 200])
+def test_zero_carry_positive_rate_keeps_same_model(steps: int) -> None:
+    """Uma call sem carry não pode reintroduzir o desvio entre preço e IV."""
+    sigma = .2
+    quote = _price(carry=NONE, sigma=sigma, steps=steps)
+    assert quote.price is not None
+    result = _invert(quote.price, carry=NONE, steps=steps)
+    assert isinstance(result, bridge.AmericanIvSolution)
+    assert abs(result.sigma - sigma) <= 1e-6
+    assert result.model == CRR
