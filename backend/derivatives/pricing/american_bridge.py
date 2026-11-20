@@ -223,6 +223,12 @@ def american_implied_vol(
         return AmericanIvRefusal("iv:invalid_target")
     if years == 0:
         return AmericanIvRefusal("iv:expiry")
+    if type(cfg) is not AmericanIvConfig:
+        return AmericanIvRefusal("iv:invalid_config")
+    try:
+        cfg = AmericanIvConfig.model_validate(cfg)
+    except ValidationError:
+        return AmericanIvRefusal("iv:invalid_config")
     target = float(target_price)
     tol = cfg.tol_price_rel * max(1.0, target)
     is_call = contract.kind is OptionKind.CALL
