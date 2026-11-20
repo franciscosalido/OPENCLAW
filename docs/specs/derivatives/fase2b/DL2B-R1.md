@@ -238,3 +238,13 @@ autor não integra. As evidências de cada PR entram abaixo deste cartão, em se
 - Medições do revisor de 2026-11-19 e 2026-11-20: erro do par com 200 passos, 105 idas e
   voltas do atalho misto, 927 idas e voltas pela árvore. (medição própria, cotação
   sintética)
+
+## Evidências da Parte A — PR 1 (DL2B-PR01A)
+
+- Base: `2132e10`. Primeiro commit: `21f3de3`; três insumos conferidos pelo SHA-256.
+- RED e GREEN da correção de tipos, sem mudança de escopo, preservados nos commits
+  `d8e4ac6` e `72ffa87`. Evidência original no [cartão do PR01A](DL2B-PR01A.md).
+- Os testes de `f85e3af` cobrem as duas lacunas da revisão. Código, configuração,
+  scripts e testes idênticos ao que foi revisado em `f85e3af`.
+- Portões e evidência da revisão independente identificados na descrição do rascunho
+  pelo head publicado; parecer da skill fora do Git.

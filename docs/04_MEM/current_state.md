@@ -4,32 +4,30 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-19 · **Turno:** Claude (GO e merge do DL2-PR03).
+**Última atualização:** 2026-11-20 · **Turno:** Codex/Dots (DL2B-R1, Parte A).
 
 ## Fase 02 — Marco 2B
 
-PR atual: DL2B-PR01A — EM_REVISAO. Estado de prontidão A. ADR-0026 aceito e
-`SDD_FASE2B.md` vigente.
+PR atual: DL2B-PR01A — EM_REVISAO. Estado de prontidão A.
+[ADR-0026 revisado](../ADR/ADR-0026-laboratorio-derivativos-fase2b.md) e
+[cartão DL2B-R1](../specs/derivatives/fase2b/DL2B-R1.md) vigentes.
 
-O PR01 (#146) entregou a média das árvores CRR de N e N + 1 passos. O PR01A corrige o
-eco de entradas inválidas e a recusa de spot de tipo errado nessa ponte. Chain, MCP e CLI
-continuam recusando a americana com `american_not_supported_phase1`. No Mac e no Linux
-aarch64 passaram 9.282 testes, com 16 pulados e 261 subtestes aprovados. As seis
-mutações foram detectadas. [Cartão, RED e evidências](../specs/derivatives/fase2b/DL2B-PR01A.md).
+Este PR corrige os tipos e o eco da ponte e cobre as duas lacunas de teste.
+Não liga a ponte à chain, ao MCP nem ao CLI. O modo padrão segue inativo.
 
-**D1 para o DL2B-PR02.** Francisco decidiu neste turno que CALL com `q = 0` e taxa
-positiva (`r > 0`) reusa a IV europeia da Fase 01. O caso `r = 0`, incluído na pergunta
-original do ADR-0026, permanece em aberto. A implementação de IV pertence ao PR02.
-Francisco ainda decide D2 (passos padrão, PR04), D3 (origem e vigência dos termos, PR03)
-e D4 (NumPy, após a medição do PR02).
+**Decisões da Revisão 1.** CRR no preço e na IV da linha; BSM europeu apenas
+como sombra, sem influenciar o resultado principal. O padrão de 200 passos e
+a sombra só entram no quarto PR. O teto de 210 ms é para a mediana de CPU,
+por inversão de referência no Mac, medido nos PRs 2 e 4.
 
-**Lembrete para o início da Fase 4, se ela for aberta.** Projetar um motor Kronos dedicado
-à volatilidade, inverter a árvore para obter IV e avaliar modelos de volatilidade mais
-complexos e de maior custo computacional para venda de volatilidade.
+**Próxima ação.** Claude revisa e integra o PR01A. Só depois se publica o PR02.
+Fechada a fila 2B, priorizar a homologação com OpLab no estado B, reaproveitando
+o cliente existente e começando por séries líquidas de BOVA11. A fase atual
+não autoriza acesso real, uso de token nem ativação; o estado B tem cartão
+próprio e depende das condições do ADR.
 
-**Próxima ação.** O coordenador verifica o head local e publica o PR em rascunho.
-Claude forma seu parecer independente sobre o head publicado. Depois lê o parecer da
-skill, produzido por outro agente em sessão separada, antes de decidir a integração.
+**Lembrete para o início da Fase 4, se ela for aberta.** Projetar um motor Kronos
+dedicado à volatilidade e avaliar métodos de maior custo para venda de volatilidade.
 
 ## Fase 02 — Marco 2A — FECHADO (estado A)
 
