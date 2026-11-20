@@ -94,3 +94,85 @@ deu rc 1, **43 falhas e 51 aprovações** em 0,82 s. Para 2/abril o teste recebe
 a mesma recusa quando já esperava a versão `z-first`. A prova de carga em
 processo novo também falhou, assim como as duas provas de import dinâmico
 direto e indireto do registro. Log integral local em `reports/dl2b-pr03/mac/red.log`.
+
+## Resultado do candidato para Claude
+
+**Estado A, candidato local em revisão. NO-GO local para aceite com Pyright global
+verde.** O gate de tipos de produção utilizado no PR02 passou. O Pyright do
+repositório inteiro retornou rc 1 nos dois SO. A comparação abaixo registra o
+alcance da falha. A decisão de integração cabe à revisão.
+
+| Passo local | Commit | Prova |
+|---|---|---|
+| Cartão pré-RED | `4bc1be8` | Contrato, escopo, amostra e critérios |
+| RED | `e724d7f` | 43 falhas comportamentais e de isolamento, 51 aprovações |
+| GREEN | `3cd75bb` | 94 aprovações em testes do registro e guarda |
+| Refactor e verificação de fronteira | `1378bf2` | 105 aprovações com a guarda do binomial incluída |
+
+Durante a verificação do GREEN, um objeto genérico com os atributos de
+`OptionContract` chegou a produzir uma resolução. A contraprova isolada teve
+uma falha e cinco aprovações. O candidato exige a instância de domínio e
+revalida os campos observados em modo estrito, inclusive após cópia sem validação.
+A seleção temporal foi extraída para uma função privada. Os demais controles
+incluem campos extras de autorização e volume, ausência de datas e registro
+construído contornando o validador. No Mac, sete mutações isoladas foram detectadas,
+com 55 testes de domínio aprovados na cópia de controle. As mutações retiraram
+strike, vencimento e ISIN da identidade, ignoraram disponibilidade, excluíram
+o último dia ou aceitaram sobreposição e reutilização de versão.
+
+### Interface e isolamento
+
+A entrada pública é `SeriesRegistry.resolve(contract, *, as_of)`. O único
+resultado bem-sucedido é `SeriesResolution`. A seleção e a compatibilidade usam
+`RegistryRefusal`, e o domínio de carry preserva `CarryRefusal`. Erros de tipo
+ou de construção são tratados na fronteira. As versões e fontes são declarações
+do chamador. O par termos/carry precisa compartilhar série e data efetiva conforme
+o domínio do 2A. O chamador fornece expressamente o fim da vigência conjunta.
+O histórico em memória deve conter as versões necessárias à consulta.
+
+A guarda passou a procurar o registro inclusive como alvo de import dinâmico
+literal, direto ou por intermediário. A lista de caminhos de produção com
+permissão de alcançar a ponte teve zero acréscimos. A única alteração em produção
+é o novo módulo do domínio, com 112 linhas de 400 permitidas.
+
+### Portões offline por plataforma
+
+Base `8ec256dfef3564a0b4f34777e7e2aac6bdc97459`,
+código `1378bf2da3dc84d68379a4da19777d78ac311cbc`.
+Ambos os SO usaram CPython 3.12.13, pytest 9.0.3 e Pyright 1.1.409.
+No Mac, o interpretador veio de `/Users/fas/projetos/OPENCLAW/.venv/bin/`.
+Linux aarch64 usou o runner cacheado do PR02, com Git e Click locais e a imagem
+`sha256:943825bb4a63ab6e0c7400dbee77cddeeb31ecd457b3366293b7c45d201ca7d8`,
+`--pull never --network none --cap-drop ALL --security-opt no-new-privileges`.
+O runner publicou zero portas e utilizou zero serviços externos. Base e candidato
+foram materializados com bundle local em diretórios temporários independentes.
+
+| Comando ou verificação | macOS arm64 | Linux aarch64 | Log em cada SO |
+|---|---|---|---|
+| `python3.12 -m pytest tests/ -q --ignore=tests/integration --timeout=120` | 9.434 passaram, 16 pulados, 261 subtestes, 42,61 s | 9.434 passaram, 16 pulados, 261 subtestes, 50,44 s | `pytest.log` |
+| `python3.12 -m mypy backend/ --strict` | rc 0, 161 arquivos | rc 0, 161 arquivos | `mypy.log` |
+| `pyright --venvpath "$envroot" backend/` | 0 erros e avisos | 0 erros e avisos | `pyright-backend.log` |
+| Pyright nos dois arquivos de teste do cartão | 0 erros e avisos | 0 erros e avisos | `pyright-tests.log` |
+| `pyright --venvpath "$envroot"` global, base e candidato | rc 1, 131 erros em ambos | rc 1, 131 erros em ambos | `{base,head}.pyright-global.log` |
+| `cmp` dos diagnósticos globais, normalizado apenas o caminho do checkout | rc 0 | rc 0 | `gates.log`, `{base,head}.pyright-normalized` |
+| `git diff --check 8ec256d HEAD`, diff fora da lista permitida e integridade do bloco de memória | rc 0 | rc 0 | `gates.log`, `diff-check.log`, `escopo.log` |
+| CLI demo, `cmp` do stdout contra base no mesmo SO | rc 0, 67.097 bytes | rc 0, 67.101 bytes | `{base,head}.demo.json`, `gates.log` |
+| CLI padrão em base e candidato | rc 3, `LIVE_NOT_ACTIVATED` | rc 3, `LIVE_NOT_ACTIVATED` | `{base,head}.cli.json`, `gates.log` |
+| CLI padrão com relógio fixo, `cmp` do stdout completo | rc 0, 313 bytes | rc 0, 313 bytes | `{base,head}.cli-fixed.json`, `gates.log` |
+
+O CLI real foi chamado com `python3.12 -m backend.derivatives.cli chain BOVA11 2026-11-19`,
+adicionando `--provider offline_fixture` para a demo. O CLI padrão publica o
+instante da consulta. Para a comparação adicional do JSON completo foi usada a
+entrada `cli.main` com o relógio injetável fixado à meia-noite UTC de 19/11/2026.
+
+No Mac, a demo teve SHA-256 `a7d82699b47d31acec31995ccea3cf4149ebcb92311f980fb23390627b1de9c3`.
+No Linux, teve SHA-256 `f4f8003f2021b2744202c782f6e5245872c09d7f9d1968a3356466a7e85ead08`.
+O CLI com relógio fixo teve o mesmo SHA-256 nos dois SO, `230690465fe972c140d87c662e3b61de934a0b99896a0282e078c31829f16fb7`.
+
+O Pyright global apontou sete arquivos de teste preexistentes. Os diagnósticos
+são idênticos aos do PR02 ao substituir somente o caminho absoluto do checkout.
+A suíte ganhou 57 testes sobre os 9.377 do PR02. As provas de código ficam em
+`reports/dl2b-pr03/code/{mac,linux}/` neste worktree. As contraprovas ficam em
+`reports/dl2b-pr03/mac/`, e os comandos completos em `reports/dl2b-pr03/support/`.
+O handoff local `curren_status.md` identifica o SHA final e os logs da repetição.
+Claude faz o parecer independente. A decisão de fonte e validade reais continua com Francisco.
