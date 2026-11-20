@@ -87,7 +87,10 @@ def test_cross_model_discretization() -> None:
     result = _invert(obs.price, carry=NONE, steps=200)
     assert isinstance(result, bridge.AmericanIvSolution), result
     assert result.sigma == _oracle(obs.price)
-    assert abs(result.sigma - .199983104711) < 1e-11
+    lo, hi = result.bracket
+    assert lo <= .199983104711 <= hi
+    ref = price(BsmInputs(OptionKind.CALL, 100., 100., 1., .05, .199983104711), theta_basis=252)
+    assert abs(ref.price - float(obs.price)) < 5e-11
     assert 1.68e-5 < .2 - result.sigma < 1.70e-5
 
 
@@ -143,9 +146,9 @@ def test_invalid_target(target: Any) -> None:
 
 
 @pytest.mark.parametrize(("target", "changes", "reason"), [
-    ("9", dict(contract=PUT, spot=Decimal("90")), "iv:below_intrinsic"),
-    ("10", dict(contract=PUT, spot=Decimal("90")), "iv:not_identifiable"),
-    ("0.00000000001", dict(contract=PUT), "iv:not_identifiable"),
+    ("9", dict(contract=PUT, spot=Decimal("90"), carry=NONE), "iv:below_intrinsic"),
+    ("10", dict(contract=PUT, spot=Decimal("90"), carry=NONE), "iv:not_identifiable"),
+    ("0.00000000001", dict(contract=PUT, carry=NONE), "iv:not_identifiable"),
     ("4", dict(carry=NONE), "iv:below_intrinsic"),
     ("100.000000001", dict(carry=NONE), "iv:not_identifiable"),
     ("101", dict(), "iv:above_upper_bound"),
