@@ -6,6 +6,23 @@
 
 **Última atualização:** 2026-11-19 · **Turno:** Claude (GO e merge do DL2-PR03).
 
+## Fase 02 — Marco 2B
+
+PR atual: DL2B-PR01 — EM_REVISAO. Estado de prontidão A.
+
+A ponte pura calcula a média das árvores americanas de N e N + 1 passos com volatilidade
+dada e carry resolvido. O GREEN local é `522fa89`, após os REDs `609a2cd` (árvore única)
+e `c799efa` (duas fontes de rendimento).
+
+Mac arm64 e Linux aarch64 em clones limpos: 9.244 aprovados, 16 pulados, 261 subtestes
+aprovados em cada plataforma. Mypy strict e Pyright com zero erros. Os 16 mutantes do
+cartão falharam. A demo coincidiu com a base byte a byte em cada plataforma.
+ChainService, MCP e CLI recusaram as mesmas dez americanas sintéticas com
+`american_not_supported_phase1`. O CLI padrão devolveu `LIVE_NOT_ACTIVATED`, rc 3.
+
+Dots publica o draft e inicia o piloto isolado sobre o head remoto.
+[Evidências do DL2B-PR01](../specs/derivatives/fase2b/DL2B-PR01.md#evidências-da-implementação--em_revisao).
+
 ## Fase 02 — Marco 2A — FECHADO (estado A)
 
 PR atual: DL2-PR04 — MERGEADO (PR #145, GO na primeira rodada de revisão). Marco fechado.

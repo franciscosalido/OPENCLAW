@@ -392,3 +392,114 @@ O rótulo entre parênteses diz o peso da fonte.
 
 Quant Stack Exchange: o site segue bloqueado para as ferramentas de leitura desta sessão
 e a busca restrita a ele voltou vazia. Nenhuma afirmação deste cartão se apoia nele.
+
+## Evidências da implementação — EM_REVISAO
+
+Base `ff0c1bec941eb4b78da0c717f1ece4dae2cf02e7`. A SPEC, em
+`515f0cf4fc1e3580d6bd7c6fe6280059e25d705e`, contém as três cópias conferidas pelo
+manifesto de origem. O GREEN de código e testes é
+`522fa89a1304a8f23d1b1a8357637b28fc59e473`. O registro posterior das evidências muda
+apenas este cartão e o bloco Marco 2B da memória.
+
+### Dois REDs reproduzidos em clones dos respectivos commits
+
+1. `609a2cdd0ed146e0feb7ebd1e2f0a9568812b495`. A1 devolveu o preço de N sozinho.
+   A média esperada vem dos dois `american_price` do JSON em Decimal. Saída de pytest
+   (trecho de `logs/red1.log`).
+
+   ```text
+   >       assert abs(outcome.price - american) <= Decimal("1e-11") * max(1, american)
+   E       AssertionError: assert Decimal('0.00633428294684240645') <= (Decimal('1E-11') * Decimal('6.54380395978580340645'))
+   E        +  where Decimal('0.00633428294684240645') = abs((Decimal('6.537469676838961') - Decimal('6.54380395978580340645')))
+   FAILED tests/unit/derivatives/test_american_bridge.py::test_t1_anchors[A1] - ...
+   1 failed in 0.13s
+   ```
+
+2. `c799efaefa0b6de0250c173fb1306b6c8312e46c`. A1 e A2 passaram com a média. Em T3,
+   o rendimento de entrada `0.0` permaneceu nas hipóteses junto ao carry resolvido `0.08`.
+   Saída de pytest (trechos de `logs/red2.log`).
+
+   ```text
+               "dividend_yield": 0.0, "strike_adjusted_by_exchange_assumed": True,
+           assert outcome.assumptions["carry_dividend_yield"] == 0.08
+   >       assert "dividend_yield" not in outcome.assumptions, outcome.assumptions
+   E       AssertionError: {'calendar_id': 'test_calendar', 'carry_dividend_yield': 0.08, 'carry_effective_on': '2026-11-19', 'carry_kind': 'CONTINUOUS_YIELD', ...}
+   FAILED tests/unit/derivatives/test_american_bridge.py::test_t3_single_yield_source
+   1 failed, 2 passed in 0.12s
+   ```
+
+As reproduções com `pytest -vv` registram os SHAs, as asserções e o rc 1 em
+`logs/red1.pinned.log` e `logs/red2.pinned.log`. No GREEN, T1–T9 somam 45 casos.
+As duas guardas somam 48, incluindo os intrusos diretos e indiretos de T10 e as
+provas em interpretador novo.
+
+### Resultados numéricos
+
+| Âncora | Preço no Mac | Prêmio no Mac |
+|---|---:|---:|
+| A1 · call com rendimento de 0.08 | 6.543803959785978 | 0.4010597478426474 |
+| A2 · put com carry NONE | 6.091951932388676 | 0.5190598881323645 |
+
+T1 compara com a referência decimal independente do 2A. T9 compara com as 12 referências
+de alta resolução do cartão. No Mac, o maior erro absoluto a 400 passos foi
+**0.00292704077488**, na call com K = 110, r = 0.13, q = 0.06, sigma = 0.40 e T = 1.
+Preço obtido 13.94992704077488, referência 13.9470, limite 0.01. Os limites de T1, T8 e T9
+são os da SPEC.
+
+### Mutação
+
+Um único defeito por execução em clone separado de `522fa89`. Controle de T1–T9 com
+45 aprovados. Cada execução terminou com rc 1 por falha de asserção. O clone voltou
+à árvore limpa. Os patches e as saídas individuais estão em `logs/mutants/M01…M16`.
+
+| Mutante | Defeito introduzido | Primeiro teste que falhou |
+|---|---|---|
+| 01 | só N | T1 A1 |
+| 02 | N e N + 2 | T1 A1 |
+| 03 | q das hipóteses | T1 A1 |
+| 04 | ausência de carry vira NONE | T3 |
+| 05 | omite igualdade do strike | T4 strike |
+| 06 | omite igualdade do lote | T4 lot |
+| 07 | aceita europeia | T4 european |
+| 08 | recusa com preço | T4 european |
+| 09 | motivo genérico do binomial | T4 zero-sigma |
+| 10 | prêmio com sinal trocado | T1 A1 |
+| 11 | regime sempre tree | T7 vencimento |
+| 12 | mantém chaves da Fase 01 | T3 |
+| 13 | altera hipóteses na recusa | T3 |
+| 14 | identidade do contrato antes de resolver carry | T4 invalid-terms |
+| 15 | Decimal direto do float | T2 média exata |
+| 16 | lote ausente diverge | T6 |
+
+### Portões e consumidores
+
+Clones limpos de base e candidato por plataforma. Python 3.12.13, ambientes existentes
+conferidos contra o lock congelado. O Linux usou a imagem aarch64 local com rede desligada.
+
+| Prova no GREEN | macOS arm64 nativo | Linux aarch64 |
+|---|---:|---:|
+| pytest do cartão · aprovados / pulados / subtestes aprovados | 9.244 / 16 / 261 | 9.244 / 16 / 261 |
+| T1–T10, inclusive casos antigos das guardas | 93 aprovados | 93 aprovados |
+| mypy strict | 0 erros, 160 arquivos | 0 erros, 160 arquivos |
+| pyright | 0 erros, 0 avisos | 0 erros, 0 avisos |
+| CLI padrão | LIVE_NOT_ACTIVATED, rc 3 | LIVE_NOT_ACTIVATED, rc 3 |
+| cmp da demo offline entre base e candidato | rc 0, 67.097 bytes | rc 0, 67.101 bytes |
+
+SHA-256 da demo offline em base e candidato, por plataforma:
+
+- Mac `a7d82699b47d31acec31995ccea3cf4149ebcb92311f980fb23390627b1de9c3`
+- Linux `f4f8003f2021b2744202c782f6e5245872c09d7f9d1968a3356466a7e85ead08`
+
+**Prova separada da demo.** Na resposta sintética em memória, dez das cem linhas receberam
+estilo americano. Em cada plataforma, o ChainService, a ferramenta MCP de teste e o CLI
+devolveram os mesmos dez símbolos com `american_not_supported_phase1`, preço, gregas e IV
+nulos. As outras 90 linhas continuaram suportadas em cada consumidor.
+
+`git diff --check` e os dois `git diff --exit-code` do cartão retornaram 0. O numstat de
+produção é 109 adições em `american_bridge.py`. Em arquitetura o diff lista somente as
+duas guardas. O estado de prontidão continua A.
+
+**Arquivo local das evidências.** No pai do clone, `evidencias-dl2b-pr01/` contém o manifesto
+`SHA256SUMS.txt`, os patches de mutação e os logs novos. Em `logs/{mac,linux}/green/` ficam
+as provas do commit de código. Em `logs/{mac,linux}/final/` ficam os portões repetidos para
+o head de entrega, identificado por `git rev-parse HEAD` em `head.gates.log`.
