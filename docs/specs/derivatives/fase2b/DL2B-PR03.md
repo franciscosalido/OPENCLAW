@@ -1,10 +1,10 @@
 # DL2B-PR03 — Registro versionado de termos e carry por série
 
-Cartão candidato para Claude. Estado A. Base local do PR02
-`8ec256dfef3564a0b4f34777e7e2aac6bdc97459`, confirmada em ambas as branches.
-Francisco autorizou empilhar os commits locais. O critério 7 do SDD exige recusa
-com motivo próprio para registro ausente, vencido ou divergente do contrato.
-Os critérios 5, 9 e 10 também se aplicam. D3 continua aberta.
+Rascunho para Claude, estado A. Parte A, passo 3 do [DL2B-R1](DL2B-R1.md),
+sobre a `main` integrada em `eacb172` (#148), com o domínio de `4c76d14` intacto.
+O critério 7 do SDD exige recusa com motivo próprio para registro ausente,
+vencido ou divergente do contrato. Aplicam-se os critérios 5, 9 e 10.
+D3 permanece aberta. Sem a Parte B e sem código de ligação com a chain.
 
 ## Escopo do candidato
 
@@ -78,8 +78,8 @@ para o par. Nenhuma duração, autorização de uso ou lista de fontes vem do c�
 
 ## Não-objetivos e limites de autoridade
 
-D3 pertence a Francisco, inclusive fonte real, aplicabilidade e prazo. D2 e D4
-permanecem abertas. Ficam fora do cartão a autoria de termos B3, inferir
+D3 pertence a Francisco, inclusive fonte real, aplicabilidade e prazo. D4 fica
+aberta. A Revisão 1 decidiu D2, que só é implementada no PR04. Ficam fora do cartão a autoria de termos B3, inferir
 vencimento, preencher volume nominal, inferir q=0, reclassificar proveniência,
 persistência, precificação, configuração, IV, consumidores da ponte e PR04.
 Não há meta de desempenho. A resolução prova consistência dos dados fornecidos.
@@ -95,7 +95,7 @@ a mesma recusa quando já esperava a versão `z-first`. A prova de carga em
 processo novo também falhou, assim como as duas provas de import dinâmico
 direto e indireto do registro. Log integral local em `reports/dl2b-pr03/mac/red.log`.
 
-## Resultado do candidato para Claude
+## Resultado histórico do candidato local (anterior ao DL2B-R1)
 
 **Estado A, candidato local em revisão. NO-GO local para aceite com Pyright global
 verde.** O gate de tipos de produção utilizado no PR02 passou. O Pyright do
@@ -176,3 +176,9 @@ A suíte ganhou 57 testes sobre os 9.377 do PR02. As provas de código ficam em
 `reports/dl2b-pr03/mac/`, e os comandos completos em `reports/dl2b-pr03/support/`.
 O handoff local `curren_status.md` identifica o SHA final e os logs da repetição.
 Claude faz o parecer independente. A decisão de fonte e validade reais continua com Francisco.
+
+## Evidências da Parte A — PR 3 (DL2B-R1)
+
+O módulo do registro e os testes de `4c76d14` foram reaplicados sem alteração.
+O RED original corresponde a `b094055` nesta base. A descrição do rascunho
+vincula a medição dos portões e a evidência da skill ao head publicado.

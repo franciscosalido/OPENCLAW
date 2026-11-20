@@ -4,11 +4,11 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-20 · **Turno:** Claude (GO e merge do DL2B-PR02).
+**Última atualização:** 2026-11-20 · **Turno:** Codex/Dots (DL2B-R1, PR 3).
 
 ## Fase 02 — Marco 2B
 
-PR atual: DL2B-PR02 — MERGEADO (PR #148, GO). Estado de prontidão A.
+PR atual: DL2B-PR03 — EM_REVISAO. Base integrada: `eacb172` (#148). Estado A.
 [ADR-0026](../ADR/ADR-0026-laboratorio-derivativos-fase2b.md) aceito, com a Revisão 1.
 [Cartão DL2B-R1](../specs/derivatives/fase2b/DL2B-R1.md) e Adendo 1 do SDD vigentes.
 
@@ -35,7 +35,12 @@ Regra de memória (Francisco, 2026-11-20): este arquivo é a única fonte de ver
 os colaboradores. Decisão que apareça aqui sem registro de quem decidiu deve ser
 confirmada com Francisco antes de ser removida ou seguida.
 
-Próxima ação (uma só): Codex publica o DL2B-PR03 em rascunho sobre a `main` integrada.
+Em revisão: registro em memória de termos e carry por identidade e vigência,
+idêntico ao domínio de `4c76d14`. Sem a Parte B e sem consumidor live.
+[Contrato e evidências do PR03](../specs/derivatives/fase2b/DL2B-PR03.md).
+
+Próxima ação (uma só): Claude revisa e integra o DL2B-PR03. Só depois Codex publica
+o DL2B-PR04 sobre a `main` integrada, com a Parte B.
 
 ## Fase 02 — Marco 2A — FECHADO (estado A)
 
