@@ -301,3 +301,28 @@ def test_invalid_target_precedes_invalid_config() -> None:
     """Config inválida não mascara recusa já definida para o alvo."""
     unsafe: Any = None
     _assert_refused(_invert(Decimal("-1"), cfg=unsafe), "iv:invalid_target")
+
+
+def _linear_tree(left: float, right: float) -> Any:
+    middle = (CFG.bracket_lo + CFG.bracket_hi) / 2
+
+    def price(**kwargs: Any) -> float:
+        offset = kwargs["sigma"] - middle
+        return 7.0 + (left if offset < 0 else right) * offset
+
+    return price
+
+
+def test_right_probe_alone_can_refuse() -> None:
+    """Sensibilidade suficiente à esquerda não compensa a falta dela à direita."""
+    with patch.object(bridge, "crr_price", side_effect=_linear_tree(0.002, 0.0002)):
+        result = _invert(Decimal("7"), carry=NONE, rate_cont=0.0)
+    _assert_refused(result, "iv:not_identifiable")
+
+
+def test_probe_distance_is_one_millionth() -> None:
+    """Com 1e-9 de preço a 1e-6 de sigma a raiz é publicada; a meia distância não seria."""
+    with patch.object(bridge, "crr_price", side_effect=_linear_tree(0.001, 0.001)):
+        result = _invert(Decimal("7"), carry=NONE, rate_cont=0.0)
+    assert isinstance(result, bridge.AmericanIvSolution)
+    assert result.sigma == pytest.approx((CFG.bracket_lo + CFG.bracket_hi) / 2, abs=1e-7)

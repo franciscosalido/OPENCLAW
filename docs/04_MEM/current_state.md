@@ -4,36 +4,38 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-20 · **Turno:** Codex/Dots (DL2B-R1, PR 2).
+**Última atualização:** 2026-11-20 · **Turno:** Claude (GO e merge do DL2B-PR02).
 
 ## Fase 02 — Marco 2B
 
-PR atual: DL2B-PR02 — EM_REVISAO. Base integrada: `7cd845c`. Estado A.
+PR atual: DL2B-PR02 — MERGEADO (PR #148, GO). Estado de prontidão A.
 [ADR-0026](../ADR/ADR-0026-laboratorio-derivativos-fase2b.md) aceito, com a Revisão 1.
 [Cartão DL2B-R1](../specs/derivatives/fase2b/DL2B-R1.md) e Adendo 1 do SDD vigentes.
 
-Integrado até aqui: ponte americana pura (PR #146) e a correção de tipos e de eco (PR #147).
-Chain, MCP e CLI ainda não chamam a ponte; o modo padrão segue `LIVE_NOT_ACTIVATED`.
-Portão do head, Linux aarch64 limpo: 9.285 aprovados, 16 pulados, 261 subtestes.
+Integrado até aqui: ponte americana pura (#146), correção de tipos e de eco (#147) e
+volatilidade implícita pelo mesmo par de árvores CRR, com busca configurada em
+`config/american_iv.yaml` (#148). Chain, MCP e CLI ainda não chamam nada disso; o modo
+padrão segue `LIVE_NOT_ACTIVATED`.
+Portão do head, Linux aarch64 limpo: 9.404 aprovados, 16 pulados, 261 subtestes.
+Inversão com 200 passos no Mac: mediana de 138 ms de CPU, teto de 210 ms.
 
 Decisões da Revisão 1 (Francisco, 2026-11-20): árvore CRR no preço e na volatilidade da
-linha; BSM europeu só como sombra; 200 passos por padrão; teto de 210 ms de CPU por
-inversão com 200 passos no Mac. Sombra e passos padrão entram só no quarto PR.
+linha; BSM europeu só como sombra; 200 passos por padrão; teto de 210 ms. Sombra e passos
+padrão entram só no quarto PR.
 
-Fila do marco, um PR por vez: DL2B-PR02 (volatilidade implícita pela árvore), DL2B-PR03
-(registro de termos e carry), DL2B-PR04 (ligação na demo offline, mais a Parte B).
-Abertas: D3 (origem dos termos de série real) e D4 (NumPy).
+Fila do marco, um PR por vez: DL2B-PR03 (registro de termos e carry) e DL2B-PR04 (ligação
+na demo offline, mais a Parte B). Abertas: D3 (origem dos termos de série real) e D4
+(NumPy).
 
-Depois do quarto PR: QuantLib como oráculo de teste, gerado fora do repositório, com ADR
-próprio. Homologação com a OpLab (estado B) e qualquer outra frente só com decisão de
-Francisco; nada disso está autorizado por este marco.
+Roteiro decidido por Francisco em 2026-11-20, na ordem: Fase 2C, QuantLib como oráculo de
+teste, com ADR próprio; Fase 3, como já definida; Fase 4, Kronos. Nenhuma delas começa
+antes de fechar o Marco 2B, e nenhuma autoriza dado real ou token por si só.
 
-Em revisão: inversão da IV com o mesmo par CRR da ponte e política de busca em
-YAML próprio, sem consumo pela chain ou mudança na Fase 1. Sem Parte B.
-[Contrato e evidências do PR02](../specs/derivatives/fase2b/DL2B-PR02.md).
+Regra de memória (Francisco, 2026-11-20): este arquivo é a única fonte de verdade entre
+os colaboradores. Decisão que apareça aqui sem registro de quem decidiu deve ser
+confirmada com Francisco antes de ser removida ou seguida.
 
-Próxima ação (uma só): Claude revisa e integra o DL2B-PR02. Só depois Codex publica
-o DL2B-PR03 sobre a `main` integrada.
+Próxima ação (uma só): Codex publica o DL2B-PR03 em rascunho sobre a `main` integrada.
 
 ## Fase 02 — Marco 2A — FECHADO (estado A)
 

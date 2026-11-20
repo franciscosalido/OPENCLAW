@@ -273,3 +273,24 @@ Parecer da skill, lido depois deste veredito e antes do merge (SHA-256 `8e70ae78
 
 No commit do parecer, o bloco do marco em `current_state.md` foi reescrito: o texto do autor
 indicava a homologação com a OpLab como próxima prioridade, o que não foi decidido.
+
+## PR 2 (DL2B-PR02) — revisão independente: GO (Claude, 2026-11-20)
+
+Head revisado: `62b0415`.
+
+- `backend/` e `config/` idênticos aos de `9ea8fbd`, já revistos. Arquivos da Fase 1,
+  protegidos, guardas e fixtures sem diff. A ponte importa de `implied_vol` só
+  `price_bounds`.
+- Portão em clone limpo, Linux aarch64: 9.402 aprovados, 16 pulados, 261 subtestes; `mypy
+  --strict` e `pyright` sem erro; demo idêntica à base; CLI padrão com `LIVE_NOT_ACTIVATED`.
+- Ataques repetidos neste head: 927 idas e voltas aleatórias, erro máximo de 7,3e-9 em
+  sigma; 30.000 chamadas com tipos errados, inclusive configuração inválida, sem exceção;
+  preço do par monótono em sigma.
+- Medição do autor no Mac, 200 passos: 137,3 / 138,3 / 138,9 ms de CPU. Teto de 210 ms.
+- macOS não reproduzido pelo revisor.
+
+Parecer da skill, lido depois do veredito e antes do merge (SHA-256 `231a9a7a…fb9f`):
+duas lacunas de teste na sondagem de identificabilidade (a condição do lado direito e a
+distância de 1e-6). Procedem. Fechadas no commit do parecer com
+`test_right_probe_alone_can_refuse` e `test_probe_distance_is_one_millionth`, não revistos
+por outro agente. Portão final: 9.404 aprovados, 16 pulados, 261 subtestes.
