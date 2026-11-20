@@ -6,6 +6,20 @@
 
 **Última atualização:** 2026-11-20 · **Turno:** Claude (integração do DL2B-PR04).
 
+## Fase 02 — Marco 2C1 (estado A)
+
+Francisco aprovou expressamente D1 a D5 em 2026-11-20, após a discussão
+exploratória. Aceite do [ADR-0027](../ADR/ADR-0027-laboratorio-derivativos-fase2c1.md)
+e do [cartão DL2C1](../specs/derivatives/fase2c1/DL2C1.md), com D4 e D5 provisórios.
+O motor de diferenças finitas é diagnóstico offline; CRR continua principal e
+a sombra BSM continua até a revisão de fechamento da Fase 2C.
+
+Roteiro: 2C1 → 2C (QuantLib só como oráculo de teste) → Fase 3 → Fase 4 (Kronos).
+Nenhum passo deste roteiro autoriza dado real, OpLab ou token.
+
+Próxima ação: DL2C1-PR01, motor e inversão sem consumidor, em rascunho para
+revisão e sem merge. PR02 só depois de Claude integrar o PR01.
+
 ## Fase 02 — Marco 2B — FECHADO (estado A)
 
 PR atual: DL2B-PR04 — MERGEADO (PR #150, NO-GO na primeira rodada, GO na segunda).
