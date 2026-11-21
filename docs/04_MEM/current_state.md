@@ -4,7 +4,54 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-20 · **Turno:** Claude (integração do DL2C1-PR02).
+**Última atualização:** 2026-11-21 · **Turno:** Claude (integração do DL2C2-PR01).
+
+## Fase 02 — Marco 2C2 — FECHADO (estado A)
+
+PR atual: DL2C2-PR01 — MERGEADO (PR #153, GO na primeira rodada). Zero linha de produção.
+[ADR-0028](../ADR/ADR-0028-laboratorio-derivativos-fase2c2.md) aceito por Francisco em
+2026-11-20, com as ressalvas S1 a S4. Cartão em
+[DL2C2.md](../specs/derivatives/fase2c2/DL2C2.md),
+[Adendo 1](../specs/derivatives/fase2c2/DL2C2-ADENDO-1.md) e resultados em
+[DL2C2-PR01.md](../specs/derivatives/fase2c2/DL2C2-PR01.md).
+
+Entregue:
+- Referência de 69 preços do QuantLib 1.44, gerada fora do repositório em contêiner, com
+  incerteza por caso. O QuantLib não é dependência nem motor.
+- Testes que medem contra ela o BSM europeu, a árvore CRR e as diferenças finitas, em preço
+  e em volatilidade. Portão do head, Linux aarch64 limpo: 10.750 aprovados, 16 pulados, 261
+  subtestes.
+
+Resultado, com a configuração mantida por Francisco (árvore com 200 passos, malha
+400 por 200), nos 67 casos identificáveis:
+- Árvore: erro de volatilidade de até 3,7e-4; inversão em 148 ms no caso mais lento.
+- Diferenças finitas: erro de até 2,3e-4; inversão em 405 ms no caso mais lento.
+- BSM europeu contra o analítico do QuantLib: 1e-14.
+
+O que o marco não prova:
+- Nada sobre o modelo: volatilidade e juros constantes e rendimento contínuo são premissas
+  dos três métodos.
+- Nada sobre dias úteis, provento discreto ou dado de mercado.
+
+Pendências com dono:
+- **Identificação de VI perto do intrínseco**, antes de qualquer uso com dado real. Nos casos
+  `B21` e `C01` os dois motores devolvem `ok` e erram de 2,6 a 5,5 pontos percentuais.
+  Francisco decide a regra; Claude escreve o cartão, junto do alerta de relevância
+  (ADR-0028, S3).
+- Convenção de dias úteis `(D0,Dv]`, ainda hipótese em `config/derivatives.yaml`; o
+  `Business/252` do QuantLib conta `[D0,Dv)`.
+- Sombra BSM: fica como controle no grupo sem rendimento (acerta 18 de 18) e não vota nos
+  demais (11 de 51). Sem PR nesta fase (ADR-0028, S4).
+
+O limiar de 0,00050 é aviso de diagnóstico e não muda. Repetir a conferência com dado real é
+marco futuro, depois da ativação da OpLab, que tem rito próprio.
+
+Roteiro (Francisco): 2C1 e 2C2 fechados → Fase 3 → Fase 4 (Kronos). A Fase 3 não tem cartão
+aprovado. ADR-0024 (corretora) segue PROPOSED: só muda com commit assinado por Francisco
+alterando `CLAUDE.md`.
+
+Próxima ação (uma só): Francisco define o objetivo da Fase 3. Nenhum código antes de um
+cartão aprovado.
 
 ## Fase 02 — Marco 2C1 — FECHADO (estado A)
 

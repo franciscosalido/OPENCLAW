@@ -1,0 +1,12 @@
+# Proveniência de quantlib_reference_v1.json
+- Gerado em: 2026-11-21 00:55:12 UTC
+- Quem rodou: Codex, sessão de implementação DL2C2-PR01
+- Máquina: aarch64 3.12.16
+- Imagem: python@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b
+- Pacote: QuantLib==1.44, hash fb76eb6695fdc178d7da063274e11b40ee772c9da046827616348d26242fdd02
+- pip freeze: QuantLib==1.44
+- SHA-256 do gerador: c24ca695116b82823bba5389dd69583c496f44df94ad9585cce3f08892e937db
+- SHA-256 do JSON: c2afec8cca56175390d8c2be54bea544869251148a39363d721add1200a77281
+- Determinismo: duas execuções idênticas (cmp, rc 0)
+- Conferência cruzada com x86-64: maior diferença relativa 4.5316597349932466e-13, limite 1e-9
+- Comando: passo 1 do cartão DL2C2, sem alteração
