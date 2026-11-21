@@ -9,7 +9,7 @@ from pydantic import ValidationError
 
 from backend.derivatives.ticket.digest import canonical_bytes, digest
 from backend.derivatives.ticket.models import (
-    EditableField, Environment, FieldRef, Leg, Preview, Side, TicketDraft,
+    EditableField, Environment, FieldRef, Leg, MarketSuggestion, Preview, Side, TicketDraft,
     apply_human_edit, apply_market_refresh, unlock,
 )
 
@@ -97,15 +97,15 @@ def test_refresh_locks_and_version() -> None:
     edited = apply_human_edit(original, PRICE, D("2.00"))
     assert edited.version == original.version + 1 and edited.locked == {PRICE}
     for suggestions in ({}, {PRICE: D("3")}, {OTHER: D("1.2000")}):
-        assert apply_market_refresh(edited, suggestions, quote_snapshot_id="new") is edited
-    updated = apply_market_refresh(edited, {PRICE: D("3"), OTHER: D("4")}, quote_snapshot_id="q1")
+        assert apply_market_refresh(edited, MarketSuggestion("new", suggestions)) is edited
+    updated = apply_market_refresh(edited, MarketSuggestion("q1", {PRICE: D("3"), OTHER: D("4")}))
     assert [x.limit_price for x in updated.legs] == [D("2"), D("4")]
     assert updated.version == edited.version + 1 and updated.quote_snapshot_id == "q1"
     assert updated.locked == {PRICE} and edited.quote_snapshot_id == "q0"
     unlocked = unlock(updated, PRICE)
     assert unlocked.version == updated.version
     assert preview(unlocked).digest == preview(updated).digest
-    refreshed = apply_market_refresh(unlocked, {PRICE: D("3")}, quote_snapshot_id="q2")
+    refreshed = apply_market_refresh(unlocked, MarketSuggestion("q2", {PRICE: D("3")}))
     assert refreshed.legs[0].limit_price == 3
 
 
@@ -179,8 +179,8 @@ def test_each_operational_field_stays_locked(ref: FieldRef, value: object,
     """A trava é endereçada e a foto só avança quando uma sugestão é adotada."""
     edited = apply_human_edit(draft(), ref, value)
     assert ref in edited.locked and edited.version == 2
-    assert apply_market_refresh(edited, {ref: replacement}, quote_snapshot_id="q1") is edited
-    update = apply_market_refresh(unlock(edited, ref), {ref: replacement}, quote_snapshot_id="q2")
+    assert apply_market_refresh(edited, MarketSuggestion("q1", {ref: replacement})) is edited
+    update = apply_market_refresh(unlock(edited, ref), MarketSuggestion("q2", {ref: replacement}))
     assert update.version == 3 and update.quote_snapshot_id == "q2"
 
 
@@ -189,9 +189,9 @@ def test_refresh_is_atomic_and_revalidates_the_whole_draft() -> None:
     first, second = (FieldRef(EditableField.SYMBOL, i) for i in (0, 1))
     original = draft()
     with pytest.raises(ValidationError):
-        apply_market_refresh(original, {first: "synb"}, quote_snapshot_id="q1")
+        apply_market_refresh(original, MarketSuggestion("q1", {first: "synb"}))
     changes = {first: "SYNB", second: "SYNA"}
-    changed = apply_market_refresh(original, changes, quote_snapshot_id="q1")
+    changed = apply_market_refresh(original, MarketSuggestion("q1", changes))
     assert tuple(x.symbol for x in changed.legs) == ("SYNB", "SYNA")
     assert changed.version == 2 and original.legs[0].symbol == "SYNA"
 

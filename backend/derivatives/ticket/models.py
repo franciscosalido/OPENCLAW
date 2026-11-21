@@ -171,15 +171,21 @@ def apply_human_edit(draft: TicketDraft, field: FieldRef, value: object) -> Tick
     return _updated(draft, {field: value}, locked=draft.locked | {field}, version=draft.version + 1)
 
 
-def apply_market_refresh(draft: TicketDraft, suggestion: Mapping[FieldRef, object],
-                         *, quote_snapshot_id: str) -> TicketDraft:
+class MarketSuggestion(NamedTuple):
+    """Foto de origem e alterações candidatas a uma atualização atômica."""
+
+    quote_snapshot_id: str
+    changes: Mapping[FieldRef, object]
+
+
+def apply_market_refresh(draft: TicketDraft, suggestion: MarketSuggestion) -> TicketDraft:
     """Adota a foto somente ao incorporar uma mudança autorizável, num único incremento."""
-    changes = {ref: value for ref, value in suggestion.items() if ref not in draft.locked}
+    changes = {ref: value for ref, value in suggestion.changes.items() if ref not in draft.locked}
     updated = _updated(draft, changes)
     if updated == draft:
         return draft
     return TicketDraft.model_validate(dict(updated) | {
-        "quote_snapshot_id": quote_snapshot_id, "version": draft.version + 1,
+        "quote_snapshot_id": suggestion.quote_snapshot_id, "version": draft.version + 1,
     })
 
 
