@@ -43,7 +43,7 @@ def test_canonical_contract() -> None:
     expected = {
         "environment": "SIMULATED",
         "legs": [{"symbol": symbol, "side": side, "quantity": 20, "limit_price": "1.2",
-                  "lot_size": 10} for symbol, side in [("SYNA", "BUY"), ("SYNB", "SELL")]],
+                  } for symbol, side in [("SYNA", "BUY"), ("SYNB", "SELL")]],
         "net_limit": "-2.5", "gross_cap": "24", "partial_exposure": "24",
         "send_deadline": "2026-11-21T14:00:00+00:00", "order_validity": "2026-11-22T14:00:00+00:00",
         "quote_snapshot_id": "q0",
@@ -70,7 +70,6 @@ def test_signed_ticket_fields(field: str, value: object) -> None:
 
 @pytest.mark.parametrize(("field", "value"), [
     ("symbol", "SYNC"), ("side", Side.SELL), ("quantity", 30), ("limit_price", D("1.21")),
-    ("lot_size", 5),
 ])
 def test_signed_leg_fields(field: str, value: object) -> None:
     """Cada campo da perna e a ordem econômica participam do resumo."""
@@ -205,3 +204,13 @@ def test_version_digest_and_environment_cannot_be_supplied_as_signed_overrides()
             Preview.model_validate(dict(p) | overrides)
     with pytest.raises(ValidationError):
         digest(p.model_copy(update={"net_limit": .3}))
+
+
+def test_lot_validates_quantity_without_changing_signed_content() -> None:
+    """O SDD assina unidades e limite por perna. O lote valida as unidades."""
+    p = preview()
+    valid = Leg.model_validate(dict(p.legs[0]) | {"lot_size": 5})
+    other = Preview.model_validate(dict(p) | {"legs": (valid, p.legs[1])})
+    assert other.digest == p.digest
+    with pytest.raises(ValidationError):
+        Leg.model_validate(dict(valid) | {"lot_size": 3})
