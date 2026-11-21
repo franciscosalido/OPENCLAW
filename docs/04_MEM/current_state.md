@@ -4,7 +4,26 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-20 · **Turno:** Claude (integração do DL2C1-PR02).
+**Última atualização:** 2026-11-21 · **Turno:** Codex (DL2C2-PR01).
+
+## Fase 02 — Marco 2C2 (estado A)
+
+[ADR-0028](../ADR/ADR-0028-laboratorio-derivativos-fase2c2.md) aceito por Francisco em
+2026-11-20, com as ressalvas S1 a S4. Cartão em
+[DL2C2.md](../specs/derivatives/fase2c2/DL2C2.md) e
+[Adendo 1](../specs/derivatives/fase2c2/DL2C2-ADENDO-1.md).
+
+O QuantLib 1.44 entra só como arquivo de referência, gerado fora do repositório; não é
+dependência nem motor. O limiar de 0,00050 é aviso de diagnóstico e não muda. A sombra BSM
+não ganha PR nesta fase. Repetir a conferência com dado real é marco futuro, depois da OpLab.
+
+PR atual: DL2C2-PR01 — EM_REVISAO. Zero linha de produção.
+
+Próxima ação: Claude revisa o DL2C2-PR01. Configuração mantida por Francisco: árvore com
+200 passos e malha 400 por 200. A fase fecha com a tabela de resultados e a revisão.
+
+Pendência antes de qualquer uso com dado real: identificação de VI perto do intrínseco
+(casos B21 e C01 do oráculo). Dono: Francisco decide a regra; Claude escreve o cartão.
 
 ## Fase 02 — Marco 2C1 — FECHADO (estado A)
 
