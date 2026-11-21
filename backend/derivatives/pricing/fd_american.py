@@ -38,7 +38,7 @@ class FdGrid:
     rannacher_steps: int
 
 
-_Status = Literal["ok", "unbracketed", "not_identifiable", "no_convergence",
+_Status = Literal["ok", "below_intrinsic", "unbracketed", "not_identifiable", "no_convergence",
                   "grid_not_admissible", "invalid_input"]
 
 
@@ -180,9 +180,10 @@ def fd_implied_vol(*, kind: OptionKind, spot: float, strike: float, time_years: 
             return FdIvResult("invalid_input", None)
         sign = 1 if kind is OptionKind.CALL else -1
         tol = tol_price_rel * max(1., target_price)
-        intrinsic = max(0., sign * (spot - strike))
-        if (abs(target_price - intrinsic) <= tol
-                or target_price - max(lower_bound, intrinsic) < price_tick):
+        lower = max(lower_bound, sign * (spot - strike))
+        if lower - target_price > tol:
+            return FdIvResult("below_intrinsic", None)
+        if target_price - lower <= tol or target_price <= lower + price_tick:
             return FdIvResult("not_identifiable", None)
         mesh_inputs = (math.sqrt(time_years), time_years, rate_cont - dividend_yield,
                        abs(math.log(spot) - math.log(strike)), grid)
