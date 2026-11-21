@@ -42,7 +42,7 @@ def _check(engine: str, row: oracle._Case, refused: bool) -> None:
 @pytest.mark.parametrize("engine", ["tree", "fd"])
 @pytest.mark.parametrize("scale", [1 - 1e-6, 1 + 1e-6])
 def test_tick_boundary(engine: str, scale: float) -> None:
-    """T3: a fronteira usa distância estritamente menor que um tick."""
+    """T3: preços de ambos os lados da fronteira seguem a política do tick."""
     row = next(case for case in oracle._CASES if case.id == "B21")
     _check(engine, replace(row, american=row.intrinsic + .01 * scale), scale < 1)
 
@@ -110,15 +110,59 @@ def test_demo_quote_within_one_tick(
 
 
 @pytest.mark.parametrize("engine", ["tree", "fd"])
-def test_reviewer_exactly_one_tick_above_the_floor_is_published(engine: str) -> None:
-    """Revisor: a regra é estrita; cotação a exatamente um tick do piso ainda tem VI."""
+def test_otm_quote_at_one_cent_is_not_identifiable(engine: str) -> None:
+    """O caso A01 do revisor fixa o tick inclusivo numa opção fora do dinheiro."""
     row = next(case for case in oracle._CASES if case.id == "A01")
     floor, _ = price_bounds(**row.inputs)
     assert floor == 0. and row.intrinsic == 0.
-    quoted = replace(row, american=.01)
-    if engine == "tree":
-        tree = oracle._tree_iv(quoted)
-        assert isinstance(tree, oracle.AmericanIvSolution) and tree.sigma > 0
+    _check(engine, replace(row, american=.01), True)
+
+
+@pytest.mark.parametrize("case_id", ["A01", "A13", "B21"])
+@pytest.mark.parametrize("offset", [-1, 0, 1], ids=["previous-float", "at-tick", "next-float"])
+def test_one_tick_and_adjacent_prices(case_id: str, offset: int) -> None:
+    """A vizinhança binária cobre pisos zero, europeu e de exercício."""
+    row = next(case for case in oracle._CASES if case.id == case_id)
+    floor = max(row.intrinsic, price_bounds(**row.inputs)[0])
+    edge = floor + oracle._IV.price_tick
+    target = math.nextafter(edge, math.inf if offset > 0 else -math.inf) if offset else edge
+    quoted = replace(row, american=target)
+    if offset <= 0:
+        _check("tree", quoted, True)
+        _check("fd", quoted, True)
     else:
+        assert isinstance(oracle._tree_iv(quoted), oracle.AmericanIvSolution)
         fd = oracle._fd_iv(quoted)
-        assert fd.status == "ok" and fd.sigma is not None and fd.sigma > 0
+        assert fd.status == "ok" and fd.sigma is not None
+
+
+@pytest.mark.parametrize("case_id", ["A13", "B21"])
+@pytest.mark.parametrize(("distance", "reason"), [
+    (2., "below_intrinsic"), (.5, "not_identifiable"), (0., "not_identifiable"),
+])
+def test_effective_floor_precedes_tick(case_id: str, distance: float, reason: str) -> None:
+    """Os motores distinguem arbitragem de ruído numérico nos dois pisos vinculantes."""
+    row = next(case for case in oracle._CASES if case.id == case_id)
+    european_floor = price_bounds(**row.inputs)[0]
+    floor = max(row.intrinsic, european_floor)
+    target = floor - distance * oracle._IV.tol_price_rel * max(1., floor)
+    tree = oracle._tree_iv(replace(row, american=target))
+    assert isinstance(tree, AmericanIvRefusal)
+    assert tree.reason == f"iv:{reason}" and tree.sigma is None
+    fd = _iv_with(**row.inputs, target_price=target, lower_bound=european_floor)
+    assert fd.status == reason and fd.sigma is None
+
+
+def test_numerical_tolerance_at_european_floor_with_subcent_tick(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Mesmo com tick pequeno, o FD respeita a tolerância numérica do piso efetivo."""
+    row = next(case for case in oracle._CASES if case.id == "A13")
+    floor = price_bounds(**row.inputs)[0]
+    target = floor + .5 * oracle._IV.tol_price_rel * floor
+    def unexpected_search(**kwargs: object) -> float:
+        pytest.fail("FD pesquisou dentro da tolerância de preço")
+
+    monkeypatch.setattr("backend.derivatives.pricing.fd_american.fd_price", unexpected_search)
+    fd = _iv_with(**row.inputs, target_price=target, lower_bound=floor, price_tick=1e-12)
+    assert fd.status == "not_identifiable" and fd.sigma is None

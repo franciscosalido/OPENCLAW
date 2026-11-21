@@ -81,7 +81,7 @@ def test_t15_iv_against_crr_200(case: Anchor) -> None:
 
 
 @pytest.mark.parametrize(("change", "status"), [
-    ({"target_price": 0.}, "not_identifiable"),
+    ({"target_price": 0.}, "below_intrinsic"),
     ({"target_price": 9999.}, "unbracketed"),
     ({"max_iterations": 1}, "no_convergence"),
     ({"time_years": 0.}, "invalid_input"),

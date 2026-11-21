@@ -132,3 +132,30 @@ Pare e relate, sem ajustar número nem regra, se:
 4. Rode a skill `quimera-lab-review` na cabeça publicada e gere os **dois relatórios fora do
    Git**: parecer e avaliação de simplificação v0.2. Só os SHA-256 vão na descrição.
 5. Não marque como pronto para revisão. Claude forma o parecer, lê os relatórios e decide.
+
+## Adendo de 21/11/2026 — piso americano e fronteira inclusiva
+
+Francisco autorizou as duas correções apontadas na revisão de `d064fb3` do PR #154.
+Este adendo substitui a comparação estrita dos §§2, 4 e 5 e as expectativas anteriores
+de igualdade do revisor e de alvo zero abaixo de piso positivo no teste FD T16.
+
+1. Para alvo válido, use o piso efetivo, o maior entre o limite europeu e o exercício imediato.
+   Se `piso − alvo > tol_price_rel × max(1, alvo)`, recuse sem sigma por
+   `below_intrinsic` no FD e `iv:below_intrinsic` na árvore, antes de avaliar o tick.
+   A tolerância numérica também se aplica ao piso efetivo quando excede o tick.
+2. O limite de publicação é inclusivo. Compare o alvo diretamente com `piso + price_tick`
+   no formato binário dos motores. Isso arredonda a soma uma única vez. Para um piso de
+   20,00 e um tick de 0,01, subtrair o piso de 20,01 produziria 0,010000000000001563.
+   O primeiro float acima da soma já está fora da regra do tick. Permanecem os testes de
+   domínio, tolerância, identificabilidade do solver e limite superior de cada motor.
+3. A B3 especifica variação mínima de R$ 0,01 no prêmio cotado por unidade ou lote,
+   conforme o fator de cotação. O tick configurado neste laboratório se aplica ao preço
+   já normalizado por ação. A recusa de VI é uma política de publicação do QUIMERA.
+   [Especificação de opções sobre ações da B3](https://b3.com.br/pt_br/produtos-e-servicos/negociacao/renda-variavel/opcoes-sobre-acoes.htm).
+4. No QuantLib 1.44, a inversão americana usa o preço-alvo, um motor de diferenças finitas
+   e parâmetros numéricos de busca. O oráculo offline continua sendo a referência de preço.
+   [Implementação de VanillaOption no QuantLib 1.44](https://github.com/lballabio/QuantLib/blob/v1.44/ql/instruments/vanillaoption.cpp#L42-L81).
+
+Aceite adicional: cobrir piso europeu e de exercício, alvos abaixo e dentro da tolerância,
+piso zero e positivo, igualdade no tick e vizinhos binários imediatos. Os 69 pares devem
+coincidir com a cabeça do revisor. Em relação a main, só B21 e C01 mudam.
