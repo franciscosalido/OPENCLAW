@@ -16,7 +16,7 @@ from backend.derivatives.pricing.american_bridge import (
 from backend.derivatives.pricing.contract_pricing import PricingOutcome
 from backend.derivatives.pricing.conventions import continuous_rate
 from backend.derivatives.pricing.fd_american import FD_MODEL, FdGrid, fd_implied_vol, fd_price
-from backend.derivatives.pricing.implied_vol import IvStatus, implied_vol
+from backend.derivatives.pricing.implied_vol import IvStatus, implied_vol, price_bounds
 from backend.derivatives.pricing.quote_iv import IvDiagnosticModel, IvResultModel, QuoteIv
 from backend.derivatives.provenance import Provenance, Purpose
 from backend.derivatives.service.chain_service import B3_TIMEZONE, PricedChain, PricedRow
@@ -160,7 +160,10 @@ def _price_row(item: PricedRow, priced: PricedChain, registry: SeriesRegistry, *
             if not math.isfinite(price_gap):
                 raise ValueError("fd_price_gap")
             assumptions["fd_price_gap"] = price_gap
+            lower, _ = price_bounds(contract.kind, float(spot), float(contract.strike),
+                                    tte.year_fraction, rate, resolved.carry.dividend_yield)
             fd = fd_implied_vol(
+                lower_bound=lower, price_tick=iv_config.price_tick,
                 **inputs, target_price=float(mid / record.terms.quotation_form),
                 bracket_lo=fd_config.bracket_lo, bracket_hi=fd_config.bracket_hi,
                 max_iterations=fd_config.max_iterations, tol_price_rel=fd_config.tol_price_rel,

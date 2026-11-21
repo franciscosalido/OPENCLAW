@@ -12,6 +12,7 @@ from pydantic import ValidationError
 from backend.derivatives.domain.models import ExerciseStyle, OptionKind
 from backend.derivatives.pricing.american_bridge import AmericanIvSolution, american_implied_vol
 from backend.derivatives.pricing.fd_american import FdGrid, FdIvResult, fd_implied_vol, fd_price
+from backend.derivatives.pricing.implied_vol import price_bounds
 from config.american_fd_config_model import load_american_fd_config
 from config.american_iv_config_model import load_american_iv_config
 from tests.unit.derivatives.test_american_bridge import A1_TERMS, CALL, TTE, _carry
@@ -27,6 +28,8 @@ def test_t13_round_trip(kind: OptionKind, spot: float, years: float, sigma: floa
                       time_years=years, rate_cont=.06, dividend_yield=.04, sigma=sigma, grid=grid)
     solved = fd_implied_vol(kind=kind, spot=spot, strike=100., time_years=years, rate_cont=.06,
                             dividend_yield=.04, target_price=target, grid=grid, bracket_lo=.001,
+                            lower_bound=price_bounds(kind, spot, 100., years, .06, .04)[0],
+                            price_tick=load_american_iv_config().price_tick,
                             bracket_hi=2., max_iterations=64, tol_price_rel=1e-10, tol_vol=1e-8)
     assert solved.status == "ok"
     assert solved.sigma == pytest.approx(sigma, abs=1e-6, rel=0)
@@ -37,6 +40,8 @@ IV: dict[str, Any] = dict(
     rate_cont=R, dividend_yield=.06, target_price=13.0276741026,
     grid=GRID, bracket_lo=.001, bracket_hi=2., max_iterations=64,
     tol_price_rel=1e-10, tol_vol=1e-8,
+    lower_bound=price_bounds(OptionKind.CALL, 100., 100., 1., R, .06)[0],
+    price_tick=load_american_iv_config().price_tick,
 )
 
 
@@ -48,7 +53,8 @@ def _iv_with(**change: Any) -> FdIvResult:
 def _case_iv(case: Anchor) -> dict[str, Any]:
     _, kind, spot, strike, years, rate, q, _, _, _, target = case
     return IV | dict(kind=kind, spot=spot, strike=strike, time_years=years,
-                     rate_cont=rate, dividend_yield=q, target_price=target)
+                     rate_cont=rate, dividend_yield=q, target_price=target,
+                     lower_bound=price_bounds(kind, spot, strike, years, rate, q)[0])
 
 
 @pytest.mark.parametrize("case", [pytest.param(case, id=case[0]) for case in ANCHORS])
@@ -142,5 +148,6 @@ def test_review_stop_needs_the_price_residual_too() -> None:
     solved = fd_implied_vol(kind=OptionKind.CALL, spot=100., strike=100., time_years=1.,
                             rate_cont=R, dividend_yield=.06, target_price=target, grid=grid,
                             bracket_lo=.001, bracket_hi=2., max_iterations=64,
+                            lower_bound=IV["lower_bound"], price_tick=IV["price_tick"],
                             tol_price_rel=1e-10, tol_vol=1.)
     assert solved.status == "ok" and solved.sigma == pytest.approx(.25, abs=1e-8)
