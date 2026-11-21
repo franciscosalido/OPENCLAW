@@ -14,6 +14,7 @@ from backend.derivatives.pricing import bsm
 from backend.derivatives.pricing.american_bridge import AmericanIvSolution, american_implied_vol
 from backend.derivatives.pricing.binomial import crr_price
 from backend.derivatives.pricing.fd_american import FdGrid, fd_implied_vol, fd_price
+from backend.derivatives.pricing.implied_vol import price_bounds
 from config.american_fd_config_model import load_american_fd_config
 from config.american_iv_config_model import load_american_iv_config
 from tests.unit.derivatives.test_american_bridge import A1_TERMS, CALL, TTE, _carry
@@ -97,6 +98,7 @@ def _fd_iv(case, grid=_GRID):
     """Invert the archived price through the production finite differences."""
     return fd_implied_vol(
         **case.inputs, target_price=case.american, grid=grid,
+        lower_bound=max(case.intrinsic, price_bounds(**case.inputs)[0]), price_tick=_IV.price_tick,
         bracket_lo=_FD.bracket_lo, bracket_hi=_FD.bracket_hi, max_iterations=_FD.max_iterations,
         tol_price_rel=_FD.tol_price_rel, tol_vol=_FD.tol_vol,
     )
@@ -236,6 +238,14 @@ def test_o11_near_intrinsic(row):
     assert abs(row.american - row.intrinsic) <= row.american_uncertainty
 
 
+@pytest.mark.parametrize("row", [row for row in _CASES if row.id in _EDGES], ids=lambda row: row.id)
+def test_o11b_near_intrinsic_is_refused(row: _Case) -> None:
+    """Os dois motores recusam publicar sigma a menos de um tick do piso."""
+    tree, fd = _tree_iv(row), _fd_iv(row)
+    assert tree.reason == "iv:not_identifiable" and tree.sigma is None
+    assert fd.status == "not_identifiable" and fd.sigma is None
+
+
 def _observation(case):
     """Record errors and keep statuses even in the near-intrinsic cases."""
     tree_iv = _tree_iv(case)
@@ -264,5 +274,10 @@ def test_o12_report(tmp_path):
     keys = {"id", "group", "tree_price_error", "fd_price_error", "tree_iv_status",
             "fd_iv_status", "tree_iv", "fd_iv", "tree_iv_error", "fd_iv_error"}
     assert all(set(row) == keys for row in report)
-    assert all(row["tree_iv_error"] is not None and row["fd_iv_error"] is not None
-               for row in report)
+    for row in report:
+        if row["id"] in _EDGES:
+            assert row["tree_iv_error"] is None and row["fd_iv_error"] is None
+            assert row["tree_iv_status"] == "iv:not_identifiable"
+            assert row["fd_iv_status"] == "not_identifiable"
+        else:
+            assert row["tree_iv_error"] is not None and row["fd_iv_error"] is not None

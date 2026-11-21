@@ -21,6 +21,14 @@ class AmericanIvConfig(BaseModel):
     default_steps: int = Field(ge=1, le=4999)
     tol_price_rel: float = Field(gt=0)
     tol_vol: float = Field(gt=0)
+    price_tick: float = Field(gt=0)
+
+    @field_validator("price_tick", mode="before")
+    @classmethod
+    def _require_price_tick_float(cls, value: object) -> float:
+        if type(value) is not float:
+            raise ValueError("price_tick exige float sem coerção")
+        return value
 
     @field_validator("default_steps", mode="before")
     @classmethod
