@@ -245,6 +245,8 @@ def american_implied_vol(
             return AmericanIvRefusal("iv:above_upper_bound")
         if target - lower <= tol or upper - target <= tol:
             return AmericanIvRefusal("iv:not_identifiable")
+        if target <= lower + cfg.price_tick:
+            return AmericanIvRefusal("iv:not_identifiable")
     except (ArithmeticError, ValueError):
         return AmericanIvRefusal("iv:not_representable")
 

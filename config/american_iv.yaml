@@ -5,3 +5,5 @@ max_iterations: 64
 default_steps: 200
 tol_price_rel: 1.0e-10
 tol_vol: 1.0e-8
+# passo de preço por ação; VI não é publicada até um tick (inclusive) acima do limite inferior
+price_tick: 0.01

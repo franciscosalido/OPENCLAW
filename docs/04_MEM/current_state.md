@@ -4,7 +4,40 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-21 · **Turno:** Claude (integração do DL2C2-PR01).
+**Última atualização:** 2026-11-21 · **Turno:** Claude (integração do DL3-PR00).
+
+## Fase 03 — Motor da boleta em simulador (D0) — ABERTA (estado A)
+
+PR atual: DL3-PR00 — MERGEADO (PR #154). Cartão, adendo e revisão em
+[DL3-PR00.md](../specs/derivatives/fase3/DL3-PR00.md).
+
+Entregue pelo DL3-PR00:
+- A árvore e as diferenças finitas recusam publicar VI quando o preço está até um tick
+  (`price_tick: 0.01`, inclusive) acima do piso americano efetivo, o maior entre o limite
+  europeu e o exercício imediato. Preço abaixo do piso além da tolerância é
+  `below_intrinsic` nos dois motores.
+- Nas 69 referências do oráculo só `B21` e `C01` mudam, de `ok` para recusa. Os outros 67
+  ficam idênticos bit a bit. A demo mista fica idêntica byte a byte.
+- Portão da cabeça `fb5b07f`, Linux x86_64 limpo: 10.797 aprovados, 16 pulados, 261
+  subtestes; mypy estrito e Pyright sem erro.
+
+Escopo da fase (decisão de Francisco em 2026-11-21): motor da boleta em simulador local,
+sem tela, sem rede, sem conta e sem dependência nova. A interface fica para a Fase 4. O SDD
+e os cartões DL3-PR01 a DL3-PR06 estão publicados fora do repositório e entram no DL3-PR01.
+
+ADR-0024: Francisco aprovou o desenho reescrito em 2026-11-21 (degraus D0, D1 e D2, gate
+humano, ponte isolada). O texto novo ainda não está em `main`; entra pelo passo documental
+DL3-ADR. Não há vigência operacional: as proibições de `CLAUDE.md` e do ADR-007 seguem
+valendo, e acesso real continua dependendo de commit assinado por Francisco.
+
+Pendências com dono:
+- Caminho europeu (BSM): as puts da B3 são europeias e não receberam a regra do tick.
+  Cartão próprio; Francisco decide quando.
+- Convenção de dias úteis `(D0,Dv]`, ainda hipótese.
+- Sugestão S1 da avaliação de simplificação (unir duas recusas idênticas da árvore): não
+  aplicada; opcional.
+
+Próxima ação (uma só): Codex abre o DL3-ADR e o DL3-PR01 em rascunho.
 
 ## Fase 02 — Marco 2C2 — FECHADO (estado A)
 
@@ -34,10 +67,8 @@ O que o marco não prova:
 - Nada sobre dias úteis, provento discreto ou dado de mercado.
 
 Pendências com dono:
-- **Identificação de VI perto do intrínseco**, antes de qualquer uso com dado real. Nos casos
-  `B21` e `C01` os dois motores devolvem `ok` e erram de 2,6 a 5,5 pontos percentuais.
-  Francisco decide a regra; Claude escreve o cartão, junto do alerta de relevância
-  (ADR-0028, S3).
+- **Identificação de VI perto do intrínseco**: resolvida para as americanas no DL3-PR00
+  (PR #154). O alerta de relevância (ADR-0028, S3) segue pendente.
 - Convenção de dias úteis `(D0,Dv]`, ainda hipótese em `config/derivatives.yaml`; o
   `Business/252` do QuantLib conta `[D0,Dv)`.
 - Sombra BSM: fica como controle no grupo sem rendimento (acerta 18 de 18) e não vota nos
@@ -46,12 +77,8 @@ Pendências com dono:
 O limiar de 0,00050 é aviso de diagnóstico e não muda. Repetir a conferência com dado real é
 marco futuro, depois da ativação da OpLab, que tem rito próprio.
 
-Roteiro (Francisco): 2C1 e 2C2 fechados → Fase 3 → Fase 4 (Kronos). A Fase 3 não tem cartão
-aprovado. ADR-0024 (corretora) segue PROPOSED: só muda com commit assinado por Francisco
-alterando `CLAUDE.md`.
-
-Próxima ação (uma só): Francisco define o objetivo da Fase 3. Nenhum código antes de um
-cartão aprovado.
+Roteiro (Francisco, revisto em 2026-11-21): 2C1 e 2C2 fechados → Fase 3 (motor da boleta
+em simulador) → Fase 4 (interface). Kronos fica sem fase definida. Ver a seção da Fase 03.
 
 ## Fase 02 — Marco 2C1 — FECHADO (estado A)
 

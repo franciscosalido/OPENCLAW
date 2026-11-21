@@ -38,7 +38,7 @@ class FdGrid:
     rannacher_steps: int
 
 
-_Status = Literal["ok", "unbracketed", "not_identifiable", "no_convergence",
+_Status = Literal["ok", "below_intrinsic", "unbracketed", "not_identifiable", "no_convergence",
                   "grid_not_admissible", "invalid_input"]
 
 
@@ -163,12 +163,14 @@ def fd_price(*, kind: OptionKind, style: ExerciseStyle, spot: float, strike: flo
 def fd_implied_vol(*, kind: OptionKind, spot: float, strike: float, time_years: float,
                    rate_cont: float, dividend_yield: float, target_price: float,
                    grid: FdGrid, bracket_lo: float, bracket_hi: float, max_iterations: int,
-                   tol_price_rel: float, tol_vol: float) -> FdIvResult:
+                   tol_price_rel: float, tol_vol: float, lower_bound: float,
+                   price_tick: float) -> FdIvResult:
     """Inverte somente o preço deste motor na malha informada, com recusa sem sigma."""
-    floats = (target_price, bracket_lo, bracket_hi, tol_price_rel, tol_vol)
+    floats = (target_price, bracket_lo, bracket_hi, tol_price_rel, tol_vol, lower_bound, price_tick)
     if (any(type(x) is not float or not math.isfinite(x) for x in floats)
             or type(max_iterations) is not int or not 1 <= max_iterations <= 64
             or target_price < 0. or not 0. < bracket_lo < bracket_hi
+            or lower_bound < 0. or price_tick <= 0.
             or tol_price_rel <= 0. or tol_vol <= 0.):
         return FdIvResult("invalid_input", None)
     try:
@@ -178,7 +180,10 @@ def fd_implied_vol(*, kind: OptionKind, spot: float, strike: float, time_years: 
             return FdIvResult("invalid_input", None)
         sign = 1 if kind is OptionKind.CALL else -1
         tol = tol_price_rel * max(1., target_price)
-        if abs(target_price - max(0., sign * (spot - strike))) <= tol:
+        lower = max(lower_bound, sign * (spot - strike))
+        if lower - target_price > tol:
+            return FdIvResult("below_intrinsic", None)
+        if target_price - lower <= tol or target_price <= lower + price_tick:
             return FdIvResult("not_identifiable", None)
         mesh_inputs = (math.sqrt(time_years), time_years, rate_cont - dividend_yield,
                        abs(math.log(spot) - math.log(strike)), grid)
