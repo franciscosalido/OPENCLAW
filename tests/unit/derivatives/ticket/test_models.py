@@ -163,6 +163,10 @@ def test_large_equivalent_decimals_have_compact_encoding() -> None:
     for amount in ("1E100000", "100E99998"):
         data = Preview.model_validate(dict(preview()) | {"gross_cap": D(amount)})
         assert json.loads(canonical_bytes(data))["gross_cap"] == "1E+100000"
+    debit = Preview.model_validate(dict(preview()) | {"net_limit": D("1E100000")})
+    credit = Preview.model_validate(dict(preview()) | {"net_limit": D("-1E100000")})
+    assert json.loads(canonical_bytes(credit))["net_limit"] == "-1E+100000"
+    assert credit.digest != debit.digest
 
 
 @pytest.mark.parametrize(("ref", "value", "replacement"), [
