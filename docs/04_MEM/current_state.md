@@ -29,6 +29,7 @@ ADR-0024: Francisco aprovou o desenho reescrito em 2026-11-21 (degraus D0, D1 e 
 humano, ponte isolada). O texto novo ainda não está em `main`; entra pelo passo documental
 DL3-ADR. Não há vigência operacional: as proibições de `CLAUDE.md` e do ADR-007 seguem
 valendo, e acesso real continua dependendo de commit assinado por Francisco.
+ADR-0024 aprovada quanto ao desenho em 21/11/2026; sem vigência operacional; proibições de `CLAUDE.md` e ADR-007 seguem vigentes.
 
 Pendências com dono:
 - Caminho europeu (BSM): as puts da B3 são europeias e não receberam a regra do tick.
