@@ -107,3 +107,18 @@ def test_demo_quote_within_one_tick(
     assert rc == 0 and row["supported"] is False
     assert row["reason"] == "iv_unavailable:bid:iv:not_identifiable"
     assert all(side == {"sigma": None, "status": "not_applicable"} for side in row["iv"].values())
+
+
+@pytest.mark.parametrize("engine", ["tree", "fd"])
+def test_reviewer_exactly_one_tick_above_the_floor_is_published(engine: str) -> None:
+    """Revisor: a regra é estrita; cotação a exatamente um tick do piso ainda tem VI."""
+    row = next(case for case in oracle._CASES if case.id == "A01")
+    floor, _ = price_bounds(**row.inputs)
+    assert floor == 0. and row.intrinsic == 0.
+    quoted = replace(row, american=.01)
+    if engine == "tree":
+        tree = oracle._tree_iv(quoted)
+        assert isinstance(tree, oracle.AmericanIvSolution) and tree.sigma > 0
+    else:
+        fd = oracle._fd_iv(quoted)
+        assert fd.status == "ok" and fd.sigma is not None and fd.sigma > 0
