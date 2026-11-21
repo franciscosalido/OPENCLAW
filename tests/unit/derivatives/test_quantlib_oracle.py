@@ -260,3 +260,9 @@ def test_o12_report(tmp_path):
     report = json.loads(path.read_bytes())
     assert len(report) == 69
     assert {row["group"] for row in report} == set("ABCD")
+    # Revisor: toda linha traz o erro dos dois motores; ausência é nulo, nunca chave faltando.
+    keys = {"id", "group", "tree_price_error", "fd_price_error", "tree_iv_status",
+            "fd_iv_status", "tree_iv", "fd_iv", "tree_iv_error", "fd_iv_error"}
+    assert all(set(row) == keys for row in report)
+    assert all(row["tree_iv_error"] is not None and row["fd_iv_error"] is not None
+               for row in report)

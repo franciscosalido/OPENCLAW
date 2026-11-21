@@ -103,3 +103,39 @@ Todos falharam por uma asserção numérica; nenhum por coleta ou importação.
 Proveniência, comandos de geração e hashes:
 [PROVENANCE.md](../../../../tests/fixtures/derivatives/reference/quantlib/PROVENANCE.md).
 Os logs brutos estão fora do Git no diretório de evidências do cartão.
+
+## Revisão independente: GO (Claude, 2026-11-21 UTC)
+
+Head do autor: `d0e6974`.
+
+- Zero diferença em `backend`, `config`, `scripts`, `pyproject.toml`, `uv.lock` e arquivos
+  protegidos. ADR-0028, cartão e Adendo 1 copiados sem alteração; gerador com o SHA-256 do
+  cartão.
+- Referência do Mac contra a do revisor em x86-64: maior diferença relativa de 4,5e-13.
+  Proveniência com imagem por digest e pacote por hash.
+- Portão em clone limpo, Linux aarch64: 10.750 aprovados, 16 pulados, 261 subtestes;
+  `mypy --strict` e `pyright` sem erro. Os 490 testes do oráculo em 47 s. macOS não
+  reproduzido pelo revisor.
+- Antes do PR, o revisor rodou o código da `main` contra a referência de x86-64 e obteve os
+  mesmos máximos por grupo desta tabela.
+- Mutação do revisor, só com os testes do oráculo, com oito trocas diferentes das seis do
+  cartão: sete mortas. A viva tira o desconto do strike na borda distante das diferenças
+  finitas, que fica a seis desvios do spot e não alcança o preço; essa linha é presa por
+  teste do DL2C1.
+- Os testes novos não trazem anotação de tipo nas funções. Não muda comportamento; fica
+  como nota de estilo.
+
+Pareceres da skill sobre `d0e6974`, lidos depois do veredito e antes do merge: parecer
+completo (SHA-256 `39a40665…127d`), sem bloqueante; relatório de simplificação v0.2
+(SHA-256 `9a31a68b…5433`), com uma sugestão não bloqueante, não aplicada. A lacuna de teste
+apontada no relatório (O12 não fixava as chaves de cada linha) foi fechada no commit do
+parecer.
+
+O que a tabela mostra, em uma linha cada:
+
+- Os dois motores do projeto ficam dentro do erro esperado nos 67 casos identificáveis.
+- Com a configuração mantida, a árvore erra no máximo 3,7e-4 de volatilidade e as diferenças
+  finitas 2,3e-4; os dois cabem nos orçamentos de tempo.
+- Em `B21` e `C01` os dois motores concordam e os dois erram em pontos percentuais. A
+  comparação entre motores não detecta esse erro.
+- A sombra BSM acerta os 18 casos do grupo A e só 11 dos outros 51.
