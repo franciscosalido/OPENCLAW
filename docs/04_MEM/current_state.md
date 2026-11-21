@@ -4,12 +4,34 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-21 · **Turno:** Claude (integração do DL3-PR00).
+**Última atualização:** 2026-11-21 · **Turno:** Claude (integração do DL3-ADR e do DL3-PR01).
 
 ## Fase 03 — Motor da boleta em simulador (D0) — ABERTA (estado A)
 
-PR atual: DL3-PR00 — MERGEADO (PR #154). Cartão, adendo e revisão em
-[DL3-PR00.md](../specs/derivatives/fase3/DL3-PR00.md).
+PR atual: DL3-PR01 — MERGEADO (PR #156). Antes dele, DL3-PR00 (PR #154) e DL3-ADR
+(PR #155). SDD em [SDD_FASE3_BLUEPRINT.md](../specs/derivatives/fase3/SDD_FASE3_BLUEPRINT.md);
+cartões e revisões em [DL3-PR00.md](../specs/derivatives/fase3/DL3-PR00.md) e
+[DL3-PR01.md](../specs/derivatives/fase3/DL3-PR01.md).
+
+Entregue pelo DL3-PR01 (`backend/derivatives/ticket/`, 239 linhas de produção):
+- Modelo imutável da boleta simulada: 1 a 4 pernas, dinheiro em `Decimal` no passo de
+  0,01, quantidade inteira múltipla do lote, ambiente único `SIMULATED`.
+- Resumo SHA-256 do conteúdo autorizável, independente da versão e das travas.
+- Edição humana trava o campo e avança a versão; atualização de mercado não escreve em
+  campo travado; destravar não muda versão nem resumo.
+- Testes de arquitetura: o pacote não importa rede, LLM, MCP nem cliente da OpLab; o MCP
+  não importa a boleta; a rota de mercado segue só `GET`.
+- Portão da cabeça `55b1746`, Linux x86_64 limpo: 10.844 aprovados, 16 pulados, 261
+  subtestes; mypy estrito e Pyright sem erro.
+
+Para os próximos cartões:
+- O resumo não inclui a versão: editar de A para B e voltar a A recupera o mesmo resumo.
+  No DL3-PR05 a decisão humana deve prender também a versão, para que uma confirmação
+  antiga não volte a valer.
+- A prévia serializada em JSON traz o resumo calculado e não é aceita de volta como
+  entrada. O recibo (DL3-PR02) deve gravar o conteúdo e conferir o resumo na leitura.
+- A ordem entre prazo de envio e validade da ordem não é validada no modelo; fica para o
+  DL3-PR04.
 
 Entregue pelo DL3-PR00:
 - A árvore e as diferenças finitas recusam publicar VI quando o preço está até um tick
@@ -22,13 +44,13 @@ Entregue pelo DL3-PR00:
   subtestes; mypy estrito e Pyright sem erro.
 
 Escopo da fase (decisão de Francisco em 2026-11-21): motor da boleta em simulador local,
-sem tela, sem rede, sem conta e sem dependência nova. A interface fica para a Fase 4. O SDD
-e os cartões DL3-PR01 a DL3-PR06 estão publicados fora do repositório e entram no DL3-PR01.
+sem tela, sem rede, sem conta e sem dependência nova. A interface fica para a Fase 4. Os
+cartões DL3-PR02 a DL3-PR06 estão publicados fora do repositório e entram cada um no seu PR.
 
 ADR-0024: Francisco aprovou o desenho reescrito em 2026-11-21 (degraus D0, D1 e D2, gate
-humano, ponte isolada). O texto novo ainda não está em `main`; entra pelo passo documental
-DL3-ADR. Não há vigência operacional: as proibições de `CLAUDE.md` e do ADR-007 seguem
-valendo, e acesso real continua dependendo de commit assinado por Francisco.
+humano, ponte isolada). O texto está em `main` desde o PR #155. Não há vigência
+operacional: as proibições de `CLAUDE.md` e do ADR-007 seguem valendo, e acesso real
+continua dependendo de commit assinado por Francisco.
 ADR-0024 aprovada quanto ao desenho em 21/11/2026; sem vigência operacional; proibições de `CLAUDE.md` e ADR-007 seguem vigentes.
 
 Pendências com dono:
@@ -38,7 +60,7 @@ Pendências com dono:
 - Sugestão S1 da avaliação de simplificação (unir duas recusas idênticas da árvore): não
   aplicada; opcional.
 
-Próxima ação (uma só): Codex abre o DL3-ADR e o DL3-PR01 em rascunho.
+Próxima ação (uma só): Codex abre o DL3-PR02 em rascunho.
 
 ## Fase 02 — Marco 2C2 — FECHADO (estado A)
 

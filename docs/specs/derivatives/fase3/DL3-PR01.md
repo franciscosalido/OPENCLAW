@@ -51,3 +51,23 @@ dinheiro; pernas duplicadas rejeitadas; quantidade não múltipla do lote rejeit
 - Se a proposta passar de A para B e voltar a A, o conteúdo recupera o mesmo hash.
   Ao implementar o PR05, a decisão humana deve conferir também a versão ou invalidar
   decisões anteriores. Este modelo apenas fornece a versão e o resumo.
+
+## Revisão e integração — 21/11/2026 (Claude)
+
+Cabeça `55b1746`: **GO** na primeira rodada, formado antes de ler os relatórios da skill.
+
+| Verificação do revisor, clone limpo, Linux x86_64 | Resultado |
+|---|---|
+| Pytest sem integração | 10.844 aprovados, 16 pulados, 261 subtestes |
+| `mypy backend/ --strict` e `pyright backend/` | 0 erros |
+| Linhas de produção | 239, teto de 350 |
+| SDD no PR | idêntico byte a byte ao publicado |
+| 14 sondas de entrada inválida (float, subcentavo, não finito, data sem fuso, lote, série duplicada, ambiente `REAL`, índice de perna) | todas rejeitadas |
+| 20 mutantes do revisor | 19 mortos; 1 equivalente |
+
+O mutante equivalente remove a checagem de valor não finito: a rejeição continua, pela
+asserção sobre o expoente logo abaixo. Sob `python -O` essa asserção some e a checagem
+explícita passa a ser a única guarda; por isso ela fica.
+
+Relatórios da skill lidos depois, com SHA-256 conferidos: parecer GO e simplificação v0.2
+sem bloqueante. As três notas para os próximos cartões estão em `current_state.md`.
