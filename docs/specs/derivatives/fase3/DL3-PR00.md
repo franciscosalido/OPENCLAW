@@ -159,3 +159,25 @@ de igualdade do revisor e de alvo zero abaixo de piso positivo no teste FD T16.
 Aceite adicional: cobrir piso europeu e de exercício, alvos abaixo e dentro da tolerância,
 piso zero e positivo, igualdade no tick e vizinhos binários imediatos. Os 69 pares devem
 coincidir com a cabeça do revisor. Em relação a main, só B21 e C01 mudam.
+
+## Revisão e integração — 21/11/2026 (Claude)
+
+Duas rodadas. Na cabeça `c11af42`: GO técnico, com dois testes do revisor (`d064fb3`) para a
+igualdade exata de um tick, que a suíte não distinguia; a lacuna era do cartão. Francisco
+pediu então as duas correções do adendo acima. Na cabeça `fb5b07f`: **GO**.
+
+| Verificação do revisor, clone limpo, Linux x86_64 | Resultado |
+|---|---|
+| Pytest sem integração | 10.797 aprovados, 16 pulados, 261 subtestes |
+| `mypy backend/ --strict` e `pyright backend/` | 0 erros |
+| 69 inversões, sigma bit a bit, contra `main` | só `B21` e `C01` mudam |
+| 69 inversões contra `c11af42` | idênticas |
+| Saída da demo mista contra `main` | idêntica byte a byte |
+| Oito mutantes do revisor nas guardas dos dois motores | todos mortos |
+
+Relatórios da skill lidos depois do parecer formado, com SHA-256 conferidos: parecer
+`cb9a98d0…3cbf` (GO técnico) e simplificação v0.2 `757b805b…3cde` (S1 opcional, não
+aplicada).
+
+Consequência de política a lembrar: opção fora do dinheiro cotada a exatamente R$ 0,01
+fica sem VI nos dois motores. O caminho europeu não foi tocado.
