@@ -82,3 +82,39 @@ def test_preview_round_trip_and_defensive_payload() -> None:
     with pytest.raises(ReceiptError, match="digest"):
         forged.read_preview()
     assert receipt.verify()
+
+
+@pytest.mark.parametrize("state", [
+    TicketState.COMPLETED, TicketState.STOPPED, TicketState.DENIED, TicketState.EXPIRED,
+    OrderState.FILLED, OrderState.CANCELLED, OrderState.EXPIRED, OrderState.REJECTED,
+    TicketState.UNCERTAIN, OrderState.UNCERTAIN,
+])
+def test_no_ordinary_exit_from_terminal_or_uncertain(state: TicketState | OrderState) -> None:
+    """Invariantes independentes da tabela, inclusive para detectar novas arestas."""
+    for event in Event:
+        with pytest.raises(InvalidTransition):
+            transition(state, event)
+
+
+def test_cancel_rejection_and_native_expiry_keep_provenance() -> None:
+    """Recusar cancelamento mantém saldo; expiração da venue é evento distinto."""
+    pending = OrderState.CANCEL_REQUESTED
+    assert transition(pending, Event.VENUE_PARTIAL) is pending
+    assert transition(pending, Event.VENUE_CANCEL_REJECTED_PARTIAL) is OrderState.PARTIAL
+    assert transition(pending, Event.VENUE_CANCEL_REJECTED_LIVE) is OrderState.LIVE
+    assert transition(pending, Event.VENUE_EXPIRED) is OrderState.EXPIRED
+    with pytest.raises(InvalidTransition):
+        transition(pending, Event.EXPIRE)
+
+
+def test_receipt_rejects_bad_event_without_consuming_sequence() -> None:
+    """Payload não finito, tempo ingênuo e prévia genérica não entram na cadeia."""
+    receipt = Receipt()
+    with pytest.raises(ReceiptError):
+        receipt.append(NOW, Event.VENUE_FILL, {"amount": float("nan")})
+    with pytest.raises(ReceiptError):
+        receipt.append(NOW.replace(tzinfo=None), Event.VENUE_FILL, {})
+    with pytest.raises(ReceiptError):
+        receipt.append(NOW, Event.PREVIEW, {"digest": "inventado"})
+    assert receipt.events == ()
+    assert receipt.append(NOW, Event.VENUE_FILL, {"units": 10}).seq == 1
