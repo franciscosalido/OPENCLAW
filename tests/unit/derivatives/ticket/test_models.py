@@ -1,0 +1,146 @@
+"""Provas do modelo D0, da versão editada e do conteúdo autorizável."""
+import json
+from datetime import UTC, datetime, timedelta, timezone
+from decimal import Decimal, localcontext
+from hashlib import sha256
+
+import pytest
+from pydantic import ValidationError
+
+from backend.derivatives.ticket.digest import canonical_bytes, digest
+from backend.derivatives.ticket.models import (
+    EditableField, Environment, FieldRef, Leg, Preview, Side, TicketDraft,
+    apply_human_edit, apply_market_refresh, unlock,
+)
+
+D = Decimal
+TIME = datetime(2026, 11, 21, 14, tzinfo=UTC)
+PRICE = FieldRef(field=EditableField.LIMIT_PRICE, leg_index=0)
+OTHER = FieldRef(field=EditableField.LIMIT_PRICE, leg_index=1)
+
+
+def leg(symbol: str, side: Side = Side.BUY) -> Leg:
+    """Cria série sintética com lote de dez."""
+    return Leg(symbol=symbol, side=side, quantity=20, lot_size=10, limit_price=D("1.20"))
+
+
+def draft() -> TicketDraft:
+    """Fornece um rascunho com duas pernas distintas."""
+    return TicketDraft(legs=(leg("SYNA"), leg("SYNB", Side.SELL)), net_limit=D("-2.50"),
+                       gross_cap=D("24"), send_deadline=TIME, order_validity=TIME + timedelta(days=1),
+                       quote_snapshot_id="q0")
+
+
+def preview(source: TicketDraft | None = None) -> Preview:
+    """Associa uma exposição declarada à versão do rascunho."""
+    return Preview.from_draft(source or draft(), partial_exposure=D("24"))
+
+
+def test_canonical_contract() -> None:
+    """Confere bytes por um documento independente, incluindo ordem das pernas e horários."""
+    p = preview()
+    expected = {
+        "environment": "SIMULATED",
+        "legs": [{"symbol": symbol, "side": side, "quantity": 20, "limit_price": "1.2",
+                  "lot_size": 10} for symbol, side in [("SYNA", "BUY"), ("SYNB", "SELL")]],
+        "net_limit": "-2.5", "gross_cap": "24", "partial_exposure": "24",
+        "send_deadline": "2026-11-21T14:00:00+00:00", "order_validity": "2026-11-22T14:00:00+00:00",
+        "quote_snapshot_id": "q0",
+    }
+    encoded = json.dumps(expected, sort_keys=True, separators=(",", ":")).encode()
+    assert canonical_bytes(p) == encoded
+    assert p.digest == digest(p) == sha256(encoded).hexdigest()
+    values = dict(reversed(list(dict(draft()).items())))
+    values.update(net_limit=D("-2.50000"), send_deadline=TIME.astimezone(timezone(timedelta(hours=2))))
+    assert preview(TicketDraft.model_validate(values)).digest == p.digest
+
+
+@pytest.mark.parametrize(("field", "value"), [
+    ("net_limit", D("-2.49")), ("gross_cap", D("25")), ("partial_exposure", D("23")),
+    ("send_deadline", TIME + timedelta(seconds=1)), ("order_validity", TIME + timedelta(days=2)),
+    ("quote_snapshot_id", "q1"),
+])
+def test_signed_ticket_fields(field: str, value: object) -> None:
+    """Cada valor autorizável participa do conteúdo assinado."""
+    p = preview()
+    assert Preview.model_validate(dict(p) | {field: value}).digest != p.digest
+
+
+@pytest.mark.parametrize(("field", "value"), [
+    ("symbol", "SYNC"), ("side", Side.SELL), ("quantity", 30), ("limit_price", D("1.21")),
+    ("lot_size", 5),
+])
+def test_signed_leg_fields(field: str, value: object) -> None:
+    """Cada campo da perna e a ordem econômica participam do resumo."""
+    p = preview()
+    changed = Leg.model_validate(dict(p.legs[0]) | {field: value})
+    assert Preview.model_validate(dict(p) | {"legs": (changed, p.legs[1])}).digest != p.digest
+    assert Preview.model_validate(dict(p) | {"legs": p.legs[::-1]}).digest != p.digest
+
+
+def test_decimal_precision_and_zero() -> None:
+    """Precisão ambiente não arredonda quantias nem distingue zero negativo."""
+    with localcontext() as ctx:
+        ctx.prec = 3
+        p = Preview.model_validate(dict(preview()) | {"gross_cap": D("12345678901234567890.1200")})
+        assert json.loads(canonical_bytes(p))["gross_cap"] == "12345678901234567890.12"
+        for zero in ("0", "-0.00"):
+            assert json.loads(canonical_bytes(Preview.model_validate(dict(p) | {
+                "net_limit": D(zero)})))["net_limit"] == "0"
+
+
+def test_refresh_locks_and_version() -> None:
+    """Atualização de várias pernas respeita travas individuais e avança uma só versão."""
+    original = draft()
+    edited = apply_human_edit(original, PRICE, D("2.00"))
+    assert edited.version == original.version + 1 and edited.locked == {PRICE}
+    for suggestions in ({}, {PRICE: D("3")}, {OTHER: D("1.2000")}):
+        assert apply_market_refresh(edited, suggestions, quote_snapshot_id="new") is edited
+    updated = apply_market_refresh(edited, {PRICE: D("3"), OTHER: D("4")}, quote_snapshot_id="q1")
+    assert [x.limit_price for x in updated.legs] == [D("2"), D("4")]
+    assert updated.version == edited.version + 1 and updated.quote_snapshot_id == "q1"
+    assert updated.locked == {PRICE} and edited.quote_snapshot_id == "q0"
+    unlocked = unlock(updated, PRICE)
+    assert unlocked.version == updated.version and preview(unlocked).digest == preview(updated).digest
+    assert apply_market_refresh(unlocked, {PRICE: D("3")}, quote_snapshot_id="q2").legs[0].limit_price == 3
+
+
+def test_same_content_after_two_edits_has_new_version() -> None:
+    """O conteúdo ABA pode repetir; a versão distingue as duas propostas."""
+    first = draft()
+    second = apply_human_edit(apply_human_edit(first, PRICE, D("2")), PRICE, D("1.20"))
+    assert second.version == first.version + 2 and preview(first).digest == preview(second).digest
+
+
+@pytest.mark.parametrize(("field", "value"), [
+    ("limit_price", .1), ("limit_price", "1"), ("limit_price", D("1.001")),
+    ("limit_price", D("NaN")), ("limit_price", D("Infinity")), ("limit_price", D("-1")),
+    ("quantity", True), ("quantity", 15), ("lot_size", 0), ("quantity", 0),
+])
+def test_leg_rejects_invalid_inputs(field: str, value: object) -> None:
+    """Valores de dinheiro e quantidade não sofrem coerção ou arredondamento."""
+    with pytest.raises(ValidationError):
+        Leg.model_validate(dict(leg("SYNA")) | {field: value})
+
+
+@pytest.mark.parametrize(("field", "value"), [
+    ("legs", ()), ("legs", (leg("SYNA"),) * 2), ("legs", tuple(leg(str(i)) for i in range(5))),
+    ("environment", "REAL"), ("gross_cap", 2.), ("net_limit", 1.), ("locked", frozenset({FieldRef(
+        field=EditableField.SIDE, leg_index=3)})), ("send_deadline", TIME.replace(tzinfo=None)),
+    ("extra", 1),
+])
+def test_invalid_draft(field: str, value: object) -> None:
+    """Validação integral na construção do rascunho."""
+    with pytest.raises(ValidationError):
+        TicketDraft.model_validate(dict(draft()) | {field: value})
+
+
+def test_edit_and_preview_validate_nested_values() -> None:
+    """Edições inválidas e cópias Pydantic fabricadas não chegam à assinatura."""
+    with pytest.raises(ValidationError):
+        apply_human_edit(draft(), PRICE, 1.)
+    with pytest.raises(ValidationError):
+        preview(draft().model_copy(update={"legs": (leg("S").model_copy(update={"quantity": 1}),)}))
+    with pytest.raises(ValidationError):
+        Preview.model_validate(dict(preview()) | {"partial_exposure": 1.})
+    assert {member.value for member in Environment} == {"SIMULATED"}
