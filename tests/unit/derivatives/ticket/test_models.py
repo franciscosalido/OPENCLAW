@@ -42,8 +42,8 @@ def test_canonical_contract() -> None:
     p = preview()
     expected = {
         "environment": "SIMULATED",
-        "legs": [{"symbol": symbol, "side": side, "quantity": 20, "limit_price": "1.2",
-                  } for symbol, side in [("SYNA", "BUY"), ("SYNB", "SELL")]],
+        "legs": [{"symbol": symbol, "side": side, "quantity": 20, "limit_price": "1.2"}
+                 for symbol, side in [("SYNA", "BUY"), ("SYNB", "SELL")]],
         "net_limit": "-2.5", "gross_cap": "24", "partial_exposure": "24",
         "send_deadline": "2026-11-21T14:00:00+00:00", "order_validity": "2026-11-22T14:00:00+00:00",
         "quote_snapshot_id": "q0",

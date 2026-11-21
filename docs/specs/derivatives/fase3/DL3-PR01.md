@@ -39,6 +39,8 @@ dinheiro; pernas duplicadas rejeitadas; quantidade não múltipla do lote rejeit
 
 - O limite líquido positivo representa débito máximo, e o negativo, crédito mínimo.
   A prévia recebe a exposição parcial em reais. O cálculo de exposição pertence ao PR03.
+- O lote valida a quantidade. Em D0 a projeção da perna no hash contém símbolo, lado,
+  quantidade e preço-limite, conforme SDD §4.2.
 - A trava identifica o campo e, nas pernas, o índice. Um refresh aplica suas sugestões
   em conjunto. Só adota a foto do mercado se algum valor autorizável sugerido mudou.
   Destravar um campo conserva a versão e o resumo.

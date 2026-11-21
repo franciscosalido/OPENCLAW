@@ -27,7 +27,7 @@ def canonical_bytes(preview: "Preview") -> bytes:
     payload = {
         "environment": preview.environment.value,
         "legs": [{"symbol": leg.symbol, "side": leg.side.value, "quantity": leg.quantity,
-                  "limit_price": _money(leg.limit_price), "lot_size": leg.lot_size}
+                  "limit_price": _money(leg.limit_price)}
                  for leg in preview.legs],
         "net_limit": _money(preview.net_limit), "gross_cap": _money(preview.gross_cap),
         "partial_exposure": _money(preview.partial_exposure),
