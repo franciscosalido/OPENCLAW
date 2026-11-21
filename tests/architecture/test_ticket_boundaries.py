@@ -19,15 +19,26 @@ FORBIDDEN = {
 def _imports(path: Path) -> set[str]:
     names: set[str] = set()
     package = ".".join(path.parent.relative_to(ROOT).parts)
-    for node in ast.walk(ast.parse(path.read_text())):
+    tree = ast.parse(path.read_text())
+    loaders = {"__import__", "import_module"}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module == "importlib":
+            loaders.update(a.asname or a.name for a in node.names if a.name == "import_module")
+    for node in ast.walk(tree):
         names.update(local_targets(node, package))
         if isinstance(node, ast.Import):
             names.update(alias.name for alias in node.names)
         elif isinstance(node, ast.ImportFrom) and node.module:
             names.add(node.module)
             names.update(f"{node.module}.{alias.name}" for alias in node.names)
-        elif isinstance(node, ast.Call) and node.args:
-            name = node.args[0]
+        elif isinstance(node, ast.Call):
+            fn = node.func
+            if not ((isinstance(fn, ast.Name) and fn.id in loaders)
+                    or (isinstance(fn, ast.Attribute) and fn.attr == "import_module")):
+                continue
+            name = node.args[0] if node.args else next(
+                (kw.value for kw in node.keywords if kw.arg == "name"), None)
+
             if isinstance(name, ast.Constant) and isinstance(name.value, str):
                 names.add(name.value)
     return names
@@ -38,7 +49,8 @@ def test_ticket_isolation_and_mcp_direction() -> None:
     for package, forbidden in [(TICKET, FORBIDDEN), (MCP, {TICKET})]:
         for path in ROOT.joinpath(*package.split(".")).rglob("*.py"):
             for name in _imports(path):
-                assert not any(name == item or name.startswith(item + ".") for item in forbidden), path
+                blocked = any(name == item or name.startswith(item + ".") for item in forbidden)
+                assert not blocked, (path, name)
 
 
 def test_only_simulated_environment_and_read_only_market_routes() -> None:

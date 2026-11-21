@@ -27,7 +27,8 @@ def leg(symbol: str, side: Side = Side.BUY) -> Leg:
 def draft() -> TicketDraft:
     """Fornece um rascunho com duas pernas distintas."""
     return TicketDraft(legs=(leg("SYNA"), leg("SYNB", Side.SELL)), net_limit=D("-2.50"),
-                       gross_cap=D("24"), send_deadline=TIME, order_validity=TIME + timedelta(days=1),
+                       gross_cap=D("24"), send_deadline=TIME,
+                       order_validity=TIME + timedelta(days=1),
                        quote_snapshot_id="q0")
 
 
@@ -51,7 +52,8 @@ def test_canonical_contract() -> None:
     assert canonical_bytes(p) == encoded
     assert p.digest == digest(p) == sha256(encoded).hexdigest()
     values = dict(reversed(list(dict(draft()).items())))
-    values.update(net_limit=D("-2.50000"), send_deadline=TIME.astimezone(timezone(timedelta(hours=2))))
+    values.update(net_limit=D("-2.50000"),
+                  send_deadline=TIME.astimezone(timezone(timedelta(hours=2))))
     assert preview(TicketDraft.model_validate(values)).digest == p.digest
 
 
@@ -101,8 +103,10 @@ def test_refresh_locks_and_version() -> None:
     assert updated.version == edited.version + 1 and updated.quote_snapshot_id == "q1"
     assert updated.locked == {PRICE} and edited.quote_snapshot_id == "q0"
     unlocked = unlock(updated, PRICE)
-    assert unlocked.version == updated.version and preview(unlocked).digest == preview(updated).digest
-    assert apply_market_refresh(unlocked, {PRICE: D("3")}, quote_snapshot_id="q2").legs[0].limit_price == 3
+    assert unlocked.version == updated.version
+    assert preview(unlocked).digest == preview(updated).digest
+    refreshed = apply_market_refresh(unlocked, {PRICE: D("3")}, quote_snapshot_id="q2")
+    assert refreshed.legs[0].limit_price == 3
 
 
 def test_same_content_after_two_edits_has_new_version() -> None:
@@ -144,3 +148,60 @@ def test_edit_and_preview_validate_nested_values() -> None:
     with pytest.raises(ValidationError):
         Preview.model_validate(dict(preview()) | {"partial_exposure": 1.})
     assert {member.value for member in Environment} == {"SIMULATED"}
+
+
+def test_json_money_requires_decimal_text() -> None:
+    """O caminho JSON rejeita número de ponto flutuante e aceita texto exato."""
+    fields = {"symbol": "SYN", "side": "BUY", "quantity": 1, "lot_size": 1}
+    exact = Leg.model_validate_json(json.dumps(fields | {"limit_price": "0.10"}))
+    assert exact.limit_price == D(".1")
+    with pytest.raises(ValidationError):
+        Leg.model_validate_json(json.dumps(fields | {"limit_price": .1}))
+
+
+def test_large_equivalent_decimals_have_compact_encoding() -> None:
+    """Representações equivalentes de grandes potências conservam os mesmos bytes."""
+    for amount in ("1E100000", "100E99998"):
+        data = Preview.model_validate(dict(preview()) | {"gross_cap": D(amount)})
+        assert json.loads(canonical_bytes(data))["gross_cap"] == "1E+100000"
+
+
+@pytest.mark.parametrize(("ref", "value", "replacement"), [
+    (FieldRef(EditableField.SYMBOL, 0), "SYNC", "SYNX"),
+    (FieldRef(EditableField.SIDE, 0), Side.SELL, Side.BUY),
+    (FieldRef(EditableField.QUANTITY, 0), 40, 30),
+    (FieldRef(EditableField.NET_LIMIT), D("0"), D("1")),
+    (FieldRef(EditableField.SEND_DEADLINE), TIME - timedelta(minutes=1), TIME),
+    (FieldRef(EditableField.ORDER_VALIDITY), TIME + timedelta(hours=2), TIME),
+])
+def test_each_operational_field_stays_locked(ref: FieldRef, value: object,
+                                            replacement: object) -> None:
+    """A trava é endereçada e a foto só avança quando uma sugestão é adotada."""
+    edited = apply_human_edit(draft(), ref, value)
+    assert ref in edited.locked and edited.version == 2
+    assert apply_market_refresh(edited, {ref: replacement}, quote_snapshot_id="q1") is edited
+    update = apply_market_refresh(unlock(edited, ref), {ref: replacement}, quote_snapshot_id="q2")
+    assert update.version == 3 and update.quote_snapshot_id == "q2"
+
+
+def test_refresh_is_atomic_and_revalidates_the_whole_draft() -> None:
+    """A troca simultânea de séries é válida; duplicação final é recusada."""
+    first, second = (FieldRef(EditableField.SYMBOL, i) for i in (0, 1))
+    original = draft()
+    with pytest.raises(ValidationError):
+        apply_market_refresh(original, {first: "synb"}, quote_snapshot_id="q1")
+    changes = {first: "SYNB", second: "SYNA"}
+    changed = apply_market_refresh(original, changes, quote_snapshot_id="q1")
+    assert tuple(x.symbol for x in changed.legs) == ("SYNB", "SYNA")
+    assert changed.version == 2 and original.legs[0].symbol == "SYNA"
+
+
+def test_version_digest_and_environment_cannot_be_supplied_as_signed_overrides() -> None:
+    """A versão fica fora do hash; a prévia recusa ambiente e digest forjados."""
+    p = preview()
+    assert Preview.model_validate(dict(p) | {"version": 500}).digest == p.digest
+    for overrides in ({"environment": "REAL"}, {"digest": "0" * 64}):
+        with pytest.raises(ValidationError):
+            Preview.model_validate(dict(p) | overrides)
+    with pytest.raises(ValidationError):
+        digest(p.model_copy(update={"net_limit": .3}))

@@ -34,3 +34,18 @@ dinheiro; pernas duplicadas rejeitadas; quantidade não múltipla do lote rejeit
   `routes.ALLOWED_METHOD == "GET"`. Use o padrão de `tests/architecture/derivatives_imports.py`.
 - Mutantes: omitir um campo do resumo; refresh ignorar a trava; aceitar `float`.
 
+
+### Convenções de representação do PR01
+
+- O limite líquido positivo representa débito máximo, e o negativo, crédito mínimo.
+  A prévia recebe a exposição parcial em reais. O cálculo de exposição pertence ao PR03.
+- A trava identifica o campo e, nas pernas, o índice. Um refresh aplica suas sugestões
+  em conjunto. Só adota a foto do mercado se algum valor autorizável sugerido mudou.
+  Destravar um campo conserva a versão e o resumo.
+- O JSON preserva a ordem das pernas, usa prazos com fuso convertidos a UTC e dinheiro
+  em texto decimal, com zero único e sem zeros fracionários redundantes. Para valores de
+  magnitude igual ou superior a 10²¹,
+  usa notação científica compacta. O hash exclui o próprio digest, a versão e as travas.
+- Se a proposta passar de A para B e voltar a A, o conteúdo recupera o mesmo hash.
+  Ao implementar o PR05, a decisão humana deve conferir também a versão ou invalidar
+  decisões anteriores. Este modelo apenas fornece a versão e o resumo.
