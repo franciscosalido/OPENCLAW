@@ -4,16 +4,38 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-21 · **Turno:** Claude (integração do DL3-PR03).
+**Última atualização:** 2026-11-21 · **Turno:** Claude (integração do DL3-PR04).
 
 ## Fase 03 — Motor da boleta em simulador (D0) — ABERTA (estado A)
 
-PR atual: DL3-PR03 — MERGEADO (PR #158, GO na segunda rodada). Antes dele, DL3-PR00
-(PR #154), DL3-ADR (PR #155), DL3-PR01 (PR #156) e DL3-PR02 (PR #157). SDD em [SDD_FASE3_BLUEPRINT.md](../specs/derivatives/fase3/SDD_FASE3_BLUEPRINT.md);
+PR atual: DL3-PR04 — MERGEADO (PR #159). Antes dele, DL3-PR00 (PR #154), DL3-ADR
+(PR #155), DL3-PR01 (PR #156), DL3-PR02 (PR #157) e DL3-PR03 (PR #158). SDD em [SDD_FASE3_BLUEPRINT.md](../specs/derivatives/fase3/SDD_FASE3_BLUEPRINT.md);
 cartões e revisões em [DL3-PR00.md](../specs/derivatives/fase3/DL3-PR00.md),
 [DL3-PR01.md](../specs/derivatives/fase3/DL3-PR01.md),
-[DL3-PR02.md](../specs/derivatives/fase3/DL3-PR02.md) e
-[DL3-PR03.md](../specs/derivatives/fase3/DL3-PR03.md).
+[DL3-PR02.md](../specs/derivatives/fase3/DL3-PR02.md),
+[DL3-PR03.md](../specs/derivatives/fase3/DL3-PR03.md) e
+[DL3-PR04.md](../specs/derivatives/fase3/DL3-PR04.md).
+
+Entregue pelo DL3-PR04 (`ticket/replay.py`, `guards.py`, `venue.py`, `paper_venue.py` e
+`config/ticket_sim.yaml`, 398 linhas de produção):
+- Replay: fixture JSON com cotações, negócios, execução de leilão, recusa de cancelamento
+  e timeout; dinheiro só como texto decimal; lacuna de sequência fica marcada no evento.
+- Venue simulada: a ordem só casa com cotação posterior ao envio, pelo livro e pela
+  quantidade exibida, nunca pelo último negócio. Cancelamento só se confirma em cotação
+  posterior do mesmo símbolo, depois do casamento. Validade nativa só "dia".
+- Travas de mercado: bloqueio por cotação vencida, leilão, suspensão, livro inválido ou
+  incompleto, falta de cotação e perda de sequência; cautela por spread e profundidade.
+- Dois prazos: prazo de envio e validade nativa, conferidos antes de enviar.
+- Portão com o teste do revisor, Linux x86_64 limpo: 11.012 aprovados, 16 pulados, 261
+  subtestes; mypy estrito e Pyright sem erro.
+
+Limites do simulador, para o DL3-PR05 saber:
+- Depois do fechamento da sessão a venue só expira ordens; qualquer outro evento com
+  horário igual ou posterior ao fechamento é ignorado.
+- `check_deadlines` aceita o instante exato do fechamento quando prazo e validade
+  coincidem com ele; a venue rejeita o envio nesse instante. O motor trata a rejeição.
+- Trava de volatilidade não existe: a ADR exige números homologados.
+- Parâmetros de `ticket_sim.yaml` são sintéticos e não homologados.
 
 Entregue pelo DL3-PR03 (`ticket/sequencing.py`, 299 linhas de produção):
 - Plano de pernas: compras antes das vendas; na desmontagem, recompra da vendida antes de
@@ -100,7 +122,7 @@ Pendências com dono:
 - Sugestão S1 da avaliação de simplificação (unir duas recusas idênticas da árvore): não
   aplicada; opcional.
 
-Próxima ação (uma só): Codex abre o DL3-PR04 em rascunho, pelo supercartão do DL3-PR04.
+Próxima ação (uma só): Codex abre o DL3-PR05 em rascunho, pelo supercartão do DL3-PR05.
 
 ## Fase 02 — Marco 2C2 — FECHADO (estado A)
 

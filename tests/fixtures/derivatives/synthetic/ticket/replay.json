@@ -1,0 +1,4 @@
+{"session_close":"2026-11-23T21:00:00Z","events":[
+{"seq":1,"ts":"2026-11-23T14:00:00Z","type":"quote","symbol":"A","bid":"0.95","bid_size":50,"ask":"1.02","ask_size":50,"phase":"CONTINUOUS"},
+{"seq":2,"ts":"2026-11-23T14:00:00Z","type":"trade","symbol":"A","price":"0.90","size":100,"kind":"SIMPLE"},
+{"seq":4,"ts":"2026-11-23T14:00:01Z","type":"timeout","call":"submit","registered":true}]}
