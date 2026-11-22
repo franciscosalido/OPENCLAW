@@ -39,6 +39,10 @@ def _check_id_component(value: str) -> None:
         raise EngineRefusal("identificador da boleta ou símbolo fora do alfabeto permitido")
 
 
+def _send_window_open(draft: TicketDraft, now: datetime) -> bool:
+    return now <= draft.send_deadline and now < draft.order_validity
+
+
 class AccountHalts:
     """Compartilha bloqueios por incerteza e divergência entre motores da conta."""
     def __init__(self) -> None:
@@ -47,6 +51,9 @@ class AccountHalts:
     def blocked(self, account: str) -> bool:
         """Indica se alguma causa ainda bloqueia esta conta."""
         return any(a == account for a, _ in self._pending)
+
+    def divergent(self, account: str) -> bool:
+        return (account, "divergence") in self._pending
 
     def hold(self, account: str, key: str) -> None:
         """Registra a causa que bloqueia novos envios da conta."""
@@ -124,7 +131,16 @@ class TicketEngine:
         state = transition(self._state, event)
         assert isinstance(state, T)
         self._record(event, now, state=state.value, **data)
+        self._set_state(state)
+
+    def _set_state(self, state: T) -> None:
         self._state = state
+        if state == T.STOPPED and not self._halts.divergent(self._account):
+            assert self._plan is not None
+            sent = {o.leg.symbol for o in self._orders.values()}
+            for leg in self._plan.legs:
+                if leg.side is Side.BUY and leg.symbol not in sent:
+                    self._reservations.settle_buy(self._account, self._ticket, leg.symbol)
 
     def _propose(self, draft: TicketDraft, now: datetime) -> None:
         draft = TicketDraft.model_validate(draft)
@@ -217,7 +233,7 @@ class TicketEngine:
         if all(sum(f.quantity for f in self._fills if f.symbol == leg.symbol) == leg.quantity
                for leg in plan.legs):
             return T.COMPLETED
-        if not self._cancelled and now <= plan.draft.send_deadline and any(
+        if not self._cancelled and _send_window_open(plan.draft, now) and any(
                 self._available(plan, leg) > 0 for leg in plan.legs if leg.side is Side.SELL
                 and not self._rejected(leg)):
             return T.WORKING
@@ -229,7 +245,7 @@ class TicketEngine:
         plan = self._require(T.WORKING)
         for leg in plan.legs:
             if (self._state != T.WORKING or self._paused or self._halts.blocked(self._account)
-                    or self._cancelled or now > plan.draft.send_deadline
+                    or self._cancelled or not _send_window_open(plan.draft, now)
                     or self._market_block(plan, now)):
                 break
             previous = sum(o.leg.symbol == leg.symbol for o in self._orders.values())
@@ -387,7 +403,7 @@ class TicketEngine:
             dest = self._destination(plan, now)
             state_ticket = reconcile(self._state, dest, evidence="poll")
             assert isinstance(state_ticket, T)
-            self._state = state_ticket
             self._record(E.RECONCILE, now, state=dest.value, evidence="poll")
+            self._set_state(state_ticket)
             if dest == T.WORKING:
                 self.pause(now)

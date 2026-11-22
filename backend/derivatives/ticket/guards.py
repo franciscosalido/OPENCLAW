@@ -88,5 +88,7 @@ def check_deadlines(draft: TicketDraft, now: datetime, venue: ExecutionVenue) ->
         raise DeadlineRefusal("prazo de envio vencido")
     if draft.send_deadline > draft.order_validity:
         raise DeadlineRefusal("prazo de envio depois da validade")
+    if now >= draft.order_validity:
+        raise DeadlineRefusal("validade encerrada")
     if not venue.accepts_validity(draft.order_validity):
         raise DeadlineRefusal("validade que a venue não garante")
