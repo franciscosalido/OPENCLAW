@@ -176,3 +176,17 @@ def test_no_match_in_submit_and_timeout_is_consumed_once() -> None:
     assert venue.poll("o1") is None
     assert venue.submit(order, NOW).event is Event.VENUE_LIVE
     assert venue.poll("o1") == (S.LIVE, 0, 5)
+
+
+def test_quote_matches_all_orders_before_any_cancellation_report() -> None:
+    """Uma confirmação da ordem antiga sai após a execução da outra compra da série."""
+    venue = PaperVenue(CLOSE)
+    for oid, price in [("old", ".90"), ("new", "1.00")]:
+        order = VenueOrder(order_id=oid, symbol="A", side=Side.BUY, quantity=5, lot_size=1,
+                           limit_price=D(price), valid_until=CLOSE)
+        assert venue.submit(order, NOW).event is Event.VENUE_LIVE
+    venue.request_cancel("old", NOW)
+    assert venue.advance(quote(age=0)) == (
+        VenueReport("new", Event.VENUE_FILL, 5, D("1"), NOW),
+        VenueReport("old", Event.VENUE_CANCELLED, None, None, NOW),
+    )
