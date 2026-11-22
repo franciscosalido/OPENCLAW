@@ -918,3 +918,12 @@ def test_r6_release_never_sent_on_drive_stop(s: Session) -> None:
         E.PAUSE, E.REQUEST_CANCEL, E.VENUE_CANCELLED, E.STOP]
     second.confirm(s.dec(second), at(5))
     assert second.orders == {"T2:B:1": O.LIVE}
+
+
+def test_divergence_retains_unsent_buyback_after_reconciliation(s: Session) -> None:
+    pos, first, _ = two_buybacks(s, registered=False)
+    s.halts.hold("sim", "divergence")
+    first.reconcile("T1:C:1", at(3))
+    assert first.state == T.STOPPED and s.halts.blocked("sim")
+    with pytest.raises(SequenceRefusal):
+        s.res.admissible(buyback_plan(pos), ticket="T2")
