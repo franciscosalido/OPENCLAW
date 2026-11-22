@@ -57,3 +57,31 @@ def test_only_simulated_environment_and_read_only_market_routes() -> None:
     """O contrato mantém D0 simulado e a fronteira de mercado em leitura."""
     assert {item.value for item in Environment} == {"SIMULATED"}
     assert routes.ALLOWED_METHOD == "GET" and routes.ALLOWED_HOST == "api.oplab.com.br"
+
+
+def test_ticket_determinism_imports() -> None:
+    """Impede dependências de tempo, sorteio e concorrência adicionais."""
+    for path in ROOT.joinpath(*TICKET.split(".")).rglob("*.py"):
+        banned = {"random", "secrets", "time", "asyncio", "threading"}
+        if path.name == "sequencing.py":
+            banned.remove("threading")
+        assert not {n.split(".")[0] for n in _imports(path)} & banned, path
+
+
+def test_ticket_has_no_wall_clock() -> None:
+    """Identifica chamadas ao relógio por datetime, date ou aliases importados."""
+    for path in ROOT.joinpath(*TICKET.split(".")).rglob("*.py"):
+        tree = ast.parse(path.read_text())
+        aliases = {}
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module == "datetime":
+                aliases.update({a.asname or a.name: a.name for a in node.names})
+            elif isinstance(node, ast.Import):
+                aliases.update({a.asname or a.name: a.name for a in node.names})
+        for call in (n for n in ast.walk(tree) if isinstance(n, ast.Call)):
+            parts = ast.unparse(call.func).split(".")
+            parts[0] = aliases.get(parts[0], parts[0])
+            assert ".".join(parts).removeprefix("datetime.datetime.") not in (
+                "now", "today", "utcnow") or len(parts) == 1, path
+            assert ".".join(parts) not in {"datetime.now", "datetime.utcnow", "datetime.today",
+                                           "date.today", "datetime.date.today"}, path
