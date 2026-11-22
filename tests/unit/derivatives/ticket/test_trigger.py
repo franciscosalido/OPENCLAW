@@ -1,5 +1,5 @@
 """Oráculos literais do gatilho de aviso, sem motor ou envio."""
-from datetime import timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal as D
 
 import pytest
@@ -34,9 +34,10 @@ def trade(kind: str, **changes: object) -> TradeEvent:
     (q(ask=D("1"),ask_size=9),Source.ASK,NOW,None), (None,Source.ASK,NOW,"sem cotação"),
     (q(gap_before=True),Source.ASK,NOW,"perda de sequência"),
     (q(phase="AUCTION"),Source.ASK,NOW,"fora do contínuo"), (q(),Source.ASK,UNTIL,"prazo vencido"),
-    (q(),Source.STRATEGY_TRADE,NOW,None), (q(bid=D("1"),ask=D("1")),Source.ASK,NOW,"livro inválido"),
+    (q(),Source.STRATEGY_TRADE,NOW,None),
+    (q(bid=D("1"),ask=D("1")),Source.ASK,NOW,"livro inválido"),
 ],ids="A1 A2 A3 A4 A5 A6 A7 A8 A9".split())
-def test_arm(photo, source, now, expected) -> None:
+def test_arm(photo: QuoteEvent | None, source: Source, now: datetime, expected: str | None) -> None:
     """Verifica cada fronteira ao armar."""
     book=BookView()
     if photo:
@@ -106,7 +107,7 @@ def test_events(spec: str, events: list[ReplayEvent], outcomes: str, state: str)
     dict(symbol="B"), dict(source=Source.BID), dict(direction=Direction.AT_OR_ABOVE),
     dict(threshold=D("1.01")), dict(min_size=11), dict(armed_until=UNTIL+timedelta(seconds=1)),
 ])
-def test_digest_fields(changed: dict) -> None:
+def test_digest_fields(changed: dict[str, object]) -> None:
     """Cada campo entra no resumo da especificação."""
     assert spec_digest(SPEC) != spec_digest(SPEC.model_copy(update=changed))
 
@@ -116,12 +117,28 @@ def test_canonical_digest() -> None:
     alternate=UNTIL.astimezone(timezone(timedelta(hours=-3)))
     digest=spec_digest(SPEC)
     assert len(bytes.fromhex(digest))==32
-    assert digest==spec_digest(SPEC.model_copy(update=dict(threshold=D("1.0"),armed_until=alternate)))
+    equivalent = SPEC.model_copy(update=dict(threshold=D("1.0"), armed_until=alternate))
+    assert digest == spec_digest(equivalent)
 
 
 @pytest.mark.parametrize("changed", [dict(threshold=D("0")),dict(threshold=D(".001")),
                                      dict(min_size=0),dict(armed_until=NOW.replace(tzinfo=None))])
-def test_spec_fields_validated(changed: dict) -> None:
+def test_spec_fields_validated(changed: dict[str, object]) -> None:
     """A condição só admite preço positivo em ticks, tamanho mínimo e prazo com fuso."""
     with pytest.raises(ValidationError):
         TriggerSpec.model_validate(dict(SPEC) | changed)
+
+
+def test_initial_state_and_empty_book_on_event() -> None:
+    """Um evento antes de armar ou sem foto no livro apresentado não dispara."""
+    book = BookView()
+    book.advance(q())
+    trigger = Trigger(SPEC)
+    assert trigger.on_event(q(ask=D(".99")), book) == Outcome.NONE
+    with pytest.raises(TriggerRefusal):
+        trigger.disarm()
+    with pytest.raises(TriggerRefusal, match="tempo inválido"):
+        trigger.arm(book, NOW.replace(tzinfo=None))
+    trigger.arm(book, NOW)
+    assert trigger.on_event(q(ask=D(".99")), BookView()) == Outcome.NONE
+    assert trigger.state == TriggerState.ARMED

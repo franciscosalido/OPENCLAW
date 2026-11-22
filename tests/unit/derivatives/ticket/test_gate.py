@@ -30,27 +30,30 @@ P3 = Preview.from_draft(apply_human_edit(apply_human_edit(T,Q,20),Q,10),
     ("EXECUTE",dict(expires_at=TIME-timedelta(seconds=1), preview=P),"tempo inválido"),
     ("EXECUTE",{},"vínculo ausente"), ("ARM",dict(spec_digest="aaa"),"vínculo ausente"),
     ("ARM",dict(preview=P),"vínculo ausente"), ("CANCEL_ORDER",{},"vínculo ausente"),
-    ("RESUME",dict(preview=P),"vínculo indevido"), ("DISARM",dict(order_id="o1"),"vínculo indevido"),
+    ("RESUME",dict(preview=P),"vínculo indevido"),
+    ("DISARM",dict(order_id="o1"),"vínculo indevido"),
     ("DISCARD",dict(spec_digest="aaa"),"vínculo indevido"),
     ("EXECUTE",dict(preview=P,order_id="o1"),"vínculo indevido"),
     ("EXECUTE",dict(preview=P,spec_digest="aaa"),"vínculo indevido"),
     ("ARM",dict(preview=P,spec_digest="aaa",order_id="o1"),"vínculo indevido"),
     ("CANCEL_ORDER",dict(preview=P,order_id="o1"),"vínculo indevido"),
-], ids="I1-ticket I1-nonce I2-issued I2-expires I3-equal I3-before I4 I5-preview I5-spec I6 I7-resume I7-disarm I7-discard I8-order I8-spec arm-order cancel-preview".split())
-def test_issue_refuses(action: str, options: dict, reason: str) -> None:
+], ids=("I1-ticket I1-nonce I2-issued I2-expires I3-equal I3-before I4 I5-preview I5-spec I6 "
+        "I7-resume I7-disarm I7-discard I8-order I8-spec arm-order cancel-preview").split())
+def test_issue_refuses(action: str, options: dict[str, object], reason: str) -> None:
     """As recusas de emissão têm motivo explícito."""
     with pytest.raises(DecisionRefusal, match=reason):
         issue(Action(action), **(BASE | options))
 
 
 @pytest.mark.parametrize(("opts","reason"), [
-    ({},None), (dict(now=LIMIT),None), (dict(now=LIMIT+timedelta(microseconds=1)),"decisão vencida"),
+    ({},None), (dict(now=LIMIT),None),
+    (dict(now=LIMIT+timedelta(microseconds=1)),"decisão vencida"),
     (dict(now=TIME-timedelta(seconds=1)),"decisão ainda não válida"), (dict(now=TIME),None),
     (dict(preview=P2),"resumo divergente"), (dict(preview=P3),"versão divergente"),
     (dict(ticket="T2"),"boleta divergente"), (dict(action=Action.CANCEL_ORDER),"ação divergente"),
     (dict(ticket="T2", now=LIMIT+timedelta(seconds=1)),"boleta divergente"),
 ], ids="K1 K3 K3b K4 K4b K5 K6 K7 K8 K12".split())
-def test_consume(opts: dict, reason: str | None) -> None:
+def test_consume(opts: dict[str, object], reason: str | None) -> None:
     """A ida e volta da quantidade recupera o resumo da versão 1."""
     assert (P.version,P2.version,P3.version)==(1,2,3)
     assert P.digest != P2.digest and P.digest == P3.digest
@@ -101,3 +104,16 @@ def test_immutable_decision() -> None:
         decision.ticket="T2"
     with pytest.raises(ValidationError):
         type(decision).model_validate(dict(decision) | {"unknown":1})
+
+
+def test_consumption_requires_decision_and_aware_time() -> None:
+    """Dados serializados ou sem fuso não consomem a decisão."""
+    ledger = DecisionLedger()
+    decision = issue(Action.EXECUTE, **BASE, preview=P)
+    with pytest.raises(DecisionRefusal, match="decisão inválida"):
+        ledger.consume(dict(decision), **USE)
+    with pytest.raises(DecisionRefusal, match="tempo inválido"):
+        ledger.consume(decision, **(USE | dict(now=TIME.replace(tzinfo=None))))
+    ledger.consume(decision, **USE)
+    with pytest.raises(DecisionRefusal, match="decisão já usada"):
+        ledger.consume(decision, **(USE | dict(preview=P2)))
