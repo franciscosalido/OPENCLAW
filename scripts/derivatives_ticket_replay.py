@@ -1,6 +1,8 @@
 """Executa uma sessão D0 a partir de uma fita e de decisões humanas roteirizadas."""
 import argparse
+import ctypes
 import json
+import os
 import sys
 from datetime import datetime, timedelta
 from functools import partial
@@ -18,7 +20,7 @@ from backend.derivatives.ticket.engine import EngineRefusal, TicketEngine
 from backend.derivatives.ticket.gate import Action, DecisionRefusal, issue
 from backend.derivatives.ticket.guards import DeadlineRefusal
 from backend.derivatives.ticket.models import Instant, PositiveInt, TicketDraft
-from backend.derivatives.ticket.replay import ReplayError, load_replay
+from backend.derivatives.ticket.replay import load_replay
 from backend.derivatives.ticket.sequencing import Position, SequenceRefusal
 from backend.derivatives.ticket.session import ReplaySession, SessionRefusal
 from backend.derivatives.ticket.trigger import TriggerRefusal, TriggerSpec, spec_digest
@@ -85,9 +87,9 @@ def _read(path: Path) -> _Script:
     if len(accounts) != len(script.positions):
         raise ValueError("conta repetida")
     opened = set()
-    previous = 0
+    previous: int | None = None
     for step in script.steps:
-        if step.after_seq < previous:
+        if previous is not None and step.after_seq < previous:
             raise ValueError("sequência de passos decrescente")
         previous = step.after_seq
         if isinstance(step, _Open):
@@ -129,11 +131,13 @@ def _run(session: ReplaySession, script: _Script) -> list[dict[str, object]]:
         if isinstance(step, _Open):
             try:
                 session.open(step.ticket, positions[step.account], step.draft, step.at)
-            except Exception as exc:
+            except ValueError as exc:
                 raise SessionRefusal(f"abertura recusada no passo {n}: {exc}") from exc
         else:
             try:
                 _act(session.engine(step.ticket), step, n, script.decision_ttl_s)
+            except OverflowError as exc:
+                raise SessionRefusal(f"prazo fora do intervalo no passo {n}") from exc
             except (EngineRefusal, DecisionRefusal, SequenceRefusal, DeadlineRefusal,
                     TriggerRefusal) as exc:
                 refusals.append({"passo": n, "acao": step.do, "boleta": step.ticket,
@@ -142,10 +146,25 @@ def _run(session: ReplaySession, script: _Script) -> list[dict[str, object]]:
     return refusals
 
 
+def _publish(staged: Path, out: Path) -> None:
+    """Renomeia sem substituir nem mesmo um diretório vazio surgido durante a execução."""
+    libc = ctypes.CDLL(None, use_errno=True)
+    src, dst = os.fsencode(staged), os.fsencode(out)
+    if sys.platform == "darwin":
+        status = libc.renamex_np(src, dst, 0x4)  # RENAME_EXCL
+    elif sys.platform == "linux" and hasattr(libc, "renameat2"):
+        status = libc.renameat2(-100, src, -100, dst, 1)  # AT_FDCWD, RENAME_NOREPLACE
+    else:
+        raise OSError("destino sem suporte a rename exclusivo")
+    if status:
+        errno = ctypes.get_errno()
+        raise OSError(errno, os.strerror(errno), out)
+
+
 def _write(out: Path, session: ReplaySession, tickets: list[str],
            summary: dict[str, object]) -> None:
-    out.mkdir(parents=True, exist_ok=True)
-    with TemporaryDirectory(dir=out) as staging:
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with TemporaryDirectory(dir=out.parent) as staging:
         staged = Path(staging)
         for ticket in tickets:
             with (staged / f"recibo_{ticket}.jsonl").open("x", encoding="utf-8") as stream:
@@ -158,11 +177,7 @@ def _write(out: Path, session: ReplaySession, tickets: list[str],
         report = staged / "resumo.json"
         report.write_text(json.dumps(summary, sort_keys=True, indent=2, ensure_ascii=False) + "\n",
                           encoding="utf-8")
-        paths = [*staged.glob("recibo_*.jsonl"), report]
-        if any((out / p.name).is_dir() for p in paths):
-            raise OSError("diretório no destino de um arquivo")
-        for path in paths:
-            path.replace(out / path.name)
+        _publish(staged, out)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -172,17 +187,25 @@ def main(argv: list[str] | None = None) -> int:
         parser.add_argument("--" + option, type=Path, required=True)
     args = parser.parse_args(argv)
     try:
-        script = _read(args.roteiro)
-        session = ReplaySession(load_replay(args.replay), config=load_ticket_sim_config())
+        if os.path.lexists(args.out):
+            raise ValueError("destino já existe")
+        try:
+            script = _read(args.roteiro)
+            session = ReplaySession(load_replay(args.replay), config=load_ticket_sim_config())
+        except (OSError, OverflowError) as exc:
+            raise ValueError(str(exc)) from exc
         refusals = _run(session, script)
         tickets = [step.ticket for step in script.steps if isinstance(step, _Open)]
         summary = session.summary()
         summary["recusas"] = refusals
-        _write(args.out, session, tickets, summary)
+        try:
+            _write(args.out, session, tickets, summary)
+        except OSError as exc:
+            raise ValueError(str(exc)) from exc
     except ValidationError as exc:
         logger.error("Roteiro inválido: {}", exc.errors(include_input=False)[0]["msg"])
         return 2
-    except (ReplayError, SessionRefusal, ValueError, OverflowError, OSError) as exc:
+    except ValueError as exc:
         logger.error("Replay interrompido: {}", exc)
         return 2
     logger.info("{}", summary["aviso"])

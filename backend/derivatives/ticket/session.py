@@ -29,6 +29,8 @@ class ReplaySession:
     """Distribui os mesmos eventos, livro, venue e recursos de conta entre as boletas."""
 
     def __init__(self, replay: Replay, *, config: TicketSimConfig) -> None:
+        if replay.events and replay.events[0].seq <= 0:
+            raise SessionRefusal("after_seq=0 reservado para antes do primeiro evento")
         self._events = replay.events
         self._cursor = 0
         self._config = config
@@ -39,15 +41,10 @@ class ReplaySession:
         self._halts = AccountHalts()
         self._tickets: dict[str, _Ticket] = {}
 
-    @property
-    def ledger(self) -> DecisionLedger:
-        """Livro de decisões consumidas por todos os motores da sessão."""
-        return self._ledger
-
     def open(self, ticket: str, position: Position, draft: TicketDraft,
              now: datetime) -> TicketEngine:
         """Registra a boleta somente depois que a proposta gera a primeira prévia."""
-        if ticket in self._tickets:
+        if any(name.casefold() == ticket.casefold() for name in self._tickets):
             raise SessionRefusal("boleta já aberta")
         receipt = Receipt()
         engine = TicketEngine(ticket, position, venue=self._venue, book=self._book,
