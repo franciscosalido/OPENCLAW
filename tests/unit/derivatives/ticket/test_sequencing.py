@@ -104,7 +104,9 @@ def test_scope_and_duplicate_fills() -> None:
     ("1", "-5", "25", "0", (), True), ("1", "-5.01", "25", "0", (), False),
     ("1", "-5", "24.99", "0", (), False), ("1", "-4.99", "25.01", ".01", (), True),
     ("1", "-5.30", "24.70", "0",
-     (Fill(execution="f1", symbol="A", side=Side.BUY, quantity=3, price=D(".90")),), True), ("2", "5", "35", "0", (), True), ("2", "4.99", "35", "0", (), False),
+     (Fill(execution="f1", symbol="A", side=Side.BUY, quantity=3, price=D(".90")),),
+     True),
+    ("2", "5", "35", "0", (), True), ("2", "4.99", "35", "0", (), False),
 ])
 def test_entire_signed_structure(buy: str, net: str, gross: str, cost: str,
                                  fills: tuple[Fill, ...], expected: bool) -> None:

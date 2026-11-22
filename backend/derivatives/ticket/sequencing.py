@@ -266,7 +266,8 @@ def within_signed_limits(draft: TicketDraft, fills: tuple[Fill, ...], next_leg: 
                 fill = Fill.model_validate(fact)
                 leg = signed[fill.symbol]
                 if (fill.execution in seen or fill.side != leg.side
-                        or fill.quantity > remaining[fill.symbol] or not _price_ok(leg, fill.price)):
+                        or fill.quantity > remaining[fill.symbol]
+                        or not _price_ok(leg, fill.price)):
                     return False
                 seen.add(fill.execution)
                 remaining[fill.symbol] -= fill.quantity
