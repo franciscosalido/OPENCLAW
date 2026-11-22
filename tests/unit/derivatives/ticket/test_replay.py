@@ -49,3 +49,15 @@ def test_timestamp_requires_explicit_offset_and_representable_instant(tmp_path: 
     path.write_text(FIXTURE.read_text().replace("2026-11-23T14:00:00Z", bad))
     with pytest.raises(ReplayError, match="tempo inválido"):
         load_replay(path)
+
+
+@pytest.mark.parametrize("bad", ["0", "2026-11-23T21:00:00", "0001-01-01T00:00:00+01:00"])
+def test_reviewer_session_close_follows_the_same_time_policy(tmp_path: Path, bad: str) -> None:
+    """Revisor: o fechamento da sessão exige fuso explícito e instante representável."""
+    path = tmp_path / "close.json"
+    text = FIXTURE.read_text()
+    assert text.count('"session_close":"2026-11-23T21:00:00Z"') == 1
+    path.write_text(text.replace('"session_close":"2026-11-23T21:00:00Z"',
+                                 f'"session_close":"{bad}"'))
+    with pytest.raises(ReplayError, match="tempo inválido"):
+        load_replay(path)
