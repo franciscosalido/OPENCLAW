@@ -4,14 +4,15 @@ import ctypes
 import json
 import os
 import sys
-from datetime import datetime, timedelta
+from datetime import timedelta
 from functools import partial
+from itertools import pairwise
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Annotated, Literal
 
 from loguru import logger
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, ValidationError
+from pydantic import Field, ValidationError
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -19,27 +20,17 @@ if __package__ in (None, ""):
 from backend.derivatives.ticket.engine import EngineRefusal, TicketEngine
 from backend.derivatives.ticket.gate import Action, DecisionRefusal, issue
 from backend.derivatives.ticket.guards import DeadlineRefusal
-from backend.derivatives.ticket.models import Instant, PositiveInt, TicketDraft
-from backend.derivatives.ticket.replay import load_replay
+from backend.derivatives.ticket.models import PositiveInt, TicketDraft, _Frozen
+from backend.derivatives.ticket.replay import Timestamp, load_replay
 from backend.derivatives.ticket.sequencing import Position, SequenceRefusal
 from backend.derivatives.ticket.session import ReplaySession, SessionRefusal
 from backend.derivatives.ticket.trigger import TriggerRefusal, TriggerSpec, spec_digest
 from config.ticket_sim_config_model import load_ticket_sim_config
 
 
-class _Model(BaseModel):
-    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
-
-
-def _instant(value: object) -> datetime:
-    if not isinstance(value, str):
-        raise ValueError("instante deve ser texto com fuso")
-    return datetime.fromisoformat(value)
-
-
-class _Step(_Model):
+class _Step(_Frozen):
     after_seq: Annotated[int, Field(ge=0)]
-    at: Annotated[Instant, BeforeValidator(_instant)]
+    at: Timestamp
     ticket: str
 
 
@@ -66,7 +57,7 @@ class _Simple(_Step):
 type Step = Annotated[_Open | _Arm | _Order | _Simple, Field(discriminator="do")]
 
 
-class _Script(_Model):
+class _Script(_Frozen):
     decision_ttl_s: PositiveInt
     positions: tuple[Position, ...]
     steps: tuple[Step, ...]
@@ -87,11 +78,9 @@ def _read(path: Path) -> _Script:
     if len(accounts) != len(script.positions):
         raise ValueError("conta repetida")
     opened = set()
-    previous: int | None = None
+    if any(a.after_seq > b.after_seq for a, b in pairwise(script.steps)):
+        raise ValueError("sequência de passos decrescente")
     for step in script.steps:
-        if previous is not None and step.after_seq < previous:
-            raise ValueError("sequência de passos decrescente")
-        previous = step.after_seq
         if isinstance(step, _Open):
             if step.account not in accounts:
                 raise ValueError("conta ausente")
@@ -161,11 +150,24 @@ def _publish(staged: Path, out: Path) -> None:
         raise OSError(errno, os.strerror(errno), out)
 
 
-def _write(out: Path, session: ReplaySession, tickets: list[str],
+def _write(out: Path, target: Path, session: ReplaySession, tickets: list[str],
            summary: dict[str, object]) -> None:
-    out.parent.mkdir(parents=True, exist_ok=True)
-    with TemporaryDirectory(dir=out.parent) as staging:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with TemporaryDirectory(dir=target.parent) as staging:
         staged = Path(staging)
+        if ".." in out.parts:
+            # O próprio volume decide se um ancestral ausente é um alias do destino final.
+            marker = staged / target.name
+            marker.touch()
+            for parent in reversed(out.parents):
+                if parent.is_dir():
+                    continue
+                physical = Path(os.path.realpath(parent))
+                if physical.parent.is_dir() and physical.parent.samefile(target.parent):
+                    if (staged / physical.name).exists():
+                        continue
+                physical.mkdir(exist_ok=True)
+            marker.unlink()
         for ticket in tickets:
             with (staged / f"recibo_{ticket}.jsonl").open("x", encoding="utf-8") as stream:
                 for event in session.receipt(ticket).events:
@@ -174,10 +176,9 @@ def _write(out: Path, session: ReplaySession, tickets: list[str],
                            "hash": event.hash}
                     stream.write(json.dumps(row, sort_keys=True, ensure_ascii=False,
                                             separators=(",", ":")) + "\n")
-        report = staged / "resumo.json"
-        report.write_text(json.dumps(summary, sort_keys=True, indent=2, ensure_ascii=False) + "\n",
-                          encoding="utf-8")
-        _publish(staged, out)
+        formatted = json.dumps(summary, sort_keys=True, indent=2, ensure_ascii=False)
+        (staged / "resumo.json").write_text(formatted + "\n", encoding="utf-8")
+        _publish(staged, target)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -187,8 +188,12 @@ def main(argv: list[str] | None = None) -> int:
         parser.add_argument("--" + option, type=Path, required=True)
     args = parser.parse_args(argv)
     try:
-        if os.path.lexists(args.out):
+        out = args.out.absolute()
+        target = Path(os.path.realpath(out.parent)) / out.name
+        if out.name == ".." or os.path.lexists(target):
             raise ValueError("destino já existe")
+        if any(p.is_symlink() and not p.is_dir() for p in out.parents):
+            raise ValueError("link de diretório sem destino acessível")
         try:
             script = _read(args.roteiro)
             session = ReplaySession(load_replay(args.replay), config=load_ticket_sim_config())
@@ -196,17 +201,14 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError(str(exc)) from exc
         refusals = _run(session, script)
         tickets = [step.ticket for step in script.steps if isinstance(step, _Open)]
-        summary = session.summary()
-        summary["recusas"] = refusals
+        summary = session.summary() | {"recusas": refusals}
         try:
-            _write(args.out, session, tickets, summary)
+            _write(out, target, session, tickets, summary)
         except OSError as exc:
             raise ValueError(str(exc)) from exc
-    except ValidationError as exc:
-        logger.error("Roteiro inválido: {}", exc.errors(include_input=False)[0]["msg"])
-        return 2
     except ValueError as exc:
-        logger.error("Replay interrompido: {}", exc)
+        reason = exc.errors()[0]["type"] if isinstance(exc, ValidationError) else str(exc)
+        logger.error("Replay interrompido: {}", reason)
         return 2
     logger.info("{}", summary["aviso"])
     for ticket in tickets:

@@ -284,7 +284,7 @@ def test_publication_fault_leaves_no_partial_receipts(fault: str, tmp_path: Path
         assert list(tmp_path.iterdir()) == [out] and not list(out.iterdir())
 
 
-@pytest.mark.parametrize("path", ["a/../a", "intermediario/../resultado", "link/../resultado"])
+@pytest.mark.parametrize("path", ["a/../a", "A/../a", "intermediario/../resultado", "link/../resultado"])
 def test_parent_creation_with_dotdot_preserves_destination(path: str, tmp_path: Path) -> None:
     """O nome solicitado permanece utilizável e '..' segue os links do sistema de arquivos."""
     if path.startswith("link/"):
