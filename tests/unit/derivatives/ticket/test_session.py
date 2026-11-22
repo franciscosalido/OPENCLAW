@@ -6,10 +6,12 @@ from pathlib import Path
 import pytest
 
 from backend.derivatives.ticket.engine import EngineRefusal
+from backend.derivatives.ticket.gate import Action, DecisionRefusal, issue
 from backend.derivatives.ticket.models import TicketDraft
 from backend.derivatives.ticket.replay import load_replay
 from backend.derivatives.ticket.sequencing import Position
 from backend.derivatives.ticket.session import ReplaySession, SessionRefusal
+from backend.derivatives.ticket.state import OrderState, TicketState
 from config.ticket_sim_config_model import load_ticket_sim_config
 
 FIXTURES = Path(__file__).resolve().parents[3] / "fixtures/derivatives/synthetic/ticket/sessions"
@@ -70,3 +72,64 @@ def test_incompatible_venue_event_is_session_refusal() -> None:
                       config=load_ticket_sim_config())
     with pytest.raises(SessionRefusal):
         s.finish()
+
+
+@pytest.mark.parametrize("second", ["t1", "T1"], ids=["U1", "U2"])
+def test_open_preserves_first_spelling(second: str) -> None:
+    """A sessão recusa as duas colisões e preserva a consulta por grafia original."""
+    s, pos, draft, now = session_data()
+    s.advance_to(2)
+    first = s.open("T1", pos, draft, now)
+    with pytest.raises(SessionRefusal):
+        s.open(second, pos, draft, now)
+    assert s.engine("T1") is first
+    with pytest.raises(KeyError):
+        s.engine("t1")
+
+
+@pytest.mark.parametrize("delta", [1, 2], ids=["U3", "U4"])
+def test_only_session_reserves_zero_for_before_first_event(delta: int, tmp_path: Path) -> None:
+    """O leitor admite o replay com seq <= 0 e o construtor recusa a ambiguidade."""
+    tape = json.loads((FIXTURES / "calmo.replay.json").read_bytes())
+    for event in tape["events"]:
+        event["seq"] -= delta
+    source = tmp_path / "fita"
+    source.write_text(json.dumps(tape))
+    replay = load_replay(source)
+    assert replay.events[0].seq == 1 - delta
+    with pytest.raises(SessionRefusal, match="after_seq=0"):
+        ReplaySession(replay, config=load_ticket_sim_config())
+
+
+def test_empty_tape_can_finish() -> None:
+    """Uma fita vazia tem zero eventos e nenhuma fronteira temporal."""
+    replay = load_replay(FIXTURES / "calmo.replay.json").model_copy(update={"events": ()})
+    session = ReplaySession(replay, config=load_ticket_sim_config())
+    session.advance_to(0)
+    session.finish()
+    assert session.summary()["eventos"] == 0
+
+
+def test_u5_nonce_used_by_first_ticket_is_spent_for_second() -> None:
+    """O saldo de decisões pertence à sessão inteira."""
+    s, pos, draft, now = session_data()
+    s.advance_to(2)
+    one = s.open("T1", pos, draft, now)
+    two = s.open("T2", pos, draft, now)
+    for name, engine in (("T1", one), ("T2", two)):
+        decision = issue(Action.EXECUTE, ticket=name, nonce="x", preview=engine.preview,
+                         issued_at=now, expires_at=now + timedelta(minutes=1))
+        if name == "T1":
+            one.confirm(decision, now)
+        else:
+            with pytest.raises(DecisionRefusal):
+                two.confirm(decision, now)
+    assert one.state is TicketState.WORKING and one.orders == {"T1:A:1": OrderState.LIVE}
+    assert two.state is TicketState.DRAFT and not two.orders
+
+
+def test_u6_naive_time_is_refused_even_without_previous_event() -> None:
+    """O tipo da recusa faz parte do contrato."""
+    s, _, _, _ = session_data()
+    with pytest.raises(SessionRefusal):
+        s.check_time(datetime(2026, 11, 23, 14, 0, 2))
