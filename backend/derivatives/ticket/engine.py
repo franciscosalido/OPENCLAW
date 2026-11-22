@@ -127,6 +127,7 @@ class TicketEngine:
         self._state = state
 
     def _propose(self, draft: TicketDraft, now: datetime) -> None:
+        draft = TicketDraft.model_validate(draft)
         for leg in draft.legs:
             _check_id_component(leg.symbol)
         plan = plan_legs(draft, self._position)
