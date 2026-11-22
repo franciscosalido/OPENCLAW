@@ -313,3 +313,45 @@ gate precisar de exceção; `session.py` passar de 150 linhas, o script de 220 o
 4. Copie este cartão para `docs/specs/derivatives/fase3/DL3-PR06.md`.
 5. Skill `quimera-lab-review` e simplificação v0.2 na cabeça publicada, relatórios fora do
    Git, SHA-256 na descrição.
+
+## Revisão adversarial (Claude) — duas rodadas, GO na cabeça `029a092`
+
+| Rodada | Cabeça | Parecer | Motivo |
+|---|---|---|---|
+| 1 | `742b852` | NO-GO | Boletas `T1` e `t1` na mesma sessão, `after_seq=0` ambíguo em fita que começa em zero, pasta de saída reaproveitada, `open` capturando qualquer exceção, propriedade `ledger` sem uso e seis lacunas de teste. Correção no [DL3-PR06B](DL3-PR06B.md) |
+| 2 | `029a092` | GO | Sem bloqueante |
+
+Quatro pontos da rodada 1 eram lacunas deste cartão, não erro de implementação: ele não
+tratava maiúsculas nos ids, não exigia sequência positiva na fita, mandava capturar
+"qualquer exceção" na abertura e definia a propriedade `ledger`, que ninguém usava.
+
+| Verificação do revisor na cabeça `029a092`, clone limpo, Linux x86_64 | Resultado |
+|---|---|
+| Pytest sem integração | 11.227 aprovados, 16 pulados, 261 subtestes |
+| `mypy backend/ --strict`, `mypy --strict` no script e `pyright backend/` | 0 erros |
+| Linhas | `session.py` 116 (teto 150), script 220 (teto 220), PR com 336 de produção (teto 370) |
+| Três sessões oficiais pela linha de comando, de outro diretório | os quatro hashes do cartão reproduzem |
+| 75 mutantes do revisor, um por vez | 64 mortos; 11 vivos, dos quais 3 são lacuna de teste e 8 são equivalentes ou redundantes |
+| Sondas de destino: `x/..`, pai que é link quebrado, pai que é arquivo, destino que é link, `../irmao`, barra final, destino vazio | código 2 ou 0 conforme o cartão, sem traceback e sem resíduo |
+| Oito processos disputando o mesmo destino | um publica a sessão inteira, sete recebem código 2 |
+| Arquivos protegidos, fixtures e módulos existentes de `backend/` | intactos |
+
+Observações, nenhuma bloqueante:
+
+1. **Três comportamentos corretos sem teste.** Destino terminado em `..`, pai que é link
+   quebrado e prazo de decisão que estoura a data: a linha de comando devolve 2 nos três,
+   mas remover cada tratamento não derruba nenhum teste.
+2. **Bloco de caminhos com `..` (14 linhas).** Funciona nos casos sondados, mas quatro
+   mutantes sobrevivem nele: há condição que nenhum teste distingue. Recusar
+   `..` em `--out` tiraria o bloco inteiro. Candidato à rodada de simplificação (DP-17).
+3. **Renomeação exclusiva por `ctypes`.** Vai além do que o cartão pediu (pasta nova e um
+   `rename`). Fecha a disputa entre processos e, onde o sistema não oferece a primitiva,
+   o comando recusa publicar. Conferido em Linux x86_64 pelo revisor e em macOS e Linux
+   arm64 pelo implementador.
+4. **Uma linha de teste com 105 colunas** (`test_ticket_replay_script.py`, linha 287).
+   Entra como higiene no próximo cartão.
+5. **Pai sem permissão de escrita** não foi sondado: o revisor roda como administrador.
+
+Relatórios da skill lidos depois do parecer formado, com SHA-256 conferidos
+(`99384157…2ce0` e `2697023d…6e36`): GO técnico, sem bloqueante e sem simplificação com
+prova. A pesquisa bibliográfica do implementador não foi reconferida pelo revisor.
