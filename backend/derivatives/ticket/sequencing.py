@@ -142,6 +142,7 @@ class ReservationBook:
         """Inicia saldos vazios sem carregar posições externas."""
         self._lock = Lock()
         self._plans: dict[tuple[str, str], LegPlan] = {}
+        self._occupation: dict[tuple[str, str, str], int] = {}
         self._buys: dict[tuple[str, str, str], int] = {}
         self._orders: dict[tuple[str, str], _Order] = {}
         self._executions: set[tuple[str, str]] = set()
@@ -162,6 +163,42 @@ class ReservationBook:
         self._plans[account, ticket] = plan
         self._positions[account] = plan.position
 
+    def _admission(self, plan: LegPlan, ticket: str) -> dict[tuple[str, str, str], int]:
+        account = self._check(plan, ticket)
+        balances = {h.symbol: h.balance for h in plan.position.holdings}
+        occupation = {}
+        for leg in plan.legs:
+            if leg.side is not Side.BUY:
+                continue
+            initial = balances[leg.symbol]
+            if initial < 0:
+                other = sum(n for (a, t, s), n in self._occupation.items()
+                            if a == account and t != ticket and s == leg.symbol)
+                if other + leg.quantity > -initial:
+                    raise SequenceRefusal("recompra excede a posição vendida disponível")
+            occupation[account, ticket, leg.symbol] = leg.quantity
+        return occupation
+
+    def admissible(self, plan: LegPlan, *, ticket: str) -> None:
+        """Confere foto e capacidade sem ocupar saldo nem registrar o plano."""
+        with self._lock:
+            self._admission(plan, ticket)
+
+    def admit(self, plan: LegPlan, *, ticket: str) -> None:
+        """Reconfere e ocupa todas as compras em uma só seção crítica."""
+        with self._lock:
+            occupation = self._admission(plan, ticket)
+            self._remember(plan, ticket)
+            self._occupation.update(occupation)
+
+    def settle_buy(self, account: str, ticket: str, symbol: str) -> None:
+        """Conserva somente o executado quando a compra alcança estado final."""
+        key = account, ticket, symbol
+        with self._lock:
+            if key not in self._occupation:
+                raise SequenceRefusal("compra sem ocupação")
+            self._occupation[key] = self._buys.get(key, 0)
+
     def confirm_buy(self, plan: LegPlan, leg: Leg, execution: str, quantity: int, *,
                     ticket: str) -> None:
         """Credita uma execução de compra conciliada uma única vez."""
@@ -171,7 +208,8 @@ class ReservationBook:
             total = self._buys.get(key, 0)
             if (leg not in plan.legs or leg.side is not Side.BUY or not execution
                     or (account, execution) in self._executions or type(quantity) is not int
-                    or quantity <= 0 or total + quantity > leg.quantity):
+                    or quantity <= 0 or total + quantity > leg.quantity
+                    or total + quantity > self._occupation.get(key, leg.quantity)):
                 raise SequenceRefusal("execução de compra inválida")
             initial = next(h.balance for h in plan.position.holdings if h.symbol == leg.symbol)
             if initial < 0 and self._bought(account, leg.symbol) + quantity > -initial:

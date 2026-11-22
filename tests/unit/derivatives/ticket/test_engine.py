@@ -10,14 +10,14 @@ import pytest
 from backend.derivatives.ticket.engine import AccountHalts, EngineRefusal, TicketEngine
 from backend.derivatives.ticket.gate import Action, DecisionLedger, HumanDecision, issue
 from backend.derivatives.ticket.guards import BookView
-from backend.derivatives.ticket.models import MarketSuggestion, Side
+from backend.derivatives.ticket.models import Leg, MarketSuggestion, Side
 from backend.derivatives.ticket.paper_venue import PaperVenue
 from backend.derivatives.ticket.receipt import Receipt
 from backend.derivatives.ticket.replay import AuctionFill, CancelRejected, ReplayEvent, VenueTimeout
-from backend.derivatives.ticket.sequencing import Position, ReservationBook, SequenceRefusal, plan_legs
+from backend.derivatives.ticket.sequencing import LegPlan, Position, ReservationBook, SequenceRefusal, plan_legs
 from backend.derivatives.ticket.state import Event as E, OrderState as O, TicketState as T
 from backend.derivatives.ticket.trigger import Source, TriggerSpec, spec_digest
-from backend.derivatives.ticket.venue import OrderSnapshot, VenueReport
+from backend.derivatives.ticket.venue import OrderSnapshot, VenueOrder, VenueReport
 from config.ticket_sim_config_model import load_ticket_sim_config
 from tests.unit.derivatives.ticket.test_guards import NOW, CLOSE, quote
 from tests.unit.derivatives.ticket.test_models import PRICE
@@ -509,8 +509,11 @@ def test_c3_divergent_photo_cannot_consume_or_submit(s: Session) -> None:
 
 class FirstBuyFails(ReservationBook):
     """A primeira contabilização falha depois de uma execução factual da venue."""
-    def confirm_buy(self, plan, leg, execution, quantity, *, ticket) -> None:
-        if not hasattr(self, "failed"):
+    failed = False
+
+    def confirm_buy(self, plan: LegPlan, leg: Leg, execution: str, quantity: int, *,
+                    ticket: str) -> None:
+        if not self.failed:
             self.failed = True
             raise SequenceRefusal("falha contábil sintética")
         super().confirm_buy(plan, leg, execution, quantity, ticket=ticket)
@@ -545,7 +548,7 @@ def test_fill_survives_accounting_refusal(s: Session, uncertain: bool) -> None:
 
 
 def test_c6_rejected_sale_is_final(s: Session) -> None:
-    def submit(order, now):
+    def submit(order: VenueOrder, now: datetime) -> VenueReport:
         if order.side == Side.SELL:
             return VenueReport(order.order_id, E.VENUE_REJECTED, None, None, now)
         return s.paper.submit(order, now)
@@ -589,3 +592,17 @@ def test_l3_release_is_per_order(s: Session) -> None:
     assert [(oid, n) for oid, n, _, _ in s.submitted()] == [(A, 10), (B, 3), ("T1:B:2", 4)]
     assert e.orders[B] == O.FILLED and e.orders["T1:B:2"] == O.CANCELLED
     assert free(s) == 4 and e.state == T.WORKING
+
+
+def test_r15_continues_batch_after_partial_buy_refusal(s: Session) -> None:
+    s.res = FirstBuyFails()
+    engine = s.confirmed()
+    reports = [VenueReport(A, E.VENUE_PARTIAL, 3, D("1.00"), at(3)),
+               VenueReport(A, E.VENUE_FILL, 7, D("1.00"), at(4))]
+    engine.on_reports(reports, at(4))
+    facts = [(r.kind, json.loads(r.payload)) for r in s.receipts[0].events
+             if r.kind in (E.VENUE_PARTIAL, E.VENUE_FILL, E.DIVERGENCE)]
+    assert [(kind, data.get("quantity")) for kind, data in facts] == [
+        (E.VENUE_PARTIAL, 3), (E.DIVERGENCE, None), (E.VENUE_FILL, 7)]
+    assert engine.orders[A] == O.FILLED and s.halts.blocked("sim")
+    assert free(s) == 7 and len(s.submitted()) == 1

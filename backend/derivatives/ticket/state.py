@@ -35,6 +35,7 @@ class OrderState(StrEnum):
 class Event(StrEnum):
     """Evento de replay aceito por uma máquina ou registrado no recibo."""
 
+    DIVERGENCE = "divergence"
     PAUSE = "pause"
     RESUME = "resume"
     PREVIEW = "preview"

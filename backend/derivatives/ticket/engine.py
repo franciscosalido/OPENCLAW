@@ -14,7 +14,8 @@ from backend.derivatives.ticket.models import (
 from backend.derivatives.ticket.receipt import Receipt
 from backend.derivatives.ticket.replay import ReplayEvent
 from backend.derivatives.ticket.sequencing import (
-    Fill, LegPlan, Position, ReservationBook, partial_exposure, plan_legs, within_signed_limits,
+    Fill, LegPlan, Position, ReservationBook, SequenceRefusal, partial_exposure, plan_legs,
+    within_signed_limits,
 )
 from backend.derivatives.ticket.state import (
     Event as E, InvalidTransition, OrderState as O, TicketState as T, reconcile, transition,
@@ -32,13 +33,19 @@ class EngineRefusal(ValueError):
 
 
 class AccountHalts:
-    """Identifica cada ordem incerta, inclusive quando vários motores compartilham a conta."""
+    """Compartilha bloqueios por incerteza e divergência entre motores da conta."""
     def __init__(self) -> None:
         self._pending: set[tuple[str, str]] = set()
 
     def blocked(self, account: str) -> bool:
-        """Indica se ainda há incerteza nesta conta."""
+        """Indica se alguma causa ainda bloqueia esta conta."""
         return any(a == account for a, _ in self._pending)
+
+    def hold(self, account: str, key: str) -> None:
+        self._pending.add((account, key))
+
+    def release(self, account: str, key: str) -> None:
+        self._pending.discard((account, key))
 
 
 @dataclass
@@ -178,12 +185,18 @@ class TicketEngine:
             raise EngineRefusal(reason)
         if not within_signed_limits(plan.draft, (), plan.legs[0], known_costs=_ZERO):
             raise EngineRefusal("limites assinados")
-        self._move(E.CONFIRM, now, **self._consume(decision, Action.EXECUTE, now))
+        self._reservations.admissible(plan, ticket=self._ticket)
+        auth = self._consume(decision, Action.EXECUTE, now)
+        self._reservations.admit(plan, ticket=self._ticket)
+        self._move(E.CONFIRM, now, **auth)
         self._move(E.START, now)
         self._drive(now)
 
     def _available(self, plan: LegPlan, leg: Leg) -> int:
         return self._reservations.available(plan, leg, ticket=self._ticket)
+
+    def _rejected(self, leg: Leg) -> bool:
+        return any(o.leg == leg and o.state == O.REJECTED for o in self._orders.values())
 
     def _destination(self, plan: LegPlan, now: datetime) -> T:
         if any(o.state in _LIVE for o in self._orders.values()):
@@ -192,7 +205,8 @@ class TicketEngine:
                for leg in plan.legs):
             return T.COMPLETED
         if not self._cancelled and now <= plan.draft.send_deadline and any(
-                self._available(plan, leg) > 0 for leg in plan.legs if leg.side is Side.SELL):
+                self._available(plan, leg) > 0 for leg in plan.legs if leg.side is Side.SELL
+                and not self._rejected(leg)):
             return T.WORKING
         return T.STOPPED
 
@@ -206,7 +220,7 @@ class TicketEngine:
                     or self._market_block(plan, now)):
                 break
             previous = sum(o.leg.symbol == leg.symbol for o in self._orders.values())
-            if leg.side is Side.BUY and previous:
+            if self._rejected(leg) or (leg.side is Side.BUY and previous):
                 continue
             quantity = leg.quantity if leg.side is Side.BUY else self._available(plan, leg)
             if not quantity:
@@ -234,29 +248,43 @@ class TicketEngine:
         dest = transition(order.state, r.event)
         assert isinstance(dest, O) and self._plan is not None
         data: dict[str, object] = {"order_id": r.order_id, "state": dest.value}
+        fill = None
         if r.event in (E.VENUE_FILL, E.VENUE_PARTIAL):
             assert r.quantity is not None and r.price is not None
             key = f"{r.order_id}#{order.executions + 1}"
             fill = Fill(execution=key, symbol=order.leg.symbol, side=order.leg.side,
                         quantity=r.quantity, price=r.price)
-            if order.leg.side is Side.BUY:
-                self._reservations.confirm_buy(self._plan, order.leg, key, r.quantity,
-                                               ticket=self._ticket)
-            else:
-                self._reservations.confirm_sale(self._account, r.order_id, key, r.quantity)
             order.executions += 1
             order.filled += r.quantity
             self._fills.append(fill)
             data.update(execution=key, price=str(r.price), quantity=r.quantity)
-        if dest in (O.REJECTED, O.EXPIRED, O.CANCELLED):
-            self._release(order)
         if order.state == O.PENDING_SEND:
             data["request"] = order.request.model_dump(mode="json")
         order.state = dest
         self._record(r.event, r.ts, **data)
+        self._account_report(order, r.ts, fill)
         if dest == O.UNCERTAIN:
-            self._halts._pending.add((self._account, r.order_id))
+            self._halts.hold(self._account, r.order_id)
             self._move(E.UNCERTAIN, r.ts)
+
+    def _account_report(self, order: _Order, now: datetime, fill: Fill | None = None) -> None:
+        oid = order.request.order_id
+        try:
+            if fill is not None:
+                if order.leg.side is Side.BUY:
+                    assert self._plan is not None
+                    self._reservations.confirm_buy(self._plan, order.leg, fill.execution,
+                                                   fill.quantity, ticket=self._ticket)
+                else:
+                    self._reservations.confirm_sale(self._account, oid, fill.execution, fill.quantity)
+            if order.state in (O.FILLED, O.CANCELLED, O.EXPIRED, O.REJECTED):
+                if order.leg.side is Side.BUY:
+                    self._reservations.settle_buy(self._account, self._ticket, order.leg.symbol)
+                else:
+                    self._release(order)
+        except SequenceRefusal:
+            self._record(E.DIVERGENCE, now, order_id=oid)
+            self._halts.hold(self._account, "divergence")
 
     def _release(self, order: _Order) -> None:
         balance = order.request.quantity - order.filled
@@ -336,11 +364,11 @@ class TicketEngine:
         order.state = state
         self._record(E.RECONCILE, now, order_id=order_id, state=resolved.value, evidence="poll")
         if snap is None:
-            self._release(order)
+            self._account_report(order, now)
         for r in order.pending:
             self._apply(r)
         order.pending.clear()
-        self._halts._pending.discard((self._account, order_id))
+        self._halts.release(self._account, order_id)
         if not any(o.state == O.UNCERTAIN for o in self._orders.values()):
             dest = self._destination(plan, now)
             state_ticket = reconcile(self._state, dest, evidence="poll")
