@@ -955,3 +955,20 @@ def test_r1_other_account_divergence_preserves_local_release(s: Session) -> None
     assert s.halts.blocked("outra")
     second.confirm(s.dec(second), at(3))
     assert second.orders == {"T2:B:1": O.LIVE}
+
+
+def test_r6_another_uncertain_ticket_does_not_strand_buyback(s: Session) -> None:
+    """Encerrar as duas boletas libera a capacidade apesar da sobreposição de bloqueios."""
+    pos, first, second = two_buybacks(s, registered=True)
+    first.reconcile("T1:C:1", at(3))
+    third = s.new(pos, legs=(BUY,), net_limit=D("10"), gross_cap=D("10"))
+    s.step(VenueTimeout(type="timeout", seq=4, ts=at(3), call="submit", registered=False))
+    third.confirm(s.dec(third), at(3))
+    assert third.state == T.UNCERTAIN
+    s.cancel(first, "T1:C:1", 3)
+    s.q("C", 4, ask="1.60")
+    assert first.state == T.STOPPED and s.halts.blocked("sim")
+    third.reconcile("T3:A:1", at(4))
+    assert third.state == T.STOPPED and not s.halts.blocked("sim")
+    second.confirm(s.dec(second), at(5))
+    assert second.orders == {"T2:B:1": O.LIVE}
