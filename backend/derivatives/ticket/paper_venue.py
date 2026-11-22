@@ -88,6 +88,7 @@ class PaperVenue:
             liquidity: dict[Side | None, int] = (
                 {None: event.size} if isinstance(event, AuctionFill)
                 else {Side.BUY: event.ask_size, Side.SELL: event.bid_size})
+            cancellations: list[VenueReport] = []
             for oid, entry in self._orders.items():
                 order = entry.order
                 if not entry.remaining or order.symbol != event.symbol:
@@ -108,5 +109,6 @@ class PaperVenue:
                     entry.cancel = False
                 elif entry.cancel and isinstance(event, QuoteEvent):
                     entry.state, entry.cancel = S.CANCELLED, False
-                    reports.append(VenueReport(oid, E.VENUE_CANCELLED, None, None, ts))
+                    cancellations.append(VenueReport(oid, E.VENUE_CANCELLED, None, None, ts))
+            reports.extend(cancellations)
         return tuple(reports)

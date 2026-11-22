@@ -17,6 +17,7 @@ def test_gap_is_observable_and_times_are_aware() -> None:
 
 @pytest.mark.parametrize(("old", "new"), [
     ('"0.95"', '0.95'), ('"0.95"', '"0.955"'), ('"0.95"', '"0"'), ('"0.95"', '"-1"'),
+    ('"1.02"', 'null'),
     ('"bid_size":50', '"bid_size":-1'), ('"0.95"', 'null'),
     ('14:00:01Z', '13:59:59Z'), ('14:00:01Z', '14:00:01'), ('"seq":4', '"seq":2'),
     ('"seq":4', '"seq":1'), ('"seq":4', '"seq":4,"extra":1'),

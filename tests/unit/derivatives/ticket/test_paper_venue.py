@@ -190,3 +190,27 @@ def test_quote_matches_all_orders_before_any_cancellation_report() -> None:
         VenueReport("new", Event.VENUE_FILL, 5, D("1"), NOW),
         VenueReport("old", Event.VENUE_CANCELLED, None, None, NOW),
     )
+
+
+@pytest.mark.parametrize("fill", [False, True], ids=["recusa-anterior", "execucao-integral"])
+def test_cancel_rejection_requires_a_still_pending_request(fill: bool) -> None:
+    """A recusa prévia e a execução integral encerram o pedido de cancelamento."""
+    venue = PaperVenue(CLOSE)
+    order = VenueOrder(order_id="A1", symbol="A", side=Side.BUY, quantity=2, lot_size=1,
+                       limit_price=D("1"), valid_until=CLOSE)
+    venue.submit(order, NOW)
+    venue.request_cancel("A1", NOW)
+    reject = CancelRejected(type="cancel_rejected", seq=3, ts=NOW, order="A1")
+    if fill:
+        assert venue.advance(quote(age=0))[0].event is Event.VENUE_FILL
+    else:
+        assert venue.advance(reject)[0].event is Event.VENUE_CANCEL_REJECTED_LIVE
+    with pytest.raises(VenueRefusal):
+        venue.advance(reject.model_copy(update={"seq":4}))
+
+
+def test_replay_cannot_reject_cancellation_for_unknown_id() -> None:
+    """Uma recusa de fixture sem ordem registrada é erro tipado."""
+    with pytest.raises(VenueRefusal):
+        PaperVenue(CLOSE).advance(CancelRejected(type="cancel_rejected", seq=1, ts=NOW,
+                                                order="ausente"))
