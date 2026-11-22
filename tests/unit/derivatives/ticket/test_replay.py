@@ -30,3 +30,12 @@ def test_invalid_fixture(tmp_path: Path, old: str, new: str) -> None:
     path.write_text(FIXTURE.read_text().replace(old, new))
     with pytest.raises(ReplayError):
         load_replay(path)
+
+
+@pytest.mark.parametrize("key", ["price", "size", "arbitrary"])
+def test_extra_key_in_timeout_is_a_format_error(tmp_path: Path, key: str) -> None:
+    """O nome de um campo de outro evento não altera o motivo de chave desconhecida."""
+    path = tmp_path / "extra.json"
+    path.write_text(FIXTURE.read_text().replace('"registered":true', f'"registered":true,"{key}":1'))
+    with pytest.raises(ReplayError, match="formato inválido"):
+        load_replay(path)
