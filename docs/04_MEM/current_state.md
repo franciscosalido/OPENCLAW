@@ -4,19 +4,59 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-21 · **Turno:** Claude (integração do DL3-PR05a).
+**Última atualização:** 2026-11-22 · **Turno:** Claude (integração do DL3-PR05b).
 
 ## Fase 03 — Motor da boleta em simulador (D0) — ABERTA (estado A)
 
-PR atual: DL3-PR05a — MERGEADO (PR #160). Antes dele, DL3-PR00 (PR #154), DL3-ADR
-(PR #155), DL3-PR01 (PR #156), DL3-PR02 (PR #157), DL3-PR03 (PR #158) e DL3-PR04
-(PR #159). O DL3-PR05 foi dividido: 05a (decisão e gatilho) e 05b (motor). SDD em [SDD_FASE3_BLUEPRINT.md](../specs/derivatives/fase3/SDD_FASE3_BLUEPRINT.md);
+PR atual: DL3-PR05b — MERGEADO (PR #161). Antes dele, DL3-PR00 (PR #154), DL3-ADR
+(PR #155), DL3-PR01 (PR #156), DL3-PR02 (PR #157), DL3-PR03 (PR #158), DL3-PR04
+(PR #159) e DL3-PR05a (PR #160). O DL3-PR05 foi dividido: 05a (decisão e gatilho) e 05b (motor). SDD em [SDD_FASE3_BLUEPRINT.md](../specs/derivatives/fase3/SDD_FASE3_BLUEPRINT.md);
 cartões e revisões em [DL3-PR00.md](../specs/derivatives/fase3/DL3-PR00.md),
 [DL3-PR01.md](../specs/derivatives/fase3/DL3-PR01.md),
 [DL3-PR02.md](../specs/derivatives/fase3/DL3-PR02.md),
 [DL3-PR03.md](../specs/derivatives/fase3/DL3-PR03.md),
-[DL3-PR04.md](../specs/derivatives/fase3/DL3-PR04.md) e
-[DL3-PR05a.md](../specs/derivatives/fase3/DL3-PR05a.md).
+[DL3-PR04.md](../specs/derivatives/fase3/DL3-PR04.md),
+[DL3-PR05a.md](../specs/derivatives/fase3/DL3-PR05a.md) e
+[DL3-PR05b.md](../specs/derivatives/fase3/DL3-PR05b.md), com as correções em
+[DL3-PR05b-R1.md](../specs/derivatives/fase3/DL3-PR05b-R1.md) e
+[DL3-PR05b-R2.md](../specs/derivatives/fase3/DL3-PR05b-R2.md).
+
+Entregue pelo DL3-PR05b (`ticket/engine.py` novo e admissão em `ticket/sequencing.py`; 435
+linhas de produção no PR, em três rodadas de revisão):
+- Motor de uma boleta no replay síncrono: propor, editar, atualizar, armar, desarmar,
+  descartar, confirmar, cancelar, pausar, retomar e reconciliar; aplica relatórios da venue
+  e eventos de mercado. Nunca cancela nem reenvia por conta própria.
+- A confirmação confere, nesta ordem: estado, pausa, conta bloqueada, prazos, trava de
+  mercado, limites assinados, admissão no livro e, por último, a decisão humana. Recusa em
+  qualquer passo não gasta a decisão e não envia nada.
+- Livro de reservas com admissão (`admissible`, `admit`) e ocupação de compra
+  (`settle_buy`): duas boletas não ocupam a mesma recompra de posição vendida, e foto de
+  posição divergente é recusada antes de gastar a decisão.
+- O fato da venue vem primeiro: o relatório entra no estado da ordem e no recibo antes da
+  contabilidade. Se o livro recusar, o motor grava `DIVERGENCE` e bloqueia a conta até o
+  fim da sessão, sem levantar exceção.
+- Rejeição da venue é definitiva: a perna rejeitada não recebe novo envio.
+- `order_id = "{boleta}:{símbolo}:{n}"`. Id de boleta e símbolo só aceitam letras, dígitos,
+  `_`, `.` e `-`; fora disso o motor recusa no construtor ou na proposta.
+- Portão da cabeça `9f5db3c`, Linux x86_64 limpo: 11.173 aprovados, 16 pulados, 261
+  subtestes; mypy estrito e Pyright sem erro. 55 mutantes do revisor mortos; 6.000 sessões
+  aleatórias contra a `PaperVenue` real sem violar estado, recibo, prazo ou cobertura.
+
+Para o DL3-PR06 saber:
+- O condutor entrega cada evento nesta ordem: `book.advance`, `venue.advance`, e para cada
+  motor `on_reports` (só com os relatórios das ordens daquele motor) e `on_market`.
+- O id da boleta precisa ser único na sessão inteira, em todas as contas. O motor não
+  confere isso; o DL3-PR06 recusa id repetido.
+- Relatório impossível da venue (transição inválida) ainda levanta exceção. A `PaperVenue`
+  não emite isso; o tratamento fica para o degrau D1.
+- O bloqueio por divergência não tem liberação: a saída é sessão nova com posição
+  conciliada. Ocupação de perna de compra nunca enviada só sai no fim da sessão.
+
+Comportamentos do motor que Francisco pode querer rever (não são defeito):
+- A cobertura é por conta, não por boleta (contrato do DL3-PR03, S09). Uma boleta pode
+  vender usando proteção comprada por outra boleta da mesma conta que parou sem vender.
+- Venda executada a preço melhor que o assinado aumenta o volume bruto e pode parar a
+  boleta por `gross_cap` (cenário L1 do DL3-PR05b-R1).
 
 Entregue pelo DL3-PR05a (`ticket/gate.py` e `ticket/trigger.py`, 247 linhas de produção):
 - Decisão humana presa à boleta, à ação, ao prazo, ao resumo **e à versão** da prévia, à
@@ -133,7 +173,8 @@ Pendências com dono:
 - Sugestão S1 da avaliação de simplificação (unir duas recusas idênticas da árvore): não
   aplicada; opcional.
 
-Próxima ação (uma só): Codex abre o DL3-PR05b (motor) em rascunho, pelo supercartão do DL3-PR05b.
+Próxima ação (uma só): Codex abre o DL3-PR06 (replay por linha de comando e relatório de
+fechamento) em rascunho, pelo supercartão do DL3-PR06.
 
 ## Fase 02 — Marco 2C2 — FECHADO (estado A)
 
