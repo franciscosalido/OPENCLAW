@@ -125,3 +125,9 @@ def test_cancelling_legs_preserve_representable_total_at_decimal_exponent_limit(
         ctx.traps[InvalidOperation] = False
         with pytest.raises(PayoffRefusal):
             expiry_leg_results(positions, spot)
+
+
+def test_neutral_pair_inside_zero_interval_has_no_extra_breakeven():
+    legs = (leg("CALL", "BUY", 100, 1, 5), leg("CALL", "SELL", 105, 1, 5),
+            leg("CALL", "BUY", 95, 1, 1), leg("CALL", "SELL", 95, 1, 1))
+    assert expiry_profile(legs).breakevens == (F(0), F(100))
