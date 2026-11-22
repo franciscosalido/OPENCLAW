@@ -122,3 +122,20 @@ def test_trigger_only_notifies() -> None:
     for node in ast.walk(ast.parse(path.read_text())):
         if isinstance(node,ast.Call) and isinstance(node.func,ast.Attribute):
             assert node.func.attr not in {"submit","request_cancel","reserve"}
+
+
+def test_engine_uses_protocol_and_never_drives_replay() -> None:
+    """Restringe importações e impede o motor de avançar o replay ou a venue."""
+    path = ROOT / "backend/derivatives/ticket/engine.py"
+    allowed = {"gate": {"Action", "DecisionLedger", "DecisionRefusal", "HumanDecision"},
+               "replay": {"ReplayEvent"}, "paper_venue": set()}
+    tree = ast.parse(path.read_text())
+    for node in ast.walk(tree):
+        for name in allowed:
+            module = TICKET + "." + name
+            if module not in set(local_targets(node, TICKET)):
+                continue
+            assert isinstance(node, ast.ImportFrom) and node.module in (module, name), path
+            assert {a.name for a in node.names} <= allowed[name], path
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+            assert node.func.attr != "advance", path
