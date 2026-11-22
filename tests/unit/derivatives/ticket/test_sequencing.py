@@ -481,3 +481,31 @@ def test_k7_failed_admit_leaves_no_occupation() -> None:
         book.admit(p, ticket="T2")
     with pytest.raises(SequenceRefusal):
         book.settle_buy("sim", "T2", "B")
+
+
+def test_g3_separate_accounts_can_both_buy_back_ten() -> None:
+    """A ocupação de sim não consome o saldo vendido de sim2."""
+    book = ReservationBook()
+    p = close_plan()
+    other = plan_legs(p.draft, p.position.model_copy(update={"account": "sim2"}))
+    book.admit(p, ticket="T1")
+    book.admit(other, ticket="T2")
+
+
+def test_g4_distinct_short_series_have_independent_capacity() -> None:
+    """Recomprar B não ocupa a capacidade de recomprar D na mesma conta."""
+    book = ReservationBook()
+    q = Position(account="sim", holdings=(holding("A", 10), holding("B", -10),
+                                          holding("C", 10), holding("D", -10)),
+                 pairs=(("A", "B"), ("C", "D")))
+    cd = draft(leg("C", Side.SELL, "1"), leg("D", Side.BUY, "1.50"), net="5", gross="25")
+    book.admit(plan_legs(close_plan().draft, q), ticket="T1")
+    book.admit(plan_legs(cd, q), ticket="T2")
+
+
+def test_g6_admission_remembers_reconciled_position() -> None:
+    """A foto da primeira admissão prevalece mesmo antes de qualquer execução."""
+    book = ReservationBook()
+    book.admit(close_plan(), ticket="T1")
+    with pytest.raises(SequenceRefusal, match="foto divergente; conciliação necessária"):
+        book.admissible(close_plan(long_balance=12), ticket="T2")

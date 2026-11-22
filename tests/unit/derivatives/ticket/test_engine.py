@@ -10,18 +10,22 @@ import pytest
 from backend.derivatives.ticket.engine import AccountHalts, EngineRefusal, TicketEngine
 from backend.derivatives.ticket.gate import Action, DecisionLedger, HumanDecision, issue
 from backend.derivatives.ticket.guards import BookView
-from backend.derivatives.ticket.models import Leg, MarketSuggestion, Side
+from backend.derivatives.ticket.models import EditableField, FieldRef, Leg, MarketSuggestion, Side
 from backend.derivatives.ticket.paper_venue import PaperVenue
 from backend.derivatives.ticket.receipt import Receipt
 from backend.derivatives.ticket.replay import AuctionFill, CancelRejected, ReplayEvent, VenueTimeout
-from backend.derivatives.ticket.sequencing import LegPlan, Position, ReservationBook, SequenceRefusal, plan_legs
+from backend.derivatives.ticket.sequencing import (
+    LegPlan, Position, ReservationBook, SequenceRefusal, plan_legs,
+)
 from backend.derivatives.ticket.state import Event as E, OrderState as O, TicketState as T
 from backend.derivatives.ticket.trigger import Source, TriggerSpec, spec_digest
 from backend.derivatives.ticket.venue import OrderSnapshot, VenueOrder, VenueReport
 from config.ticket_sim_config_model import load_ticket_sim_config
 from tests.unit.derivatives.ticket.test_guards import NOW, CLOSE, quote
 from tests.unit.derivatives.ticket.test_models import PRICE
-from tests.unit.derivatives.ticket.test_sequencing import BUY, SELL, draft, holding, leg, position
+from tests.unit.derivatives.ticket.test_sequencing import (
+    BUY, SELL, close_plan, draft, holding, leg, position,
+)
 from tests.unit.derivatives.ticket.test_trigger import SPEC, trade
 
 A, B = "T1:A:1", "T1:B:1"
@@ -48,16 +52,20 @@ class Session:
         self.q("A", 0)
         self.q("B", 1)
 
-    def new(self, pos: Position | None = None, closing: bool = False, **changes: object
-            ) -> TicketEngine:
-        """Propõe a boleta de referência antes de decidir."""
+    def engine(self, ticket: str, pos: Position) -> TicketEngine:
+        """Constrói um motor com o livro e a venue desta sessão."""
         r = Receipt()
         self.receipts.append(r)
-        ticket = "T" + str(len(self.receipts))
-        e = TicketEngine(ticket, pos or position(), venue=self.venue, book=self.book,
+        e = TicketEngine(ticket, pos, venue=self.venue, book=self.book,
                          reservations=self.res, ledger=self.ledger, halts=self.halts,
                          receipt=r, config=load_ticket_sim_config())
         self.engines.append(e)
+        return e
+
+    def new(self, pos: Position | None = None, closing: bool = False, **changes: object
+            ) -> TicketEngine:
+        """Propõe a boleta de referência antes de decidir."""
+        e = self.engine(f"T{len(self.receipts) + 1}", pos or position())
         legs = (leg("A", Side.SELL, "1"), leg("B", Side.BUY, "1.50")) if closing else (BUY, SELL)
         d = draft(*legs, net="5" if closing else "-5")
         e.propose(d.model_copy(update=dict(send_deadline=END, order_validity=CLOSE) | changes), NOW)
@@ -408,7 +416,8 @@ def test_x8_caution(s: Session) -> None:
     assert e.orders[A]==O.LIVE
 
 
-@pytest.mark.parametrize("snapshot", [None,OrderSnapshot(O.PARTIAL,1,9),OrderSnapshot(O.FILLED,9,0)])
+@pytest.mark.parametrize("snapshot", [None, OrderSnapshot(O.PARTIAL, 1, 9),
+                                      OrderSnapshot(O.FILLED, 9, 0)])
 def test_poll_mismatch_is_atomic(s: Session, snapshot: OrderSnapshot | None) -> None:
     e=timeout(s)
     s.q("A",3,ask="1")
@@ -606,3 +615,114 @@ def test_r15_continues_batch_after_partial_buy_refusal(s: Session) -> None:
         (E.VENUE_PARTIAL, 3), (E.DIVERGENCE, None), (E.VENUE_FILL, 7)]
     assert engine.orders[A] == O.FILLED and s.halts.blocked("sim")
     assert free(s) == 7 and len(s.submitted()) == 1
+
+
+@pytest.mark.parametrize("ticket", ["T:X", "T#1", "T 1", "", "Té", "T\n"])
+def test_i1_invalid_ticket_refused_at_construction(s: Session, ticket: str) -> None:
+    """O domínio ASCII exclui separadores, espaços e a quebra de linha final."""
+    with pytest.raises(EngineRefusal):
+        s.engine(ticket, position())
+
+
+def test_i2_valid_ticket_round_trips_into_order_id(s: Session) -> None:
+    """Toda a pontuação autorizada e a caixa da boleta permanecem no identificador."""
+    ticket = "T-1_a.b"
+    e = s.engine(ticket, position())
+    e.propose(draft(BUY, SELL).model_copy(update={"send_deadline": END, "order_validity": CLOSE}),
+              NOW)
+    d = issue(Action.EXECUTE, ticket=ticket, nonce="n1", issued_at=NOW, expires_at=END,
+              preview=e.preview)
+    e.confirm(d, at(2))
+    assert dict(e.orders) == {"T-1_a.b:A:1": O.LIVE}
+
+
+@pytest.mark.parametrize(("buy", "sell"), [("X:A", "B"), ("A", "B#1"), ("A", "É")])
+def test_i3_bad_leg_symbol_refused_before_preview(s: Session, buy: str, sell: str) -> None:
+    """Uma perna inválida em qualquer posição impede a primeira prévia."""
+    pos = Position(account="sim", holdings=(holding(buy), holding(sell)), pairs=((buy, sell),))
+    e = s.engine("T1", pos)
+    with pytest.raises(EngineRefusal):
+        e.propose(draft(leg(buy, Side.BUY, "1"), leg(sell, Side.SELL, "1.50")), NOW)
+    assert e.preview is None and not s.receipts[0].events
+
+
+@pytest.mark.parametrize("refresh", [False, True], ids=["edit", "refresh"])
+def test_i3_invalid_symbol_preserves_prior_preview(s: Session, refresh: bool) -> None:
+    """A identidade é conferida antes do plano, inclusive em uma nova versão."""
+    e = s.new()
+    preview, events = e.preview, s.receipts[0].events
+    symbol = FieldRef(EditableField.SYMBOL, 0)
+    with pytest.raises(EngineRefusal):
+        if refresh:
+            e.refresh(MarketSuggestion("q2", {symbol: "X:A"}), at(2))
+        else:
+            e.edit(symbol, "X:A", at(2))
+    assert e.preview == preview and s.receipts[0].events == events
+
+
+def test_g1_missing_order_after_timeout_releases_buyback(s: Session) -> None:
+    """A segunda boleta usa a capacidade integral após a rejeição conciliada."""
+    pos = close_plan().position
+    one, two = s.new(pos, closing=True), s.new(pos, closing=True)
+    s.step(VenueTimeout(type="timeout", seq=3, ts=at(2), call="submit", registered=False))
+    one.confirm(s.dec(one), at(2))
+    assert one.state == T.UNCERTAIN and s.halts.blocked("sim")
+    one.reconcile(B, at(3))
+    assert s.paper.poll(B) is None and one.orders[B] == O.REJECTED
+    assert one.state == T.STOPPED and not s.halts.blocked("sim")
+    two.confirm(s.dec(two), at(3))
+    assert dict(two.orders) == {"T2:B:1": O.LIVE}
+
+
+def test_g2_expired_buyback_releases_capacity(s: Session) -> None:
+    """Depois do fechamento, o livro admite outra recompra de dez unidades."""
+    plan = close_plan()
+    e = s.new(plan.position, closing=True)
+    e.confirm(s.dec(e), at(2))
+    s.q("B", 25200)
+    assert e.orders[B] == O.EXPIRED and e.state == T.STOPPED
+    s.res.admissible(plan, ticket="T2")
+
+
+def test_g5_release_refusal_preserves_cancel_and_halts_account(s: Session) -> None:
+    """A recusa ao liberar saldo conserva o fato terminal e precede o STOP."""
+    class RefuseRelease(ReservationBook):
+        """Livro sintético cuja liberação final sempre recusa."""
+
+        def confirm_release(self, account: str, order: str, remaining: int) -> None:
+            """Simula uma divergência contábil após o cancelamento."""
+            raise SequenceRefusal("saldo divergente")
+
+    s.res = RefuseRelease()
+    e = s.confirmed()
+    s.q("A", 3, ask="1.00")
+    assert dict(e.orders) == {A: O.FILLED, B: O.LIVE}
+    s.cancel(e, B, 3)
+    s.q("B", 4)
+    assert e.orders[B] == O.CANCELLED and s.paper.poll(B) == (O.CANCELLED, 0, 0)
+    receipt = s.receipts[0]
+    assert [r.kind for r in receipt.events[-3:]] == [E.VENUE_CANCELLED, E.DIVERGENCE, E.STOP]
+    assert s.halts.blocked("sim") and receipt.verify() and e.state == T.STOPPED
+
+
+def test_g7_paused_draft_preserves_nonce_and_receipt(s: Session) -> None:
+    """A pausa impede confirmar e preserva a decisão emitida para a prévia."""
+    e = s.new()
+    e.pause(at(2))
+    d = s.dec(e)
+    with pytest.raises(EngineRefusal):
+        e.confirm(d, at(2))
+    assert e.state == T.DRAFT and not e.orders
+    assert [r.kind for r in s.receipts[0].events] == [E.PREVIEW, E.PAUSE]
+    s.ledger.consume(d, action=Action.EXECUTE, ticket="T1", now=at(2), preview=e.preview)
+
+
+def test_g8_stale_then_fresh_quote_at_exact_send_deadline(s: Session) -> None:
+    """O prazo inclui as 15h tanto na decisão de fechar quanto no envio."""
+    e = s.confirmed()
+    s.q("A", 3600, ask="1.00")
+    assert dict(e.orders) == {A: O.FILLED} and e.state == T.WORKING
+    assert len(s.submitted()) == 1
+    s.q("B", 3600)
+    assert e.orders[B] == O.LIVE and e.state == T.WORKING
+    assert s.submitted() == [(A, 10, D("1.00"), at(2)), (B, 10, D("1.50"), END)]
