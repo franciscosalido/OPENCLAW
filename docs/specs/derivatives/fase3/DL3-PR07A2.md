@@ -260,3 +260,37 @@ do §1 estourar; os testes de arquitetura precisarem de exceção.
 4. Copie este cartão para o caminho do §1. Não edite `docs/04_MEM/current_state.md`.
 5. Skill `quimera-lab-review` e simplificação v0.2 na cabeça publicada, relatórios fora do
    Git, SHA-256 na descrição.
+
+## Revisão adversarial (Claude) — GO na primeira rodada, cabeça `10076d3`
+
+Parecer formado antes de ler os relatórios da skill. O portão Linux desta cabeça foi
+executado pelo implementador em ARM64, por decisão de Francisco; o revisor analisou o log
+(SHA-256 `1caabc9a…0043`) e, como x86_64 seguia sem validação, rodou também o seu.
+
+| Verificação do revisor | Resultado |
+|---|---|
+| Log Linux ARM64 do implementador | 11.267 aprovados, 16 pulados, 261 subtestes; mypy e Pyright sem erro; SHA conferido |
+| Pytest sem integração, clone limpo, Linux x86_64 | 11.267 aprovados, 16 pulados, 261 subtestes |
+| `mypy backend/ --strict`, `mypy --strict` no script e `pyright backend/`, x86_64 | 0 erros |
+| Linhas | `engine.py` 432 (teto 445), `sequencing.py` 366 (370), `session.py` 119 (122) |
+| Cenários B0, B1, B2 e B2b pelo script de fatos do planejador | todos com o esperado do cartão |
+| Sete arquivos das sessões oficiais | idênticos byte a byte aos do protótipo do planejador e aos SHA-256 do §6 |
+| Recibos comparados com os do `main` anterior | mesmos tipos de registro, prévias idênticas, conteúdo antigo preservado; chaves novas só `gross` e `protection` |
+| 30 mutantes do revisor, um por vez | 28 mortos, 2 vivos |
+| 2.000 sessões aleatórias, motor e `PaperVenue` reais | nenhuma violação |
+| Arquivos protegidos, fixtures e a lista "não mudam" | intactos |
+
+Observações, nenhuma bloqueante. As três são lacunas deste cartão, que não pediu os casos:
+
+1. **`EXPIRED` sem teste.** Tirar `EXPIRED` da regra terminal não derruba teste. A cabeça
+   está correta: gatilho expirado mostra 25,00; 0,00; 0,00.
+2. **Duas ordens abertas da mesma série sem teste.** Trocar a soma por atribuição não
+   derruba teste. A cabeça está correta: no cenário da skill, com `T1:A:1` parcial e duas
+   vendas de B abertas, o projetado é 16,04.
+3. **Cancelamento pedido depois da parada** também não tem teste; a projeção se mantém.
+
+Os três cenários estão fixados nas contraprovas da skill e entram como testes no próximo
+cartão.
+
+Relatórios da skill lidos depois, com SHA-256 conferidos (`398f5fe2…ad92` e
+`51ddebdd…7920`): GO técnico, com as mesmas lacunas de teste.
