@@ -4,17 +4,28 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-21 · **Turno:** Claude (integração do DL3-PR04).
+**Última atualização:** 2026-11-21 · **Turno:** Claude (integração do DL3-PR05a).
 
 ## Fase 03 — Motor da boleta em simulador (D0) — ABERTA (estado A)
 
-PR atual: DL3-PR04 — MERGEADO (PR #159). Antes dele, DL3-PR00 (PR #154), DL3-ADR
-(PR #155), DL3-PR01 (PR #156), DL3-PR02 (PR #157) e DL3-PR03 (PR #158). SDD em [SDD_FASE3_BLUEPRINT.md](../specs/derivatives/fase3/SDD_FASE3_BLUEPRINT.md);
+PR atual: DL3-PR05a — MERGEADO (PR #160). Antes dele, DL3-PR00 (PR #154), DL3-ADR
+(PR #155), DL3-PR01 (PR #156), DL3-PR02 (PR #157), DL3-PR03 (PR #158) e DL3-PR04
+(PR #159). O DL3-PR05 foi dividido: 05a (decisão e gatilho) e 05b (motor). SDD em [SDD_FASE3_BLUEPRINT.md](../specs/derivatives/fase3/SDD_FASE3_BLUEPRINT.md);
 cartões e revisões em [DL3-PR00.md](../specs/derivatives/fase3/DL3-PR00.md),
 [DL3-PR01.md](../specs/derivatives/fase3/DL3-PR01.md),
 [DL3-PR02.md](../specs/derivatives/fase3/DL3-PR02.md),
-[DL3-PR03.md](../specs/derivatives/fase3/DL3-PR03.md) e
-[DL3-PR04.md](../specs/derivatives/fase3/DL3-PR04.md).
+[DL3-PR03.md](../specs/derivatives/fase3/DL3-PR03.md),
+[DL3-PR04.md](../specs/derivatives/fase3/DL3-PR04.md) e
+[DL3-PR05a.md](../specs/derivatives/fase3/DL3-PR05a.md).
+
+Entregue pelo DL3-PR05a (`ticket/gate.py` e `ticket/trigger.py`, 247 linhas de produção):
+- Decisão humana presa à boleta, à ação, ao prazo, ao resumo **e à versão** da prévia, à
+  ordem (no cancelamento) e ao gatilho (ao armar). Uso único por `nonce`; recusa não
+  consome. Em D0 a emissão é função local, sem autenticação real.
+- Gatilho de aviso: não arma com condição já verdadeira nem com dado inválido, dispara uma
+  vez, expira, e nunca envia, reserva ou grava recibo.
+- Portão, Linux x86_64 limpo: 11.093 aprovados, 16 pulados, 261 subtestes; mypy estrito e
+  Pyright sem erro.
 
 Entregue pelo DL3-PR04 (`ticket/replay.py`, `guards.py`, `venue.py`, `paper_venue.py` e
 `config/ticket_sim.yaml`, 398 linhas de produção):
@@ -122,7 +133,7 @@ Pendências com dono:
 - Sugestão S1 da avaliação de simplificação (unir duas recusas idênticas da árvore): não
   aplicada; opcional.
 
-Próxima ação (uma só): Codex abre o DL3-PR05 em rascunho, pelo supercartão do DL3-PR05.
+Próxima ação (uma só): Codex abre o DL3-PR05b (motor) em rascunho, pelo supercartão do DL3-PR05b.
 
 ## Fase 02 — Marco 2C2 — FECHADO (estado A)
 
