@@ -117,3 +117,29 @@ def test_consumption_requires_decision_and_aware_time() -> None:
     ledger.consume(decision, **USE)
     with pytest.raises(DecisionRefusal, match="decisão já usada"):
         ledger.consume(decision, **(USE | dict(preview=P2)))
+
+
+def test_concurrent_consumers_cannot_commit_the_same_nonce(monkeypatch: pytest.MonkeyPatch) -> None:
+    """As duas chamadas iniciam a validação antes que qualquer uma consuma a decisão."""
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+
+    ledger = DecisionLedger()
+    decision = issue(Action.EXECUTE, **BASE, preview=P)
+    original = Preview.digest
+    barrier = Barrier(2, timeout=10)
+
+    def synchronized_digest(preview: Preview) -> str:
+        barrier.wait()
+        return original.__get__(preview, Preview)
+
+    def consume(_: int) -> str:
+        try:
+            ledger.consume(decision, **USE)
+        except DecisionRefusal as exc:
+            return str(exc)
+        return "aceita"
+
+    monkeypatch.setattr(Preview, "digest", property(synchronized_digest))
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        assert sorted(pool.map(consume, range(2))) == ["aceita", "decisão já usada"]

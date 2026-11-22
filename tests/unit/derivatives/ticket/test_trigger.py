@@ -142,3 +142,17 @@ def test_initial_state_and_empty_book_on_event() -> None:
     trigger.arm(book, NOW)
     assert trigger.on_event(q(ask=D(".99")), BookView()) == Outcome.NONE
     assert trigger.state == TriggerState.ARMED
+
+
+@pytest.mark.parametrize(("source", "kind"), [(Source.SIMPLE_TRADE, "SIMPLE"),
+                                              (Source.STRATEGY_TRADE, "STRATEGY")])
+def test_trade_size_threshold(source: Source, kind: str) -> None:
+    """Preço e fonte corretos só disparam com tamanho suficiente no próprio negócio."""
+    book = BookView()
+    book.advance(q().model_copy(update={"ts": NOW}))
+    trigger = Trigger(SPEC.model_copy(update={"source": source}))
+    trigger.arm(book, NOW)
+    for size, expected in [(9, Outcome.NONE), (10, Outcome.FIRED)]:
+        event = trade(kind, size=size)
+        book.advance(event)
+        assert trigger.on_event(event, book) == expected
