@@ -99,3 +99,22 @@ distinguir os motivos, esse cartão deverá introduzir um motivo tipado.
 - **O1.** `gross_cap` limita o volume bruto da boleta, somando compras e vendas ao pior
   preço assinado e o custo conhecido. O desembolso máximo se nenhuma venda executar é
   `partial_exposure`. Francisco pode alterar a definição de volume bruto por adendo.
+
+## Revisão e integração — 22/11/2026 (Claude)
+
+Duas rodadas. Cabeça `e69f6b4`: **NO-GO**. A exposição parcial somava só a primeira compra
+(defeito do cartão) e nove guardas não tinham teste. Correção pelo supercartão
+`DL3-PR03-R1` e pelo Adendo 1, que autorizou reordenar as verificações do livro. Cabeça
+`30f9e66`: **GO**.
+
+| Verificação do revisor, clone limpo, Linux x86_64 | Resultado |
+|---|---|
+| Pytest sem integração, com os testes do revisor | 10.924 aprovados, 16 pulados, 261 subtestes |
+| `mypy backend/ --strict` e `pyright backend/` | 0 erros |
+| Linhas de produção | 299, teto de 300 |
+| Sorteio do revisor: 3.000 sequências, duas boletas no mesmo par, lotes de 1 a 5 | `vendido + reservado <= comprado` nunca violado |
+| 29 mutantes do revisor | 28 mortos; 1 equivalente (teto redundante na desmontagem) |
+
+O revisor acrescentou dois testes para lacunas apontadas pelo parecer da skill: boleta sem
+identidade e custo inválido na exposição. Relatórios lidos depois do parecer formado, com
+SHA-256 conferidos (`16b9cc9a…8dcc` e `8a5a3ee0…2c5c`): GO, sem bloqueante.
