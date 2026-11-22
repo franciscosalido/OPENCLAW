@@ -282,3 +282,24 @@ def test_publication_fault_leaves_no_partial_receipts(fault: str, tmp_path: Path
         assert not list(tmp_path.iterdir())
     else:
         assert list(tmp_path.iterdir()) == [out] and not list(out.iterdir())
+
+
+@pytest.mark.parametrize("path", ["a/../a", "intermediario/../resultado", "link/../resultado"])
+def test_parent_creation_with_dotdot_preserves_destination(path: str, tmp_path: Path) -> None:
+    """O nome solicitado permanece utilizável e '..' segue os links do sistema de arquivos."""
+    if path.startswith("link/"):
+        (tmp_path / "real/sub").mkdir(parents=True)
+        (tmp_path / "link").symlink_to(tmp_path / "real/sub", target_is_directory=True)
+    out = tmp_path / path
+    assert main(_official("calmo", out)) == 0
+    assert {p.name for p in out.iterdir()} == {"resumo.json", "recibo_T1.jsonl"}
+    if path.startswith("link/"):
+        assert (tmp_path / "real/resultado").samefile(out)
+        assert not (tmp_path / "resultado").exists()
+
+
+def test_destination_cannot_be_its_own_required_subdirectory(tmp_path: Path) -> None:
+    """A pasta final não pode conter um ancestral extra para tornar o caminho navegável."""
+    out = tmp_path / "a/sub/../../a"
+    assert main(_official("calmo", out)) == 2
+    assert not (tmp_path / "a").exists()
