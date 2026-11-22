@@ -39,3 +39,13 @@ def test_extra_key_in_timeout_is_a_format_error(tmp_path: Path, key: str) -> Non
     path.write_text(FIXTURE.read_text().replace('"registered":true', f'"registered":true,"{key}":1'))
     with pytest.raises(ReplayError, match="formato inválido"):
         load_replay(path)
+
+
+@pytest.mark.parametrize("bad", ["0", "0001-01-01T00:00:00+01:00"])
+def test_timestamp_requires_explicit_offset_and_representable_instant(tmp_path: Path,
+                                                                     bad: str) -> None:
+    """Um texto de época ou instante irrepresentável exige recusa tipada."""
+    path = tmp_path / "time.json"
+    path.write_text(FIXTURE.read_text().replace("2026-11-23T14:00:00Z", bad))
+    with pytest.raises(ReplayError, match="tempo inválido"):
+        load_replay(path)
