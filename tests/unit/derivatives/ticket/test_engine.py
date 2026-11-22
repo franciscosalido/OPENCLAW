@@ -617,7 +617,7 @@ def test_r15_continues_batch_after_partial_buy_refusal(s: Session) -> None:
     assert free(s) == 7 and len(s.submitted()) == 1
 
 
-@pytest.mark.parametrize("ticket", ["T:X", "T#1", "T 1", "", "Té", "T\n"])
+@pytest.mark.parametrize("ticket", ["T:X", "T#1", "T 1", "", "Té", "Tİ", "T\n"])
 def test_i1_invalid_ticket_refused_at_construction(s: Session, ticket: str) -> None:
     """O domínio ASCII exclui separadores, espaços e a quebra de linha final."""
     with pytest.raises(EngineRefusal):
@@ -634,6 +634,30 @@ def test_i2_valid_ticket_round_trips_into_order_id(s: Session) -> None:
               preview=e.preview)
     e.confirm(d, at(2))
     assert dict(e.orders) == {"T-1_a.b:A:1": O.LIVE}
+
+
+def test_i2_restored_legs_preserve_valid_symbol_in_order_id(s: Session) -> None:
+    """A proposta reconstrói pernas serializadas e conserva a pontuação assinada."""
+    symbol = "X-1_A.B"
+    pos = Position(account="sim", holdings=(holding(symbol),), pairs=())
+    e = s.engine("T1", pos)
+    d = draft(leg(symbol, Side.BUY, "1.00"), net="10", gross="10")
+    restored = d.model_copy(update={"legs": tuple(row.model_dump() for row in d.legs),
+                                    "send_deadline": END, "order_validity": CLOSE})
+    s.q(symbol, 1, bid=".95", ask="1.02")
+    e.propose(restored, NOW)
+    e.confirm(s.dec(e), at(2))
+    assert dict(e.orders) == {"T1:X-1_A.B:1": O.LIVE}
+
+
+def test_i3_restored_symbol_still_refused_before_planning(s: Session) -> None:
+    """Reconstruir a perna preserva a recusa tipada e o recibo vazio."""
+    e = s.engine("T1", position())
+    d = draft(BUY, SELL)
+    rows = (BUY.model_dump() | {"symbol": "X:A"}, SELL.model_dump())
+    with pytest.raises(EngineRefusal):
+        e.propose(d.model_copy(update={"legs": rows}), NOW)
+    assert e.preview is None and not s.receipts[0].events
 
 
 @pytest.mark.parametrize(("buy", "sell"), [("X:A", "B"), ("A", "B#1"), ("A", "É")])
