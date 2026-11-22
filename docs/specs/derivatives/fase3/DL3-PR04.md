@@ -351,3 +351,23 @@ original (morre no terceiro e no último passo).
   registrada.
 
 Se algum desses três não reproduzir, pare e relate.
+
+## Revisão e integração — 22/11/2026 (Claude)
+
+Cabeça `fc4a6cf`: **GO** na primeira rodada, formado antes de ler os relatórios da skill.
+O cartão teve um erro meu no V14 (invariante por identificador em vez de por tentativa),
+corrigido pelo Adendo 1 antes da implementação.
+
+| Verificação do revisor, clone limpo, Linux x86_64 | Resultado |
+|---|---|
+| Pytest sem integração, com o teste do revisor | 11.012 aprovados, 16 pulados, 261 subtestes |
+| `mypy backend/ --strict` e `pyright backend/` | 0 erros |
+| Linhas de produção e configuração | 398, teto de 400 |
+| Sorteio do revisor: 4.000 sessões, 48.348 relatórios | a tabela de `state.py` aceita todos; execução sempre dentro do limite e da quantidade; `poll` coerente |
+| 42 mutantes do revisor | 41 mortos; 1 equivalente |
+
+O mutante equivalente deixa de limpar o pedido de cancelamento ao expirar: depois do
+fechamento a venue ignora qualquer evento, então a diferença não é observável numa
+sessão em ordem. O revisor acrescentou um teste para a lacuna L1 do parecer da skill
+(política de horário no fechamento da sessão). Relatórios lidos depois do parecer
+formado, com SHA-256 conferidos (`e811b538…d558` e `e1852a2a…3698`): GO, sem bloqueante.
