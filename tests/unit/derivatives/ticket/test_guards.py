@@ -82,7 +82,9 @@ def test_deadlines(send: float, valid: int, now: str, reason: str | None) -> Non
 
 
 @pytest.mark.parametrize("overrides", [dict(max_quote_age_s=5), dict(max_spread_ticks=10.0),
-                                       dict(max_quote_age_s=-1.0), dict(max_spread_ticks=-1)])
+                                       dict(max_quote_age_s=-1.0), dict(max_spread_ticks=-1),
+                                       dict(max_quote_age_s=float("inf")),
+                                       dict(max_quote_age_s=float("nan"))])
 def test_strict_config(overrides: dict[str, object]) -> None:
     """O YAML exige ambos os parâmetros com os tipos declarados."""
     with pytest.raises(ValidationError):

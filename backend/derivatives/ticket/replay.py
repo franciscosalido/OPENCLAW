@@ -1,13 +1,16 @@
 """Eventos imutáveis e leitura estrita de uma sessão sintética."""
 import json
+from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Literal, Self
 
-from pydantic import Field, ValidationError, model_validator
+from pydantic import BeforeValidator, Field, ValidationError, model_validator
 
 from backend.derivatives.ticket.models import Instant, Money, Text, _Frozen
 
 type Price = Annotated[Money, Field(gt=0)]
+type Timestamp = Annotated[Instant, BeforeValidator(
+    lambda v: datetime.fromisoformat(v) if isinstance(v, str) else v)]
 type Size = Annotated[int, Field(ge=0)]
 type Phase = Literal["CONTINUOUS", "AUCTION", "SUSPENDED"]
 
@@ -18,7 +21,7 @@ class ReplayError(ValueError):
 
 class _Event(_Frozen):
     seq: int
-    ts: Instant
+    ts: Timestamp
     gap_before: bool = False
 
 
@@ -74,7 +77,7 @@ type ReplayEvent = QuoteEvent | TradeEvent | AuctionFill | CancelRejected | Venu
 
 class Replay(_Frozen):
     """Sessão ordenada com validade nativa de dia."""
-    session_close: Instant
+    session_close: Timestamp
     events: tuple[Annotated[ReplayEvent, Field(discriminator="type")], ...]
 
 
@@ -92,15 +95,16 @@ def load_replay(path: Path) -> Replay:
         replay = Replay.model_validate_json(json.dumps(raw, allow_nan=False))
     except ValidationError as exc:
         error = exc.errors()[0]
-        field = error["loc"][-1] if error["loc"] else ""
+        loc = () if error["type"] in {"extra_forbidden", "missing"} else error["loc"]
+        field = str(loc[-1]) if loc else ""
         reasons = {"bid": "preço inválido", "ask": "preço inválido", "price": "preço inválido",
                    "ts": "tempo inválido", "session_close": "tempo inválido",
                    "bid_size": "tamanho inválido", "ask_size": "tamanho inválido",
                    "size": "tamanho inválido", "quote": "tamanho inválido"}
-        if error["type"] in {"extra_forbidden", "missing"}:
-            field = ""
-        reason = reasons.get(str(field), "formato inválido")
+        reason = reasons.get(field, "formato inválido")
         raise ReplayError(f"{reason}: {error['msg']}") from exc
+    except OverflowError as exc:
+        raise ReplayError("tempo inválido") from exc
     except (ValueError, OSError) as exc:
         raise ReplayError("formato inválido") from exc
     events = list(replay.events)
