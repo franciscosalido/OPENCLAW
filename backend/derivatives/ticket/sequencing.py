@@ -65,6 +65,8 @@ def plan_legs(draft: TicketDraft, position: Position) -> LegPlan:
     """Planeja por vínculo explícito de proteção; não interpreta o código de negociação."""
     draft = TicketDraft.model_validate(draft)
     position = Position.model_validate(position)
+    position = Position(account=position.account, pairs=tuple(sorted(position.pairs)),
+                        holdings=tuple(sorted(position.holdings, key=lambda h: h.symbol)))
     rows = {r.symbol: r for r in position.holdings}
     if len(rows) != len(position.holdings) or any(leg.symbol not in rows for leg in draft.legs):
         raise SequenceRefusal("posição ausente ou duplicada")
