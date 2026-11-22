@@ -109,12 +109,18 @@ ORDER_TRANSITIONS = MappingProxyType({
     (_O.CANCEL_REQUESTED, _E.VENUE_EXPIRED): _O.EXPIRED,
     (_O.CANCEL_REQUESTED, _E.UNCERTAIN): _O.UNCERTAIN,
 })
-LABELS_PT = MappingProxyType({
-    **dict(zip(_T, ("Proposta", "Engatilhada", "Gatilho atingido", "Confirmada", "Em execução",
-                    "Concluída", "Parada", "Negada", "Expirada", "Estado incerto"), strict=True)),
-    **dict(zip(_O, ("Envio pendente", "Viva", "Parcial", "Executada",
-                    "Cancelamento solicitado", "Cancelada", "Expirada",
-                    "Recusada pela venue", "Estado incerto"), strict=True)),
+TICKET_LABELS_PT = MappingProxyType({
+    _T.DRAFT: "Proposta", _T.ARMED: "Engatilhada", _T.TRIGGERED: "Gatilho atingido",
+    _T.CONFIRMED: "Confirmada", _T.WORKING: "Em execução", _T.COMPLETED: "Concluída",
+    _T.STOPPED: "Parada", _T.DENIED: "Negada", _T.EXPIRED: "Boleta expirada",
+    _T.UNCERTAIN: "Boleta em estado incerto",
+})
+ORDER_LABELS_PT = MappingProxyType({
+    _O.PENDING_SEND: "Envio pendente", _O.LIVE: "Ordem aberta",
+    _O.PARTIAL: "Ordem parcialmente executada", _O.FILLED: "Ordem totalmente executada",
+    _O.CANCEL_REQUESTED: "Cancelamento solicitado", _O.CANCELLED: "Ordem cancelada",
+    _O.EXPIRED: "Ordem expirada", _O.REJECTED: "Ordem rejeitada",
+    _O.UNCERTAIN: "Ordem em estado incerto",
 })
 
 
