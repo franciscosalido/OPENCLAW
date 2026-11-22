@@ -4,15 +4,34 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-21 · **Turno:** Claude (integração do DL3-PR02).
+**Última atualização:** 2026-11-21 · **Turno:** Claude (integração do DL3-PR03).
 
 ## Fase 03 — Motor da boleta em simulador (D0) — ABERTA (estado A)
 
-PR atual: DL3-PR02 — MERGEADO (PR #157). Antes dele, DL3-PR00 (PR #154), DL3-ADR
-(PR #155) e DL3-PR01 (PR #156). SDD em [SDD_FASE3_BLUEPRINT.md](../specs/derivatives/fase3/SDD_FASE3_BLUEPRINT.md);
+PR atual: DL3-PR03 — MERGEADO (PR #158, GO na segunda rodada). Antes dele, DL3-PR00
+(PR #154), DL3-ADR (PR #155), DL3-PR01 (PR #156) e DL3-PR02 (PR #157). SDD em [SDD_FASE3_BLUEPRINT.md](../specs/derivatives/fase3/SDD_FASE3_BLUEPRINT.md);
 cartões e revisões em [DL3-PR00.md](../specs/derivatives/fase3/DL3-PR00.md),
-[DL3-PR01.md](../specs/derivatives/fase3/DL3-PR01.md) e
-[DL3-PR02.md](../specs/derivatives/fase3/DL3-PR02.md).
+[DL3-PR01.md](../specs/derivatives/fase3/DL3-PR01.md),
+[DL3-PR02.md](../specs/derivatives/fase3/DL3-PR02.md) e
+[DL3-PR03.md](../specs/derivatives/fase3/DL3-PR03.md).
+
+Entregue pelo DL3-PR03 (`ticket/sequencing.py`, 299 linhas de produção):
+- Plano de pernas: compras antes das vendas; na desmontagem, recompra da vendida antes de
+  vender a comprada. O pareamento vem de evidência explícita na foto de posição.
+- Livro de reservas por conta: a venda só é liberada na quantidade comprada e executada,
+  descontado o vendido e o reservado, em múltiplos do lote, entre boletas concorrentes.
+- Foto de posição divergente bloqueia com motivo próprio.
+- `partial_exposure`: desembolso máximo se nenhuma venda executar, somando todas as
+  compras. `within_signed_limits`: limites por perna, líquido e bruto, com o executado.
+- Portão com os testes do revisor, Linux x86_64 limpo: 10.924 aprovados, 16 pulados, 261
+  subtestes; mypy estrito e Pyright sem erro.
+
+Limitações conhecidas do sequenciamento, com dono (Francisco decide quando):
+- Vender para zerar uma posição comprada própria, sem série vendida pareada, é recusado.
+- Borboleta e toda estrutura em que duas compras protegem a mesma venda são recusadas.
+  Trava e condor funcionam.
+- `gross_cap` é o volume bruto (compras mais vendas ao pior preço assinado, mais custo),
+  não o desembolso. O desembolso máximo é `partial_exposure`.
 
 Entregue pelo DL3-PR02 (`ticket/state.py` e `ticket/receipt.py`, 291 linhas de produção):
 - Duas máquinas de estados com tabela explícita e imutável, uma da boleta e uma da ordem.
@@ -47,6 +66,10 @@ Para os próximos cartões:
   grava dinheiro como texto decimal.
 - A sugestão S1 da simplificação (evitar a segunda decodificação da prévia em `verify`)
   é opcional e não foi aplicada.
+- Custo conhecido com fração de centavo gera exposição que a prévia recusa. O motor
+  (DL3-PR05) arredonda o custo para cima ao centavo antes de calcular.
+- O motor não decide pelo texto da recusa do livro. Se precisar separar "conciliar a
+  posição" de "plano inválido", cria tipo próprio de recusa (DL3-PR05).
 - A ordem entre prazo de envio e validade da ordem não é validada no modelo; fica para o
   DL3-PR04.
 
@@ -77,7 +100,7 @@ Pendências com dono:
 - Sugestão S1 da avaliação de simplificação (unir duas recusas idênticas da árvore): não
   aplicada; opcional.
 
-Próxima ação (uma só): Codex abre o DL3-PR03 em rascunho.
+Próxima ação (uma só): Codex abre o DL3-PR04 em rascunho, pelo supercartão do DL3-PR04.
 
 ## Fase 02 — Marco 2C2 — FECHADO (estado A)
 
