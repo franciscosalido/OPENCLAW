@@ -68,3 +68,34 @@ arredonde uma comparação de fronteira. [Python 3.12, decimal](https://docs.pyt
 
 Permanecem para o PR04 a relação entre prazos, para o PR05 a vinculação de versão e o
 dinheiro como texto decimal no recibo, e para o PR06 a separação dos rótulos se divergirem.
+
+### Adendo R1 e Adendo 1 autorizados por Francisco em 22/11/2026
+
+O plano envia todas as compras antes das vendas. A prévia deve mostrar o desembolso máximo
+se nenhuma venda executar. A regra R1 substitui a referência original à primeira perna.
+Somam-se a quantidade vezes o preço limite de cada compra e, uma única vez, o custo conhecido.
+
+| Boleta | Custo conhecido | Desembolso máximo |
+|---|---:|---:|
+| Trava com compra de 10 a 1,00 e venda de 10 a 1,50 | 0,00 | 10,00 |
+| Condor com compras de 10 A a 3,00 e de 10 D a 0,50, vendas de 10 B a 2,00 e de 10 C a 1,00 | 0,00 | 35,00 |
+| Mesmo condor | 0,07 | 35,07 |
+
+O livro valida primeiro a identidade não vazia e a integridade do plano recebido. Em seguida
+compara a foto conciliada da conta e, por último, o plano já registrado para a boleta.
+Uma foto divergente de um plano íntegro exige conciliação inclusive para a boleta original.
+Um plano adulterado ou uma troca de plano sob a mesma foto gera a recusa de identidade ou
+plano divergente. O motor do PR05 jamais deve decidir pelo texto da mensagem. Se precisar
+distinguir os motivos, esse cartão deverá introduzir um motivo tipado.
+
+### Limitações conhecidas
+
+- **N1.** A venda para zerar uma posição comprada própria, sem série vendida pareada, é
+  recusada. Essa operação encerraria a posição sem abrir venda descoberta. Suporte fica
+  para cartão próprio.
+- **N2.** A atribuição exige uma única compra protetora por venda. Borboletas e demais
+  estruturas com duas compras protegendo a mesma venda são recusadas. Travas e condores
+  com pares identificáveis são suportados. Atribuição múltipla fica para cartão próprio.
+- **O1.** `gross_cap` limita o volume bruto da boleta, somando compras e vendas ao pior
+  preço assinado e o custo conhecido. O desembolso máximo se nenhuma venda executar é
+  `partial_exposure`. Francisco pode alterar a definição de volume bruto por adendo.

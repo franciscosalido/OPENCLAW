@@ -149,11 +149,12 @@ class ReservationBook:
 
     def _check(self, plan: LegPlan, ticket: str) -> str:
         account = plan.position.account
-        if (type(ticket) is not str or not ticket or plan != plan_legs(plan.draft, plan.position)
-                or self._plans.get((account, ticket), plan) != plan):
+        if type(ticket) is not str or not ticket or plan != plan_legs(plan.draft, plan.position):
             raise SequenceRefusal("identidade ou plano divergente")
         if self._positions.get(account, plan.position) != plan.position:
             raise SequenceRefusal("foto divergente; conciliação necessária")
+        if self._plans.get((account, ticket), plan) != plan:
+            raise SequenceRefusal("identidade ou plano divergente")
         return account
 
     def _remember(self, plan: LegPlan, ticket: str) -> None:
@@ -194,6 +195,7 @@ class ReservationBook:
         free = releasable_quantity(leg, bought, used, 0)
         if closing:
             disposed = sum(o.filled + o.live for o in orders if o.leg.symbol == leg.symbol)
+            # Teto redundante: a recompra cabe no vendido, já coberto pelo saldo comprado.
             free = min(free, balances[leg.symbol] - disposed)
         own = sum(o.live + o.filled for o in orders if o.ticket == ticket and o.leg == leg)
         room = min(free, leg.quantity - own)
@@ -240,13 +242,13 @@ def _exact() -> Context:
 
 
 def partial_exposure(draft: TicketDraft, *, known_costs: Decimal = Decimal(0)) -> Decimal:
-    """Desembolso máximo da primeira compra no plano estável, incluindo seu custo conhecido."""
+    """Desembolso máximo se nenhuma venda executar, incluindo o custo conhecido."""
     draft = TicketDraft.model_validate(draft)
-    first = next((leg for leg in draft.legs if leg.side is Side.BUY), None)
-    if first is None or not _valid_cost(known_costs):
+    buys = tuple(leg for leg in draft.legs if leg.side is Side.BUY)
+    if not buys or not _valid_cost(known_costs):
         raise SequenceRefusal("exposição sem compra protetora ou custo válido")
     with localcontext(_exact()):
-        return first.quantity * first.limit_price + known_costs
+        return sum((leg.quantity * leg.limit_price for leg in buys), known_costs)
 
 
 def within_signed_limits(draft: TicketDraft, fills: tuple[Fill, ...], next_leg: Leg, *,

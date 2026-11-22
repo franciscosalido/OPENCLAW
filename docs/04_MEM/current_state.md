@@ -4,12 +4,11 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-22 · **Turno:** Codex (rascunho DL3-PR03).
+**Última atualização:** 2026-11-21 · **Turno:** Claude (integração do DL3-PR02).
 
 ## Fase 03 — Motor da boleta em simulador (D0) — ABERTA (estado A)
 
-PR atual: [DL3-PR03](../specs/derivatives/fase3/DL3-PR03.md), em rascunho.
-Último integrado: DL3-PR02 (PR #157). Antes dele, DL3-PR00 (PR #154), DL3-ADR
+PR atual: DL3-PR02 — MERGEADO (PR #157). Antes dele, DL3-PR00 (PR #154), DL3-ADR
 (PR #155) e DL3-PR01 (PR #156). SDD em [SDD_FASE3_BLUEPRINT.md](../specs/derivatives/fase3/SDD_FASE3_BLUEPRINT.md);
 cartões e revisões em [DL3-PR00.md](../specs/derivatives/fase3/DL3-PR00.md),
 [DL3-PR01.md](../specs/derivatives/fase3/DL3-PR01.md) e
@@ -78,7 +77,7 @@ Pendências com dono:
 - Sugestão S1 da avaliação de simplificação (unir duas recusas idênticas da árvore): não
   aplicada; opcional.
 
-Próxima ação: revisão humana do rascunho DL3-PR03.
+Próxima ação (uma só): Codex abre o DL3-PR03 em rascunho.
 
 ## Fase 02 — Marco 2C2 — FECHADO (estado A)
 
