@@ -4,11 +4,12 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-22 · **Turno:** Claude (integração do DL3-PR05b).
+**Última atualização:** 2026-11-22 · **Turno:** Claude (DL3-PR06 integrado; Fase 3 fechada).
 
-## Fase 03 — Motor da boleta em simulador (D0) — ABERTA (estado A)
+## Fase 03 — Motor da boleta em simulador (D0) — FECHADA (estado A)
 
-PR atual: DL3-PR05b — MERGEADO (PR #161). Antes dele, DL3-PR00 (PR #154), DL3-ADR
+Último PR: DL3-PR06 com a correção DL3-PR06B — MERGEADO (PR #162). Antes dele, DL3-PR05b
+(PR #161), DL3-PR00 (PR #154), DL3-ADR
 (PR #155), DL3-PR01 (PR #156), DL3-PR02 (PR #157), DL3-PR03 (PR #158), DL3-PR04
 (PR #159) e DL3-PR05a (PR #160). O DL3-PR05 foi dividido: 05a (decisão e gatilho) e 05b (motor). SDD em [SDD_FASE3_BLUEPRINT.md](../specs/derivatives/fase3/SDD_FASE3_BLUEPRINT.md);
 cartões e revisões em [DL3-PR00.md](../specs/derivatives/fase3/DL3-PR00.md),
@@ -16,10 +17,51 @@ cartões e revisões em [DL3-PR00.md](../specs/derivatives/fase3/DL3-PR00.md),
 [DL3-PR02.md](../specs/derivatives/fase3/DL3-PR02.md),
 [DL3-PR03.md](../specs/derivatives/fase3/DL3-PR03.md),
 [DL3-PR04.md](../specs/derivatives/fase3/DL3-PR04.md),
-[DL3-PR05a.md](../specs/derivatives/fase3/DL3-PR05a.md) e
-[DL3-PR05b.md](../specs/derivatives/fase3/DL3-PR05b.md), com as correções em
-[DL3-PR05b-R1.md](../specs/derivatives/fase3/DL3-PR05b-R1.md) e
-[DL3-PR05b-R2.md](../specs/derivatives/fase3/DL3-PR05b-R2.md).
+[DL3-PR05a.md](../specs/derivatives/fase3/DL3-PR05a.md),
+[DL3-PR05b.md](../specs/derivatives/fase3/DL3-PR05b.md) e
+[DL3-PR06.md](../specs/derivatives/fase3/DL3-PR06.md), com as correções em
+[DL3-PR05b-R1.md](../specs/derivatives/fase3/DL3-PR05b-R1.md),
+[DL3-PR05b-R2.md](../specs/derivatives/fase3/DL3-PR05b-R2.md) e
+[DL3-PR06B.md](../specs/derivatives/fase3/DL3-PR06B.md). Fechamento em
+[RELATORIO_FECHAMENTO_FASE3.md](../specs/derivatives/fase3/RELATORIO_FECHAMENTO_FASE3.md).
+
+Critério binário da SDD cumprido: os 22 cenários de aceite passam, os testes de
+arquitetura passam, o portão completo está verde e não entrou dependência nova.
+
+Entregue pelo DL3-PR06 e pelo DL3-PR06B (`ticket/session.py` novo e
+`scripts/derivatives_ticket_replay.py` novo; 336 linhas de produção, em duas rodadas):
+- Sessão de replay: uma fita, um livro, uma venue, um livro de reservas, um livro de
+  decisões e um quadro de bloqueios, compartilhados por todas as boletas da sessão.
+- A sessão recusa abrir boleta cujo id só difere de outro por maiúsculas (DP-18). O
+  motor continua aceitando os dois.
+- `after_seq=0` é o instante anterior ao primeiro evento. A sessão recusa fita cujo
+  primeiro evento tem sequência zero ou negativa (DP-19). O leitor de replay não mudou.
+- Linha de comando `scripts/derivatives_ticket_replay.py --replay --roteiro --out`: roda a
+  sessão inteira e só então publica um recibo por boleta e o `resumo.json`, juntos, em
+  pasta nova. Destino que já existe é recusado antes de ler as entradas. Código 0 ou 2.
+- Só recusa de domínio vira código 2. Erro de programação na abertura sobe com traceback.
+- Três sessões sintéticas oficiais (`calmo`, `leilao`, `rapido`) com quatro âncoras de
+  recibo fixadas em teste; duas execuções produzem os mesmos bytes.
+- Portão da cabeça `029a092`, Linux x86_64 limpo: 11.227 aprovados, 16 pulados, 261
+  subtestes; mypy estrito e Pyright sem erro. 75 mutantes do revisor, 64 mortos.
+
+Limites do que foi entregue, para quem continuar:
+- A publicação é inteira durante a execução normal. Queda de energia e morte abrupta do
+  processo não foram ensaiadas. Windows fica sem a renomeação exclusiva e o comando
+  recusa publicar.
+- O `resumo.json` guarda a âncora de cada recibo na mesma pasta e sob o mesmo usuário.
+  Isso não prova que o recibo não foi trocado (DP-11).
+- Destino terminado em `..`, pai que é link quebrado e prazo de decisão que estoura a
+  data devolvem 2, mas não têm teste. Uma linha de teste tem 105 colunas. O bloco de
+  caminhos com `..` é candidato à rodada de simplificação (DP-17).
+
+Decisões de produto de Francisco (DP-01 a DP-19): a Revisão 1 está em
+[DECISOES_PRODUTO_DP01-DP19.md](../specs/derivatives/fase3/DECISOES_PRODUTO_DP01-DP19.md).
+A Revisão 2, de 22/11/2026, separa o que vale hoje, o que é produto e o que depende de
+dado ou homologação. Ela ainda está fora do repositório (`reports/fase03/`, SHA-256
+`2c0eb6a1d3cc1dbe59fcd5ae28331e06cf8c0c2a9276aa79a54115b0a24300a9`) e entra no próximo PR.
+Recorte autorizado: PR07A (origem da cobertura; bruto assinado, executado e projetado;
+DP-12 a DP-15) e PR07B (zeragem e borboleta em simulação). O resto tem cartão próprio.
 
 Entregue pelo DL3-PR05b (`ticket/engine.py` novo e admissão em `ticket/sequencing.py`; 435
 linhas de produção no PR, em três rodadas de revisão):
@@ -42,7 +84,7 @@ linhas de produção no PR, em três rodadas de revisão):
   subtestes; mypy estrito e Pyright sem erro. 55 mutantes do revisor mortos; 6.000 sessões
   aleatórias contra a `PaperVenue` real sem violar estado, recibo, prazo ou cobertura.
 
-Para o DL3-PR06 saber:
+Notas do motor que o DL3-PR06 recebeu (seguem valendo):
 - O condutor entrega cada evento nesta ordem: `book.advance`, `venue.advance`, e para cada
   motor `on_reports` (só com os relatórios das ordens daquele motor) e `on_market`.
 - O id da boleta precisa ser único na sessão inteira, em todas as contas. O motor não
@@ -173,8 +215,9 @@ Pendências com dono:
 - Sugestão S1 da avaliação de simplificação (unir duas recusas idênticas da árvore): não
   aplicada; opcional.
 
-Próxima ação (uma só): Codex abre o DL3-PR06 (replay por linha de comando e relatório de
-fechamento) em rascunho, pelo supercartão do DL3-PR06.
+Próxima ação (uma só): Claude publica o supercartão do DL3-PR07A e Codex o abre em
+rascunho. Nenhum código de margem, custo ou integração antes do cartão próprio; o DP-01
+só vira código depois de adendo à G3 da ADR-0024 assinado por Francisco.
 
 ## Fase 02 — Marco 2C2 — FECHADO (estado A)
 

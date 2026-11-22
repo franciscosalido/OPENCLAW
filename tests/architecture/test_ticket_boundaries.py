@@ -149,3 +149,52 @@ def test_engine_only_accesses_its_own_private_attributes() -> None:
             if node.attr.startswith("__") and node.attr.endswith("__"):
                 continue
             assert isinstance(node.value, ast.Name) and node.value.id == "self", ast.unparse(node)
+
+
+def test_ticket_replay_script_imports_and_clock() -> None:
+    """O humano simulado usa apenas o domínio da boleta e o horário da fita."""
+    path = ROOT / "scripts/derivatives_ticket_replay.py"
+    tree = ast.parse(path.read_text())
+    imports = _imports(path)
+    for name in imports:
+        assert not any(name == banned or name.startswith(banned + ".") for banned in FORBIDDEN)
+        if name.startswith("backend."):
+            assert name == "backend.derivatives" or name == TICKET or name.startswith(TICKET + ".")
+    bindings = _script_bindings(tree)
+    for target in bindings.values():
+        if target.split(".")[0] == "backend":
+            assert target == TICKET or target.startswith(TICKET + "."), target
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            target = _resolved(node.func, bindings)
+            assert target not in {"datetime.datetime.now", "datetime.datetime.utcnow",
+                                  "datetime.datetime.today", "datetime.date.today", "time.time"}
+
+
+def _script_bindings(tree: ast.AST) -> dict[str, str]:
+    bindings = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom):
+            bindings.update({a.asname or a.name: f"{node.module}.{a.name}" for a in node.names})
+        elif isinstance(node, ast.Import):
+            bindings.update({a.asname or a.name: a.name for a in node.names})
+    return bindings
+
+
+def _resolved(node: ast.AST, bindings: dict[str, str]) -> str:
+    first, dot, rest = ast.unparse(node).partition(".")
+    return bindings.get(first, first) + dot + rest
+
+
+def test_script_gate_authority_is_exclusive() -> None:
+    """Somente o roteiro pode importar o emissor de decisões no diretório scripts."""
+    for path in (ROOT / "scripts").rglob("*.py"):
+        if path == ROOT / "scripts/derivatives_ticket_replay.py":
+            continue
+        names = _imports(path)
+        assert TICKET + ".gate.issue" not in names and TICKET + ".gate.*" not in names, path
+        tree = ast.parse(path.read_text())
+        bindings = _script_bindings(tree)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Attribute) and node.attr == "issue":
+                assert _resolved(node, bindings) != TICKET + ".gate.issue", path

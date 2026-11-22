@@ -1,0 +1,8 @@
+{"decision_ttl_s":60,
+"positions":[{"account":"sim","holdings":[{"symbol":"A","underlying":"ETF","kind":"CALL","expiry":"2027-01-15","multiplier":1,"balance":0},{"symbol":"B","underlying":"ETF","kind":"CALL","expiry":"2027-01-15","multiplier":1,"balance":0}],"pairs":[["A","B"]]}],
+"steps":[
+{"after_seq":2,"at":"2026-11-23T14:00:02Z","do":"open","ticket":"T1","account":"sim","draft":{"legs":[{"symbol":"A","side":"BUY","quantity":10,"limit_price":"1.00","lot_size":1},{"symbol":"B","side":"SELL","quantity":10,"limit_price":"1.50","lot_size":1}],"net_limit":"-5.00","gross_cap":"25.00","send_deadline":"2026-11-23T15:00:00Z","order_validity":"2026-11-23T21:00:00Z","quote_snapshot_id":"calmo-2"}},
+{"after_seq":2,"at":"2026-11-23T14:00:02Z","do":"arm","ticket":"T1","spec":{"symbol":"A","source":"ASK","direction":"AT_OR_BELOW","threshold":"1.00","min_size":10,"armed_until":"2026-11-23T15:00:00Z"}},
+{"after_seq":6,"at":"2026-11-23T14:00:12Z","do":"confirm","ticket":"T1"},
+{"after_seq":6,"at":"2026-11-23T14:00:12Z","do":"pause","ticket":"T1"},
+{"after_seq":7,"at":"2026-11-23T14:00:13Z","do":"resume","ticket":"T1"}]}

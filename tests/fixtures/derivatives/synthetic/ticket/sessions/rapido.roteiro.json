@@ -1,0 +1,12 @@
+{"decision_ttl_s":60,
+"positions":[{"account":"sim","holdings":[{"symbol":"A","underlying":"ETF","kind":"CALL","expiry":"2027-01-15","multiplier":1,"balance":10},{"symbol":"B","underlying":"ETF","kind":"CALL","expiry":"2027-01-15","multiplier":1,"balance":-10}],"pairs":[["A","B"]]}],
+"steps":[
+{"after_seq":2,"at":"2026-11-23T14:00:02Z","do":"open","ticket":"T1","account":"sim","draft":{"legs":[{"symbol":"A","side":"SELL","quantity":10,"limit_price":"1.00","lot_size":1},{"symbol":"B","side":"BUY","quantity":10,"limit_price":"1.50","lot_size":1}],"net_limit":"5.00","gross_cap":"25.00","send_deadline":"2026-11-23T15:00:00Z","order_validity":"2026-11-23T21:00:00Z","quote_snapshot_id":"rapido-2"}},
+{"after_seq":2,"at":"2026-11-23T14:00:02Z","do":"open","ticket":"T2","account":"sim","draft":{"legs":[{"symbol":"A","side":"SELL","quantity":10,"limit_price":"1.00","lot_size":1},{"symbol":"B","side":"BUY","quantity":10,"limit_price":"1.50","lot_size":1}],"net_limit":"5.00","gross_cap":"25.00","send_deadline":"2026-11-23T15:00:00Z","order_validity":"2026-11-23T21:00:00Z","quote_snapshot_id":"rapido-2"}},
+{"after_seq":3,"at":"2026-11-23T14:00:02Z","do":"confirm","ticket":"T1"},
+{"after_seq":3,"at":"2026-11-23T14:00:02Z","do":"confirm","ticket":"T2"},
+{"after_seq":4,"at":"2026-11-23T14:00:03Z","do":"reconcile","ticket":"T1","order_id":"T1:B:1"},
+{"after_seq":4,"at":"2026-11-23T14:00:03Z","do":"confirm","ticket":"T2"},
+{"after_seq":4,"at":"2026-11-23T14:00:03Z","do":"resume","ticket":"T1"},
+{"after_seq":7,"at":"2026-11-23T14:00:06Z","do":"cancel","ticket":"T1","order_id":"T1:B:1"},
+{"after_seq":8,"at":"2026-11-23T14:00:08Z","do":"confirm","ticket":"T2"}]}

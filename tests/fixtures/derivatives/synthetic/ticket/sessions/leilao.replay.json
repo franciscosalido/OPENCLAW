@@ -1,0 +1,12 @@
+{"session_close":"2026-11-23T21:00:00Z","events":[
+{"seq":1,"ts":"2026-11-23T14:00:00Z","type":"quote","symbol":"A","bid":"0.95","bid_size":50,"ask":"1.02","ask_size":50,"phase":"AUCTION"},
+{"seq":2,"ts":"2026-11-23T14:00:01Z","type":"quote","symbol":"B","bid":"1.45","bid_size":50,"ask":"1.55","ask_size":50,"phase":"AUCTION"},
+{"seq":3,"ts":"2026-11-23T14:05:00Z","type":"quote","symbol":"A","bid":"0.95","bid_size":50,"ask":"1.02","ask_size":50,"phase":"CONTINUOUS"},
+{"seq":4,"ts":"2026-11-23T14:05:01Z","type":"quote","symbol":"B","bid":"1.45","bid_size":50,"ask":"1.55","ask_size":50,"phase":"CONTINUOUS"},
+{"seq":5,"ts":"2026-11-23T14:05:03Z","type":"quote","symbol":"A","bid":"0.95","bid_size":50,"ask":"1.00","ask_size":3,"phase":"CONTINUOUS"},
+{"seq":6,"ts":"2026-11-23T14:05:04Z","type":"quote","symbol":"B","bid":"1.50","bid_size":3,"ask":"1.56","ask_size":50,"phase":"CONTINUOUS"},
+{"seq":7,"ts":"2026-11-23T14:05:05Z","type":"quote","symbol":"A","bid":"0.95","bid_size":50,"ask":"1.00","ask_size":50,"phase":"AUCTION"},
+{"seq":8,"ts":"2026-11-23T14:05:07Z","type":"auction_fill","symbol":"A","price":"1.00","size":1},
+{"seq":9,"ts":"2026-11-23T14:05:08Z","type":"cancel_rejected","order":"T1:A:1"},
+{"seq":10,"ts":"2026-11-23T14:10:00Z","type":"quote","symbol":"A","bid":"0.95","bid_size":50,"ask":"1.02","ask_size":50,"phase":"CONTINUOUS"},
+{"seq":11,"ts":"2026-11-23T21:00:00Z","type":"quote","symbol":"B","bid":"1.45","bid_size":50,"ask":"1.55","ask_size":50,"phase":"CONTINUOUS"}]}
