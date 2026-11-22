@@ -33,3 +33,26 @@ Mutantes: permitir `CANCEL_REQUESTED → CANCELLED` sem evento da venue; permiti
   [MappingProxyType](https://docs.python.org/3.12/library/types.html#types.MappingProxyType)
   e [Pydantic Strict Mode](https://docs.pydantic.dev/latest/concepts/strict_mode/).
   Trata-se de perfil JSON local, não uma implementação de RFC 8785.
+
+## Revisão e integração — 22/11/2026 (Claude)
+
+Cabeça `638fc31`: **GO**, formado antes de ler os relatórios da skill. A produção não mudou
+na revisão; os testes ganharam 13 casos do revisor.
+
+| Verificação do revisor, clone limpo, Linux x86_64 | Resultado |
+|---|---|
+| Pytest sem integração, com os testes do revisor | 10.873 aprovados, 16 pulados, 261 subtestes |
+| `mypy backend/ --strict` e `pyright backend/` | 0 erros |
+| Linhas de produção | 291, teto de 300 |
+| Sondas de adulteração do recibo (truncar, remover, trocar ordem, payload, instante, tipo, prévia forjada com cadeia refeita) | todas detectadas; truncamento só com âncora, como documentado |
+| 20 mutantes do revisor na primeira passada | 12 mortos, 8 sobreviventes |
+
+Os 8 sobreviventes eram lacunas de teste, não de código. A matriz de transições calculava
+o esperado a partir da própria tabela, então um destino trocado passava. Os testes do
+revisor fixam à mão a tabela, os destinos de reconciliação, os rótulos e cada campo do
+evento. Depois deles sobra 1 mutante, equivalente: a checagem de chave duplicada é
+redundante com a comparação de bytes canônicos.
+
+Relatórios da skill lidos depois, com SHA-256 conferidos (`4eec4087…98b0` e
+`e71d8334…4b8d`): GO sem bloqueante. As lacunas L1 (tabela), L2 (rótulos) e a de gravação
+em UTC que eles apontam estão cobertas pelos testes do revisor.

@@ -4,14 +4,26 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-21 · **Turno:** Claude (integração do DL3-ADR e do DL3-PR01).
+**Última atualização:** 2026-11-21 · **Turno:** Claude (integração do DL3-PR02).
 
 ## Fase 03 — Motor da boleta em simulador (D0) — ABERTA (estado A)
 
-PR atual: DL3-PR01 — MERGEADO (PR #156). Antes dele, DL3-PR00 (PR #154) e DL3-ADR
-(PR #155). SDD em [SDD_FASE3_BLUEPRINT.md](../specs/derivatives/fase3/SDD_FASE3_BLUEPRINT.md);
-cartões e revisões em [DL3-PR00.md](../specs/derivatives/fase3/DL3-PR00.md) e
-[DL3-PR01.md](../specs/derivatives/fase3/DL3-PR01.md).
+PR atual: DL3-PR02 — MERGEADO (PR #157). Antes dele, DL3-PR00 (PR #154), DL3-ADR
+(PR #155) e DL3-PR01 (PR #156). SDD em [SDD_FASE3_BLUEPRINT.md](../specs/derivatives/fase3/SDD_FASE3_BLUEPRINT.md);
+cartões e revisões em [DL3-PR00.md](../specs/derivatives/fase3/DL3-PR00.md),
+[DL3-PR01.md](../specs/derivatives/fase3/DL3-PR01.md) e
+[DL3-PR02.md](../specs/derivatives/fase3/DL3-PR02.md).
+
+Entregue pelo DL3-PR02 (`ticket/state.py` e `ticket/receipt.py`, 291 linhas de produção):
+- Duas máquinas de estados com tabela explícita e imutável, uma da boleta e uma da ordem.
+  Estado terminal não reabre. `UNCERTAIN` só sai por `reconcile`, com evidência.
+- Pedido de cancelamento não cancela: só o evento da venue confirma. Execução que chega
+  durante o pedido fica registrada.
+- Recibo só de acréscimo, encadeado por SHA-256. A prévia é gravada inteira e o resumo é
+  conferido na leitura. Sem uma ponta externa conhecida, o recibo não prova que não foi
+  truncado.
+- Portão com os testes do revisor, Linux x86_64 limpo: 10.873 aprovados, 16 pulados, 261
+  subtestes; mypy estrito e Pyright sem erro.
 
 Entregue pelo DL3-PR01 (`backend/derivatives/ticket/`, 239 linhas de produção):
 - Modelo imutável da boleta simulada: 1 a 4 pernas, dinheiro em `Decimal` no passo de
@@ -28,8 +40,13 @@ Para os próximos cartões:
 - O resumo não inclui a versão: editar de A para B e voltar a A recupera o mesmo resumo.
   No DL3-PR05 a decisão humana deve prender também a versão, para que uma confirmação
   antiga não volte a valer.
-- A prévia serializada em JSON traz o resumo calculado e não é aceita de volta como
-  entrada. O recibo (DL3-PR02) deve gravar o conteúdo e conferir o resumo na leitura.
+- `LABELS_PT` junta os dois enums num só dicionário. `EXPIRED` e `UNCERTAIN` existem nos
+  dois e comparam iguais como texto, então os rótulos coincidem por construção. Se um dia
+  precisarem diferir, separar em dois dicionários (DL3-PR06).
+- O recibo aceita número em ponto flutuante no conteúdo genérico. No DL3-PR05 o motor
+  grava dinheiro como texto decimal.
+- A sugestão S1 da simplificação (evitar a segunda decodificação da prévia em `verify`)
+  é opcional e não foi aplicada.
 - A ordem entre prazo de envio e validade da ordem não é validada no modelo; fica para o
   DL3-PR04.
 
@@ -60,7 +77,7 @@ Pendências com dono:
 - Sugestão S1 da avaliação de simplificação (unir duas recusas idênticas da árvore): não
   aplicada; opcional.
 
-Próxima ação (uma só): Codex abre o DL3-PR02 em rascunho.
+Próxima ação (uma só): Codex abre o DL3-PR03 em rascunho.
 
 ## Fase 02 — Marco 2C2 — FECHADO (estado A)
 
