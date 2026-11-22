@@ -9,6 +9,8 @@ import pytest
 from backend.derivatives.ticket.receipt import Receipt, ReceiptEvent
 from backend.derivatives.ticket.session import ReplaySession
 from backend.derivatives.ticket.state import Event
+from loguru import logger
+
 from scripts.derivatives_ticket_replay import main
 from tests.unit.derivatives.ticket.test_session import FIXTURES
 
@@ -284,7 +286,9 @@ def test_publication_fault_leaves_no_partial_receipts(fault: str, tmp_path: Path
         assert list(tmp_path.iterdir()) == [out] and not list(out.iterdir())
 
 
-@pytest.mark.parametrize("path", ["a/../a", "A/../a", "intermediario/../resultado", "link/../resultado"])
+@pytest.mark.parametrize("path", [
+    "a/../a", "A/../a", "intermediario/../resultado", "link/../resultado",
+])
 def test_parent_creation_with_dotdot_preserves_destination(path: str, tmp_path: Path) -> None:
     """O nome solicitado permanece utilizável e '..' segue os links do sistema de arquivos."""
     if path.startswith("link/"):
@@ -310,3 +314,39 @@ def test_unusable_output_parent_is_a_cli_refusal(tmp_path: Path) -> None:
     out = tmp_path / ("x" * 256) / "resultado"
     assert main(_official("calmo", out)) == 2
     assert not list(tmp_path.iterdir())
+
+
+@pytest.mark.parametrize(("case", "lines"), [
+    ("calmo", ["T1: Concluída (COMPLETED)"]),
+    ("leilao", ["T1: Parada (STOPPED)"]),
+    ("rapido", ["T1: Parada (STOPPED)", "T2: Proposta (DRAFT)"]),
+])
+def test_l4_summary_log_names_ticket_state(case: str, lines: list[str], tmp_path: Path) -> None:
+    messages: list[str] = []
+    sink = logger.add(lambda msg: messages.append(msg.record["message"]), format="{message}")
+    try:
+        assert main(_official(case, tmp_path / "out")) == 0
+    finally:
+        logger.remove(sink)
+    assert messages == [AVISO, *lines]
+
+
+def test_h3a_missing_parent_followed_by_dotdot(tmp_path: Path) -> None:
+    assert main(_official("calmo", tmp_path / "x/..")) == 2
+    assert not list(tmp_path.iterdir())
+
+
+def test_h3b_broken_parent_link(tmp_path: Path) -> None:
+    link = tmp_path / "link"
+    link.symlink_to(tmp_path / "missing", target_is_directory=True)
+    assert main(_official("calmo", link / "novo")) == 2
+    assert list(tmp_path.iterdir()) == [link] and link.is_symlink()
+
+
+def test_h3c_unrepresentable_decision_lifetime(tmp_path: Path) -> None:
+    script = tmp_path / "roteiro"
+    data = json.loads((FIXTURES / "calmo.roteiro.json").read_bytes())
+    data["decision_ttl_s"] = 10**18
+    script.write_text(json.dumps(data))
+    assert main(args(FIXTURES / "calmo.replay.json", script, tmp_path / "out")) == 2
+    assert list(tmp_path.iterdir()) == [script]

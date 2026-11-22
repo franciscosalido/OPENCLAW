@@ -9,7 +9,7 @@ import pytest
 
 from backend.derivatives.ticket.engine import AccountHalts, EngineRefusal, TicketEngine
 from backend.derivatives.ticket.gate import Action, DecisionLedger, HumanDecision, issue
-from backend.derivatives.ticket.guards import BookView
+from backend.derivatives.ticket.guards import BookView, DeadlineRefusal
 from backend.derivatives.ticket.models import EditableField, FieldRef, Leg, MarketSuggestion, Side
 from backend.derivatives.ticket.paper_venue import PaperVenue
 from backend.derivatives.ticket.receipt import Receipt
@@ -750,3 +750,171 @@ def test_g8_stale_then_fresh_quote_at_exact_send_deadline(s: Session) -> None:
     s.q("B", 3600)
     assert e.orders[B] == O.LIVE and e.state == T.WORKING
     assert s.submitted() == [(A, 10, D("1.00"), at(2)), (B, 10, D("1.50"), END)]
+
+
+def closing_decision(e: TicketEngine, action: Action = Action.EXECUTE) -> HumanDecision:
+    return issue(action, ticket="T1", nonce=action.value, issued_at=NOW,
+                 expires_at=CLOSE + timedelta(seconds=1),
+                 preview=e.preview if action == Action.EXECUTE else None)
+
+
+def closing_quotes(s: Session) -> None:
+    s.q("A", 25196)
+    s.q("B", 25196.5)
+
+
+def test_f1_confirm_before_expiration(s: Session) -> None:
+    closing_quotes(s)
+    e = s.new(send_deadline=CLOSE)
+    now = CLOSE - timedelta(microseconds=1)
+    e.confirm(closing_decision(e), now)
+    assert e.state == T.WORKING and e.orders == {A: O.LIVE}
+    assert s.submitted() == [(A, 10, D("1"), now)]
+    assert [r.kind for r in s.receipts[0].events] == [E.PREVIEW, E.CONFIRM, E.START, E.VENUE_LIVE]
+
+
+@pytest.mark.parametrize("delay", [0, 1], ids=["F2", "F3"])
+def test_confirm_at_or_after_expiration(s: Session, delay: int) -> None:
+    closing_quotes(s)
+    e = s.new(send_deadline=CLOSE)
+    now = CLOSE + timedelta(microseconds=delay)
+    decision = closing_decision(e)
+    with pytest.raises(DeadlineRefusal):
+        e.confirm(decision, now)
+    assert e.state == T.DRAFT and not e.orders and not s.submitted()
+    assert [r.kind for r in s.receipts[0].events] == [E.PREVIEW]
+    s.ledger.consume(decision, action=Action.EXECUTE, ticket="T1", now=now, preview=e.preview)
+
+
+def buyback_plan(pos: Position, deadline: datetime = END) -> LegPlan:
+    proposed = draft(leg("A", Side.SELL, "1"), leg("B", Side.BUY, "1.50"), net="5")
+    return plan_legs(proposed.model_copy(update=dict(send_deadline=deadline, order_validity=CLOSE)), pos)
+
+
+def test_f2b_refusal_precedes_buyback_reservation(s: Session) -> None:
+    closing_quotes(s)
+    pos = close_plan().position
+    first, second = (s.new(pos, closing=True, send_deadline=CLOSE) for _ in range(2))
+    with pytest.raises(DeadlineRefusal):
+        first.confirm(closing_decision(first), CLOSE)
+    assert not s.submitted() and second.preview is not None
+    s.res.admissible(buyback_plan(pos, CLOSE), ticket="T2")
+
+
+@pytest.mark.parametrize("delay", [0, -1], ids=["F4", "F5"])
+def test_resume_at_validity_boundary(s: Session, delay: int) -> None:
+    closing_quotes(s)
+    e = s.new(send_deadline=CLOSE)
+    start = CLOSE - timedelta(seconds=3)
+    e.confirm(closing_decision(e), start)
+    e.pause(start)
+    s.q("A", 25198, ask="1")
+    s.q("B", 25199)
+    now = CLOSE + timedelta(microseconds=delay)
+    e.resume(closing_decision(e, Action.RESUME), now)
+    if delay == 0:
+        assert s.submitted() == [(A, 10, D("1"), start)]
+        assert e.state == T.STOPPED and e.orders == {A: O.FILLED}
+        assert [r.kind for r in s.receipts[0].events] == [
+            E.PREVIEW, E.CONFIRM, E.START, E.VENUE_LIVE, E.PAUSE, E.VENUE_FILL, E.RESUME, E.STOP]
+    else:
+        assert s.submitted() == [(A, 10, D("1"), start), (B, 10, D("1.50"), now)]
+        assert e.state == T.WORKING and e.orders == {A: O.FILLED, B: O.LIVE}
+
+
+def two_buybacks(s: Session, *, registered: bool) -> tuple[Position, TicketEngine, TicketEngine]:
+    pos = Position(account="sim", holdings=(holding("A", 10), holding("B", -10),
+                                           holding("C", -10), holding("D", 10)),
+                   pairs=(("A", "B"), ("D", "C")))
+    s.q("C", 1)
+    s.q("D", 1)
+    first = s.engine("T1", pos)
+    proposal = draft(leg("C", Side.BUY, "1.50"), leg("B", Side.BUY, "1.50"),
+                     leg("D", Side.SELL, "1"), leg("A", Side.SELL, "1"), net="10", gross="50")
+    first.propose(proposal.model_copy(update=dict(send_deadline=END, order_validity=CLOSE)), NOW)
+    second = s.new(pos, closing=True)
+    s.step(VenueTimeout(type="timeout", seq=3, ts=at(2), call="submit", registered=registered))
+    first.confirm(s.dec(first), at(2))
+    assert first.state == T.UNCERTAIN and first.orders == {"T1:C:1": O.UNCERTAIN}
+    assert s.submitted() == [("T1:C:1", 10, D("1.50"), at(2))]
+    return pos, first, second
+
+
+def test_r1_release_never_sent_on_reconciliation(s: Session) -> None:
+    _, first, second = two_buybacks(s, registered=False)
+    first.reconcile("T1:C:1", at(3))
+    assert first.state == T.STOPPED and first.orders == {"T1:C:1": O.REJECTED}
+    assert not s.halts.blocked("sim")
+    second.confirm(s.dec(second), at(3))
+    s.q("B", 4, ask="1.50")
+    s.q("A", 5, bid="1")
+    assert second.state == T.COMPLETED
+    assert s.submitted() == [("T1:C:1", 10, D("1.50"), at(2)), ("T2:B:1", 10, D("1.50"), at(3)),
+                             ("T2:A:1", 10, D("1"), at(4))]
+
+
+def test_r2_uncertain_account_preserves_decision(s: Session) -> None:
+    _, _, second = two_buybacks(s, registered=False)
+    decision = s.dec(second)
+    with pytest.raises(EngineRefusal):
+        second.confirm(decision, at(2))
+    s.ledger.consume(decision, action=Action.EXECUTE, ticket="T2", now=at(2), preview=second.preview)
+
+
+def test_r3_readmission_occupies_capacity(s: Session) -> None:
+    pos, first, second = two_buybacks(s, registered=False)
+    first.reconcile("T1:C:1", at(3))
+    second.confirm(s.dec(second), at(3))
+    third = s.new(pos, closing=True)
+    decision = s.dec(third)
+    with pytest.raises(SequenceRefusal):
+        third.confirm(decision, at(3))
+    s.ledger.consume(decision, action=Action.EXECUTE, ticket="T3", now=at(3), preview=third.preview)
+
+
+@pytest.mark.parametrize(("quantity", "net", "gross"), [(6, "3", "15"), (7, "3.50", "17.50")])
+def test_r4_partial_buyback_keeps_executed_quantity(s: Session, quantity: int,
+                                                    net: str, gross: str) -> None:
+    pos = close_plan().position
+    first = s.new(pos, closing=True)
+    first.confirm(s.dec(first), at(2))
+    s.q("B", 3, ask="1.50", size=4)
+    s.cancel(first, B, 3)
+    s.q("B", 4, ask="1.60")
+    s.q("A", 4, bid="1")
+    assert first.state == T.STOPPED and first.orders == {B: O.CANCELLED, A: O.FILLED}
+    assert s.paper.poll(B) == (O.CANCELLED, 4, 0) and s.paper.poll(A) == (O.FILLED, 4, 0)
+    second = s.new(pos, closing=True, legs=(leg("A", Side.SELL, "1", quantity),
+                                           leg("B", Side.BUY, "1.50", quantity)),
+                   net_limit=D(net), gross_cap=D(gross))
+    if quantity == 7:
+        with pytest.raises(SequenceRefusal):
+            second.confirm(s.dec(second), at(5))
+    else:
+        second.confirm(s.dec(second), at(5))
+        assert s.submitted()[-1] == ("T2:B:1", 6, D("1.50"), at(5))
+
+
+def test_r5_uncertain_keeps_unsent_occupation(s: Session) -> None:
+    pos, _, second = two_buybacks(s, registered=False)
+    assert second.preview is not None
+    with pytest.raises(SequenceRefusal):
+        s.res.admissible(buyback_plan(pos), ticket="T2")
+
+
+def test_r6_release_never_sent_on_drive_stop(s: Session) -> None:
+    pos, first, second = two_buybacks(s, registered=True)
+    first.reconcile("T1:C:1", at(3))
+    assert first.state == T.WORKING and first.paused and first.orders == {"T1:C:1": O.LIVE}
+    assert second.preview is not None
+    with pytest.raises(SequenceRefusal):
+        s.res.admissible(buyback_plan(pos), ticket="T2")
+    s.cancel(first, "T1:C:1", 3)
+    s.q("C", 4, ask="1.60")
+    s.q("A", 4)
+    s.q("B", 4)
+    assert first.state == T.STOPPED
+    assert [r.kind for r in s.receipts[0].events][-4:] == [
+        E.PAUSE, E.REQUEST_CANCEL, E.VENUE_CANCELLED, E.STOP]
+    second.confirm(s.dec(second), at(5))
+    assert second.orders == {"T2:B:1": O.LIVE}

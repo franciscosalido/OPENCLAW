@@ -214,3 +214,12 @@ def test_replay_cannot_reject_cancellation_for_unknown_id() -> None:
     with pytest.raises(VenueRefusal):
         PaperVenue(CLOSE).advance(CancelRejected(type="cancel_rejected", seq=1, ts=NOW,
                                                 order="ausente"))
+
+
+@pytest.mark.parametrize(("microseconds", "event"), [
+    (-1, Event.VENUE_LIVE), (0, Event.VENUE_REJECTED), (1, Event.VENUE_REJECTED),
+])
+def test_f6_submit_at_session_boundary(microseconds: int, event: Event) -> None:
+    request = VenueOrder(order_id="o1", symbol="A", side=Side.BUY, quantity=10, lot_size=1,
+                         limit_price=D("1"), valid_until=CLOSE)
+    assert PaperVenue(CLOSE).submit(request, CLOSE + timedelta(microseconds=microseconds)).event == event

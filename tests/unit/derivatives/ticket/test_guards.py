@@ -89,3 +89,19 @@ def test_strict_config(overrides: dict[str, object]) -> None:
     """O YAML exige ambos os parâmetros com os tipos declarados."""
     with pytest.raises(ValidationError):
         TicketSimConfig.model_validate(load_ticket_sim_config().model_dump() | overrides)
+
+
+@pytest.mark.parametrize(("deadline", "instant", "reason"), [
+    (CLOSE, CLOSE - timedelta(microseconds=1), None),
+    (CLOSE, CLOSE, "validade encerrada"),
+    (CLOSE, CLOSE + timedelta(microseconds=1), "prazo de envio vencido"),
+    (NOW.replace(hour=15), NOW.replace(hour=15), None),
+])
+def test_f7_send_inclusive_validity_exclusive(deadline: datetime, instant: datetime,
+                                              reason: str | None) -> None:
+    proposal = draft(BUY, SELL).model_copy(update=dict(send_deadline=deadline, order_validity=CLOSE))
+    if reason:
+        with pytest.raises(DeadlineRefusal, match=reason):
+            check_deadlines(proposal, instant, PaperVenue(CLOSE))
+    else:
+        check_deadlines(proposal, instant, PaperVenue(CLOSE))
