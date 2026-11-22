@@ -246,3 +246,35 @@ estourar; a regra do gate nos testes de arquitetura precisar de exceção.
    `docs/04_MEM/current_state.md`.
 5. Skill `quimera-lab-review` e simplificação v0.2 na cabeça publicada, relatórios fora do
    Git, SHA-256 na descrição.
+
+## Revisão adversarial (Claude) — GO na primeira rodada, cabeça `101147f`
+
+Parecer formado antes de ler os relatórios da skill.
+
+| Verificação do revisor, clone limpo, Linux x86_64 | Resultado |
+|---|---|
+| Pytest sem integração | 11.258 aprovados, 16 pulados, 261 subtestes |
+| `mypy backend/ --strict`, `mypy --strict` no script e `pyright backend/` | 0 erros |
+| Linhas | `engine.py` 410 (teto 412), `guards.py` 94 (96), `state.py` 150 (150), script 222 (222); 37 de produção no PR (teto 45) |
+| Cenários F1–F7, F2b e R1–R6 rodados pelo script de fatos do planejador | todos com o esperado do cartão |
+| Sete arquivos das três sessões oficiais | idênticos byte a byte à referência do §6 |
+| 30 mutantes do revisor, um por vez | 29 mortos, 1 vivo |
+| 3.000 sessões aleatórias, motor e `PaperVenue` reais | nenhuma violação de estado, recibo, prazo ou cobertura |
+| Arquivos protegidos, fixtures e a lista "não mudam" | intactos |
+
+Observações, nenhuma bloqueante:
+
+1. **Um mutante vivo, e ele é perigoso.** Trocar "compra que nunca teve ordem" por "toda
+   compra" na liberação não derruba nenhum teste. Com essa troca, uma boleta parada por
+   limite com recompra ainda aberta (6 de 10 executadas, 4 em aberto) deixa outra boleta
+   recomprar a mesma posição. A cabeça está correta: nesse cenário a segunda boleta é
+   recusada. Falta o teste. Entra no próximo cartão, com o cenário já fixado pelo revisor.
+2. **Divergência retém a ocupação.** Se a boleta para com divergência aberta na própria
+   conta, o motor não libera a recompra nunca enviada. O cartão era ambíguo nesse ponto
+   (lacuna do planejador); a leitura do implementador é a conservadora e fica. Divergência
+   em outra conta e incerteza de outra boleta não retêm.
+3. `AccountHalts` ganhou o método público `divergent`, que o cartão não previa. Aceito: é o
+   que a observação 2 exige.
+
+Relatórios da skill lidos depois, com SHA-256 conferidos (`f1ad5f27…92b4` e
+`3f69f9e6…3152`): GO, sem bloqueante e sem simplificação com prova.

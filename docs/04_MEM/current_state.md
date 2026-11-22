@@ -4,7 +4,41 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-22 · **Turno:** Claude (DL3-PR06 integrado; Fase 3 fechada).
+**Última atualização:** 2026-11-22 · **Turno:** Claude (DL3-PR07A1 integrado).
+
+## Depois da Fase 3 — decisões de produto no simulador (D0) — EM ANDAMENTO
+
+Trabalho sobre o mesmo motor, guiado pelo registro de decisões de Francisco
+([Revisão 2](../specs/derivatives/fase3/DECISOES_PRODUTO_DP01-DP19_R2.md), que substitui a
+Revisão 1). O PR07A foi cortado em três pelo planejador.
+
+| Cartão | Conteúdo | Situação |
+|---|---|---|
+| [DL3-PR07A1](../specs/derivatives/fase3/DL3-PR07A1.md) | DP-14, DP-12, DP-15 e higiene | MERGEADO (PR #163) |
+| DL3-PR07A2 | origem da cobertura; bruto assinado, executado e projetado | cartão a publicar |
+| DL3-PR07A3 | DP-13: relatório contraditório e evento externo | depois do A2 |
+| DL3-PR07B | DP-02 e DP-03: zeragem e borboleta em simulação | depois do PR07A |
+
+Entregue pelo DL3-PR07A1 (37 linhas de produção):
+- No instante exato da validade o motor recusa antes de gastar a decisão, ocupar o livro
+  ou enviar. A janela de envio é uma só: `now <= send_deadline` e `now < order_validity`.
+  O instante exato do prazo de envio continua permitido.
+- Boleta que entra em `STOPPED` libera a ocupação das compras que nunca tiveram ordem,
+  pelos dois caminhos (laço de envio e conciliação). Compra enviada, parcial ou incerta
+  não muda. Divergência aberta na própria conta retém a ocupação.
+- Rótulos em português separados: `TICKET_LABELS_PT` e `ORDER_LABELS_PT`, com os textos
+  decididos por Francisco. `LABELS_PT` deixou de existir. O log da linha de comando
+  mostra rótulo e código. O `resumo.json` segue com códigos.
+- As três sessões oficiais saem idênticas byte a byte; as quatro âncoras não mudaram.
+- Portão da cabeça `101147f`, Linux x86_64 limpo: 11.258 aprovados, 16 pulados, 261
+  subtestes; mypy estrito e Pyright sem erro. 30 mutantes do revisor, 29 mortos.
+
+Pendente para o próximo cartão:
+- Teste que falta: boleta parada por limite com recompra ainda aberta não libera a
+  ocupação dessa recompra. O código está certo; o mutante correspondente sobrevive.
+
+Próxima ação (uma só): Claude publica o supercartão do DL3-PR07A2 e Codex o abre em
+rascunho. O DP-01 só vira código depois de adendo à G3 da ADR-0024 assinado por Francisco.
 
 ## Fase 03 — Motor da boleta em simulador (D0) — FECHADA (estado A)
 
@@ -58,8 +92,7 @@ Limites do que foi entregue, para quem continuar:
 Decisões de produto de Francisco (DP-01 a DP-19): a Revisão 1 está em
 [DECISOES_PRODUTO_DP01-DP19.md](../specs/derivatives/fase3/DECISOES_PRODUTO_DP01-DP19.md).
 A Revisão 2, de 22/11/2026, separa o que vale hoje, o que é produto e o que depende de
-dado ou homologação. Ela ainda está fora do repositório (`reports/fase03/`, SHA-256
-`2c0eb6a1d3cc1dbe59fcd5ae28331e06cf8c0c2a9276aa79a54115b0a24300a9`) e entra no próximo PR.
+dado ou homologação. Ela entrou no repositório com o PR #163.
 Recorte autorizado: PR07A (origem da cobertura; bruto assinado, executado e projetado;
 DP-12 a DP-15) e PR07B (zeragem e borboleta em simulação). O resto tem cartão próprio.
 
@@ -215,9 +248,7 @@ Pendências com dono:
 - Sugestão S1 da avaliação de simplificação (unir duas recusas idênticas da árvore): não
   aplicada; opcional.
 
-Próxima ação (uma só): Claude publica o supercartão do DL3-PR07A e Codex o abre em
-rascunho. Nenhum código de margem, custo ou integração antes do cartão próprio; o DP-01
-só vira código depois de adendo à G3 da ADR-0024 assinado por Francisco.
+A sequência depois do fechamento está na seção "Depois da Fase 3", no alto deste arquivo.
 
 ## Fase 02 — Marco 2C2 — FECHADO (estado A)
 
