@@ -6,7 +6,6 @@ from fractions import Fraction
 from itertools import islice
 from typing import Literal
 
-_ZERO = Decimal(0)
 _Position = tuple[bool, int, int, int]  # call, strike, quantidade assinada e escalada, prêmio
 
 
@@ -62,7 +61,6 @@ class ExpiryProfile:
         return self.max_loss is None
 
 
-
 def _units(value: Decimal, exponent: int) -> int:
     if not value:
         return 0
@@ -82,7 +80,10 @@ def _money(units: int, exponent: int) -> Decimal:
 def _structure(legs: Sequence[ExpiryLeg], multiplier: int,
                *amounts: Decimal) -> tuple[tuple[_Position, ...], int]:
     _positive_int(multiplier, "multiplicador")
-    snapshot = tuple(islice(legs, 9)) if isinstance(legs, Sequence) else ()
+    try:
+        snapshot = tuple(islice(legs, 9)) if isinstance(legs, Sequence) else ()
+    except Exception as exc:
+        raise PayoffRefusal("sequência de pernas ilegível") from exc
     if not 1 <= len(snapshot) <= 8 or not all(isinstance(leg, ExpiryLeg) for leg in snapshot):
         raise PayoffRefusal("estrutura exige de uma a oito pernas válidas")
     for value in amounts:
@@ -107,14 +108,14 @@ def expiry_leg_results(legs: Sequence[ExpiryLeg], spot: Decimal, *,
 
 
 def expiry_result(legs: Sequence[ExpiryLeg], spot: Decimal, *,
-                  multiplier: int = 1, costs: Decimal = _ZERO) -> Decimal:
+                  multiplier: int = 1, costs: Decimal = Decimal(0)) -> Decimal:
     """Resultado total da estrutura, descontados os custos uma vez."""
     positions, exp = _structure(legs, multiplier, spot, costs)
     return _money(sum(_results(positions, _units(spot, exp))) - _units(costs, exp), exp)
 
 
 def expiry_profile(legs: Sequence[ExpiryLeg], *, multiplier: int = 1,
-                   costs: Decimal = _ZERO) -> ExpiryProfile:
+                   costs: Decimal = Decimal(0)) -> ExpiryProfile:
     """Perfil linear por trechos em todo o semieixo de preços não negativos."""
     positions, exp = _structure(legs, multiplier, costs)
     spots = sorted({0, *(strike for _, strike, _, _ in positions)})
