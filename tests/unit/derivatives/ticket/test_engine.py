@@ -753,17 +753,20 @@ def test_g8_stale_then_fresh_quote_at_exact_send_deadline(s: Session) -> None:
 
 
 def closing_decision(e: TicketEngine, action: Action = Action.EXECUTE) -> HumanDecision:
+    """Emite decisão sintética cuja validade atravessa o fechamento."""
     return issue(action, ticket="T1", nonce=action.value, issued_at=NOW,
                  expires_at=CLOSE + timedelta(seconds=1),
                  preview=e.preview if action == Action.EXECUTE else None)
 
 
 def closing_quotes(s: Session) -> None:
+    """Atualiza os dois lados do spread antes da última janela."""
     s.q("A", 25196)
     s.q("B", 25196.5)
 
 
 def test_f1_confirm_before_expiration(s: Session) -> None:
+    """Uma confirmação ainda válida envia a primeira compra."""
     closing_quotes(s)
     e = s.new(send_deadline=CLOSE)
     now = CLOSE - timedelta(microseconds=1)
@@ -775,6 +778,7 @@ def test_f1_confirm_before_expiration(s: Session) -> None:
 
 @pytest.mark.parametrize("delay", [0, 1], ids=["F2", "F3"])
 def test_confirm_at_or_after_expiration(s: Session, delay: int) -> None:
+    """A expiração preserva decisão, proposta e recibo."""
     closing_quotes(s)
     e = s.new(send_deadline=CLOSE)
     now = CLOSE + timedelta(microseconds=delay)
@@ -787,11 +791,14 @@ def test_confirm_at_or_after_expiration(s: Session, delay: int) -> None:
 
 
 def buyback_plan(pos: Position, deadline: datetime = END) -> LegPlan:
+    """Reconstrói o plano da segunda boleta para consultar o livro diretamente."""
     proposed = draft(leg("A", Side.SELL, "1"), leg("B", Side.BUY, "1.50"), net="5")
-    return plan_legs(proposed.model_copy(update=dict(send_deadline=deadline, order_validity=CLOSE)), pos)
+    return plan_legs(proposed.model_copy(update=dict(send_deadline=deadline,
+                                                    order_validity=CLOSE)), pos)
 
 
 def test_f2b_refusal_precedes_buyback_reservation(s: Session) -> None:
+    """Recusar no fechamento mantém a capacidade da outra boleta."""
     closing_quotes(s)
     pos = close_plan().position
     first, second = (s.new(pos, closing=True, send_deadline=CLOSE) for _ in range(2))
@@ -803,6 +810,7 @@ def test_f2b_refusal_precedes_buyback_reservation(s: Session) -> None:
 
 @pytest.mark.parametrize("delay", [0, -1], ids=["F4", "F5"])
 def test_resume_at_validity_boundary(s: Session, delay: int) -> None:
+    """Uma retomada humana também respeita a validade assinada."""
     closing_quotes(s)
     e = s.new(send_deadline=CLOSE)
     start = CLOSE - timedelta(seconds=3)
@@ -823,6 +831,7 @@ def test_resume_at_validity_boundary(s: Session, delay: int) -> None:
 
 
 def two_buybacks(s: Session, *, registered: bool) -> tuple[Position, TicketEngine, TicketEngine]:
+    """T1 ocupa duas recompras, mas somente a primeira chega ao envio."""
     pos = Position(account="sim", holdings=(holding("A", 10), holding("B", -10),
                                            holding("C", -10), holding("D", 10)),
                    pairs=(("A", "B"), ("D", "C")))
@@ -841,6 +850,7 @@ def two_buybacks(s: Session, *, registered: bool) -> tuple[Position, TicketEngin
 
 
 def test_r1_release_never_sent_on_reconciliation(s: Session) -> None:
+    """A segunda boleta consegue concluir a desmontagem após o poll."""
     _, first, second = two_buybacks(s, registered=False)
     first.reconcile("T1:C:1", at(3))
     assert first.state == T.STOPPED and first.orders == {"T1:C:1": O.REJECTED}
@@ -854,14 +864,17 @@ def test_r1_release_never_sent_on_reconciliation(s: Session) -> None:
 
 
 def test_r2_uncertain_account_preserves_decision(s: Session) -> None:
+    """A incerteza recusa a segunda decisão antes do consumo."""
     _, _, second = two_buybacks(s, registered=False)
     decision = s.dec(second)
     with pytest.raises(EngineRefusal):
         second.confirm(decision, at(2))
-    s.ledger.consume(decision, action=Action.EXECUTE, ticket="T2", now=at(2), preview=second.preview)
+    s.ledger.consume(decision, action=Action.EXECUTE, ticket="T2", now=at(2),
+                     preview=second.preview)
 
 
 def test_r3_readmission_occupies_capacity(s: Session) -> None:
+    """A capacidade liberada só pode ser ocupada por uma boleta de cada vez."""
     pos, first, second = two_buybacks(s, registered=False)
     first.reconcile("T1:C:1", at(3))
     second.confirm(s.dec(second), at(3))
@@ -875,6 +888,7 @@ def test_r3_readmission_occupies_capacity(s: Session) -> None:
 @pytest.mark.parametrize(("quantity", "net", "gross"), [(6, "3", "15"), (7, "3.50", "17.50")])
 def test_r4_partial_buyback_keeps_executed_quantity(s: Session, quantity: int,
                                                     net: str, gross: str) -> None:
+    """Quatro unidades executadas deixam seis disponíveis para a próxima boleta."""
     pos = close_plan().position
     first = s.new(pos, closing=True)
     first.confirm(s.dec(first), at(2))
@@ -896,6 +910,7 @@ def test_r4_partial_buyback_keeps_executed_quantity(s: Session, quantity: int,
 
 
 def test_r5_uncertain_keeps_unsent_occupation(s: Session) -> None:
+    """O livro mantém a ocupação mesmo sem consultar o bloqueio da conta."""
     pos, _, second = two_buybacks(s, registered=False)
     assert second.preview is not None
     with pytest.raises(SequenceRefusal):
@@ -903,6 +918,7 @@ def test_r5_uncertain_keeps_unsent_occupation(s: Session) -> None:
 
 
 def test_r6_release_never_sent_on_drive_stop(s: Session) -> None:
+    """A compra viva preserva a ocupação até a parada confirmada."""
     pos, first, second = two_buybacks(s, registered=True)
     first.reconcile("T1:C:1", at(3))
     assert first.state == T.WORKING and first.paused and first.orders == {"T1:C:1": O.LIVE}
@@ -921,6 +937,7 @@ def test_r6_release_never_sent_on_drive_stop(s: Session) -> None:
 
 
 def test_divergence_retains_unsent_buyback_after_reconciliation(s: Session) -> None:
+    """Conciliar a ordem não resolve uma divergência independente da conta."""
     pos, first, _ = two_buybacks(s, registered=False)
     s.halts.hold("sim", "divergence")
     first.reconcile("T1:C:1", at(3))

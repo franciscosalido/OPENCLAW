@@ -322,6 +322,7 @@ def test_unusable_output_parent_is_a_cli_refusal(tmp_path: Path) -> None:
     ("rapido", ["T1: Parada (STOPPED)", "T2: Proposta (DRAFT)"]),
 ])
 def test_l4_summary_log_names_ticket_state(case: str, lines: list[str], tmp_path: Path) -> None:
+    """O log exibe a descrição portuguesa junto do código estável."""
     messages: list[str] = []
     sink = logger.add(lambda msg: messages.append(msg.record["message"]), format="{message}")
     try:
@@ -332,11 +333,13 @@ def test_l4_summary_log_names_ticket_state(case: str, lines: list[str], tmp_path
 
 
 def test_h3a_missing_parent_followed_by_dotdot(tmp_path: Path) -> None:
+    """A recusa do destino final preserva o pai vazio."""
     assert main(_official("calmo", tmp_path / "x/..")) == 2
     assert not list(tmp_path.iterdir())
 
 
 def test_h3b_broken_parent_link(tmp_path: Path) -> None:
+    """A recusa mantém só o link quebrado original."""
     link = tmp_path / "link"
     link.symlink_to(tmp_path / "missing", target_is_directory=True)
     assert main(_official("calmo", link / "novo")) == 2
@@ -344,6 +347,7 @@ def test_h3b_broken_parent_link(tmp_path: Path) -> None:
 
 
 def test_h3c_unrepresentable_decision_lifetime(tmp_path: Path) -> None:
+    """A validade irrepresentável interrompe o roteiro antes de publicar."""
     script = tmp_path / "roteiro"
     data = json.loads((FIXTURES / "calmo.roteiro.json").read_bytes())
     data["decision_ttl_s"] = 10**18

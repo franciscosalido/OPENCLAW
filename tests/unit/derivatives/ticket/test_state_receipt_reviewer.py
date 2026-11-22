@@ -80,14 +80,17 @@ def test_reviewer_reconcile_targets_are_exactly_the_verifiable_states() -> None:
 
 
 def test_l2_shared_codes_distinguish_order_from_ticket() -> None:
+    """Cada domínio nomeia seus próprios estados homônimos."""
     for ticket, order in ((TicketState.EXPIRED, OrderState.EXPIRED),
                           (TicketState.UNCERTAIN, OrderState.UNCERTAIN)):
         assert states.TICKET_LABELS_PT[ticket] != states.ORDER_LABELS_PT[order]
 
 
 def test_l3_all_labels_are_immutable_and_domain_specific() -> None:
+    """Os mapas imutáveis cobrem os enums com as chaves do domínio correto."""
     assert not hasattr(states, "LABELS_PT")
-    for labels, enum in ((states.TICKET_LABELS_PT, TicketState), (states.ORDER_LABELS_PT, OrderState)):
+    domains = ((states.TICKET_LABELS_PT, TicketState), (states.ORDER_LABELS_PT, OrderState))
+    for labels, enum in domains:
         assert set(labels) == set(enum)
         assert all(type(key) is enum for key in labels)
         with pytest.raises(TypeError):
@@ -151,7 +154,8 @@ def test_l1_portuguese_labels_are_pinned_per_state() -> None:
         "UNCERTAIN": "Boleta em estado incerto",
     }
     order = {
-        "PENDING_SEND": "Envio pendente", "LIVE": "Ordem aberta", "PARTIAL": "Ordem parcialmente executada",
+        "PENDING_SEND": "Envio pendente", "LIVE": "Ordem aberta",
+        "PARTIAL": "Ordem parcialmente executada",
         "FILLED": "Ordem totalmente executada", "CANCEL_REQUESTED": "Cancelamento solicitado",
         "CANCELLED": "Ordem cancelada", "EXPIRED": "Ordem expirada", "REJECTED": "Ordem rejeitada",
         "UNCERTAIN": "Ordem em estado incerto",

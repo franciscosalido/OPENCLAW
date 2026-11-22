@@ -116,9 +116,10 @@ TICKET_LABELS_PT = MappingProxyType({
     _T.UNCERTAIN: "Boleta em estado incerto",
 })
 ORDER_LABELS_PT = MappingProxyType({
-    _O.PENDING_SEND: "Envio pendente", _O.LIVE: "Ordem aberta", _O.PARTIAL: "Ordem parcialmente executada",
-    _O.FILLED: "Ordem totalmente executada", _O.CANCEL_REQUESTED: "Cancelamento solicitado",
-    _O.CANCELLED: "Ordem cancelada", _O.EXPIRED: "Ordem expirada", _O.REJECTED: "Ordem rejeitada",
+    _O.PENDING_SEND: "Envio pendente", _O.LIVE: "Ordem aberta",
+    _O.PARTIAL: "Ordem parcialmente executada", _O.FILLED: "Ordem totalmente executada",
+    _O.CANCEL_REQUESTED: "Cancelamento solicitado", _O.CANCELLED: "Ordem cancelada",
+    _O.EXPIRED: "Ordem expirada", _O.REJECTED: "Ordem rejeitada",
     _O.UNCERTAIN: "Ordem em estado incerto",
 })
 

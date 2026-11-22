@@ -99,7 +99,9 @@ def test_strict_config(overrides: dict[str, object]) -> None:
 ])
 def test_f7_send_inclusive_validity_exclusive(deadline: datetime, instant: datetime,
                                               reason: str | None) -> None:
-    proposal = draft(BUY, SELL).model_copy(update=dict(send_deadline=deadline, order_validity=CLOSE))
+    """Verifica as duas fronteiras e a precedência da recusa."""
+    proposal = draft(BUY, SELL).model_copy(
+        update=dict(send_deadline=deadline, order_validity=CLOSE))
     if reason:
         with pytest.raises(DeadlineRefusal, match=reason):
             check_deadlines(proposal, instant, PaperVenue(CLOSE))

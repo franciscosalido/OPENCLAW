@@ -53,6 +53,7 @@ class AccountHalts:
         return any(a == account for a, _ in self._pending)
 
     def divergent(self, account: str) -> bool:
+        """Indica uma divergência contábil ainda aberta na conta."""
         return (account, "divergence") in self._pending
 
     def hold(self, account: str, key: str) -> None:
