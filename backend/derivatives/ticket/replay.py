@@ -97,6 +97,8 @@ def load_replay(path: Path) -> Replay:
                    "ts": "tempo inválido", "session_close": "tempo inválido",
                    "bid_size": "tamanho inválido", "ask_size": "tamanho inválido",
                    "size": "tamanho inválido", "quote": "tamanho inválido"}
+        if error["type"] in {"extra_forbidden", "missing"}:
+            field = ""
         reason = reasons.get(str(field), "formato inválido")
         raise ReplayError(f"{reason}: {error['msg']}") from exc
     except (ValueError, OSError) as exc:
