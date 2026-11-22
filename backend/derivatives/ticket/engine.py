@@ -3,6 +3,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
+import re
 from types import MappingProxyType
 
 from backend.derivatives.ticket.gate import Action, DecisionLedger, HumanDecision
@@ -26,10 +27,16 @@ from config.ticket_sim_config_model import TicketSimConfig
 
 _LIVE = {O.PENDING_SEND, O.LIVE, O.PARTIAL, O.CANCEL_REQUESTED, O.UNCERTAIN}
 _ZERO = Decimal(0)
+_ID_COMPONENT = re.compile(r"[A-Za-z0-9._-]+")
 
 
 class EngineRefusal(ValueError):
     """O estado ou os limites vigentes impedem a ação."""
+
+
+def _check_id_component(value: str) -> None:
+    if not isinstance(value, str) or not _ID_COMPONENT.fullmatch(value):
+        raise EngineRefusal("identificador da boleta ou símbolo fora do alfabeto permitido")
 
 
 class AccountHalts:
@@ -42,9 +49,11 @@ class AccountHalts:
         return any(a == account for a, _ in self._pending)
 
     def hold(self, account: str, key: str) -> None:
+        """Registra a causa que bloqueia novos envios da conta."""
         self._pending.add((account, key))
 
     def release(self, account: str, key: str) -> None:
+        """Libera somente o bloqueio associado à chave informada."""
         self._pending.discard((account, key))
 
 
@@ -63,6 +72,7 @@ class TicketEngine:
     def __init__(self, ticket: str, position: Position, *, venue: ExecutionVenue,
                  book: BookView, reservations: ReservationBook, ledger: DecisionLedger,
                  halts: AccountHalts, receipt: Receipt, config: TicketSimConfig) -> None:
+        _check_id_component(ticket)
         self._ticket = ticket
         self._position = Position.model_validate(position)
         self._account = position.account
@@ -117,6 +127,8 @@ class TicketEngine:
         self._state = state
 
     def _propose(self, draft: TicketDraft, now: datetime) -> None:
+        for leg in draft.legs:
+            _check_id_component(leg.symbol)
         plan = plan_legs(draft, self._position)
         preview = Preview.from_draft(plan.draft, partial_exposure=partial_exposure(plan.draft))
         self._receipt.append_preview(now, preview)
@@ -276,7 +288,8 @@ class TicketEngine:
                     self._reservations.confirm_buy(self._plan, order.leg, fill.execution,
                                                    fill.quantity, ticket=self._ticket)
                 else:
-                    self._reservations.confirm_sale(self._account, oid, fill.execution, fill.quantity)
+                    self._reservations.confirm_sale(
+                        self._account, oid, fill.execution, fill.quantity)
             if order.state in (O.FILLED, O.CANCELLED, O.EXPIRED, O.REJECTED):
                 if order.leg.side is Side.BUY:
                     self._reservations.settle_buy(self._account, self._ticket, order.leg.symbol)
