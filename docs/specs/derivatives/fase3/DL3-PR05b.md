@@ -301,3 +301,30 @@ preciso tocar em arquivo fora do §2.
    `docs/04_MEM/current_state.md`.
 5. Skill `quimera-lab-review` na cabeça publicada e os dois relatórios fora do Git, com
    SHA-256 na descrição. PR em rascunho.
+
+---
+
+## Revisão adversarial (Claude) — três rodadas, GO na cabeça `9f5db3c`
+
+| Rodada | Cabeça | Parecer | Motivo |
+|---|---|---|---|
+| 1 | `3f4d4e1` | NO-GO | Duas boletas na mesma recompra, foto divergente depois do envio, recusa do livro derrubando o lote, venda rejeitada reenviada sem limite. Correção no DL3-PR05b-R1 |
+| 2 | `79e49f8` | NO-GO | Colisão de `order_id` com `:` no id ou no símbolo, duas docstrings, linhas longas e nove mutantes vivos. Correção no DL3-PR05b-R2 |
+| 3 | `9f5db3c` | GO | Sem achado |
+
+Três dos bloqueios da rodada 1 e o da rodada 2 eram lacunas deste cartão, não erro de
+implementação: ele não previa duas boletas disputando a mesma recompra, não mandava
+conferir a foto antes de gastar a decisão, não dizia o que fazer com venda rejeitada e
+fixou o formato do `order_id` sem restringir os caracteres.
+
+| Verificação do revisor na cabeça `9f5db3c`, clone limpo, Linux x86_64 | Resultado |
+|---|---|
+| Pytest sem integração | 11.173 aprovados, 16 pulados, 261 subtestes |
+| `mypy backend/ --strict` e `pyright backend/` | 0 erros |
+| Linhas | `engine.py` 393 (teto 400), `sequencing.py` 337 (teto 360), PR com 435 de produção (teto 480) |
+| 55 mutantes do revisor em `engine.py` e `sequencing.py` | todos mortos (na rodada 2, 8 de 46 sobreviviam) |
+| Sondas dos bloqueios das rodadas 1 e 2 | nenhuma reproduz |
+| 6.000 sessões aleatórias, motor e `PaperVenue` reais | estado da ordem igual ao da venue, recibo íntegro, nenhum envio depois do prazo, cobertura por conta e teto de recompra respeitados |
+
+Relatórios da skill lidos depois do parecer formado, com SHA-256 conferidos
+(`9ba2ea47…8256` e `30497b94…0e96`): GO para o simulador D0, sem bloqueante.
