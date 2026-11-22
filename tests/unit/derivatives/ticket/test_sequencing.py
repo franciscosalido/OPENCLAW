@@ -206,3 +206,33 @@ def test_signed_projection_rejects_repeats_overfill_wrong_side_and_missing_cost(
     assert not within_signed_limits(t, (), SELL, known_costs=D("NaN"))
     assert not within_signed_limits(t, (), SELL, known_costs=D(".01"))
     assert partial_exposure(t, known_costs=D(".01")) == D("10.01")
+
+
+def test_partial_execution_sequences_conserve_shared_protection() -> None:
+    """Em cada prefixo, confronta o livro com saldos separados de dois participantes."""
+    plan = plan_legs(draft(BUY, SELL), position())
+    for sequence in product(("buy", "reserve-1", "reserve-2", "fill", "release"), repeat=4):
+        book = ReservationBook()
+        bought = sold = 0
+        live: list[str] = []
+        for i, event in enumerate(sequence):
+            identity = str(i)
+            if event == "buy":
+                book.confirm_buy(plan, BUY, identity, 1, ticket="buyer")
+                bought += 1
+            elif event.startswith("reserve"):
+                if sold + len(live) < bought:
+                    book.reserve(plan, SELL, identity, 1, ticket=event)
+                    live.append(identity)
+                else:
+                    with pytest.raises(SequenceRefusal):
+                        book.reserve(plan, SELL, identity, 1, ticket=event)
+            elif live:
+                order = live.pop(0)
+                if event == "fill":
+                    book.confirm_sale("sim", order, identity, 1)
+                    sold += 1
+                else:
+                    book.confirm_release("sim", order, 1)
+            assert sold + len(live) <= bought
+            assert book.available(plan, SELL, ticket="observer") == bought - sold - len(live)
