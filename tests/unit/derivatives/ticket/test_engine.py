@@ -14,7 +14,7 @@ from backend.derivatives.ticket.models import MarketSuggestion, Side
 from backend.derivatives.ticket.paper_venue import PaperVenue
 from backend.derivatives.ticket.receipt import Receipt
 from backend.derivatives.ticket.replay import AuctionFill, CancelRejected, ReplayEvent, VenueTimeout
-from backend.derivatives.ticket.sequencing import Position, ReservationBook, plan_legs
+from backend.derivatives.ticket.sequencing import Position, ReservationBook, SequenceRefusal, plan_legs
 from backend.derivatives.ticket.state import Event as E, OrderState as O, TicketState as T
 from backend.derivatives.ticket.trigger import Source, TriggerSpec, spec_digest
 from backend.derivatives.ticket.venue import OrderSnapshot, VenueReport
@@ -469,3 +469,123 @@ def test_disarm_and_rejected_second_propose(s: Session) -> None:
     s.arm(e)
     e.disarm(s.dec(e, Action.DISARM), at(2))
     assert e.state == T.DENIED and not s.submitted()
+
+
+@pytest.mark.parametrize("cancel", [False, True], ids=["C1", "C2"])
+def test_closing_capacity_precedes_nonce_and_submission(s: Session, cancel: bool) -> None:
+    p = position(holding("A", 10), holding("B", -10))
+    one, two = s.new(p, closing=True), s.new(p, closing=True)
+    one.confirm(s.dec(one), at(2))
+    decision = s.dec(two)
+    with pytest.raises(SequenceRefusal):
+        two.confirm(decision, at(2))
+    assert two.state == T.DRAFT and not two.orders and len(s.submitted()) == 1
+    if cancel:
+        s.cancel(one, B, 2)
+        s.q("B", 3)
+        assert one.orders[B] == O.CANCELLED and one.state == T.STOPPED
+        two.confirm(decision, at(3))
+        assert s.submitted()[-1] == ("T2:B:1", 10, D("1.50"), at(3))
+    else:
+        s.ledger.consume(decision, action=Action.EXECUTE, ticket="T2", now=at(2),
+                         preview=two.preview)
+        s.q("B", 3, ask="1.50")
+        assert one.orders[B] == O.FILLED
+        assert s.submitted()[-1] == (A, 10, D("1.00"), at(3))
+    assert len(s.submitted()) == 2
+
+
+def test_c3_divergent_photo_cannot_consume_or_submit(s: Session) -> None:
+    s.confirmed()
+    s.q("A", 3, ask="1.00")
+    two = s.new(position(holding("A", 5), holding("B")))
+    decision = s.dec(two)
+    with pytest.raises(SequenceRefusal, match="foto divergente; conciliação necessária"):
+        two.confirm(decision, at(3))
+    assert two.state == T.DRAFT and not two.orders
+    assert all(oid.startswith("T1:") for oid, *_ in s.submitted())
+    s.ledger.consume(decision, action=Action.EXECUTE, ticket="T2", now=at(3), preview=two.preview)
+
+
+class FirstBuyFails(ReservationBook):
+    """A primeira contabilização falha depois de uma execução factual da venue."""
+    def confirm_buy(self, plan, leg, execution, quantity, *, ticket) -> None:
+        if not hasattr(self, "failed"):
+            self.failed = True
+            raise SequenceRefusal("falha contábil sintética")
+        super().confirm_buy(plan, leg, execution, quantity, ticket=ticket)
+
+
+@pytest.mark.parametrize("uncertain", [False, True], ids=["C4", "C5"])
+def test_fill_survives_accounting_refusal(s: Session, uncertain: bool) -> None:
+    s.res = FirstBuyFails()
+    e = timeout(s) if uncertain else s.confirmed()
+    s.q("A", 3, ask="1.00")
+    if uncertain:
+        e.reconcile(A, at(3))
+    assert e.orders[A] == O.FILLED and s.paper.poll(A) == (O.FILLED, 10, 0)
+    events = s.receipts[0].events
+    index = next(i for i, r in enumerate(events) if r.kind == E.VENUE_FILL)
+    fill = json.loads(events[index].payload)
+    assert (fill["quantity"], fill["price"]) == (10, "1.00")
+    assert events[index+1].kind == E.DIVERGENCE
+    assert json.loads(events[index+1].payload)["order_id"] == A
+    assert e.state == T.STOPPED and s.halts.blocked("sim") and len(s.submitted()) == 1
+    if uncertain:
+        with pytest.raises(EngineRefusal):
+            e.reconcile(A, at(3))
+        assert events == s.receipts[0].events and s.halts.blocked("sim")
+    else:
+        two = s.new()
+        decision = s.dec(two)
+        with pytest.raises(EngineRefusal):
+            two.confirm(decision, at(3))
+        s.ledger.consume(decision, action=Action.EXECUTE, ticket="T2", now=at(3),
+                         preview=two.preview)
+
+
+def test_c6_rejected_sale_is_final(s: Session) -> None:
+    def submit(order, now):
+        if order.side == Side.SELL:
+            return VenueReport(order.order_id, E.VENUE_REJECTED, None, None, now)
+        return s.paper.submit(order, now)
+    s.venue.submit.side_effect = submit
+    e = s.confirmed()
+    s.q("A", 3, ask="1")
+    assert dict(e.orders) == {A: O.FILLED, B: O.REJECTED} and e.state == T.STOPPED
+    s.q("B", 4)
+    s.q("A", 5)
+    assert len(s.submitted()) == 2 and free(s) == 10
+
+
+def test_l1_recheck_gross_after_favorable_partial(s: Session) -> None:
+    e = s.confirmed()
+    s.q("A", 3, ask="1", size=3)
+    s.q("B", 4, bid="1.54")
+    s.q("A", 5, ask="1", size=7)
+    assert e.state == T.STOPPED
+    assert [(oid, n) for oid, n, _, _ in s.submitted()] == [(A, 10), (B, 3)]
+    fills = [json.loads(r.payload) for r in s.receipts[0].events if r.kind == E.VENUE_FILL]
+    assert fills[0]["price"] == "1.54" and fills[0]["quantity"] == 3
+
+
+def test_l2_pause_never_calls_venue(s: Session) -> None:
+    e = s.confirmed()
+    before = list(s.venue.mock_calls)
+    e.pause(at(2))
+    assert s.venue.mock_calls == before
+    s.q("A", 3, ask="1")
+    e.resume(s.dec(e, Action.RESUME), at(3))
+    assert s.submitted()[-1] == (B, 10, D("1.50"), at(3))
+
+
+def test_l3_release_is_per_order(s: Session) -> None:
+    e = s.confirmed()
+    s.q("A", 3, ask="1", size=3)
+    s.q("B", 4, bid="1.50", size=3)
+    s.q("A", 5, ask="1", size=4)
+    s.cancel(e, "T1:B:2", 5)
+    s.q("B", 6, bid="1.45")
+    assert [(oid, n) for oid, n, _, _ in s.submitted()] == [(A, 10), (B, 3), ("T1:B:2", 4)]
+    assert e.orders[B] == O.FILLED and e.orders["T1:B:2"] == O.CANCELLED
+    assert free(s) == 4 and e.state == T.WORKING

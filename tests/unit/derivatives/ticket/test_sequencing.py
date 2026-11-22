@@ -7,7 +7,7 @@ import pytest
 
 from backend.derivatives.ticket.models import Leg, Side, TicketDraft
 from backend.derivatives.ticket.sequencing import (
-    Fill, Holding, Position, ReservationBook, SequenceRefusal, partial_exposure, plan_legs,
+    Fill, Holding, LegPlan, Position, ReservationBook, SequenceRefusal, partial_exposure, plan_legs,
     releasable_quantity, within_signed_limits,
 )
 from tests.unit.derivatives.ticket.test_models import TIME
@@ -409,3 +409,75 @@ def test_reviewer_partial_exposure_refuses_invalid_cost(cost: object) -> None:
     with pytest.raises(SequenceRefusal):
         partial_exposure(draft(BUY, SELL), known_costs=cost)  # type: ignore[arg-type]
     assert partial_exposure(draft(BUY, SELL), known_costs=D("0.07")) == D("10.07")
+
+
+def close_plan(quantity: int = 10, long_balance: int = 10) -> LegPlan:
+    """Desmontagens D6, D7 e D10 com os limites totais literais do cartão."""
+    net, gross = {6: ("3", "15"), 7: ("3.50", "17.50"), 10: ("5", "25")}[quantity]
+    sale = leg("A", Side.SELL, "1", quantity)
+    buy = leg("B", Side.BUY, "1.50", quantity)
+    return plan_legs(draft(sale, buy, net=net, gross=gross),
+                     position(holding("A", long_balance), holding("B", -10)))
+
+
+def test_k1_conflicting_buybacks_refuse() -> None:
+    book = ReservationBook()
+    p = close_plan()
+    book.admit(p, ticket="T1")
+    with pytest.raises(SequenceRefusal):
+        book.admissible(p, ticket="T2")
+
+
+def settled_four() -> ReservationBook:
+    """Admite dez, credita quatro, encerra a compra."""
+    book = ReservationBook()
+    p = close_plan()
+    book.admit(p, ticket="T1")
+    book.confirm_buy(p, p.legs[0], "e1", 4, ticket="T1")
+    book.settle_buy("sim", "T1", "B")
+    return book
+
+
+def test_k2_settled_capacity_boundary() -> None:
+    book = settled_four()
+    book.admissible(close_plan(6), ticket="T2")
+    with pytest.raises(SequenceRefusal):
+        book.admissible(close_plan(7), ticket="T2")
+
+
+def test_k3_settlement_caps_later_buy_fills() -> None:
+    book = settled_four()
+    p = close_plan()
+    with pytest.raises(SequenceRefusal):
+        book.confirm_buy(p, p.legs[0], "late", 1, ticket="T1")
+
+
+def test_k4_admissible_is_read_only() -> None:
+    book = ReservationBook()
+    book.admissible(close_plan(), ticket="T1")
+    book.admissible(close_plan(long_balance=12), ticket="T2")
+
+
+def test_k5_opening_buys_have_independent_capacity() -> None:
+    book = ReservationBook()
+    p = plan_legs(draft(BUY, SELL), position())
+    book.admit(p, ticket="T1")
+    book.admit(p, ticket="T2")
+
+
+def test_k6_admission_is_idempotent() -> None:
+    book = ReservationBook()
+    p = close_plan()
+    book.admit(p, ticket="T1")
+    book.admit(p, ticket="T1")
+    book.admissible(p, ticket="T1")
+
+
+def test_k7_failed_admit_leaves_no_occupation() -> None:
+    book = ReservationBook()
+    p = close_plan()
+    book.admit(p, ticket="T1")
+    with pytest.raises(SequenceRefusal):
+        book.admit(p, ticket="T2")
+    with pytest.raises(SequenceRefusal):
+        book.settle_buy("sim", "T2", "B")

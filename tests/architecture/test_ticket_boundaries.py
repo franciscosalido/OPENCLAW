@@ -139,3 +139,13 @@ def test_engine_uses_protocol_and_never_drives_replay() -> None:
             assert {a.name for a in node.names} <= allowed[name], path
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
             assert node.func.attr != "advance", path
+
+
+def test_engine_only_accesses_its_own_private_attributes() -> None:
+    """Estado privado de colaboradores só pode ser consultado pela interface pública."""
+    tree = ast.parse((ROOT / "backend/derivatives/ticket/engine.py").read_text())
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Attribute) and node.attr.startswith("_"):
+            if node.attr.startswith("__") and node.attr.endswith("__"):
+                continue
+            assert isinstance(node.value, ast.Name) and node.value.id == "self", ast.unparse(node)
