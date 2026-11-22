@@ -1,7 +1,6 @@
 """Venue local determinística com liquidez consumida por ordem de chegada."""
 from dataclasses import dataclass
 from datetime import datetime
-from decimal import Decimal
 
 from backend.derivatives.ticket.models import Side
 from backend.derivatives.ticket.replay import (
@@ -86,30 +85,23 @@ class PaperVenue:
                     return ()
             elif self._phases.get(event.symbol) not in ("AUCTION", "SUSPENDED"):
                 return ()
-            available = event.size if isinstance(event, AuctionFill) else 0
-            asks = event.ask_size if isinstance(event, QuoteEvent) else 0
-            bids = event.bid_size if isinstance(event, QuoteEvent) else 0
+            liquidity: dict[Side | None, int] = (
+                {None: event.size} if isinstance(event, AuctionFill)
+                else {Side.BUY: event.ask_size, Side.SELL: event.bid_size})
             for oid, entry in self._orders.items():
                 order = entry.order
                 if not entry.remaining or order.symbol != event.symbol:
                     continue
                 buy = order.side is Side.BUY
-                price: Decimal | None
-                if isinstance(event, AuctionFill):
-                    price, size = event.price, available
-                else:
-                    price, size = (event.ask, asks) if buy else (event.bid, bids)
-                qty = min(entry.remaining, size)
+                pool = None if isinstance(event, AuctionFill) else order.side
+                price = event.price if isinstance(event, AuctionFill) else (
+                    event.ask if buy else event.bid)
+                qty = min(entry.remaining, liquidity[pool])
                 if qty and price is not None and (
                         price <= order.limit_price if buy else price >= order.limit_price):
                     entry.filled += qty
                     entry.state = S.PARTIAL if entry.remaining else S.FILLED
-                    if isinstance(event, AuctionFill):
-                        available -= qty
-                    elif buy:
-                        asks -= qty
-                    else:
-                        bids -= qty
+                    liquidity[pool] -= qty
                     kind = E.VENUE_PARTIAL if entry.remaining else E.VENUE_FILL
                     reports.append(VenueReport(oid, kind, qty, price, ts))
                 if not entry.remaining:

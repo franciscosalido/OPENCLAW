@@ -43,9 +43,13 @@ class ExecutionVenue(Protocol):
     """Operações permitidas pelo motor em uma sessão."""
     def accepts_validity(self, valid_until: datetime) -> bool:
         """Consulta a validade garantida."""
+        ...
     def submit(self, order: VenueOrder, now: datetime) -> VenueReport:
         """Tenta registrar uma nova ordem."""
+        ...
     def request_cancel(self, order_id: str, now: datetime) -> None:
         """Solicita cancelamento do saldo."""
+        ...
     def poll(self, order_id: str) -> OrderSnapshot | None:
         """Consulta a ordem registrada."""
+        ...
