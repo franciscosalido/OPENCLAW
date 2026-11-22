@@ -303,3 +303,10 @@ def test_destination_cannot_be_its_own_required_subdirectory(tmp_path: Path) -> 
     out = tmp_path / "a/sub/../../a"
     assert main(_official("calmo", out)) == 2
     assert not (tmp_path / "a").exists()
+
+
+def test_unusable_output_parent_is_a_cli_refusal(tmp_path: Path) -> None:
+    """Um componente longo demais deve recusar a saída sem criar resíduos."""
+    out = tmp_path / ("x" * 256) / "resultado"
+    assert main(_official("calmo", out)) == 2
+    assert not list(tmp_path.iterdir())
