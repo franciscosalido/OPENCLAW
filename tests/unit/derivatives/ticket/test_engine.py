@@ -134,7 +134,8 @@ def test_complete(s: Session, kind: str) -> None:
     rows = [holding(x).model_copy(update={"kind":kind}) for x in ("A","B")]
     e = s.new(position(*rows))
     e.confirm(s.dec(e), at(2))
-    s.q("A",3,ask="1"); s.q("B",4,bid="1.50")
+    s.q("A",3,ask="1")
+    s.q("B",4,bid="1.50")
     assert e.state == T.COMPLETED and dict(e.orders) == {A:O.FILLED,B:O.FILLED}
     assert s.submitted() == [(A,10,D("1"),at(2)), (B,10,D("1.50"),at(3))]
     assert [r.kind for r in s.receipts[0].events] == [
@@ -144,7 +145,9 @@ def test_complete(s: Session, kind: str) -> None:
 @pytest.mark.parametrize("again", [False,True], ids=["S03","S22"])
 def test_expire_uncrossed_sale(s: Session, again: bool) -> None:
     """Preço da venda permanece assinado até a expiração nativa."""
-    e = s.confirmed(); s.q("A",3,ask="1"); s.q("B",4,bid="1.49")
+    e = s.confirmed()
+    s.q("A",3,ask="1")
+    s.q("B",4,bid="1.49")
     if again:
         s.q("B",5,bid="1.49")
     s.q("A",25200)
@@ -161,14 +164,17 @@ def free(s: Session, ticket: str = "T1") -> int:
 
 
 def test_s04_partial(s: Session) -> None:
-    e=s.confirmed(); s.q("A",3,ask="1",size=3)
+    e=s.confirmed()
+    s.q("A",3,ask="1",size=3)
     assert e.orders[A]==O.PARTIAL and e.state==T.WORKING and free(s)==0
     assert s.submitted()==[(A,10,D("1"),at(2)),(B,3,D("1.50"),at(3))]
 
 
 @pytest.mark.parametrize("cancel", [True,False], ids=["S05","X7"])
 def test_auction(s: Session, cancel: bool) -> None:
-    e=s.confirmed(); s.q("A",3,ask="1",size=3); s.q("A",4,ask="1",phase="AUCTION")
+    e=s.confirmed()
+    s.q("A",3,ask="1",size=3)
+    s.q("A",4,ask="1",phase="AUCTION")
     if cancel:
         s.cancel(e,A,4)
         assert e.orders[A]==O.CANCEL_REQUESTED
@@ -180,32 +186,43 @@ def test_auction(s: Session, cancel: bool) -> None:
 
 
 def test_s06_discard(s: Session) -> None:
-    e=s.new(); e.discard(s.dec(e,Action.DISCARD),at(2))
+    e=s.new()
+    e.discard(s.dec(e,Action.DISCARD),at(2))
     assert e.state==T.DENIED and not e.orders and not s.venue.mock_calls
 
 
 def test_s07_cancel_buy(s: Session) -> None:
-    e=s.confirmed(); s.cancel(e,A,2)
+    e=s.confirmed()
+    s.cancel(e,A,2)
     assert e.orders[A]==O.CANCEL_REQUESTED
     s.q("A",3)
     assert e.orders[A]==O.CANCELLED and e.state==T.STOPPED
 
 
 def test_s08_cancel_partial_sale(s: Session) -> None:
-    e=s.confirmed(); s.q("A",3,ask="1"); s.cancel(e,B,3); s.q("B",4,bid="1.50",size=4)
+    e=s.confirmed()
+    s.q("A",3,ask="1")
+    s.cancel(e,B,3)
+    s.q("B",4,bid="1.50",size=4)
     assert e.state==T.STOPPED and e.orders[B]==O.CANCELLED and free(s)==6
     assert s.paper.poll(B)==(O.CANCELLED,4,0) and len(s.submitted())==2
     assert [r.kind for r in s.receipts[0].events][-3:]==[E.VENUE_PARTIAL,E.VENUE_CANCELLED,E.STOP]
 
 
 def test_s09_shared_coverage(s: Session) -> None:
-    one=s.confirmed(); two=s.new(); two.confirm(s.dec(two),at(2)); s.q("A",3,ask="1",size=3)
+    one=s.confirmed()
+    two=s.new()
+    two.confirm(s.dec(two),at(2))
+    s.q("A",3,ask="1",size=3)
     assert one.orders[A]==O.PARTIAL and dict(two.orders)=={"T2:A:1":O.LIVE}
     assert s.submitted()[-1]==(B,3,D("1.50"),at(3)) and free(s,"T2")==0
 
 
 def test_s10_trigger_only_then_confirm(s: Session) -> None:
-    e=s.new(); s.arm(e); s.q("A",3,ask="1"); s.q("A",4,ask=".99")
+    e=s.new()
+    s.arm(e)
+    s.q("A",3,ask="1")
+    s.q("A",4,ask=".99")
     assert e.state==T.TRIGGERED and not e.orders and not s.submitted()
     assert [r.kind for r in s.receipts[0].events].count(E.TRIGGER)==1
     e.confirm(s.dec(e),at(5))
@@ -213,23 +230,31 @@ def test_s10_trigger_only_then_confirm(s: Session) -> None:
 
 
 def test_s11_reused_arm(s: Session) -> None:
-    e=s.new(); s.q("A",3,ask="1"); d=s.dec(e,Action.ARM,spec_digest=spec_digest(SPEC))
+    e=s.new()
+    s.q("A",3,ask="1")
+    d=s.dec(e,Action.ARM,spec_digest=spec_digest(SPEC))
     with pytest.raises(ValueError, match="condição já verdadeira"):
         e.arm(SPEC,d,at(4))
     assert e.state==T.DRAFT
-    s.q("A",4); e.arm(SPEC,d,at(5))
+    s.q("A",4)
+    e.arm(SPEC,d,at(5))
     assert e.state==T.ARMED and not s.submitted()
 
 
 def test_s12_strategy(s: Session) -> None:
-    e=s.new(); s.arm(e,SPEC.model_copy(update=dict(source=Source.STRATEGY_TRADE,
+    e=s.new()
+    s.arm(e,SPEC.model_copy(update=dict(source=Source.STRATEGY_TRADE,
                                                    threshold=D(".50"),min_size=1)))
-    s.step(trade("SIMPLE",ts=at(3))); assert e.state==T.ARMED
-    s.step(trade("STRATEGY",ts=at(4))); assert e.state==T.TRIGGERED
+    s.step(trade("SIMPLE",ts=at(3)))
+    assert e.state==T.ARMED
+    s.step(trade("STRATEGY",ts=at(4)))
+    assert e.state==T.TRIGGERED
 
 
 def test_s13_expired_trigger(s: Session) -> None:
-    e=s.new(); s.arm(e); s.q("A",3600.000001,ask="1")
+    e=s.new()
+    s.arm(e)
+    s.q("A",3600.000001,ask="1")
     assert e.state==T.EXPIRED
     with pytest.raises(EngineRefusal):
         e.confirm(s.dec(e),at(3601))
@@ -237,17 +262,24 @@ def test_s13_expired_trigger(s: Session) -> None:
 
 
 def test_s14_refresh_and_cancel_blocked_market(s: Session) -> None:
-    e=s.new(); d=s.dec(e)
+    e=s.new()
+    d=s.dec(e)
     with pytest.raises(EngineRefusal,match="cotação vencida"):
         e.confirm(d,at(10))
     assert not s.submitted() and not e.orders and e.state==T.DRAFT
-    s.q("A",10); s.q("B",11); e.confirm(d,at(12)); s.q("A",13,phase="AUCTION")
+    s.q("A",10)
+    s.q("B",11)
+    e.confirm(d,at(12))
+    s.q("A",13,phase="AUCTION")
     s.cancel(e,A,13)
     assert e.orders[A]==O.CANCEL_REQUESTED
 
 
 def test_s15_native_expiry(s: Session) -> None:
-    e=s.confirmed(); s.q("A",3,ask="1",size=3); s.q("A",3601,ask="1"); s.q("B",25200)
+    e=s.confirmed()
+    s.q("A",3,ask="1",size=3)
+    s.q("A",3601,ask="1")
+    s.q("B",25200)
     assert e.state==T.STOPPED and dict(e.orders)=={A:O.FILLED,B:O.EXPIRED}
     assert len(s.submitted())==2 and s.paper.poll(A)==(O.FILLED,10,0)
 
@@ -257,7 +289,8 @@ def test_s15_native_expiry(s: Session) -> None:
     (dict(net_limit=D("-5.01")),None),
 ],ids=["S16","X1"])
 def test_refused_confirmation_preserves_nonce(s: Session, changes: dict, message: str|None) -> None:
-    e=s.new(**changes); d=s.dec(e)
+    e=s.new(**changes)
+    d=s.dec(e)
     with pytest.raises(ValueError,match=message):
         e.confirm(d,at(2))
     assert e.state==T.DRAFT and not s.submitted() and not e.orders
@@ -265,7 +298,9 @@ def test_refused_confirmation_preserves_nonce(s: Session, changes: dict, message
 
 
 def test_s17_edit_and_locked_refresh(s: Session) -> None:
-    e=s.new(); old=s.dec(e); e.edit(PRICE,D(".99"),at(2))
+    e=s.new()
+    old=s.dec(e)
+    e.edit(PRICE,D(".99"),at(2))
     e.refresh(MarketSuggestion("other",{PRICE:D("1.01")}),at(2))
     assert e.preview.version==2 and len(s.receipts[0].events)==2
     with pytest.raises(ValueError,match="resumo divergente"):
@@ -275,7 +310,9 @@ def test_s17_edit_and_locked_refresh(s: Session) -> None:
 
 
 def test_s18_duplicate_confirm(s: Session) -> None:
-    e=s.new(); d=s.dec(e); e.confirm(d,at(2))
+    e=s.new()
+    d=s.dec(e)
+    e.confirm(d,at(2))
     with pytest.raises(EngineRefusal):
         e.confirm(d,at(2))
     assert len(s.submitted())==1
@@ -290,7 +327,9 @@ def timeout(s: Session) -> TicketEngine:
 
 
 def test_s19_reconcile_and_resume(s: Session) -> None:
-    e=timeout(s); other=s.new(); s.q("A",3,ask="1")
+    e=timeout(s)
+    other=s.new()
+    s.q("A",3,ask="1")
     assert e.orders[A]==O.UNCERTAIN and len(s.submitted())==1
     d=s.dec(other)
     with pytest.raises(EngineRefusal):
@@ -303,7 +342,9 @@ def test_s19_reconcile_and_resume(s: Session) -> None:
 
 
 def test_s20_pause_fill_resume(s: Session) -> None:
-    e=s.confirmed(); e.pause(at(2)); assert s.paper.poll(A)==(O.LIVE,0,10)
+    e=s.confirmed()
+    e.pause(at(2))
+    assert s.paper.poll(A)==(O.LIVE,0,10)
     s.q("A",3,ask="1")
     assert e.orders[A]==O.FILLED and len(s.submitted())==1
     e.resume(s.dec(e,Action.RESUME),at(3))
@@ -314,7 +355,9 @@ def test_s20_pause_fill_resume(s: Session) -> None:
 def test_s21_close(s: Session) -> None:
     e=s.new(position(holding("A",10),holding("B",-10)),closing=True)
     assert e.preview.partial_exposure==D("15.00")
-    e.confirm(s.dec(e),at(2)); s.q("B",3,ask="1.50"); s.q("A",4,bid="1",ask="1.05")
+    e.confirm(s.dec(e),at(2))
+    s.q("B",3,ask="1.50")
+    s.q("A",4,bid="1",ask="1.05")
     assert e.state==T.COMPLETED
     assert s.submitted()==[(B,10,D("1.50"),at(2)),(A,10,D("1"),at(3))]
 
@@ -327,19 +370,23 @@ def test_x2_rejected(s: Session) -> None:
 
 
 def test_x3_temporary_block(s: Session) -> None:
-    e=s.confirmed(); s.q("A",7,ask="1")
+    e=s.confirmed()
+    s.q("A",7,ask="1")
     assert e.orders[A]==O.FILLED and len(s.submitted())==1 and e.state==T.WORKING
-    s.q("B",8); assert s.submitted()[-1]==(B,10,D("1.50"),at(8))
+    s.q("B",8)
+    assert s.submitted()[-1]==(B,10,D("1.50"),at(8))
 
 
 def test_x4_edit_armed(s: Session) -> None:
-    e=s.new(); s.arm(e)
+    e=s.new()
+    s.arm(e)
     with pytest.raises(EngineRefusal):
         e.edit(PRICE,D(".99"),at(2))
 
 
 def test_x5_cancel_other_and_terminal(s: Session) -> None:
-    e=s.confirmed(); s.q("A",3,ask="1")
+    e=s.confirmed()
+    s.q("A",3,ask="1")
     for oid in ["T2:A:1",A]:
         d=s.dec(e,Action.CANCEL_ORDER,order_id=oid)
         with pytest.raises(EngineRefusal):
@@ -348,22 +395,77 @@ def test_x5_cancel_other_and_terminal(s: Session) -> None:
 
 
 def test_x6_resume_uncertain(s: Session) -> None:
-    e=timeout(s); d=s.dec(e,Action.RESUME)
+    e=timeout(s)
+    d=s.dec(e,Action.RESUME)
     with pytest.raises(EngineRefusal):
         e.resume(d,at(2))
     s.ledger.consume(d,action=Action.RESUME,ticket="T1",now=at(2))
 
 
 def test_x8_caution(s: Session) -> None:
-    s.q("B",1,bid="1.44"); e=s.confirmed()
+    s.q("B",1,bid="1.44")
+    e=s.confirmed()
     assert e.orders[A]==O.LIVE
 
 
 @pytest.mark.parametrize("snapshot", [None,OrderSnapshot(O.PARTIAL,1,9),OrderSnapshot(O.FILLED,9,0)])
 def test_poll_mismatch_is_atomic(s: Session, snapshot: OrderSnapshot | None) -> None:
-    e=timeout(s); s.q("A",3,ask="1"); s.venue.poll.return_value=snapshot
+    e=timeout(s)
+    s.q("A",3,ask="1")
+    s.venue.poll.return_value=snapshot
     before=s.receipts[0].events
     with pytest.raises(EngineRefusal):
         e.reconcile(A,at(3))
     assert e.orders[A]==O.UNCERTAIN and s.halts.blocked("sim") and free(s)==0
     assert s.receipts[0].events==before
+
+
+def test_send_deadline_with_both_books_fresh(s: Session) -> None:
+    """Isola prazo de envio da cotação vencida, que também protege S15."""
+    e = s.confirmed()
+    s.q("B", 3599)
+    s.q("A", 3601, ask="1")
+    assert e.orders[A] == O.FILLED
+    assert e.state == T.STOPPED and len(s.submitted()) == 1
+
+
+def test_s01_audit_of_actual_price_quantity_and_signed_request(s: Session) -> None:
+    """Recibo usa texto para o preço real e conserva quantidade e ID de execução."""
+    e = s.confirmed()
+    s.q("A", 3, ask=".98")
+    s.q("B", 4, bid="1.50")
+    assert e.state == T.COMPLETED
+    fills = [json.loads(r.payload) for r in s.receipts[0].events if r.kind == E.VENUE_FILL]
+    assert [(f["execution"], f["quantity"], D(f["price"])) for f in fills] == [
+        (A+"#1", 10, D(".98")), (B+"#1", 10, D("1.50"))]
+    assert all(type(f["price"]) is str for f in fills)
+
+
+def test_reconcile_unregistered_submit_does_not_resend(s: Session) -> None:
+    """Ausência em poll sem fatos posteriores encerra a tentativa."""
+    s.step(VenueTimeout(type="timeout", seq=3, ts=at(2), call="submit", registered=False))
+    e = s.confirmed()
+    e.reconcile(A, at(3))
+    assert e.orders[A] == O.REJECTED and e.state == T.STOPPED
+    assert not s.halts.blocked("sim") and len(s.submitted()) == 1
+
+
+def test_uncertain_sale_reserves_until_reconciled(s: Session) -> None:
+    """Venda registrada ocupa o saldo durante timeout e converte a reserva só após poll."""
+    e = s.confirmed()
+    s.step(VenueTimeout(type="timeout", seq=3, ts=at(2), call="submit", registered=True))
+    s.q("A", 3, ask="1")
+    assert e.orders[B] == O.UNCERTAIN and free(s) == 0
+    s.q("B", 4, bid="1.50")
+    assert e.state == T.UNCERTAIN and e.orders[B] == O.UNCERTAIN
+    e.reconcile(B, at(4))
+    assert e.orders[B] == O.FILLED and e.state == T.COMPLETED and free(s) == 0
+
+
+def test_disarm_and_rejected_second_propose(s: Session) -> None:
+    e = s.new()
+    with pytest.raises(EngineRefusal):
+        e.propose(draft(BUY, SELL), at(2))
+    s.arm(e)
+    e.disarm(s.dec(e, Action.DISARM), at(2))
+    assert e.state == T.DENIED and not s.submitted()
