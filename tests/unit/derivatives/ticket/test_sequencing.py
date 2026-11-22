@@ -389,3 +389,23 @@ def test_r11_available_rounds_remaining_ticket_capacity_to_lot() -> None:
     book.confirm_sale("sim", "order", "s1", 1)
     book.confirm_release("sim", "order", 2)
     assert book.available(plan, sell, ticket="T1") == 6
+
+
+@pytest.mark.parametrize("ticket", ["", None, 7])
+def test_reviewer_book_requires_a_ticket_identity(ticket: object) -> None:
+    """Revisor: sem identidade de boleta o livro não credita, não consulta e não reserva."""
+    plan, book = plan_legs(draft(BUY, SELL), position()), ReservationBook()
+    with pytest.raises(SequenceRefusal, match="identidade"):
+        book.confirm_buy(plan, BUY, "e1", 1, ticket=ticket)  # type: ignore[arg-type]
+    with pytest.raises(SequenceRefusal, match="identidade"):
+        book.available(plan, SELL, ticket=ticket)  # type: ignore[arg-type]
+    book.confirm_buy(plan, BUY, "e1", 1, ticket="T1")
+    assert book.available(plan, SELL, ticket="T1") == 1
+
+
+@pytest.mark.parametrize("cost", [D("-0.01"), D("NaN"), D("Infinity"), 0.01, 1])
+def test_reviewer_partial_exposure_refuses_invalid_cost(cost: object) -> None:
+    """Revisor: custo negativo, não finito ou fora de Decimal não entra na exposição."""
+    with pytest.raises(SequenceRefusal):
+        partial_exposure(draft(BUY, SELL), known_costs=cost)  # type: ignore[arg-type]
+    assert partial_exposure(draft(BUY, SELL), known_costs=D("0.07")) == D("10.07")
