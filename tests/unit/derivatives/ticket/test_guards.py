@@ -107,3 +107,12 @@ def test_f7_send_inclusive_validity_exclusive(deadline: datetime, instant: datet
             check_deadlines(proposal, instant, PaperVenue(CLOSE))
     else:
         check_deadlines(proposal, instant, PaperVenue(CLOSE))
+
+
+def test_f7_expired_validity_precedes_unsupported_validity() -> None:
+    """A validade já encerrada prevalece sobre a recusa de validade não nativa."""
+    expired = NOW.replace(hour=20)
+    proposal = draft(BUY, SELL).model_copy(
+        update=dict(send_deadline=expired, order_validity=expired))
+    with pytest.raises(DeadlineRefusal, match="validade encerrada"):
+        check_deadlines(proposal, expired, PaperVenue(CLOSE))

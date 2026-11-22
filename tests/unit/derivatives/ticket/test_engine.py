@@ -944,3 +944,14 @@ def test_divergence_retains_unsent_buyback_after_reconciliation(s: Session) -> N
     assert first.state == T.STOPPED and s.halts.blocked("sim")
     with pytest.raises(SequenceRefusal):
         s.res.admissible(buyback_plan(pos), ticket="T2")
+
+
+def test_r1_other_account_divergence_preserves_local_release(s: Session) -> None:
+    """Uma divergência alheia não retém a recompra da conta conciliada."""
+    _, first, second = two_buybacks(s, registered=False)
+    s.halts.hold("outra", "divergence")
+    first.reconcile("T1:C:1", at(3))
+    assert first.state == T.STOPPED and not s.halts.blocked("sim")
+    assert s.halts.blocked("outra")
+    second.confirm(s.dec(second), at(3))
+    assert second.orders == {"T2:B:1": O.LIVE}
