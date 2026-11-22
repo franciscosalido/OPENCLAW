@@ -85,3 +85,40 @@ def test_ticket_has_no_wall_clock() -> None:
                 "now", "today", "utcnow") or len(parts) == 1, path
             assert ".".join(parts) not in {"datetime.now", "datetime.utcnow", "datetime.today",
                                            "date.today", "datetime.date.today"}, path
+
+
+def test_only_gate_issues_or_constructs_decisions() -> None:
+    """Impede importação da emissão e construção externa, inclusive por alias."""
+    gate = TICKET + ".gate"
+    for path in (ROOT / "backend").rglob("*.py"):
+        if path == ROOT / "backend/derivatives/ticket/gate.py":
+            continue
+        tree = ast.parse(path.read_text())
+        aliases = {}
+        package = ".".join(path.parent.relative_to(ROOT).parts)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for a in node.names:
+                    aliases[a.asname or a.name] = a.name
+            elif isinstance(node, ast.ImportFrom):
+                from importlib.util import resolve_name
+                module = resolve_name("." * node.level + (node.module or ""), package)
+                for a in node.names:
+                    aliases[a.asname or a.name] = module + "." + a.name
+                    assert aliases[a.asname or a.name] not in {gate+".issue",gate+".*"}, path
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                name = ast.unparse(node.func)
+                first, dot, rest = name.partition(".")
+                target = aliases.get(first,first) + dot + rest
+                assert target not in {gate+".issue",gate+".HumanDecision","HumanDecision"}, path
+
+
+def test_trigger_only_notifies() -> None:
+    """O gatilho não depende dos módulos operacionais e não chama execução ou reserva."""
+    path=ROOT / "backend/derivatives/ticket/trigger.py"
+    assert not _imports(path) & {TICKET+"."+n for n in
+                                 ("gate","venue","paper_venue","sequencing","receipt")}
+    for node in ast.walk(ast.parse(path.read_text())):
+        if isinstance(node,ast.Call) and isinstance(node.func,ast.Attribute):
+            assert node.func.attr not in {"submit","request_cancel","reserve"}
