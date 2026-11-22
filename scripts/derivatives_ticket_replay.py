@@ -188,13 +188,13 @@ def main(argv: list[str] | None = None) -> int:
         parser.add_argument("--" + option, type=Path, required=True)
     args = parser.parse_args(argv)
     try:
-        out = args.out.absolute()
-        target = Path(os.path.realpath(out.parent)) / out.name
-        if out.name == ".." or os.path.lexists(target):
-            raise ValueError("destino já existe")
-        if any(p.is_symlink() and not p.is_dir() for p in out.parents):
-            raise ValueError("link de diretório sem destino acessível")
         try:
+            out = args.out.absolute()
+            target = Path(os.path.realpath(out.parent)) / out.name
+            if out.name == ".." or os.path.lexists(target):
+                raise ValueError("destino já existe")
+            if any(p.is_symlink() and not p.is_dir() for p in out.parents):
+                raise ValueError("link de diretório sem destino acessível")
             script = _read(args.roteiro)
             session = ReplaySession(load_replay(args.replay), config=load_ticket_sim_config())
         except (OSError, OverflowError) as exc:
