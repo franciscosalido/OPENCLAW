@@ -131,3 +131,9 @@ def test_neutral_pair_inside_zero_interval_has_no_extra_breakeven():
     legs = (leg("CALL", "BUY", 100, 1, 5), leg("CALL", "SELL", 105, 1, 5),
             leg("CALL", "BUY", 95, 1, 1), leg("CALL", "SELL", 95, 1, 1))
     assert expiry_profile(legs).breakevens == (F(0), F(100))
+
+
+def test_p9_unreadable_sequence_is_a_typed_refusal():
+    values = memoryview(b"abcd").cast("B", shape=(2, 2))
+    with pytest.raises(PayoffRefusal):
+        expiry_profile(values)
