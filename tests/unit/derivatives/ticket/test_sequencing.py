@@ -53,7 +53,7 @@ def test_s03_and_s21() -> None:
 
 @pytest.mark.parametrize("rows", [
     (holding("A"),), (holding("A"), holding("B", multiplier=100)),
-    (holding("A", 1), holding("B", -1)),
+    (holding("A", -1), holding("B", 1)),
 ])
 def test_unverifiable_or_crossing_positions_refuse(rows: tuple[Holding, ...]) -> None:
     """Somente planos de abertura ou desmontagem com evidência coerente."""
@@ -72,19 +72,20 @@ def test_s09_cancel_and_late_fill() -> None:
     """Duas boletas da conta disputam uma única cobertura confirmada."""
     plan = plan_legs(draft(SELL, BUY), position())
     book = ReservationBook()
-    book.confirm_buy(plan, BUY, "buy-fill", 3)
-    book.reserve(plan, SELL, "ord1", 3)
-    book.confirm_sale("ord1", "sell-fill1", 1)
-    assert book.available(plan, SELL) == 0
+    assert book.available(plan, SELL, ticket="T2") == 0
+    book.confirm_buy(plan, BUY, "buy-fill", 3, ticket="T1")
+    book.reserve(plan, SELL, "ord1", 3, ticket="T1")
+    book.confirm_sale("sim", "ord1", "sell-fill1", 1)
+    assert book.available(plan, SELL, ticket="T2") == 0
     with pytest.raises(SequenceRefusal):
-        book.reserve(plan, SELL, "ord2", 1)
+        book.reserve(plan, SELL, "ord2", 1, ticket="T2")
     # Pedido de cancelamento local não é um fato conciliado.
-    book.confirm_sale("ord1", "sell-fill2", 1)
-    assert book.available(plan, SELL) == 0
-    book.confirm_release("ord1", 1)
-    assert book.available(plan, SELL) == 1
-    book.reserve(plan, SELL, "ord2", 1)
-    assert book.available(plan, SELL) == 0
+    book.confirm_sale("sim", "ord1", "sell-fill2", 1)
+    assert book.available(plan, SELL, ticket="T2") == 0
+    book.confirm_release("sim", "ord1", 1)
+    assert book.available(plan, SELL, ticket="T2") == 1
+    book.reserve(plan, SELL, "ord2", 1, ticket="T2")
+    assert book.available(plan, SELL, ticket="T2") == 0
 
 
 def test_scope_and_duplicate_fills() -> None:
@@ -92,18 +93,18 @@ def test_scope_and_duplicate_fills() -> None:
     p = plan_legs(draft(BUY, SELL), position())
     other = plan_legs(draft(BUY, SELL), position(account="other"))
     book = ReservationBook()
-    book.confirm_buy(p, BUY, "fill", 3)
+    book.confirm_buy(p, BUY, "fill", 3, ticket="T1")
     with pytest.raises(SequenceRefusal):
-        book.confirm_buy(p, BUY, "fill", 3)
-    assert book.available(other, SELL) == 0
-    assert book.available(p, SELL) == 3
+        book.confirm_buy(p, BUY, "fill", 3, ticket="T1")
+    assert book.available(other, SELL, ticket="T1") == 0
+    assert book.available(p, SELL, ticket="T1") == 3
 
 
 @pytest.mark.parametrize(("buy", "net", "gross", "cost", "fills", "expected"), [
     ("1", "-5", "25", "0", (), True), ("1", "-5.01", "25", "0", (), False),
     ("1", "-5", "24.99", "0", (), False), ("1", "-4.99", "25.01", ".01", (), True),
-    ("1", "-5.30", "24.70", "0", (Fill(symbol="A", side=Side.BUY, quantity=3, price=D(".90")),),
-     True), ("2", "5", "35", "0", (), True), ("2", "4.99", "35", "0", (), False),
+    ("1", "-5.30", "24.70", "0",
+     (Fill(execution="f1", symbol="A", side=Side.BUY, quantity=3, price=D(".90")),), True), ("2", "5", "35", "0", (), True), ("2", "4.99", "35", "0", (), False),
 ])
 def test_entire_signed_structure(buy: str, net: str, gross: str, cost: str,
                                  fills: tuple[Fill, ...], expected: bool) -> None:
@@ -127,3 +128,81 @@ def test_supplemental_lot_invariant() -> None:
         if sold + reserved <= bought:
             n = releasable_quantity(leg("B", Side.SELL, "1", 6, 2), bought, sold, reserved)
             assert 0 <= n <= 6 and n % 2 == 0 and sold + reserved + n <= bought
+
+
+def test_reservations_race_and_failed_release() -> None:
+    """Somente uma reserva concorrente vence; recibos repetidos não alteram saldos."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    p = plan_legs(draft(BUY, SELL), position())
+    book = ReservationBook()
+    book.confirm_buy(p, BUY, "fill", 3, ticket="origin")
+
+    def reserve(i: int) -> bool:
+        try:
+            book.reserve(p, SELL, str(i), 3, ticket=str(i))
+        except SequenceRefusal:
+            return False
+        return True
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        results = list(executor.map(reserve, range(8)))
+    assert sum(results) == 1
+    order = str(results.index(True))
+    book.confirm_sale("sim", order, "late", 1)
+    with pytest.raises(SequenceRefusal):
+        book.confirm_sale("sim", order, "late", 1)
+    with pytest.raises(SequenceRefusal):
+        book.confirm_release("sim", order, 3)
+    assert book.available(p, SELL, ticket="next") == 0
+    book.confirm_release("sim", order, 2)
+    assert book.available(p, SELL, ticket="next") == 2
+
+
+def test_incompatible_evidence_and_shared_initial_protection() -> None:
+    """Uma mesma proteção inicial não cobre duas vendas nem cruza vencimentos."""
+    rows = (holding("A", 3), holding("B", -2), holding("C", -2))
+    pos = Position(account="sim", holdings=rows, pairs=(("A", "B"), ("A", "C")))
+    with pytest.raises(SequenceRefusal):
+        plan_legs(draft(BUY, SELL), pos)
+    later = holding("B").model_copy(update={"expiry": date(2028, 1, 15)})
+    with pytest.raises(SequenceRefusal):
+        plan_legs(draft(BUY, SELL), position(holding("A"), later))
+
+
+def test_separate_protectors_do_not_share_fills() -> None:
+    """Uma conta pode ter dois pares elegíveis e saldos independentes."""
+    pos = Position(account="sim", holdings=tuple(holding(s) for s in "ABCD"),
+                   pairs=(("A", "B"), ("C", "D")))
+    c, d = leg("C", Side.BUY, "1"), leg("D", Side.SELL, "1.50")
+    p = plan_legs(draft(SELL, d, BUY, c), pos)
+    assert p.legs == (BUY, c, SELL, d)
+    book = ReservationBook()
+    book.confirm_buy(p, BUY, "f1", 2, ticket="T1")
+    assert book.available(p, d, ticket="T1") == 0
+    assert book.available(p, SELL, ticket="T1") == 2
+
+
+def test_closing_waits_for_actual_buyback() -> None:
+    """S21: proteção original só se libera na proporção recomprada e conciliada."""
+    b, a = leg("B", Side.BUY, "1.50"), leg("A", Side.SELL, "1")
+    p = plan_legs(draft(a, b), position(holding("A", 10), holding("B", -10)))
+    book = ReservationBook()
+    assert book.available(p, a, ticket="close") == 0
+    book.confirm_buy(p, b, "rebuy", 3, ticket="close")
+    assert book.available(p, a, ticket="close") == 3
+    book.reserve(p, a, "sell", 3, ticket="close")
+    assert book.available(p, a, ticket="other") == 0
+
+
+def test_signed_projection_rejects_repeats_overfill_wrong_side_and_missing_cost() -> None:
+    """Execuções entram uma vez e só dentro da versão em avaliação."""
+    t = draft(BUY, SELL)
+    fill = Fill(execution="fid", symbol="A", side=Side.BUY, quantity=3, price=D("1"))
+    for facts in [(fill, fill), (fill.model_copy(update={"quantity": 11}),),
+                  (fill.model_copy(update={"side": Side.SELL}),),
+                  (fill.model_copy(update={"price": D("1.01")}),)]:
+        assert not within_signed_limits(t, facts, SELL, known_costs=D("0"))
+    assert not within_signed_limits(t, (), SELL, known_costs=D("NaN"))
+    assert not within_signed_limits(t, (), SELL, known_costs=D(".01"))
+    assert partial_exposure(t, known_costs=D(".01")) == D("10.01")
