@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from backend.derivatives.ticket import session as session_module
 from backend.derivatives.ticket.engine import EngineRefusal
 from backend.derivatives.ticket.gate import Action, DecisionRefusal, issue
 from backend.derivatives.ticket.models import TicketDraft
@@ -75,11 +76,16 @@ def test_incompatible_venue_event_is_session_refusal() -> None:
 
 
 @pytest.mark.parametrize("second", ["t1", "T1"], ids=["U1", "U2"])
-def test_open_preserves_first_spelling(second: str) -> None:
+def test_open_preserves_first_spelling(second: str, monkeypatch: pytest.MonkeyPatch) -> None:
     """A sessão recusa as duas colisões e preserva a consulta por grafia original."""
     s, pos, draft, now = session_data()
     s.advance_to(2)
     first = s.open("T1", pos, draft, now)
+
+    def unexpected_engine(*args: object, **kwargs: object) -> None:
+        pytest.fail("construção do motor antes da recusa de identidade duplicada")
+
+    monkeypatch.setattr(session_module, "TicketEngine", unexpected_engine)
     with pytest.raises(SessionRefusal):
         s.open(second, pos, draft, now)
     assert s.engine("T1") is first
@@ -126,6 +132,7 @@ def test_u5_nonce_used_by_first_ticket_is_spent_for_second() -> None:
                 two.confirm(decision, now)
     assert one.state is TicketState.WORKING and one.orders == {"T1:A:1": OrderState.LIVE}
     assert two.state is TicketState.DRAFT and not two.orders
+    assert not hasattr(s, "ledger")
 
 
 def test_u6_naive_time_is_refused_even_without_previous_event() -> None:

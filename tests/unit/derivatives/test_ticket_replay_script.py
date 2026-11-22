@@ -128,7 +128,7 @@ def _official(case: str, out: Path) -> list[str]:
 
 
 @pytest.mark.parametrize("case", ["V1", "V2", "V6", "V7", "V13"])
-def test_invalid_addendum_cases(case: str, tmp_path: Path) -> None:
+def test_invalid_addendum_cases(case: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Uma recusa do roteiro ou da fita deixa o destino inexistente."""
     raw = (FIXTURES / "calmo.roteiro.json").read_text()
     plan = json.loads(raw)
@@ -149,6 +149,11 @@ def test_invalid_addendum_cases(case: str, tmp_path: Path) -> None:
     else:
         steps[0]["account"] = "ausente"
     script, replay, out = (tmp_path / p for p in ("script", "replay", "out"))
+    if case in {"V6", "V7", "V13"}:
+        def unexpected_advance(*args: object) -> None:
+            pytest.fail("roteiro inválido chegou à execução de um passo")
+
+        monkeypatch.setattr(ReplaySession, "advance_to", unexpected_advance)
     script.write_text(raw if case == "V6" else json.dumps(plan))
     replay.write_text(json.dumps(tape))
     assert main(args(replay, script, out)) == 2
