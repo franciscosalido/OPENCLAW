@@ -8,7 +8,7 @@ from backend.derivatives.ticket.models import Side
 from backend.derivatives.ticket.paper_venue import PaperVenue
 from backend.derivatives.ticket.replay import AuctionFill, CancelRejected, TradeEvent, VenueTimeout
 from backend.derivatives.ticket.state import Event, OrderState as S, reconcile, transition
-from backend.derivatives.ticket.venue import VenueOrder, VenueRefusal
+from backend.derivatives.ticket.venue import VenueOrder, VenueRefusal, VenueReport
 from tests.unit.derivatives.ticket.test_guards import CLOSE, NOW, quote
 
 
@@ -46,7 +46,7 @@ def test_tape(tape: str, expected: str, snapshot: str) -> None:
     assert play(tape, expected, snapshot) == first
 
 
-def play(tape: str, expected: str, snapshot: str) -> list:
+def play(tape: str, expected: str, snapshot: str) -> list[VenueReport]:
     """Consome cada relatório pela máquina existente e compara com a fita literal."""
     venue = PaperVenue(CLOSE)
     assert not venue.advance(quote())  # cotação executável anterior ao envio
@@ -67,9 +67,10 @@ def play(tape: str, expected: str, snapshot: str) -> list:
             state = transition(S.PENDING_SEND, report.event)
             if state == S.UNCERTAIN:
                 found = venue.poll(order.order_id)
-                assert (found.state, found.filled, found.remaining) == (S.LIVE,0,10) if (
-                    "timeout-yes" in tape and found is not None) else found is None
-                assert (found is not None) == ("timeout-yes" in tape)
+                if "timeout-yes" in tape:
+                    assert found and (found.state, found.filled, found.remaining) == (S.LIVE, 0, 10)
+                else:
+                    assert found is None
                 state = reconcile(state, found.state if found else S.REJECTED, evidence="poll")
             if state != S.REJECTED:
                 states[order.order_id] = state
@@ -129,3 +130,49 @@ def play(tape: str, expected: str, snapshot: str) -> list:
         assert sum(r.quantity*r.price for r in reports if r.price is not None) == (
             D("9.97") if tape.startswith("buy") else D("15.20"))
     return reports
+
+
+def test_auction_eligibility_size_and_cancel_are_separate() -> None:
+    """Injeção de leilão compartilha quantidade e respeita lado, preço e fase da série."""
+    venue = PaperVenue(CLOSE)
+    for oid, side, price in [("ineligible", Side.BUY, ".99"), ("buyer", Side.BUY, "1"),
+                             ("seller", Side.SELL, "1"), ("expensive", Side.SELL, "1.01")]:
+        order = VenueOrder(order_id=oid, symbol="A", side=side, quantity=5, lot_size=1,
+                           limit_price=D(price), valid_until=CLOSE)
+        assert venue.submit(order, NOW).event is Event.VENUE_LIVE
+    auction = AuctionFill(type="auction_fill", seq=5, ts=NOW, symbol="A", price=D("1"), size=7)
+    venue.advance(quote(ask="1.02", age=0))
+    assert venue.advance(auction) == ()
+    venue.advance(quote(phase="SUSPENDED", age=0))
+    actual = venue.advance(auction)
+    assert [(r.order_id, r.event, r.quantity, r.price, r.ts) for r in actual] == [
+        ("buyer", Event.VENUE_FILL, 5, D("1"), NOW),
+        ("seller", Event.VENUE_PARTIAL, 2, D("1"), NOW)]
+    assert venue.advance(auction.model_copy(update={"size":10})) == (
+        VenueReport("seller", Event.VENUE_FILL, 3, D("1"), NOW),)
+
+
+def test_closed_session_expires_all_live_orders_only_once() -> None:
+    """Expiração abrange todas as séries, inclusive pedidos locais pendentes."""
+    venue = PaperVenue(CLOSE)
+    for symbol in "AB":
+        venue.submit(VenueOrder(order_id=symbol, symbol=symbol, side=Side.BUY, quantity=1,
+                                limit_price=D("1"), lot_size=1, valid_until=CLOSE), NOW)
+    venue.request_cancel("B", NOW)
+    event = quote().model_copy(update={"ts": CLOSE})
+    assert venue.advance(event) == (VenueReport("A", Event.VENUE_EXPIRED, None, None, CLOSE),
+                                    VenueReport("B", Event.VENUE_EXPIRED, None, None, CLOSE))
+    assert not venue.advance(event)
+
+
+def test_no_match_in_submit_and_timeout_is_consumed_once() -> None:
+    """O envio observa apenas eventos futuros mesmo quando o último ask já cruzava."""
+    venue = PaperVenue(CLOSE)
+    venue.advance(quote(ask=".95"))
+    order = VenueOrder(order_id="o1", symbol="A", side=Side.BUY, quantity=5,
+                       lot_size=1, limit_price=D("1"), valid_until=CLOSE)
+    venue.advance(VenueTimeout(type="timeout", call="submit", registered=False, seq=2, ts=NOW))
+    assert venue.submit(order, NOW).event is Event.UNCERTAIN
+    assert venue.poll("o1") is None
+    assert venue.submit(order, NOW).event is Event.VENUE_LIVE
+    assert venue.poll("o1") == (S.LIVE, 0, 5)

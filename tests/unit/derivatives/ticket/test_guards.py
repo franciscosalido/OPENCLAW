@@ -6,6 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from backend.derivatives.ticket.guards import BookView, DeadlineRefusal, assess, check_deadlines
+from backend.derivatives.ticket.models import Leg
 from backend.derivatives.ticket.paper_venue import PaperVenue
 from backend.derivatives.ticket.replay import QuoteEvent, load_replay
 from config.ticket_sim_config_model import TicketSimConfig, load_ticket_sim_config
@@ -42,7 +43,8 @@ def quote(symbol: str = "A", bid: str | None = ".95", ask: str | None = "1", bs:
      ("spread aberto","leilão")),
     ([quote(age=-1)], [BUY], "BLOCKED", ("tempo inválido",)),
 ], ids="G1 G2 G3 G4 G5 G6 G7 G8 G8-sell G9 G11 G12 G13 G14 G15 G16 G17".split())
-def test_book(photos, legs, level, reasons) -> None:
+def test_book(photos: list[QuoteEvent], legs: list[Leg], level: str,
+              reasons: tuple[str, ...]) -> None:
     """Somente o lado executável exige profundidade."""
     view = BookView()
     for photo in photos:
@@ -66,7 +68,7 @@ def test_g10_global_permanent_gap() -> None:
     (21,21,"14:00",None), (21.5,21,"14:00","prazo de envio depois da validade"),
     (15,20,"14:00","validade que a venue não garante"), (15,21,"21:00","prazo de envio vencido"),
 ], ids="D1 D2 D3 D4 D5 D6 D7".split())
-def test_deadlines(send, valid, now, reason) -> None:
+def test_deadlines(send: float, valid: int, now: str, reason: str | None) -> None:
     """Envio inclusivo e validade nativa da venue."""
     midnight = NOW.replace(hour=0)
     t = draft(BUY, SELL).model_copy(update=dict(send_deadline=midnight+timedelta(hours=send),
@@ -81,7 +83,7 @@ def test_deadlines(send, valid, now, reason) -> None:
 
 @pytest.mark.parametrize("overrides", [dict(max_quote_age_s=5), dict(max_spread_ticks=10.0),
                                        dict(max_quote_age_s=-1.0), dict(max_spread_ticks=-1)])
-def test_strict_config(overrides) -> None:
+def test_strict_config(overrides: dict[str, object]) -> None:
     """O YAML exige ambos os parâmetros com os tipos declarados."""
     with pytest.raises(ValidationError):
         TicketSimConfig.model_validate(load_ticket_sim_config().model_dump() | overrides)
