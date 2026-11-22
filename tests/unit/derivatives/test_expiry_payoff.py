@@ -106,3 +106,22 @@ def test_fractional_tail_root_and_eight_legs():
     legs = (leg("CALL", "BUY", 10, 3, 1),)
     assert expiry_profile(legs, costs=D(1)).breakevens == (F(34, 3),)
     assert expiry_result(legs * 8, D(12)) == D(24)
+
+
+def test_refuse_oversized_sequence_without_materializing_it():
+    with pytest.raises(PayoffRefusal):
+        expiry_profile(range(2**100))
+
+
+def test_cancelling_legs_preserve_representable_total_at_decimal_exponent_limit():
+    from decimal import MAX_EMAX
+
+    unit = D((0, (1,), MAX_EMAX))
+    spot = D((0, (3,), MAX_EMAX))
+    positions = (leg("CALL", "BUY", unit, 10, unit), leg("CALL", "SELL", unit, 10, unit))
+    assert expiry_result(positions, spot) == D(0)
+    with localcontext() as ctx:
+        from decimal import InvalidOperation
+        ctx.traps[InvalidOperation] = False
+        with pytest.raises(PayoffRefusal):
+            expiry_leg_results(positions, spot)
