@@ -238,3 +238,16 @@ def test_partial_execution_sequences_conserve_shared_protection() -> None:
                     book.confirm_release("sim", order, 1)
             assert sold + len(live) <= bought
             assert book.available(plan, SELL, ticket="observer") == bought - sold - len(live)
+
+
+def test_equivalent_position_row_order_preserves_coverage() -> None:
+    """A ordem de apresentação dos registros não altera o saldo por conta e série."""
+    t = draft(BUY, SELL)
+    rows = tuple(holding(s) for s in "ABCD")
+    pairs = (("A", "B"), ("C", "D"))
+    p = plan_legs(t, Position(account="sim", holdings=rows, pairs=pairs))
+    other = plan_legs(t, Position(account="sim", holdings=rows[::-1], pairs=pairs[::-1]))
+    book = ReservationBook()
+    book.confirm_buy(p, BUY, "buy1", 3, ticket="T1")
+    assert book.available(other, SELL, ticket="T2") == 3
+    assert book.available(other, SELL, ticket="T1") == 3
