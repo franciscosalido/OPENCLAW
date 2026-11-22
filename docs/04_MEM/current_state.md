@@ -4,7 +4,7 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-22 · **Turno:** Claude (DL3-PR07A1 integrado).
+**Última atualização:** 2026-11-22 · **Turno:** Claude (DL3-PR07A2 integrado).
 
 ## Depois da Fase 3 — decisões de produto no simulador (D0) — EM ANDAMENTO
 
@@ -15,8 +15,9 @@ Revisão 1). O PR07A foi cortado em três pelo planejador.
 | Cartão | Conteúdo | Situação |
 |---|---|---|
 | [DL3-PR07A1](../specs/derivatives/fase3/DL3-PR07A1.md) | DP-14, DP-12, DP-15 e higiene | MERGEADO (PR #163) |
-| DL3-PR07A2 | origem da cobertura; bruto assinado, executado e projetado | cartão a publicar |
-| DL3-PR07A3 | DP-13: relatório contraditório e evento externo | depois do A2 |
+| [DL3-PR07A2](../specs/derivatives/fase3/DL3-PR07A2.md) | bruto assinado, executado e projetado; série de proteção | MERGEADO (PR #164) |
+| DL3-PR07A3 | cobertura própria ou de outra boleta, com autorização na prévia | cartão a publicar |
+| DL3-PR07A4 | DP-13: relatório contraditório e evento externo | depois do A3 |
 | DL3-PR07B | DP-02 e DP-03: zeragem e borboleta em simulação | depois do PR07A |
 
 Entregue pelo DL3-PR07A1 (37 linhas de produção):
@@ -33,11 +34,30 @@ Entregue pelo DL3-PR07A1 (37 linhas de produção):
 - Portão da cabeça `101147f`, Linux x86_64 limpo: 11.258 aprovados, 16 pulados, 261
   subtestes; mypy estrito e Pyright sem erro. 30 mutantes do revisor, 29 mortos.
 
-Pendente para o próximo cartão:
-- Teste que falta: boleta parada por limite com recompra ainda aberta não libera a
-  ocupação dessa recompra. O código está certo; o mutante correspondente sobrevive.
+Entregue pelo DL3-PR07A2 (62 linhas de produção, só visibilidade):
+- `TicketEngine.gross()` devolve bruto assinado (`gross_cap`), executado (preço real ×
+  quantidade já aplicada) e projetado. O projetado conta tudo que falta ao preço assinado
+  enquanto a boleta ainda pode enviar, e só o saldo das ordens abertas depois que ela
+  termina. Ordem incerta só entra no executado depois da conciliação.
+- O recibo traz `gross` em toda execução e em todo registro que conclui ou para a
+  boleta, e `protection` no registro de pedido de cada venda. O `resumo.json` traz
+  `bruto` por boleta. A prévia assinada e os resumos criptográficos não mudaram.
+- Três âncoras oficiais mudaram por desenho (`calmo` T1, `leilao` T1, `rapido` T1); a de
+  `rapido` T2 ficou igual. Os valores estão no §6 do cartão.
+- Portão da cabeça `10076d3`: Linux ARM64 pelo implementador e Linux x86_64 pelo
+  revisor, ambos com 11.267 aprovados, 16 pulados, 261 subtestes; mypy estrito e Pyright
+  sem erro. 30 mutantes do revisor, 28 mortos.
 
-Próxima ação (uma só): Claude publica o supercartão do DL3-PR07A2 e Codex o abre em
+Regra de processo (Francisco, 22/11/2026): o implementador executa o portão Linux via
+MCP/Docker na cabeça candidata e entrega cabeça, arquitetura, imagem, comandos, log e
+manifesto. O revisor analisa e fica dispensado de repetir. A imagem disponível é ARM64;
+x86_64 só fica validado quando o revisor roda por conta própria.
+
+Pendente para o próximo cartão (testes; o código está certo):
+- bruto de boleta `EXPIRED`; duas ordens abertas da mesma série depois da parada;
+  cancelamento pedido depois da parada. Cenários fixados nas contraprovas da skill.
+
+Próxima ação (uma só): Claude publica o supercartão do DL3-PR07A3 e Codex o abre em
 rascunho. O DP-01 só vira código depois de adendo à G3 da ADR-0024 assinado por Francisco.
 
 ## Fase 03 — Motor da boleta em simulador (D0) — FECHADA (estado A)

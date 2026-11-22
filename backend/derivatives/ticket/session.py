@@ -109,8 +109,11 @@ class ReplaySession:
                 snap = self._venue.poll(oid)
                 orders[oid] = {"estado": state.value, "executado": snap.filled if snap else 0}
             events = ticket.receipt.events
+            gross = engine.gross()
+            bruto = {"assinado": f"{gross.signed:.2f}", "executado": f"{gross.executed:.2f}",
+                     "projetado": f"{gross.projected:.2f}"}
             tickets[name] = {"conta": ticket.account, "estado": engine.state.value,
-                             "pausada": engine.paused, "ordens": orders,
+                             "pausada": engine.paused, "ordens": orders, "bruto": bruto,
                              "recibo_eventos": len(events), "recibo_hash": events[-1].hash}
         return {"aviso": "SIMULADO — resultado em papel é teto otimista, não previsão.",
                 "eventos": self._cursor, "contas_bloqueadas": sorted(blocked), "boletas": tickets}

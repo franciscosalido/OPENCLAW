@@ -25,14 +25,14 @@ RAPIDO = "preview confirm start uncertain uncertain reconcile venue_partial reco
 EXPECTED = {
     "calmo": (9, [
         ("T1", "COMPLETED", [("A", "FILLED", 10), ("B", "FILLED", 10)], 12,
-         "050354936eae64e316000a2f1570845a489dfe87f87f2dc5e70a4ceb742642f7", CALMO)], []),
+         "1d50bba66aa2db714bf7006da415c39f083bc9e4374ebdbc9b94305b3356236b", CALMO)], []),
     "leilao": (11, [
         ("T1", "STOPPED", [("A", "EXPIRED", 4), ("B", "FILLED", 3)], 12,
-         "96e50b071fa291d895b4a37a6ad56b460ae1fae33774a4b59290c2f79dc5bd52", LEILAO)],
+         "0e95249a66c1eb658d8e34f58ab77e81381cc7d745b6a57de6641def3c488cda", LEILAO)],
         [(2, "T1", "EngineRefusal")]),
     "rapido": (8, [
         ("T1", "STOPPED", [("B", "CANCELLED", 4), ("A", "FILLED", 4)], 15,
-         "a81c1cbea973dfd1db5b22b6e6a53ddb0242116442c1387f0cae55d545091cb6", RAPIDO),
+         "9ebc9cd5b584f12b7e67be1ba7ba9a7da94c7a42a531c0d0105409404ba60344", RAPIDO),
         ("T2", "DRAFT", [], 1,
          "fbcaafa8eb7934ed7fe77a9f497b676904c5cc1647d42e0b8f5a77da4df3e2b5", "preview")],
         [(4, "T2", "EngineRefusal"), (6, "T2", "SequenceRefusal"), (9, "T2", "EngineRefusal")]),
@@ -59,9 +59,21 @@ def test_complete_replay(case: str, tmp_path: Path, monkeypatch: pytest.MonkeyPa
     a = {p.name: p.read_bytes() for p in first.iterdir()}
     assert a == {p.name: p.read_bytes() for p in second.iterdir()}
     assert set(a) == {"resumo.json", *(f"recibo_{row[0]}.jsonl" for row in tickets)}
+    # B4: oráculos do resumo e das linhas que ganham gross ou protection.
+    totals = {"calmo": ("25.00", "25.00"), "leilao": ("8.50", "8.50"),
+              "rapido": ("10.00", "10.00")}
+    gross_rows = {
+        "calmo": {8: ("10.00", "25.00"), 11: ("25.00", "25.00"), 12: ("25.00", "25.00")},
+        "leilao": {5: ("3.00", "25.00"), 7: ("7.50", "25.00"), 9: ("8.50", "25.00"),
+                   12: ("8.50", "8.50")},
+        "rapido": {7: ("6.00", "25.00"), 12: ("10.00", "25.00"), 15: ("10.00", "10.00")},
+    }
+    protection = {"calmo": {10: "A"}, "leilao": {6: "A"}, "rapido": {11: "B"}}
     boletas = {}
     for ticket, state, orders, n, head, sequence in tickets:
+        ex, proj = totals[case] if ticket == "T1" else ("0.00", "25.00")
         boletas[ticket] = {"conta": "sim", "estado": state, "pausada": False,
+                           "bruto": {"assinado": "25.00", "executado": ex, "projetado": proj},
                            "ordens": {f"{ticket}:{sym}:1": {"estado": st, "executado": qty}
                                       for sym, st, qty in orders},
                            "recibo_eventos": n, "recibo_hash": head}
@@ -75,6 +87,12 @@ def test_complete_replay(case: str, tmp_path: Path, monkeypatch: pytest.MonkeyPa
             events.append(ReceiptEvent(row["seq"], datetime.fromisoformat(row["ts"]),
                                        Event(row["kind"]), row["payload"].encode(),
                                        row["prev_hash"], row["hash"]))
+        payloads = {r.seq: json.loads(r.payload) for r in events}
+        assert {n: d["gross"] for n, d in payloads.items() if "gross" in d} == {
+            n: {"signed": "25.00", "executed": ex, "projected": proj}
+            for n, (ex, proj) in (gross_rows[case] if ticket == "T1" else {}).items()}
+        assert {n: d["protection"] for n, d in payloads.items() if "protection" in d} == (
+            protection[case] if ticket == "T1" else {})
         assert [r.kind.value for r in events] == sequence.split()
         assert Receipt().verify(events, expected_head=head)
     expected = {"aviso": AVISO, "eventos": count, "contas_bloqueadas": [], "boletas": boletas,
@@ -186,7 +204,7 @@ def test_session_cut_at_hand_verified_step(case: str, tmp_path: Path) -> None:
         plan["steps"] = plan["steps"][:4]
         expected = [("T1", "STOPPED", {"T1:A:1": {"estado": "FILLED", "executado": 10}},
                      "preview arm trigger confirm start venue_live pause venue_fill stop",
-                     "d285d7d125b6f024311510e96a90af72da458755e2191db19dd937ae510346da")]
+                     "9cb640c966b1cb040a61ac0bdb8665fe890784a14773424bd01b8ce95af48f99")]
         refused = []
     script, out = tmp_path / "script", tmp_path / "out"
     script.write_text(json.dumps(plan))
@@ -198,9 +216,12 @@ def test_session_cut_at_hand_verified_step(case: str, tmp_path: Path) -> None:
                                   "erro": "EngineRefusal"} for n, t in refused]
     assert set(report["boletas"]) == {row[0] for row in expected}
     for ticket, state, orders, sequence, head in expected:
+        # B5: o poll em V4 já mostra quatro, mas o motor ainda aguarda a conciliação.
+        ex, proj = ("10.00", "10.00") if case == "V5" else ("0.00", "25.00")
         kinds = sequence.split()
         assert report["boletas"][ticket] == {
             "conta": "sim", "estado": state, "ordens": orders, "pausada": case == "V5",
+            "bruto": {"assinado": "25.00", "executado": ex, "projetado": proj},
             "recibo_eventos": len(kinds), "recibo_hash": head}
         rows = [json.loads(line) for line in (out / f"recibo_{ticket}.jsonl").read_bytes()
                 .splitlines()]

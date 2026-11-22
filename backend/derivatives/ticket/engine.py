@@ -15,8 +15,8 @@ from backend.derivatives.ticket.models import (
 from backend.derivatives.ticket.receipt import Receipt
 from backend.derivatives.ticket.replay import ReplayEvent
 from backend.derivatives.ticket.sequencing import (
-    Fill, LegPlan, Position, ReservationBook, SequenceRefusal, partial_exposure, plan_legs,
-    within_signed_limits,
+    Fill, Gross, LegPlan, Position, ReservationBook, SequenceRefusal, gross_amounts,
+    partial_exposure, plan_legs, within_signed_limits,
 )
 from backend.derivatives.ticket.state import (
     Event as E, InvalidTransition, OrderState as O, TicketState as T, reconcile, transition,
@@ -120,6 +120,23 @@ class TicketEngine:
         """Foto dos estados por identificador da venue."""
         return MappingProxyType({oid: o.state for oid, o in self._orders.items()})
 
+    def gross(self) -> Gross:
+        """Consulta os três volumes pela versão e pelos fatos já aplicados nesta boleta."""
+        return self._gross(self._state)
+
+    def _gross(self, state: T) -> Gross:
+        if self._plan is None:
+            raise EngineRefusal("boleta sem proposta")
+        balances: dict[str, int] | None = None
+        if state in (T.COMPLETED, T.STOPPED, T.DENIED, T.EXPIRED):
+            balances = {}
+            for order in self._orders.values():
+                if order.state in _LIVE:
+                    symbol = order.leg.symbol
+                    live = order.request.quantity - order.filled
+                    balances[symbol] = balances.get(symbol, 0) + live
+        return gross_amounts(self._plan.draft, self._fills, balances)
+
     def _require(self, *states: T) -> LegPlan:
         if self._state not in states or self._plan is None:
             raise EngineRefusal("estado incompatível")
@@ -131,10 +148,12 @@ class TicketEngine:
     def _move(self, event: E, now: datetime, **data: object) -> None:
         state = transition(self._state, event)
         assert isinstance(state, T)
-        self._record(event, now, state=state.value, **data)
-        self._set_state(state)
+        self._set_state(state, event, now, **data)
 
-    def _set_state(self, state: T) -> None:
+    def _set_state(self, state: T, event: E, now: datetime, **data: object) -> None:
+        if state in (T.COMPLETED, T.STOPPED):
+            data["gross"] = self._gross(state).receipt_values()
+        self._record(event, now, state=state.value, **data)
         self._state = state
         if state == T.STOPPED and not self._halts.divergent(self._account):
             assert self._plan is not None
@@ -290,7 +309,11 @@ class TicketEngine:
             data.update(execution=key, price=str(r.price), quantity=r.quantity)
         if order.state == O.PENDING_SEND:
             data["request"] = order.request.model_dump(mode="json")
+            if order.leg.side is Side.SELL:
+                data["protection"] = self._plan.protection_for(order.leg)
         order.state = dest
+        if fill is not None:
+            data["gross"] = self.gross().receipt_values()
         self._record(r.event, r.ts, **data)
         self._account_report(order, r.ts, fill)
         if dest == O.UNCERTAIN:
@@ -404,7 +427,6 @@ class TicketEngine:
             dest = self._destination(plan, now)
             state_ticket = reconcile(self._state, dest, evidence="poll")
             assert isinstance(state_ticket, T)
-            self._record(E.RECONCILE, now, state=dest.value, evidence="poll")
-            self._set_state(state_ticket)
+            self._set_state(state_ticket, E.RECONCILE, now, evidence="poll")
             if dest == T.WORKING:
                 self.pause(now)

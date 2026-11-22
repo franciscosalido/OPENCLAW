@@ -1,4 +1,5 @@
 """Sequenciamento e contabilidade local de execuções conciliadas do simulador D0."""
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 from decimal import MAX_EMAX, MAX_PREC, MIN_EMIN, Context, Decimal, localcontext
@@ -277,6 +278,34 @@ class ReservationBook:
 
 def _exact() -> Context:
     return Context(prec=MAX_PREC, Emin=MIN_EMIN, Emax=MAX_EMAX)
+
+
+class Gross(NamedTuple):
+    """Limite assinado, volume executado e volume projetado da boleta em reais."""
+
+    signed: Decimal
+    executed: Decimal
+    projected: Decimal
+
+    def receipt_values(self) -> dict[str, str]:
+        """Representação monetária canônica do recibo."""
+        return {"signed": f"{self.signed:.2f}", "executed": f"{self.executed:.2f}",
+                "projected": f"{self.projected:.2f}"}
+
+
+def gross_amounts(draft: TicketDraft, fills: Sequence[Fill],
+                  open_balances: Mapping[str, int] | None) -> Gross:
+    """Após o término, projeta somente os saldos abertos informados pelo motor."""
+    remaining = {leg.symbol: leg.quantity for leg in draft.legs}
+    with localcontext(_exact()):
+        executed = Decimal(0)
+        for fill in fills:
+            executed += fill.price * fill.quantity
+            remaining[fill.symbol] -= fill.quantity
+        balances = remaining if open_balances is None else open_balances
+        projected = sum((leg.limit_price * balances.get(leg.symbol, 0) for leg in draft.legs),
+                        executed)
+        return Gross(draft.gross_cap, executed, projected)
 
 
 def partial_exposure(draft: TicketDraft, *, known_costs: Decimal = Decimal(0)) -> Decimal:

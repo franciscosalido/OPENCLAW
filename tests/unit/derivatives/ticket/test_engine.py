@@ -972,3 +972,109 @@ def test_r6_another_uncertain_ticket_does_not_strand_buyback(s: Session) -> None
     assert third.state == T.STOPPED and not s.halts.blocked("sim")
     second.confirm(s.dec(second), at(5))
     assert second.orders == {"T2:B:1": O.LIVE}
+
+
+def assert_gross(engine: TicketEngine, signed: str, executed: str, projected: str) -> None:
+    """Confere as três medidas sem converter a consulta para ponto flutuante."""
+    gross = engine.gross()
+    values = (gross.signed, gross.executed, gross.projected)
+    assert all(isinstance(value, D) for value in values)
+    assert values == (D(signed), D(executed), D(projected))
+
+
+def receipt_gross(s: Session) -> dict[int, dict[str, str]]:
+    """Seleciona todos os registros que realmente declararam gross."""
+    return {event.seq: data["gross"] for event in s.receipts[0].events
+            if "gross" in (data := json.loads(event.payload))}
+
+
+def money_row(executed: str, projected: str) -> dict[str, str]:
+    """Linha esperada do recibo da estrutura de 25 reais."""
+    return {"signed": "25.00", "executed": executed, "projected": projected}
+
+
+@pytest.mark.parametrize("cap", ["25", "30"])
+def test_b0_signed_cap_can_differ_from_initial_projection(s: Session, cap: str) -> None:
+    """A proposta já expõe o limite vigente, mesmo quando ele inclui folga."""
+    assert_gross(s.new(gross_cap=D(cap)), cap, "0", "25")
+
+
+def test_b1_better_sale_revalues_the_gross(s: Session) -> None:
+    """A venda melhora e o projetado cai ao executado quando a boleta para."""
+    e = s.confirmed()
+    s.q("A", 3, ask="1", size=3)
+    s.q("B", 4, bid="1.54")
+    s.q("A", 5, ask="1", size=7)
+    assert e.state == T.STOPPED
+    assert_gross(e, "25", "14.62", "14.62")
+    assert receipt_gross(s) == {5: money_row("3.00", "25.00"), 7: money_row("7.62", "25.12"),
+                                8: money_row("14.62", "25.12"), 9: money_row("14.62", "14.62")}
+    assert json.loads(s.receipts[0].events[5].payload)["protection"] == "A"
+
+
+def stopped_buyback(s: Session) -> TicketEngine:
+    """Para a desmontagem com seis compras aplicadas e quatro ainda na venue."""
+    e = s.new(close_plan().position, closing=True)
+    e.confirm(s.dec(e), at(2))
+    s.q("B", 3, ask="1.50", size=3)
+    s.q("A", 4, bid="1.04", ask="1.10")
+    s.q("B", 5, ask="1.50", size=3)
+    assert e.state == T.STOPPED and e.orders == {B: O.PARTIAL, A: O.FILLED}
+    assert [(oid, qty) for oid, qty, _, _ in s.submitted()] == [(B, 10), (A, 3)]
+    return e
+
+
+def test_b2_stop_counts_only_the_open_buyback_balance(s: Session) -> None:
+    """O saldo de quatro a 1,50 continua exposto após a parada."""
+    e = stopped_buyback(s)
+    assert_gross(e, "25", "12.12", "18.12")
+    assert receipt_gross(s) == {5: money_row("4.50", "25.00"), 7: money_row("7.62", "25.12"),
+                                8: money_row("12.12", "25.12"), 9: money_row("12.12", "18.12")}
+    assert json.loads(s.receipts[0].events[5].payload)["protection"] == "B"
+
+
+def test_b2b_late_fill_uses_the_terminal_projection(s: Session) -> None:
+    """Aplicar a execução tardia não reabre a boleta."""
+    e = stopped_buyback(s)
+    s.q("B", 6, ask="1.50", size=4)
+    assert e.state == T.STOPPED and e.orders[B] == O.FILLED
+    assert_gross(e, "25", "18.12", "18.12")
+    assert receipt_gross(s)[10] == money_row("18.12", "18.12")
+
+
+def test_b3_open_buyback_keeps_its_capacity(s: Session) -> None:
+    """O saldo ainda vivo impede até uma recompra de uma unidade em outra boleta."""
+    stopped_buyback(s)
+    s.q("A", 5)
+    second = s.new(close_plan().position, closing=True, legs=(leg("B", Side.BUY, "1.50", 1),
+                   leg("A", Side.SELL, "1", 1)), net_limit=D(".50"), gross_cap=D("2.50"))
+    decision = s.dec(second)
+    with pytest.raises(SequenceRefusal):
+        second.confirm(decision, at(6))
+    s.ledger.consume(decision, action=Action.EXECUTE, ticket="T2", now=at(6),
+                     preview=second.preview)
+
+
+def test_b6_gross_requires_a_proposal(s: Session) -> None:
+    """Um motor sem prévia não tem limite assinado."""
+    with pytest.raises(EngineRefusal):
+        s.engine("T1", position()).gross()
+
+
+def test_b7_denied_proposal_has_no_future_execution(s: Session) -> None:
+    """Descartar elimina a quantidade que poderia ser enviada."""
+    e = s.new()
+    e.discard(s.dec(e, Action.DISCARD), at(2))
+    assert e.state == T.DENIED
+    assert_gross(e, "25", "0", "0")
+    assert receipt_gross(s) == {}
+
+
+def test_b8_gross_on_ticket_reconciliation_only(s: Session) -> None:
+    """Só a conciliação da boleta que para carrega os brutos."""
+    _, first, _ = two_buybacks(s, registered=False)
+    first.reconcile("T1:C:1", at(3))
+    last = s.receipts[0].events[-1]
+    assert last.kind == E.RECONCILE and first.state == T.STOPPED
+    assert receipt_gross(s) == {last.seq: {"signed": "50.00", "executed": "0.00",
+                                          "projected": "0.00"}}
