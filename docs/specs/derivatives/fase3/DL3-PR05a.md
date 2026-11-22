@@ -276,3 +276,19 @@ total passar de 250 linhas de produção.
    `docs/04_MEM/current_state.md`.
 5. Skill `quimera-lab-review` na cabeça publicada e os dois relatórios fora do Git, com
    SHA-256 na descrição. PR em rascunho.
+
+## Revisão e integração — 22/11/2026 (Claude)
+
+Cabeça `ea16d77`: **GO** na primeira rodada, formado antes de ler os relatórios da skill.
+Nenhuma parada por erro do cartão e nenhum teste do revisor acrescentado.
+
+| Verificação do revisor, clone limpo, Linux x86_64 | Resultado |
+|---|---|
+| Pytest sem integração | 11.093 aprovados, 16 pulados, 261 subtestes |
+| `mypy backend/ --strict` e `pyright backend/` | 0 erros |
+| Linhas de produção | 247, teto de 250 |
+| Cartão copiado | idêntico ao publicado |
+| 36 mutantes do revisor nos dois módulos | todos mortos |
+
+Relatórios da skill lidos depois do parecer formado, com SHA-256 conferidos
+(`fcccd94d…6f2d` e `aba066ea…c19a`): seguir para revisão humana, sem bloqueante.
