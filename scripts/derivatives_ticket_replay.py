@@ -1,0 +1,195 @@
+"""Executa uma sessão D0 a partir de uma fita e de decisões humanas roteirizadas."""
+import argparse
+import json
+import sys
+from datetime import datetime, timedelta
+from functools import partial
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from typing import Annotated, Literal
+
+from loguru import logger
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, ValidationError
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from backend.derivatives.ticket.engine import EngineRefusal, TicketEngine
+from backend.derivatives.ticket.gate import Action, DecisionRefusal, issue
+from backend.derivatives.ticket.guards import DeadlineRefusal
+from backend.derivatives.ticket.models import Instant, PositiveInt, TicketDraft
+from backend.derivatives.ticket.replay import ReplayError, load_replay
+from backend.derivatives.ticket.sequencing import Position, SequenceRefusal
+from backend.derivatives.ticket.session import ReplaySession, SessionRefusal
+from backend.derivatives.ticket.trigger import TriggerRefusal, TriggerSpec, spec_digest
+from config.ticket_sim_config_model import load_ticket_sim_config
+
+
+class _Model(BaseModel):
+    model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
+
+
+def _instant(value: object) -> datetime:
+    if not isinstance(value, str):
+        raise ValueError("instante deve ser texto com fuso")
+    return datetime.fromisoformat(value)
+
+
+class _Step(_Model):
+    after_seq: Annotated[int, Field(ge=0)]
+    at: Annotated[Instant, BeforeValidator(_instant)]
+    ticket: str
+
+
+class _Open(_Step):
+    do: Literal["open"]
+    account: str
+    draft: TicketDraft
+
+
+class _Arm(_Step):
+    do: Literal["arm"]
+    spec: TriggerSpec
+
+
+class _Order(_Step):
+    do: Literal["cancel", "reconcile"]
+    order_id: str
+
+
+class _Simple(_Step):
+    do: Literal["confirm", "pause", "resume"]
+
+
+type Step = Annotated[_Open | _Arm | _Order | _Simple, Field(discriminator="do")]
+
+
+class _Script(_Model):
+    decision_ttl_s: PositiveInt
+    positions: tuple[Position, ...]
+    steps: tuple[Step, ...]
+
+
+def _unique(items: list[tuple[str, object]]) -> dict[str, object]:
+    result = dict(items)
+    if len(result) != len(items):
+        raise ValueError("chave duplicada no roteiro")
+    return result
+
+
+def _read(path: Path) -> _Script:
+    raw = path.read_bytes()
+    json.loads(raw, object_pairs_hook=_unique)
+    script = _Script.model_validate_json(raw)
+    accounts = {p.account for p in script.positions}
+    if len(accounts) != len(script.positions):
+        raise ValueError("conta repetida")
+    opened = set()
+    previous = 0
+    for step in script.steps:
+        if step.after_seq < previous:
+            raise ValueError("sequência de passos decrescente")
+        previous = step.after_seq
+        if isinstance(step, _Open):
+            if step.account not in accounts:
+                raise ValueError("conta ausente")
+            opened.add(step.ticket)
+        elif step.ticket not in opened:
+            raise ValueError("passo antes da abertura da boleta")
+    return script
+
+
+def _act(engine: TicketEngine, step: _Arm | _Order | _Simple, n: int, ttl: int) -> None:
+    at = step.at
+    if step.do == "pause":
+        engine.pause(at)
+        return
+    if isinstance(step, _Order) and step.do == "reconcile":
+        engine.reconcile(step.order_id, at)
+        return
+    decide = partial(issue, ticket=step.ticket, nonce=f"n{n}", issued_at=at,
+                     expires_at=at + timedelta(seconds=ttl))
+    if isinstance(step, _Arm):
+        decision = decide(Action.ARM, preview=engine.preview, spec_digest=spec_digest(step.spec))
+        engine.arm(step.spec, decision, at)
+    elif isinstance(step, _Order):
+        engine.cancel(step.order_id, decide(Action.CANCEL_ORDER, order_id=step.order_id), at)
+    elif step.do == "confirm":
+        engine.confirm(decide(Action.EXECUTE, preview=engine.preview), at)
+    else:
+        engine.resume(decide(Action.RESUME), at)
+
+
+def _run(session: ReplaySession, script: _Script) -> list[dict[str, object]]:
+    positions = {p.account: p for p in script.positions}
+    refusals: list[dict[str, object]] = []
+    for n, step in enumerate(script.steps, 1):
+        session.advance_to(step.after_seq)
+        session.check_time(step.at)
+        if isinstance(step, _Open):
+            try:
+                session.open(step.ticket, positions[step.account], step.draft, step.at)
+            except Exception as exc:
+                raise SessionRefusal(f"abertura recusada no passo {n}: {exc}") from exc
+        else:
+            try:
+                _act(session.engine(step.ticket), step, n, script.decision_ttl_s)
+            except (EngineRefusal, DecisionRefusal, SequenceRefusal, DeadlineRefusal,
+                    TriggerRefusal) as exc:
+                refusals.append({"passo": n, "acao": step.do, "boleta": step.ticket,
+                                 "erro": type(exc).__name__})
+    session.finish()
+    return refusals
+
+
+def _write(out: Path, session: ReplaySession, tickets: list[str],
+           summary: dict[str, object]) -> None:
+    out.mkdir(parents=True, exist_ok=True)
+    with TemporaryDirectory(dir=out) as staging:
+        staged = Path(staging)
+        for ticket in tickets:
+            with (staged / f"recibo_{ticket}.jsonl").open("x", encoding="utf-8") as stream:
+                for event in session.receipt(ticket).events:
+                    row = {"seq": event.seq, "ts": event.ts.isoformat(), "kind": event.kind.value,
+                           "payload": event.payload.decode("utf-8"), "prev_hash": event.prev_hash,
+                           "hash": event.hash}
+                    stream.write(json.dumps(row, sort_keys=True, ensure_ascii=False,
+                                            separators=(",", ":")) + "\n")
+        report = staged / "resumo.json"
+        report.write_text(json.dumps(summary, sort_keys=True, indent=2, ensure_ascii=False) + "\n",
+                          encoding="utf-8")
+        paths = [*staged.glob("recibo_*.jsonl"), report]
+        if any((out / p.name).is_dir() for p in paths):
+            raise OSError("diretório no destino de um arquivo")
+        for path in paths:
+            path.replace(out / path.name)
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Valida e executa o roteiro inteiro antes de publicar os arquivos de saída."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    for option in ("replay", "roteiro", "out"):
+        parser.add_argument("--" + option, type=Path, required=True)
+    args = parser.parse_args(argv)
+    try:
+        script = _read(args.roteiro)
+        session = ReplaySession(load_replay(args.replay), config=load_ticket_sim_config())
+        refusals = _run(session, script)
+        tickets = [step.ticket for step in script.steps if isinstance(step, _Open)]
+        summary = session.summary()
+        summary["recusas"] = refusals
+        _write(args.out, session, tickets, summary)
+    except ValidationError as exc:
+        logger.error("Roteiro inválido: {}", exc.errors(include_input=False)[0]["msg"])
+        return 2
+    except (ReplayError, SessionRefusal, ValueError, OverflowError, OSError) as exc:
+        logger.error("Replay interrompido: {}", exc)
+        return 2
+    logger.info("{}", summary["aviso"])
+    for ticket in tickets:
+        logger.info("{}: {}", ticket, session.engine(ticket).state.value)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
