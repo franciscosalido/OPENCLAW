@@ -251,3 +251,141 @@ def test_equivalent_position_row_order_preserves_coverage() -> None:
     book.confirm_buy(p, BUY, "buy1", 3, ticket="T1")
     assert book.available(other, SELL, ticket="T2") == 3
     assert book.available(other, SELL, ticket="T1") == 3
+
+
+CONDOR = (leg("A", Side.BUY, "3.00"), leg("D", Side.BUY, "0.50"),
+          leg("B", Side.SELL, "2.00"), leg("C", Side.SELL, "1.00"))
+
+
+@pytest.mark.parametrize(("legs", "cost", "expected"), [
+    ((BUY, SELL), "0", "10.00"), (CONDOR, "0", "35.00"), (CONDOR, "0.07", "35.07"),
+], ids=["trava", "condor", "condor-com-custo"])
+def test_b1_maximum_outlay_without_sales(legs: tuple[Leg, ...], cost: str, expected: str) -> None:
+    """Todas as compras podem executar antes da primeira venda, com o custo pago uma vez."""
+    ticket = draft(*legs)
+    with localcontext() as ctx:
+        ctx.prec = 1
+        assert partial_exposure(ticket, known_costs=D(cost)) == D(expected)
+
+
+def test_b1_exposure_without_a_protective_buy_refuses() -> None:
+    """Uma venda isolada não admite cálculo de desembolso protetor."""
+    with pytest.raises(SequenceRefusal):
+        partial_exposure(draft(SELL))
+
+
+def test_r2_buy_fills_cannot_exceed_signed_quantity() -> None:
+    """Comprar 6 e depois mais 5 ultrapassaria as 10 assinadas."""
+    plan = plan_legs(draft(BUY, SELL), position())
+    book = ReservationBook()
+    book.confirm_buy(plan, BUY, "b1", 6, ticket="T1")
+    with pytest.raises(SequenceRefusal):
+        book.confirm_buy(plan, BUY, "b2", 5, ticket="T1")
+    assert book.available(plan, SELL, ticket="T1") == 6
+
+
+def test_r3_sale_cannot_exceed_live_reservation() -> None:
+    """Uma execução recusada deixa disponíveis as quatro unidades da ordem."""
+    plan = plan_legs(draft(BUY, SELL), position())
+    book = ReservationBook()
+    book.confirm_buy(plan, BUY, "b1", 6, ticket="T1")
+    book.reserve(plan, SELL, "order", 4, ticket="T1")
+    with pytest.raises(SequenceRefusal):
+        book.confirm_sale("sim", "order", "s1", 5)
+    book.confirm_sale("sim", "order", "s1", 1)
+
+
+def test_r4_release_requires_exact_live_balance() -> None:
+    """Com uma venda e três ainda vivas, apenas a baixa exata de três libera cinco."""
+    plan = plan_legs(draft(BUY, SELL), position())
+    book = ReservationBook()
+    book.confirm_buy(plan, BUY, "b1", 6, ticket="T1")
+    book.reserve(plan, SELL, "order", 4, ticket="T1")
+    book.confirm_sale("sim", "order", "s1", 1)
+    with pytest.raises(SequenceRefusal):
+        book.confirm_release("sim", "order", 2)
+    book.confirm_release("sim", "order", 3)
+    assert book.available(plan, SELL, ticket="T1") == 5
+
+
+@pytest.mark.parametrize("ticket", ["T1", "T2"], ids=["r5a", "r5b"])
+@pytest.mark.parametrize("operation", ["confirm_buy", "available"])
+def test_changed_account_photo_requires_reconciliation(ticket: str, operation: str) -> None:
+    """A mesma conta exige conciliação tanto para a boleta registrada quanto para outra."""
+    t = draft(BUY, SELL)
+    original = plan_legs(t, position())
+    changed = plan_legs(t, position(holding("A", 5), holding("B")))
+    book = ReservationBook()
+    book.confirm_buy(original, BUY, "seed", 1, ticket="T1")
+    with pytest.raises(SequenceRefusal, match="foto divergente"):
+        if operation == "confirm_buy":
+            book.confirm_buy(changed, BUY, "next", 1, ticket=ticket)
+        else:
+            book.available(changed, SELL, ticket=ticket)
+    assert book.available(original, SELL, ticket="T1") == 1
+
+
+def test_r5c_same_photo_cannot_replace_registered_ticket_plan() -> None:
+    """Aumentar a compra assinada muda o plano mesmo com a mesma foto."""
+    plan = plan_legs(draft(BUY, SELL), position())
+    changed = plan_legs(draft(leg("A", Side.BUY, "1", 12), SELL), position())
+    book = ReservationBook()
+    book.confirm_buy(plan, BUY, "seed", 1, ticket="T1")
+    with pytest.raises(SequenceRefusal, match="identidade ou plano divergente"):
+        book.available(changed, SELL, ticket="T1")
+
+
+def test_r5d_noncanonical_plan_refuses_before_comparing_photos() -> None:
+    """Mesmo sob outra foto, a adulteração da dependência invalida primeiro o plano."""
+    t = draft(BUY, SELL)
+    plan = plan_legs(t, position())
+    changed = plan_legs(t, position(holding("A", 5), holding("B")))
+    book = ReservationBook()
+    book.confirm_buy(plan, BUY, "seed", 1, ticket="T1")
+    with pytest.raises(SequenceRefusal, match="identidade ou plano divergente"):
+        book.available(changed._replace(dependencies=()), SELL, ticket="T2")
+
+
+def test_r6_net_includes_known_cost() -> None:
+    """Um centavo de custo reduz o crédito de 5,00 para 4,99."""
+    for net, expected in [("-5.00", False), ("-4.99", True)]:
+        t = draft(BUY, SELL, net=net, gross="25.01")
+        assert within_signed_limits(t, (), SELL, known_costs=D("0.01")) is expected
+
+
+def test_r7_buyback_cannot_cross_short_balance() -> None:
+    """A desmontagem de dez vendidas não admite recompra de vinte."""
+    closing = draft(leg("B", Side.BUY, "1.50", 20), leg("A", Side.SELL, "1.00"))
+    with pytest.raises(SequenceRefusal, match="recompra atravessa saldo"):
+        plan_legs(closing, position(holding("A", 10), holding("B", -10)))
+
+
+def test_r8_reservation_requires_whole_lots() -> None:
+    """De seis unidades, uma reserva de quatro quebra o lote de três."""
+    buy, sell = leg("A", Side.BUY, "1", 6, 3), leg("B", Side.SELL, "1.50", 6, 3)
+    plan = plan_legs(draft(buy, sell), position())
+    book = ReservationBook()
+    book.confirm_buy(plan, buy, "b1", 6, ticket="T1")
+    with pytest.raises(SequenceRefusal):
+        book.reserve(plan, sell, "order", 4, ticket="T1")
+    book.reserve(plan, sell, "order", 3, ticket="T1")
+    assert book.available(plan, sell, ticket="T1") == 3
+
+
+def test_r10_sale_cannot_exceed_planned_protection() -> None:
+    """Dez unidades de compra planejada não cobrem vinte de venda."""
+    with pytest.raises(SequenceRefusal, match="quantidade de proteção insuficiente"):
+        plan_legs(draft(BUY, leg("B", Side.SELL, "1.50", 20)), position())
+
+
+def test_r11_available_rounds_remaining_ticket_capacity_to_lot() -> None:
+    """A conta tem saldo, mas as oito restantes de T1 comportam só dois lotes de três."""
+    buy, sell = leg("A", Side.BUY, "1", 9, 3), leg("B", Side.SELL, "1.50", 9, 3)
+    plan = plan_legs(draft(buy, sell), position())
+    book = ReservationBook()
+    book.confirm_buy(plan, buy, "b1", 9, ticket="T1")
+    book.confirm_buy(plan, buy, "b2", 9, ticket="T2")
+    book.reserve(plan, sell, "order", 3, ticket="T1")
+    book.confirm_sale("sim", "order", "s1", 1)
+    book.confirm_release("sim", "order", 2)
+    assert book.available(plan, sell, ticket="T1") == 6
