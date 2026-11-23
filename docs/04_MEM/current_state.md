@@ -4,7 +4,7 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-22 · **Turno:** Claude (DL3-PR08B integrado).
+**Última atualização:** 2026-11-23 · **Turno:** Claude (DL3-PR08C integrado).
 
 ## Depois da Fase 3 — decisões de produto no simulador (D0) — EM ANDAMENTO
 
@@ -18,8 +18,8 @@ Revisão 1). O PR07A foi cortado em três pelo planejador.
 | [DL3-PR07A2](../specs/derivatives/fase3/DL3-PR07A2.md) | bruto assinado, executado e projetado; série de proteção | MERGEADO (PR #164) |
 | [DL3-PR08A](../specs/derivatives/fase3/DL3-PR08A.md) | resultado da estrutura no vencimento | MERGEADO (PR #165) |
 | [DL3-PR08B](../specs/derivatives/fase3/DL3-PR08B.md) | a estrutura montada em parte: posição executada ao lado da planejada | MERGEADO (PR #166) |
-| DL3-PR08C | borboleta de puts, travas e iron condor conferidos, com quantidades, multiplicador e custos | cartão a publicar |
-| depois do PR08C | estimativa antes do vencimento conferida com o QuantLib; calendário da B3 | um cartão para cada |
+| [DL3-PR08C](../specs/derivatives/fase3/DL3-PR08C.md) | borboleta de puts, travas e iron condor conferidos, com quantidades, multiplicador e custos | MERGEADO (PR #167) |
+| a seguir | estimativa antes do vencimento conferida com o QuantLib; calendário da B3 | um cartão para cada; o primeiro a publicar |
 | DL3-PR07A3 | cobertura própria ou de outra boleta, com autorização na prévia | atrás da frente PR08 |
 | DL3-PR07A4 | DP-13: relatório contraditório e evento externo | atrás da frente PR08 |
 | DL3-PR07B | DP-02 e DP-03: zeragem e borboleta em simulação | atrás da frente PR08 |
@@ -98,11 +98,33 @@ Entregue pelo DL3-PR08B (`pricing/partial_position.py`, 89 linhas):
   Francisco o revisor não repetiu a suíte; conferiu as evidências e rodou o oráculo
   próprio em 8.000 planos aleatórios, sem divergência.
 
-Pendente para o próximo cartão (testes; o código está certo): plano com exatamente oito
-séries em `partial_view`; símbolo que não é texto.
+Entregue pelo DL3-PR08C (só testes; nenhuma linha de `backend/` mudou):
+- 20 casos novos com valores escritos à mão: borboleta de puts, as quatro travas, iron
+  condor, condor e borboleta com quantidade, multiplicador e custos ilustrativos, e o
+  condor montado em parte.
+- Exemplo fixado em teste: com só as duas vendas do condor executadas, a posição tem
+  crédito de 5,00 e perda ilimitada, enquanto o plano perde no máximo 2,00.
+- Fechadas as duas lacunas do DL3-PR08B: plano com exatamente oito séries e símbolo que
+  não é texto.
+- Quatro defeitos plantados passavam pelos testes anteriores e agora são detectados:
+  resultado por perna em ordem invertida; resultado por perna sem o multiplicador; plano
+  de oito séries recusado; símbolo não textual aceito.
+- Portão da cabeça `1ceba84`, pelo implementador: Linux x86_64 e macOS, 11.356
+  aprovados, 16 pulados, 261 subtestes; mypy estrito e Pyright sem erro. O revisor não
+  repetiu a suíte; conferiu o manifesto de 86 evidências e comparou os 80 valores
+  escritos nos testes com o oráculo próprio, sem divergência.
+- Os custos dos cenários são ilustrativos. A tabela real segue pendência de Francisco.
 
-Próxima ação (uma só): Claude publica o supercartão do DL3-PR08C e Codex o abre em
-rascunho. O DP-01 só vira código depois de adendo à G3 da ADR-0024 assinado por Francisco.
+Observação de processo, fora do portão do cartão: numa rodada extra de integração no Mac,
+`test_pr09_pg_dump_restore_verify_live` encontrou o Postgres do host e gerou um `pg_dump`
+em pasta temporária antes de falhar. O implementador relatou ter excluído a cópia sem
+abri-la; o revisor não tem acesso àquela pasta e não confirmou a exclusão. Recomendação
+do revisor, a decidir por Francisco: testes de `tests/integration` só no contêiner Linux
+isolado, nunca no host com banco vivo.
+
+Próxima ação (uma só): Claude publica o supercartão da estimativa antes do vencimento
+conferida com o QuantLib e Codex o abre em rascunho. O DP-01 só vira código depois de
+adendo à G3 da ADR-0024 assinado por Francisco.
 
 ## Fase 03 — Motor da boleta em simulador (D0) — FECHADA (estado A)
 
