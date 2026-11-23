@@ -4,7 +4,7 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-23 · **Turno:** Claude (DL3-PR08C integrado).
+**Última atualização:** 2026-11-23 · **Turno:** Claude (DL3-PR08D e Adendo 1 da ADR-0024 integrados).
 
 ## Depois da Fase 3 — decisões de produto no simulador (D0) — EM ANDAMENTO
 
@@ -19,7 +19,8 @@ Revisão 1). O PR07A foi cortado em três pelo planejador.
 | [DL3-PR08A](../specs/derivatives/fase3/DL3-PR08A.md) | resultado da estrutura no vencimento | MERGEADO (PR #165) |
 | [DL3-PR08B](../specs/derivatives/fase3/DL3-PR08B.md) | a estrutura montada em parte: posição executada ao lado da planejada | MERGEADO (PR #166) |
 | [DL3-PR08C](../specs/derivatives/fase3/DL3-PR08C.md) | borboleta de puts, travas e iron condor conferidos, com quantidades, multiplicador e custos | MERGEADO (PR #167) |
-| a seguir | estimativa antes do vencimento conferida com o QuantLib; calendário da B3 | um cartão para cada; o primeiro a publicar |
+| [DL3-PR08D](../specs/derivatives/fase3/DL3-PR08D.md) | estimativa antes do vencimento, compondo os preços das pontes da Fase 2 | MERGEADO (PR #169) |
+| a seguir | calendário da B3: conferir o que já existe frente à carta | planejador confere antes de escrever o cartão |
 | DL3-PR07A3 | cobertura própria ou de outra boleta, com autorização na prévia | atrás da frente PR08 |
 | DL3-PR07A4 | DP-13: relatório contraditório e evento externo | atrás da frente PR08 |
 | DL3-PR07B | DP-02 e DP-03: zeragem e borboleta em simulação | atrás da frente PR08 |
@@ -118,13 +119,43 @@ Entregue pelo DL3-PR08C (só testes; nenhuma linha de `backend/` mudou):
 Observação de processo, fora do portão do cartão: numa rodada extra de integração no Mac,
 `test_pr09_pg_dump_restore_verify_live` encontrou o Postgres do host e gerou um `pg_dump`
 em pasta temporária antes de falhar. O implementador relatou ter excluído a cópia sem
-abri-la; o revisor não tem acesso àquela pasta e não confirmou a exclusão. Recomendação
-do revisor, a decidir por Francisco: testes de `tests/integration` só no contêiner Linux
-isolado, nunca no host com banco vivo.
+abri-la. Conferência posterior de Francisco, no Mac, em 23/11/2026: a busca por arquivos
+`quimera_pg18_*.dump` na pasta temporária achou só três arquivos sintéticos de 19 bytes,
+criados pelo teste unitário `test_manifest_schema_hash_and_restore_update`; nenhum dump
+do teste de integração. Desde o DL3-PR08D o cartão manda rodar `tests/integration` só no
+contêiner Linux isolado, e o implementador cumpriu.
 
-Próxima ação (uma só): Claude publica o supercartão da estimativa antes do vencimento
-conferida com o QuantLib e Codex o abre em rascunho. O DP-01 só vira código depois de
-adendo à G3 da ADR-0024 assinado por Francisco.
+Entregue pelo DL3-PR08D (`pricing/pre_expiry.py`, 90 linhas):
+- `pre_expiry_estimate(legs, outcomes)` recebe um `PricingOutcome` por perna, vindo das
+  pontes da Fase 2 (`price_contract`, BSM; `price_american_contract`, CRR), e devolve
+  entrada, valor teórico, resultado depois dos custos, resultado por perna e os mesmos
+  `outcomes`. O módulo não calcula preço teórico nem escolhe premissa.
+- Recusa preço recusado pela ponte (com a posição da perna e o motivo), preço de outra
+  série e preços calculados com preço do ativo ou prazo diferentes. Vencimentos
+  diferentes ficam fora da cobertura.
+- Fixado em teste: no dia do vencimento, a estimativa é exatamente o resultado no
+  vencimento, para as borboletas de calls americanas e de puts europeias.
+- Conferência com o QuantLib 1.44, fora do repositório, em 18 combinações de perna e
+  preço do ativo: puts europeias até 1,4 × 10⁻¹⁴; calls americanas até R$ 0,0012 por
+  unidade, que é o erro de discretização da árvore de 200 passos.
+- Portão da cabeça `0266c58`, pelo implementador: Linux x86_64 e macOS, 11.405
+  aprovados, 16 pulados, 261 subtestes; mypy estrito e Pyright sem erro. O revisor não
+  repetiu a suíte; conferiu o manifesto de 101 evidências e rodou os 39 testes do seu
+  protótipo independente contra o módulo entregue, todos aprovados.
+- Limitação conhecida, da mesma classe da do `expiry_payoff`: com expoentes decimais
+  muito distantes (prêmio `1E-900000000`), a conta exata esgota a memória em vez de
+  recusar. Só alcançável por entrada construída de propósito; não há dado externo
+  ligado. O cartão do limite de escala cobre os dois módulos.
+
+ADR-0024, Adendo 1 (PR #168, commit de autoria de Francisco, integrado em 23/11/2026):
+G3 ganha a modalidade B, com teto em reais para o pico estimado de garantia adicional
+da conta, e a exceção da venda a preço melhor. A modalidade A (teto bruto) não muda. O
+adendo é desenho: não autoriza implementação, acesso real nem ordens. Registra duas
+condições para a liberação futura do D1 e a prova de saída do piloto em papel. A DP-01
+deixa de depender de adendo e passa a depender de cartão próprio, ainda não escrito.
+
+Próxima ação (uma só): Claude confere o calendário da B3 que já existe frente ao item 3
+da carta de Francisco e publica o cartão seguinte.
 
 ## Fase 03 — Motor da boleta em simulador (D0) — FECHADA (estado A)
 
