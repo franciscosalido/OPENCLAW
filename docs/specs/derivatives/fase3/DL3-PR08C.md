@@ -194,3 +194,45 @@ com o oráculo próprio e com o OptionLab, fora do repositório.
 
 Próximo da frente: estimativa antes do vencimento conferida com o QuantLib. Depois, o
 calendário da B3. PR07A3, PR07A4 e PR07B continuam atrás desta frente.
+
+## Revisão adversarial (Claude) — GO na primeira rodada, cabeça `1ceba84`
+
+Pela regra de processo de Francisco, o revisor **não executou a suíte, a tipagem nem
+mutantes** nesta cabeça: o implementador rodou tudo em Linux x86_64 e em macOS. O revisor
+leu o diff, conferiu as evidências pelo SHA-256 e usou o seu oráculo independente, que não
+é a suíte.
+
+| Verificação | Resultado | Quem |
+|---|---|---|
+| Suíte sem integração, Linux x86_64 (contêiner emulado em Mac ARM64, ELF AMD64) e macOS | 11.356 aprovados, 16 pulados, 261 subtestes nos dois | implementador; logs conferidos |
+| mypy estrito e Pyright, nos dois sistemas | 0 erros | implementador; logs conferidos |
+| 12 mutantes do §4, nos dois sistemas | todos detectados pelos testes novos | implementador; logs conferidos |
+| Mutantes 1 a 4 na base | sobrevivem aos 66 testes dos dois módulos (dois sistemas) e aos 11.336 do portão da base (macOS) | implementador; logs conferidos |
+| Manifesto de 86 evidências (`67990ba7…8b60`) e hashes dos dois relatórios | conferem | revisor |
+| Diff | três arquivos, só acréscimo; `backend/` intacto; nenhum import novo; nenhuma linha de teste acima de 100 colunas | revisor |
+| Cópia do cartão | SHA-256 `6f28b176…464d`, igual ao publicado | revisor |
+| 80 valores escritos nos testes de G1 a G8 (perfis, resultados e pernas) contra o oráculo do planejador | sem divergência | revisor |
+| G9, G10, H1 e H2 | literais iguais aos do cartão, por leitura | revisor |
+
+Antes de publicar o cartão, o planejador já havia conferido todos os esperados no módulo
+da `main` (41 verificações) e no OptionLab 1.9.7, fora do repositório.
+
+Limite desta revisão: sem mutantes próprios do revisor nesta cabeça, a força dos testes
+repousa nos mutantes do implementador, nos da skill e no protótipo que o planejador rodou
+antes de publicar o cartão (27 defeitos, com os mesmos quatro sobreviventes na base).
+
+Observações, nenhuma bloqueante:
+
+1. **Rodada extra de integração no Mac, fora do portão do cartão.** O teste
+   `test_pr09_pg_dump_restore_verify_live` encontrou o Postgres do host, gerou um `pg_dump`
+   em pasta temporária e falhou no cache do `uv`. O implementador relatou ter excluído a
+   cópia sem abri-la. O revisor não tem acesso à pasta temporária e não confirmou a
+   exclusão. Recomendação, a decidir por Francisco: integração só no contêiner isolado.
+2. **H1 não confere `executed_legs` vazio** no plano sem execução. O cartão não pedia; o
+   cenário E1 do DL3-PR08B já cobre.
+
+Nenhum código de terceiros entrou. O OptionLab 1.9.7 serviu de segunda conferência, fora
+do repositório, pelo planejador, pelo implementador e pela skill.
+
+Relatórios da skill lidos depois de formado o parecer, com SHA-256 conferidos
+(`51be492b…e6be` e `9dbf1d16…0583`): GO, sem bloqueante e sem proposta de simplificação.
