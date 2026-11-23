@@ -160,3 +160,43 @@ zeragem e borboleta no motor). Atrás deles, pelas decisões de Francisco de 23/
 apresentação da montagem parcial; repetir, completar e ajustar estruturas, com boleta
 concluída cedendo só o que o livro comprovar livre. O esquema JSON de saída da prévia é
 corrigido antes do primeiro consumidor externo.
+
+## Revisão adversarial (Claude) — GO na primeira rodada, cabeça `a2ffa68`
+
+Pela regra de processo de Francisco, o revisor **não executou a suíte, a tipagem nem os
+mutantes** desta cabeça. Leu o diff, conferiu as evidências pelo SHA-256 e rodou os cenários
+do seu protótipo, escrito antes do cartão.
+
+| Verificação | Resultado | Quem |
+|---|---|---|
+| Suíte sem integração, Linux x86_64 e macOS | 11.459 aprovados, 16 pulados, 261 subtestes nos dois | implementador; logs conferidos |
+| mypy estrito e Pyright, nos dois sistemas | 0 erros | implementador; logs conferidos |
+| Commit vermelho | N1 e os três testes alterados falham; N3 e N4 passam na base | implementador; logs conferidos |
+| Testes antigos contra a cabeça | só o W2 e os dois X6 mudam de resultado | implementador; log conferido |
+| 5 mutantes do §5 e 1 adicional, nos dois sistemas | todos detectados | implementador; logs conferidos |
+| Integração | só no contêiner Linux isolado: 31 aprovados, 206 pulados | implementador; evidências conferidas |
+| Manifesto de 88 evidências (`6a9a9d78…f91a`) e hashes dos dois relatórios | conferem | revisor (27 arquivos) e Francisco (os 88, no Mac) |
+| Diff | cinco arquivos; em produção, só `models.py`, com 220 linhas (teto 221) | revisor |
+| Âncoras e recibos das sessões | os quatro recibos e os três resumos iguais byte a byte entre base e cabeça | implementador; log conferido |
+| Cópia do cartão | SHA-256 `34609609…7292`, igual ao publicado | revisor |
+| 4 cenários do protótipo do planejador e os 15 do DL3-PR07A3C ainda válidos | todos aprovados | revisor |
+
+A mudança de produção é equivalente à do protótipo do planejador. O implementador acrescentou
+um teste que o cartão não pediu e que vale: a ordenação também é conferida quando a prévia é
+lida direto de JSON, e não só quando nasce de uma boleta.
+
+Limite desta revisão: sem mutantes próprios do revisor nesta cabeça.
+
+Observação, não bloqueante, que o cartão do planejador deixou de prever:
+
+1. **Recibo emitido entre o PR #173 e este, com autorizações fora da nova ordem, não é mais
+   lido.** O leitor confere se o corpo gravado é o que o modelo atual produziria; com a
+   ordenação na validação, um corpo gravado na ordem informada é recusado («conteúdo da
+   prévia incompleto ou não canônico»), mesmo com resumo e âncora corretos. O implementador
+   mediu: 49 de 65 entradas sintéticas. Não há recibo real nessa condição: o formato durou
+   horas, só em simulador, e as três sessões oficiais não usam autorização. Fica a lição
+   para o que vier com dados reais: mudança que altere o corpo canônico da prévia precisa de
+   versão de formato ou de leitor da revisão emissora.
+
+Relatórios da skill lidos depois de formado o parecer, com SHA-256 conferidos
+(`0cb2047e…4b04` e `791ba81f…5f80`): sem bloqueante.
