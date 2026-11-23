@@ -1078,3 +1078,34 @@ def test_b8_gross_on_ticket_reconciliation_only(s: Session) -> None:
     assert last.kind == E.RECONCILE and first.state == T.STOPPED
     assert receipt_gross(s) == {last.seq: {"signed": "50.00", "executed": "0.00",
                                           "projected": "0.00"}}
+
+
+def test_h1_expired_ticket_projects_no_remaining_quantity(s: Session) -> None:
+    e = s.new()
+    s.arm(e)
+    s.q("A", 3600.000001, ask="1")
+    assert e.state == T.EXPIRED
+    assert e.gross() == (D("25.00"), D("0.00"), D("0.00"))
+
+
+def _stopped_with_two_open_sell_orders(s: Session) -> TicketEngine:
+    e = s.confirmed()
+    for second in (3, 4):
+        s.q("A", second, ask="1.00", size=2)
+    s.q("B", 5, bid="1.54", size=1)
+    s.q("A", 6, ask="1.00", size=2)
+    return e
+
+
+def test_h2_stopped_ticket_sums_both_open_orders_of_one_series(s: Session) -> None:
+    e = _stopped_with_two_open_sell_orders(s)
+    assert e.state == T.STOPPED
+    assert e.orders == {"T1:A:1": O.PARTIAL, "T1:B:1": O.PARTIAL, "T1:B:2": O.LIVE}
+    assert e.gross() == (D("25.00"), D("7.54"), D("16.04"))
+
+
+def test_h3_pending_cancel_preserves_open_projection(s: Session) -> None:
+    e = _stopped_with_two_open_sell_orders(s)
+    s.cancel(e, "T1:B:1", 7)
+    assert e.orders["T1:B:1"] == O.CANCEL_REQUESTED
+    assert e.gross() == (D("25.00"), D("7.54"), D("16.04"))

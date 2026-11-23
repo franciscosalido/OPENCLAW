@@ -4,7 +4,7 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-22 · **Turno:** Claude (DL3-PR07A2 integrado).
+**Última atualização:** 2026-11-22 · **Turno:** Claude (DL3-PR08A integrado).
 
 ## Depois da Fase 3 — decisões de produto no simulador (D0) — EM ANDAMENTO
 
@@ -16,9 +16,12 @@ Revisão 1). O PR07A foi cortado em três pelo planejador.
 |---|---|---|
 | [DL3-PR07A1](../specs/derivatives/fase3/DL3-PR07A1.md) | DP-14, DP-12, DP-15 e higiene | MERGEADO (PR #163) |
 | [DL3-PR07A2](../specs/derivatives/fase3/DL3-PR07A2.md) | bruto assinado, executado e projetado; série de proteção | MERGEADO (PR #164) |
-| DL3-PR07A3 | cobertura própria ou de outra boleta, com autorização na prévia | cartão a publicar |
-| DL3-PR07A4 | DP-13: relatório contraditório e evento externo | depois do A3 |
-| DL3-PR07B | DP-02 e DP-03: zeragem e borboleta em simulação | depois do PR07A |
+| [DL3-PR08A](../specs/derivatives/fase3/DL3-PR08A.md) | resultado da estrutura no vencimento | MERGEADO (PR #165) |
+| DL3-PR08B | a mesma borboleta montada em parte: posição executada ao lado da planejada | cartão a publicar |
+| depois do PR08B | borboleta de puts, travas e iron condor; estimativa antes do vencimento; calendário da B3 | um cartão para cada |
+| DL3-PR07A3 | cobertura própria ou de outra boleta, com autorização na prévia | atrás da frente PR08 |
+| DL3-PR07A4 | DP-13: relatório contraditório e evento externo | atrás da frente PR08 |
+| DL3-PR07B | DP-02 e DP-03: zeragem e borboleta em simulação | atrás da frente PR08 |
 
 Entregue pelo DL3-PR07A1 (37 linhas de produção):
 - No instante exato da validade o motor recusa antes de gastar a decisão, ocupar o livro
@@ -53,11 +56,33 @@ MCP/Docker na cabeça candidata e entrega cabeça, arquitetura, imagem, comandos
 manifesto. O revisor analisa e fica dispensado de repetir. A imagem disponível é ARM64;
 x86_64 só fica validado quando o revisor roda por conta própria.
 
-Pendente para o próximo cartão (testes; o código está certo):
-- bruto de boleta `EXPIRED`; duas ordens abertas da mesma série depois da parada;
-  cancelamento pedido depois da parada. Cenários fixados nas contraprovas da skill.
+Frente PR08 — análise de estruturas (autorização de Francisco de 22/11/2026, em
+[AUTORIZACAO_ANALISE_ESTRUTURAS_2026-11-22.md](../specs/derivatives/fase3/AUTORIZACAO_ANALISE_ESTRUTURAS_2026-11-22.md)).
+Por decisão dele, esta frente passa à frente do PR07A3, do PR07A4 e do PR07B.
 
-Próxima ação (uma só): Claude publica o supercartão do DL3-PR07A3 e Codex o abre em
+Entregue pelo DL3-PR08A (`pricing/expiry_payoff.py`, 140 linhas, só biblioteca padrão):
+- Resultado no vencimento de estrutura de 1 a 8 pernas de opções do mesmo ativo e do
+  mesmo vencimento: resultado por perna, total depois dos custos, entrada (positivo é
+  débito), equilíbrios como fração exata, ganho máximo e perda máxima, com ilimitado
+  marcado como ilimitado. Dinheiro em `Decimal` exato; `float` é recusado.
+- Primeira prova: a borboleta de calls 95/100/105 com débito 2 dá −2, +3 e −2, com
+  equilíbrios em 97 e 103.
+- O módulo não se liga ao motor da boleta, não estima valor antes do vencimento e não
+  trata vencimentos diferentes.
+- Os três testes que faltavam no DL3-PR07A2 entraram.
+- Portão da cabeça `6a8cee4`: Linux ARM64 pelo implementador e x86_64 pelo revisor, 11.303
+  aprovados, 16 pulados, 261 subtestes; mypy estrito e Pyright sem erro. 30 mutantes do
+  revisor mortos. Sem divergência contra o oráculo do planejador em 20.000 estruturas.
+
+Referências (decisão final de Francisco, 22/11/2026): o QuantLib segue como oráculo
+principal de preço. O OptionLab é usado fora da aplicação, só para conferir estratégias.
+Nenhum dos dois é dependência do repositório. No DL3-PR08A o OptionLab 1.9.7 coincidiu
+com o módulo em 70.007 preços, com diferença máxima de 1,4 × 10⁻¹⁴.
+
+Limite conhecido: expoentes decimais muito distantes entre si custam memória e tempo no
+módulo de resultado. O cartão que ligá-lo a dados externos fixa um limite de escala.
+
+Próxima ação (uma só): Claude publica o supercartão do DL3-PR08B e Codex o abre em
 rascunho. O DP-01 só vira código depois de adendo à G3 da ADR-0024 assinado por Francisco.
 
 ## Fase 03 — Motor da boleta em simulador (D0) — FECHADA (estado A)
