@@ -35,11 +35,14 @@ class Position(_Frozen):
     holdings: tuple[Holding, ...]
     pairs: tuple[tuple[Text, Text], ...]
 
-    def unpledged(self, symbol: str) -> int:
-        """Saldo da série na foto descontadas todas as posições vendidas que ela protege."""
+    def unpledged(self) -> dict[str, int]:
+        """Saldos da foto descontadas todas as posições vendidas que cada série protege."""
         balances = {row.symbol: row.balance for row in self.holdings}
-        pledged = sum(max(0, -balances[short]) for long, short in self.pairs if long == symbol)
-        return balances[symbol] - pledged
+        free = balances.copy()
+        for long, short in self.pairs:
+            free[long] -= max(0, -balances[short])
+        return free
+
 
 
 class Fill(_Frozen):
@@ -87,7 +90,8 @@ def plan_legs(draft: TicketDraft, position: Position) -> LegPlan:
         if (a.underlying, a.kind, a.expiry, a.multiplier) != (
                 b.underlying, b.kind, b.expiry, b.multiplier):
             raise SequenceRefusal("séries incompatíveis")
-    if any(position.unpledged(long) < 0 for long in owners.values()):
+    free = position.unpledged()
+    if any(free[long] < 0 for long in owners.values()):
         raise SequenceRefusal("proteção inicial insuficiente")
     buys = {leg.symbol: leg for leg in draft.legs if leg.side is Side.BUY}
     sales = tuple(leg for leg in draft.legs if leg.side is Side.SELL)
@@ -116,7 +120,7 @@ def plan_legs(draft: TicketDraft, position: Position) -> LegPlan:
                 continue
             candidates.append((source, closing))
         if not candidates and rows[sale.symbol].balance > 0:
-            if sale.quantity > position.unpledged(sale.symbol):
+            if sale.quantity > free[sale.symbol]:
                 raise SequenceRefusal("saldo livre insuficiente")
             dependencies.append((sale.symbol, sale.symbol, True))
             continue
@@ -196,7 +200,7 @@ class ReservationBook:
     def _free_long(self, plan: LegPlan, symbol: str) -> int:
         committed = sum(o.live + o.filled for (account, _), o in self._orders.items()
                         if account == plan.position.account and o.leg.symbol == o.source == symbol)
-        return plan.position.unpledged(symbol) - committed
+        return plan.position.unpledged()[symbol] - committed
 
     def _admission(self, plan: LegPlan, ticket: str) -> dict[tuple[str, str, str], int]:
         account = self._check(plan, ticket)

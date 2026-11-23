@@ -1017,3 +1017,16 @@ def test_z4_free_stock_and_confirmed_buybacks_have_separate_capacity() -> None:
     assert balances() == (0, 0)
     with pytest.raises(SequenceRefusal, match="saldo livre indisponível"):
         book.admissible(plan_legs(zeroing_draft(1), p), ticket="T3")
+
+
+def test_z3_orders_on_other_free_series_do_not_reduce_capacity() -> None:
+    """Na mesma conta, vender X não compromete o saldo inicial de A nem o inverso."""
+    photo = Position(account="sim", holdings=(holding("A", 4), holding("X", 3)), pairs=())
+    a = plan_legs(zeroing_draft(4), photo)
+    x = plan_legs(draft(leg("X", Side.SELL, "1", 3), net="-3", gross="3"), photo)
+    book = ReservationBook()
+    book.reserve(x, x.legs[0], "x", 2, ticket="T1")
+    book.confirm_sale("sim", "x", "executed-x", 1)
+    assert book.available(a, a.legs[0], ticket="T2") == 4
+    book.reserve(a, a.legs[0], "a", 4, ticket="T2")
+    assert book.available(x, x.legs[0], ticket="T1") == 1
