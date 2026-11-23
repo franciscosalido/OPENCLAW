@@ -1,7 +1,7 @@
 """Orquestra uma única boleta assinada no replay síncrono D0."""
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 import re
 from types import MappingProxyType
@@ -315,8 +315,8 @@ class TicketEngine:
             reason = ("correção oficial" if r.corrects in self._facts
                       else "correção sem fato original")
         elif r.fact is not None and (prior := self._facts.get(r.fact)) is not None:
-            if (prior == r and type(prior.quantity) is type(r.quantity)
-                    and str(prior.price) == str(r.price)):
+            if (prior == r._replace(ts=r.ts.astimezone(UTC)) and
+                    type(prior.quantity) is type(r.quantity) and str(prior.price) == str(r.price)):
                 return False
             reason = "fato repetido com conteúdo diferente"
         elif (order.state, r.event) not in ORDER_TRANSITIONS:
@@ -363,7 +363,7 @@ class TicketEngine:
         self._record(r.event, r.ts, **data)
         self._account_report(order, r.ts, fill)
         if r.fact is not None:
-            self._facts[r.fact] = r
+            self._facts[r.fact] = r._replace(ts=r.ts.astimezone(UTC))
         if dest == O.UNCERTAIN:
             self._halts.hold(self._account, r.order_id)
             self._move(E.UNCERTAIN, r.ts)
