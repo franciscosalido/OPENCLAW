@@ -1378,3 +1378,54 @@ def test_x12_exhausted_surplus_stops_after_partial_strategy(s: Session) -> None:
     last = s.receipts[2].events[-1]
     assert last.kind == E.STOP and json.loads(last.payload)["gross"] == {
         "signed": "6.00", "executed": "3.00", "projected": "3.00"}
+
+
+def test_x6_interleaved_grants_follow_priority_within_each_series(s: Session) -> None:
+    """A mesma origem em duas séries preserva a prioridade específica da venda."""
+    s.q("C", 1)
+    s.q("D", 1)
+    pos = Position(account="sim", holdings=tuple(holding(x) for x in "ABCD"),
+                   pairs=(("A", "B"), ("C", "D")))
+    for origin, symbols in (("P", "AC"), ("Q", "A")):
+        plan = plan_legs(draft(*(leg(symbol, Side.BUY, "1", 2) for symbol in symbols)), pos)
+        s.res.admit(plan, ticket=origin)
+        for buy in plan.legs:
+            s.res.confirm_buy(plan, buy, origin + buy.symbol, 2, ticket=origin)
+        s.res.close("sim", origin)
+    sales = draft(leg("B", Side.SELL, "1.50", 2), leg("D", Side.SELL, "1.50", 2),
+                  net="-6", gross="6")
+    ticket = authorized(sales, ("C", "P", 2), ("A", "Q", 2), ("A", "P", 2))
+    e = s.new(pos=pos, legs=ticket.legs, coverage=ticket.coverage,
+              net_limit=ticket.net_limit, gross_cap=ticket.gross_cap)
+    e.confirm(s.dec(e), at(2))
+    assert [(oid, qty, order_rows(s.receipts[0], oid)[0]["origin"])
+            for oid, qty, _, _ in s.submitted()] == [("T1:B:1", 2, "Q"), ("T1:D:1", 2, "P")]
+
+
+def test_x1_reconciled_stop_makes_owned_fills_available(s: Session) -> None:
+    """O poll sem registro da venda libera as dez compras da origem parada."""
+    owner = s.confirmed()
+    s.step(VenueTimeout(type="timeout", seq=3, ts=at(2), call="submit", registered=False))
+    s.q("A", 3, ask="1")
+    assert owner.orders[B] == O.UNCERTAIN and third_party_surplus(s) == 0
+    owner.reconcile(B, at(4))
+    assert owner.state == T.STOPPED and third_party_surplus(s) == 10
+
+
+def test_x1_uncertain_borrowed_order_keeps_origin_through_poll(s: Session) -> None:
+    """O pedido incerto mantém a origem e o saldo ocupado até conciliar ambos os fills."""
+    stop_origin(s)
+    e = borrower(s)
+    s.step(VenueTimeout(type="timeout", seq=9, ts=at(5), call="submit", registered=True))
+    e.confirm(s.dec(e), at(5))
+    oid = "T2:B:1"
+    assert e.orders == {oid: O.UNCERTAIN} and third_party_surplus(s) == 0
+    request, = order_rows(s.receipts[1], oid)
+    assert request["origin"] == "T1" and request["protection"] == "A"
+    s.q("B", 6, bid="1.50", size=3)
+    s.q("B", 7, bid="1.50", size=1)
+    assert e.state == T.UNCERTAIN
+    e.reconcile(oid, at(7))
+    assert e.state == T.COMPLETED and third_party_surplus(s) == 0
+    assert [(r["quantity"], r["origin"]) for r in order_rows(s.receipts[1], oid)
+            if "execution" in r] == [(3, "T1"), (1, "T1")]
