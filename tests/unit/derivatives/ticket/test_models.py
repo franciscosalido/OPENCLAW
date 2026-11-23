@@ -243,8 +243,8 @@ def test_w1_coverage_grant_and_ticket_validation() -> None:
         TicketDraft.model_validate(dict(draft()) | {"coverage": grants})
 
 
-def test_w2_signed_coverage_is_sorted_only_in_the_digest() -> None:
-    """O recibo preserva a ordem informada e a assinatura usa a ordem canônica."""
+def test_w2_receipt_and_signed_coverage_use_canonical_order() -> None:
+    """O recibo e os bytes assinados preservam a mesma prioridade nas duas permutações."""
     from backend.derivatives.ticket.receipt import Receipt
     from tests.unit.derivatives.ticket.test_sequencing import BUY, SELL, draft as reference
 
@@ -267,10 +267,11 @@ def test_w2_signed_coverage_is_sorted_only_in_the_digest() -> None:
     assert signed(g1 | {"quantity": 5}, g9).digest != authorized.digest
     receipt = Receipt()
     plain = receipt.append_preview(TIME, empty)
-    covered = receipt.append_preview(TIME, authorized)
     assert "coverage" not in json.loads(plain.payload)["preview"]
-    assert json.loads(covered.payload)["preview"]["coverage"] == [g9, g1]
-    assert covered.read_preview() == authorized and receipt.verify()
+    for p in (authorized, signed(g1, g9)):
+        covered = receipt.append_preview(TIME, p)
+        assert json.loads(covered.payload)["preview"]["coverage"] == [g1, g9]
+        assert covered.read_preview() == p and receipt.verify()
 
 
 def test_k1_coverage_digest_orders_series_before_origin() -> None:
@@ -283,3 +284,33 @@ def test_k1_coverage_digest_orders_series_before_origin() -> None:
         p = Preview.from_draft(authorized(base(BUY, SELL), *grants), partial_exposure=D("10"))
         assert p.digest == "364d378948c544bc1afbe75e4f6b7d50b3c9f7e7fd86386f919adfc9971a601e"
         assert fragment in canonical_bytes(p)
+
+
+def test_n1_one_grant_order_from_draft_to_receipt() -> None:
+    """Permutações e caixa da série preservam o modelo, o digest histórico e o recibo."""
+    from backend.derivatives.ticket.receipt import Receipt
+    from tests.unit.derivatives.ticket.test_sequencing import BUY, SELL, authorized, draft as base
+
+    ticket = base(BUY, SELL)
+    a1, a9, b1 = ("A", "T1", 4), ("A", "T9", 2), ("B", "T1", 1)
+    for inputs, expected, expected_digest in (
+        ((a9, a1), (a1, a9), "f61d4551b8be2caec9f54774d536acf5fbc2655578555dc4843862de3e86a84e"),
+        ((b1, a9), (a9, b1), "364d378948c544bc1afbe75e4f6b7d50b3c9f7e7fd86386f919adfc9971a601e"),
+    ):
+        reference = authorized(ticket, *expected)
+        canonical = Preview.from_draft(reference, partial_exposure=D("10"))
+        for pair in (inputs, inputs[::-1]):
+            proposal = authorized(ticket, *pair)
+            assert proposal == reference
+            shown = Preview.from_draft(proposal, partial_exposure=D("10"))
+            assert shown == canonical and shown.digest == expected_digest
+            assert tuple((g.series, g.origin, g.quantity) for g in shown.coverage) == expected
+            receipt = Receipt()
+            event = receipt.append_preview(TIME, shown)
+            assert json.loads(event.payload)["preview"]["coverage"] == [
+                {"series": series, "origin": origin, "quantity": qty}
+                for series, origin, qty in expected]
+            assert event.read_preview() == shown and receipt.verify()
+    for series in ("b", "B"):
+        proposal = authorized(ticket, (series, "T1", 1), ("a", "T9", 2))
+        assert proposal == authorized(ticket, a9, b1)

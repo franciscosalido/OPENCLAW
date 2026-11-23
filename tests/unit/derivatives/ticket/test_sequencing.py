@@ -890,3 +890,26 @@ def test_k4_stopped_borrower_cannot_reserve_another_origin() -> None:
     with pytest.raises(SequenceRefusal, match="reserva indisponível"):
         book.reserve(plan, sale, "borrow", 1, ticket="T2", origin="T1")
     assert book.available(plan, sale, ticket="T3", origin="T1") == 4
+
+
+def test_n4_live_reservation_survives_borrower_stop_until_exact_release() -> None:
+    """A cedente recupera apenas o saldo vivo que a venue confirmou cancelado."""
+    book, _ = surplus_book()
+    plan = sale_only(4)
+    sale = plan.legs[0]
+    book.admit(plan, ticket="T2")
+    book.reserve(plan, sale, "borrow", 4, ticket="T2", origin="T1")
+
+    def balances() -> tuple[int, int]:
+        return (book.available(plan, sale, ticket="T3", origin="T1"),
+                book.available(plan, sale, ticket="T2", origin="T1"))
+
+    book.close("sim", "T2")
+    assert balances() == (0, 0)
+    book.confirm_sale("sim", "borrow", "late", 1)
+    assert balances() == (0, 0)
+    with pytest.raises(SequenceRefusal, match="saldo final divergente"):
+        book.confirm_release("sim", "borrow", 2)
+    assert balances() == (0, 0)
+    book.confirm_release("sim", "borrow", 3)
+    assert balances() == (3, 0)
