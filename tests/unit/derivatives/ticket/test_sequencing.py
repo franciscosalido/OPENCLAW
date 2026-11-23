@@ -1156,3 +1156,19 @@ def test_b1_strike_is_required_positive_exact_money() -> None:
     for value in (D(0), D(-1), 1.5, D("0.001")):
         with pytest.raises(ValidationError):
             Holding.model_validate(fields | {"strike": value})
+
+
+def test_b2_only_allocated_sources_can_reserve_even_if_other_wing_filled() -> None:
+    plan = plan_legs(wing_draft(5, net="7", gross="19"), wing_photo())
+    a, c, sale = plan.legs
+    book = ReservationBook()
+    book.admit(plan, ticket="T1")
+    book.confirm_buy(plan, a, "fill-a", 5, ticket="T1")
+    book.confirm_buy(plan, c, "fill-c", 5, ticket="T1")
+    assert plan.protections_for(sale) == ("A",)
+    for source in ("C", ""):
+        assert book.available(plan, sale, ticket="T1", source=source) == 0
+        with pytest.raises(SequenceRefusal, match="reserva indisponível"):
+            book.reserve(plan, sale, "ordem", 1, ticket="T1", source=source)
+    assert book.available(plan, sale, ticket="T1") == 5
+    book.reserve(plan, sale, "ordem", 5, ticket="T1")
