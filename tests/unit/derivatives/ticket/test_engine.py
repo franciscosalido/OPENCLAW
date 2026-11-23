@@ -1673,3 +1673,72 @@ def test_y3_conflicting_price_text_preserved_in_receipt(s: Session) -> None:
     assert_report_divergence(s, A, "fato repetido com conteúdo diferente", 3, {
         "event": "venue_partial", "quantity": 3, "price": "1.00", "fact": "scale"}, at(3))
     assert e.gross().executed == D("3")
+
+
+@pytest.mark.parametrize("field", ["order_id", "event"])
+def test_identity_conflict_even_if_only_order_or_event_differs(s: Session, field: str) -> None:
+    """A mesma identidade não autoriza mudar só a ordem ou só o evento."""
+    e = s.confirmed()
+    first = VenueReport(A, E.VENUE_PARTIAL, 3, D("1"), at(3), fact="f")
+    e.on_reports([first], at(3))
+    other = first._replace(order_id=B) if field == "order_id" else first._replace(event=E.VENUE_FILL)
+    e.on_reports([other], at(4))
+    assert_report_divergence(s, other.order_id, "fato repetido com conteúdo diferente",
+                             0 if field == "order_id" else 3,
+                             {"event": other.event.value, "quantity": 3, "price": "1",
+                              "fact": "f"}, at(3))
+    assert e.gross().executed == 3 and e.orders == {A: O.PARTIAL, B: O.LIVE}
+
+
+def test_final_duplicate_keeps_send_due_to_first_fill(s: Session) -> None:
+    """A decisão após o lote vê as três compras executadas uma única vez."""
+    e = s.confirmed()
+    first = VenueReport(A, E.VENUE_PARTIAL, 3, D("1"), at(3), fact="f")
+    e.on_reports([first, first], at(3))
+    assert [(oid, qty) for oid, qty, _, _ in s.submitted()] == [(A, 10), (B, 3)]
+    assert e.gross().executed == 3 and not s.halts.blocked("sim")
+
+
+def test_reconcile_checks_duplicate_correction_and_valid_tail_atomically(s: Session) -> None:
+    """O poll incompatível não grava fatos; a repetição com poll correto grava cada um uma vez."""
+    e = timeout(s)
+    first = VenueReport(A, E.VENUE_PARTIAL, 3, D("1"), at(3), fact="f")
+    correction = first._replace(quantity=2, fact="change", corrects="f")
+    tail = first._replace(quantity=1, fact="tail")
+    e.on_reports([first, first, correction, tail], at(3))
+    before = s.receipts[0].events
+    s.venue.poll.return_value = OrderSnapshot(O.PARTIAL, 9, 1)
+    with pytest.raises(EngineRefusal):
+        e.reconcile(A, at(4))
+    assert s.receipts[0].events == before and e.orders[A] == O.UNCERTAIN
+    assert free(s) == 0 and not s.halts.divergent("sim")
+    s.venue.poll.return_value = OrderSnapshot(O.PARTIAL, 4, 6)
+    e.reconcile(A, at(5))
+    rows = s.receipts[0].events[len(before):]
+    assert [row.kind for row in rows] == [
+        E.RECONCILE, E.VENUE_PARTIAL, E.DIVERGENCE, E.VENUE_PARTIAL, E.RECONCILE, E.PAUSE]
+    discrepancy = json.loads(rows[2].payload)
+    assert discrepancy["reason"] == "correção oficial" and discrepancy["filled"] == 3
+    assert discrepancy["report"] == {"event": "venue_partial", "quantity": 2, "price": "1",
+                                     "fact": "change", "corrects": "f"}
+    assert e.gross().executed == 4 and free(s) == 4 and s.halts.divergent("sim")
+    e.on_reports([correction._replace(corrects=None)], at(6))
+    assert e.gross().executed == 6 and free(s) == 6 and e.orders[A] == O.PARTIAL
+    assert len(s.submitted()) == 1 and s.receipts[0].verify()
+
+
+def test_pending_corrected_report_is_never_posted_as_original(s: Session) -> None:
+    """A correção recebida na fila deixa a identidade livre para um fato original posterior."""
+    e = timeout(s)
+    correction = VenueReport(A, E.VENUE_PARTIAL, 2, D("1"), at(3), fact="c", corrects="absent")
+    e.on_reports([correction], at(3))
+    s.venue.poll.return_value = OrderSnapshot(O.LIVE, 0, 10)
+    e.reconcile(A, at(4))
+    divergences = [json.loads(row.payload) for row in s.receipts[0].events
+                   if row.kind == E.DIVERGENCE]
+    assert [(row["reason"], row["filled"]) for row in divergences] == [
+        ("correção sem fato original", 0)]
+    assert e.orders[A] == O.LIVE and e.gross().executed == 0
+    e.on_reports([correction._replace(corrects=None)], at(5))
+    assert e.orders[A] == O.PARTIAL and e.gross().executed == 2
+    assert s.halts.divergent("sim") and s.receipts[0].verify()
