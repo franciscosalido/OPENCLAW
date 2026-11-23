@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import time
 from datetime import date
@@ -23,6 +24,7 @@ from backend.derivatives.pricing.calendar import (
     load_calendars,
     third_friday_preceding,
 )
+from backend.derivatives.pricing.conventions import time_to_expiry
 from config.derivatives_config_model import Conventions
 
 CALENDARS = Path("config/calendars")
@@ -173,7 +175,7 @@ def test_b3_2026_has_247_open_days(b3: TradingCalendar) -> None:
 
 
 def test_b3_2026_closed_weekdays_match_quadro_a(b3: TradingCalendar) -> None:
-    assert sorted(b3.closed_weekdays) == sorted(QUADRO_A_2026)
+    assert {day for day in b3.closed_weekdays if day.year == 2026} == set(QUADRO_A_2026)
 
 
 def test_b3_christmas_eve_and_new_years_eve_closed(b3: TradingCalendar) -> None:
@@ -208,6 +210,66 @@ def test_b3_full_year_2026_counts_247(b3: TradingCalendar) -> None:
     # 01/01 e 31/12 sao fechados; as duas convencoes coincidem no ano cheio.
     assert business_days_between(b3, start, end, convention="(D0,Dv]") == 247
     assert business_days_between(b3, start, end, convention="[D0,Dv)") == 247
+
+
+# --- B3 2027, OC 057/2026-VNC -----------------------------------------------
+
+
+def test_b3_2027_has_249_open_days(b3: TradingCalendar) -> None:
+    assert sum(day.year == 2027 for day in b3.open_days) == 249
+
+
+def test_b3_2027_closed_weekdays_match_quadro_a(b3: TradingCalendar) -> None:
+    assert {day for day in b3.closed_weekdays if day.year == 2027} == {
+        date(2027, 1, 1), date(2027, 2, 8), date(2027, 2, 9), date(2027, 3, 26),
+        date(2027, 4, 21), date(2027, 5, 27), date(2027, 9, 7), date(2027, 10, 12),
+        date(2027, 11, 2), date(2027, 11, 15), date(2027, 12, 24), date(2027, 12, 31),
+    }
+
+
+def test_b3_2027_special_dates_and_weekends(b3: TradingCalendar) -> None:
+    for day in (date(2027, 1, 25), date(2027, 2, 10), date(2027, 7, 9)):
+        assert is_business_day(b3, day)
+    for day in (date(2027, 12, 24), date(2027, 12, 31)):
+        assert not is_business_day(b3, day)
+    for saturday in (date(2027, 5, 1), date(2027, 11, 20), date(2027, 12, 25)):
+        assert not is_business_day(b3, saturday)
+        assert saturday not in b3.closed_weekdays
+
+
+@pytest.mark.parametrize(
+    ("start", "end", "exclusive_start", "inclusive_start"),
+    [
+        (date(2026, 12, 20), date(2027, 1, 10), 11, 11),
+        (date(2026, 12, 30), date(2027, 1, 4), 1, 1),
+        (date(2027, 1, 1), date(2027, 12, 31), 249, 249),
+        (date(2026, 1, 1), date(2027, 12, 31), 496, 496),
+        (date(2027, 2, 5), date(2027, 2, 9), 0, 1),
+        (date(2027, 2, 5), date(2027, 2, 10), 1, 1),
+    ],
+)
+def test_b3_official_interval_counts(
+    b3: TradingCalendar, start: date, end: date, exclusive_start: int, inclusive_start: int
+) -> None:
+    assert business_days_between(b3, start, end, convention="(D0,Dv]") == exclusive_start
+    assert business_days_between(b3, start, end, convention="[D0,Dv)") == inclusive_start
+
+
+def test_b3_2027_monthly_candidates(b3: TradingCalendar) -> None:
+    for month, day in enumerate((15, 19, 19, 16, 21, 18, 16, 20, 17, 15, 19, 17), start=1):
+        assert third_friday_preceding(b3, 2027, month) == date(2027, month, day)
+
+
+def test_b3_time_to_january_2027_expiry(b3: TradingCalendar) -> None:
+    result = time_to_expiry(
+        b3, valuation_date=date(2026, 11, 23), expiry=date(2027, 1, 15), cfg=Conventions()
+    )
+    assert result.business_days == 35
+    assert result.basis == 252
+    assert result.year_fraction == 35 / 252
+    assert result.convention == "(D0,Dv]"
+    assert result.calendar_id == "B3_LISTED_TRADING"
+    assert result.is_expiry_day is False
 
 
 # --- ANBIMA ----------------------------------------------------------------
@@ -252,25 +314,33 @@ def test_anbima_third_friday_january_2027(anbima: TradingCalendar) -> None:
 # --- cobertura: recusa do desconhecido --------------------------------------
 
 
-def test_b3_coverage_is_only_2026(b3: TradingCalendar) -> None:
-    assert b3.coverage_years == frozenset({2026})
+def test_b3_coverage_is_2026_and_2027(b3: TradingCalendar) -> None:
+    assert b3.coverage_years == {2026, 2027}
+    with pytest.raises(CalendarCoverageError, match="2028"):
+        is_business_day(b3, date(2028, 1, 3))
 
 
 def test_anbima_coverage_is_2026_to_2028(anbima: TradingCalendar) -> None:
     assert anbima.coverage_years == frozenset({2026, 2027, 2028})
 
 
-def test_b3_count_into_2027_raises_coverage_error(b3: TradingCalendar) -> None:
-    with pytest.raises(CalendarCoverageError, match="2027"):
+def test_b3_count_into_2028_raises_coverage_error(b3: TradingCalendar) -> None:
+    with pytest.raises(CalendarCoverageError, match="2028"):
         business_days_between(
-            b3, date(2026, 12, 20), date(2027, 1, 10), convention="(D0,Dv]"
+            b3, date(2027, 12, 20), date(2028, 1, 10), convention="(D0,Dv]"
         )
 
 
-def test_b3_projection_2027_never_promoted_to_open_days(
-    b3: TradingCalendar,
-) -> None:
-    assert all(day.year == 2026 for day in b3.open_days)
+def test_unknown_year_with_open_projection_stays_out_of_coverage(tmp_path: Path) -> None:
+    calendar_id = CalendarId.B3_LISTED_TRADING
+    row = {"calendar_id": calendar_id.value, "calendar_date": "2030-01-02", "day_status": "unknown"}
+    bundle = _synthetic_bundle(2030, [row])
+    bundle["data"]["calendar_day_projection"] = [{**row, "day_status": "open"}]
+    path = tmp_path / "b3_calendar_2030.yaml"
+    path.write_text(json.dumps(bundle), encoding="utf-8")
+    calendar = build_calendar([load_calendar_bundle(path, expected_year=2030)], calendar_id)
+    assert calendar.coverage_years == frozenset()
+    assert calendar.open_days == frozenset()
 
 
 def test_is_business_day_refuses_uncovered_year(b3: TradingCalendar) -> None:
@@ -338,8 +408,8 @@ def test_third_friday_december_2026_is_open(b3: TradingCalendar) -> None:
 
 
 def test_third_friday_out_of_coverage_refused(b3: TradingCalendar) -> None:
-    with pytest.raises(CalendarCoverageError, match="2027"):
-        third_friday_preceding(b3, 2027, 1)
+    with pytest.raises(CalendarCoverageError, match="2028"):
+        third_friday_preceding(b3, 2028, 1)
 
 
 # --- build_calendar sintetico ------------------------------------------------
