@@ -164,6 +164,8 @@ class TicketEngine:
 
     def _propose(self, draft: TicketDraft, now: datetime) -> None:
         draft = TicketDraft.model_validate(draft)
+        if draft.coverage:
+            raise EngineRefusal("autorização de cobertura ainda não disponível no motor")
         for leg in draft.legs:
             _check_id_component(leg.symbol)
         plan = plan_legs(draft, self._position)

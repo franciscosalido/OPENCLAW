@@ -221,6 +221,7 @@ def test_lot_validates_quantity_without_changing_signed_content() -> None:
 
 
 def test_w1_coverage_grant_and_ticket_validation() -> None:
+    """Valida normalização, imutabilidade, identidade e cardinalidade das autorizações."""
     from backend.derivatives.ticket.models import CoverageGrant
 
     grant = CoverageGrant(series="a", origin="T1", quantity=4)
@@ -233,14 +234,17 @@ def test_w1_coverage_grant_and_ticket_validation() -> None:
             CoverageGrant.model_validate(dict(grant) | change)
     assert draft().coverage == ()
     with pytest.raises(ValidationError, match="autorização de cobertura duplicada"):
-        TicketDraft.model_validate(dict(draft()) | {"coverage": (grant, dict(grant) | {"quantity": 2})})
+        duplicate = dict(grant) | {"quantity": 2}
+        TicketDraft.model_validate(dict(draft()) | {"coverage": (grant, duplicate)})
     grants = tuple(CoverageGrant(series="A", origin=f"T{i}", quantity=1) for i in range(5))
-    assert TicketDraft.model_validate(dict(draft()) | {"coverage": grants[:4]}).coverage == grants[:4]
+    accepted = TicketDraft.model_validate(dict(draft()) | {"coverage": grants[:4]})
+    assert accepted.coverage == grants[:4]
     with pytest.raises(ValidationError):
         TicketDraft.model_validate(dict(draft()) | {"coverage": grants})
 
 
 def test_w2_signed_coverage_is_sorted_only_in_the_digest() -> None:
+    """O recibo preserva a ordem informada e a assinatura usa a ordem canônica."""
     from backend.derivatives.ticket.receipt import Receipt
     from tests.unit.derivatives.ticket.test_sequencing import BUY, SELL, draft as reference
 
@@ -257,7 +261,9 @@ def test_w2_signed_coverage_is_sorted_only_in_the_digest() -> None:
     authorized = signed(g9, g1)
     assert authorized.digest == signed(g1, g9).digest == (
         "f61d4551b8be2caec9f54774d536acf5fbc2655578555dc4843862de3e86a84e")
-    assert b'"coverage":[{"origin":"T1","quantity":4,"series":"A"},{"origin":"T9","quantity":2,"series":"A"}]' in canonical_bytes(authorized)
+    expected = (b'"coverage":[{"origin":"T1","quantity":4,"series":"A"},'
+                b'{"origin":"T9","quantity":2,"series":"A"}]')
+    assert expected in canonical_bytes(authorized)
     assert signed(g1 | {"quantity": 5}, g9).digest != authorized.digest
     receipt = Receipt()
     plain = receipt.append_preview(TIME, empty)

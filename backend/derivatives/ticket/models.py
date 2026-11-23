@@ -7,7 +7,7 @@ from typing import Annotated, NamedTuple, Self
 
 from pydantic import (
     AfterValidator, AwareDatetime, BaseModel, BeforeValidator, ConfigDict, Field, ValidationInfo,
-    computed_field, model_validator,
+    SerializerFunctionWrapHandler, computed_field, model_serializer, model_validator,
 )
 
 from backend.derivatives.ticket.digest import digest
@@ -59,6 +59,14 @@ PositiveInt = Annotated[int, Field(gt=0)]
 Instant = Annotated[AwareDatetime, AfterValidator(lambda value: value.astimezone(UTC))]
 
 
+class CoverageGrant(_Frozen):
+    """Quantidade máxima de uma série cedida pela boleta de origem."""
+
+    series: Annotated[Text, AfterValidator(str.upper)]
+    origin: Annotated[str, Field(pattern=r"^[A-Za-z0-9._-]+$")]
+    quantity: PositiveInt
+
+
 class Leg(_Frozen):
     """Série, sentido, unidades e preço máximo de compra ou mínimo de venda."""
 
@@ -106,11 +114,22 @@ class _Ticket(_Frozen):
     order_validity: Instant
     quote_snapshot_id: Text
     version: PositiveInt = 1
+    coverage: Annotated[tuple[CoverageGrant, ...], Field(max_length=4)] = ()
+
+    @model_serializer(mode="wrap")
+    def _serialize(self, handler: SerializerFunctionWrapHandler) -> dict[str, object]:
+        """Mantém o corpo histórico dos recibos sem autorização."""
+        fields: dict[str, object] = handler(self)
+        if not self.coverage:
+            fields.pop("coverage", None)
+        return fields
 
     @model_validator(mode="after")
-    def _distinct_symbols(self) -> Self:
+    def _distinct_symbols_and_grants(self) -> Self:
         if len({leg.symbol for leg in self.legs}) != len(self.legs):
             raise ValueError("série duplicada")
+        if len({(g.series, g.origin) for g in self.coverage}) != len(self.coverage):
+            raise ValueError("autorização de cobertura duplicada")
         return self
 
 

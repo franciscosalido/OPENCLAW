@@ -588,18 +588,21 @@ def test_v6_live_and_filled_sales_consume_only_the_paired_series() -> None:
 
 
 def authorized(ticket: TicketDraft, *grants: tuple[str, str, int]) -> TicketDraft:
+    """Constrói a versão por validação pública com as autorizações informadas."""
     coverage = tuple({"series": series, "origin": origin, "quantity": qty}
                      for series, origin, qty in grants)
     return TicketDraft.model_validate(dict(ticket) | {"coverage": coverage})
 
 
 def sale_only(n: int, origin: str = "T1", *, pos: Position | None = None) -> LegPlan:
+    """Monta uma venda de B coberta pela série A da boleta de origem."""
     amount = str(D("1.50") * n)
     ticket = draft(leg("B", Side.SELL, "1.50", n), net="-" + amount, gross=amount)
     return plan_legs(authorized(ticket, ("A", origin, n)), pos or position())
 
 
 def surplus_book(*, bought: int = 10, stopped: bool = True) -> tuple[ReservationBook, LegPlan]:
+    """Monta a origem com seis vendas conciliadas e as compras indicadas."""
     book = ReservationBook()
     plan = plan_legs(draft(BUY, SELL), position())
     book.admit(plan, ticket="T1")
@@ -612,6 +615,7 @@ def surplus_book(*, bought: int = 10, stopped: bool = True) -> tuple[Reservation
 
 
 def test_w3_plan_requires_relevant_sufficient_evidenced_coverage() -> None:
+    """O plano exige série documentada, venda correspondente e quantidade suficiente."""
     sell = leg("B", Side.SELL, "1.50", 4)
     bare = draft(sell, net="-6", gross="6")
     only = authorized(bare, ("A", "T1", 4))
@@ -628,8 +632,10 @@ def test_w3_plan_requires_relevant_sufficient_evidenced_coverage() -> None:
     with pytest.raises(SequenceRefusal, match="quantidade de proteção insuficiente"):
         plan_legs(authorized(draft(five, net="-7.50", gross="7.50"), ("A", "T1", 4)), position())
     mixed = draft(leg("A", Side.BUY, "1", 1), five, net="-6.50", gross="8.50")
-    assert plan_legs(authorized(mixed, ("A", "T1", 4)), position()).dependencies == plan.dependencies
-    for series, reason in (("B", "autorização sem venda correspondente"), ("Z", "série sem evidência")):
+    mixed_plan = plan_legs(authorized(mixed, ("A", "T1", 4)), position())
+    assert mixed_plan.dependencies == plan.dependencies
+    invalid = (("B", "autorização sem venda correspondente"), ("Z", "série sem evidência"))
+    for series, reason in invalid:
         with pytest.raises(SequenceRefusal, match=reason):
             plan_legs(authorized(draft(BUY, SELL), (series, "T1", 4)), position())
     close = authorized(draft(leg("A", Side.SELL, "1", 4), net="-4", gross="4"), ("B", "T1", 4))
@@ -637,6 +643,7 @@ def test_w3_plan_requires_relevant_sufficient_evidenced_coverage() -> None:
 
 
 def test_w4_open_origin_cannot_lend() -> None:
+    """A cobertura própria permanece com a origem enquanto a boleta estiver aberta."""
     book, origin = surplus_book(stopped=False)
     plan = sale_only(4)
     for admission in (book.admissible, book.admit):
@@ -649,6 +656,7 @@ def test_w4_open_origin_cannot_lend() -> None:
 
 
 def test_w5_release_returns_only_unfilled_surplus() -> None:
+    """A liberação confirmada devolve à origem apenas o saldo que não executou."""
     book, origin = surplus_book()
     book.close("sim", "T1")
     plan = sale_only(4)
@@ -673,6 +681,7 @@ def test_w5_release_returns_only_unfilled_surplus() -> None:
 
 
 def test_w6_surplus_and_grant_both_bound_a_sale() -> None:
+    """A reserva é limitada pela sobra global e pela autorização individual."""
     book, _ = surplus_book()
     plan = sale_only(3)
     sale = plan.legs[0]
@@ -686,12 +695,15 @@ def test_w6_surplus_and_grant_both_bound_a_sale() -> None:
 
 
 def test_w7_used_grant_stays_exhausted_after_execution() -> None:
+    """A execução consome o limite mesmo após a ordem deixar de estar viva."""
     book, _ = surplus_book()
     buy, sale = leg("A", Side.BUY, "1", 2), leg("B", Side.SELL, "1.50", 5)
-    p = plan_legs(authorized(draft(buy, sale, net="-5.50", gross="9.50"), ("A", "T1", 3)), position())
+    ticket = authorized(draft(buy, sale, net="-5.50", gross="9.50"), ("A", "T1", 3))
+    p = plan_legs(ticket, position())
     book.admit(p, ticket="T2")
     def balances() -> tuple[int, int]:
-        return book.available(p, sale, ticket="T2"), book.available(p, sale, ticket="T2", origin="T1")
+        return (book.available(p, sale, ticket="T2"),
+                book.available(p, sale, ticket="T2", origin="T1"))
     assert balances() == (0, 3)
     book.reserve(p, sale, "borrow", 3, ticket="T2", origin="T1")
     book.confirm_sale("sim", "borrow", "sold", 3)
@@ -703,12 +715,14 @@ def test_w7_used_grant_stays_exhausted_after_execution() -> None:
 
 
 def test_w8_own_and_borrowed_pools_are_separate() -> None:
+    """Reservas em uma origem não debitam outra na mesma perna."""
     book, _ = surplus_book()
     buy = leg("A", Side.BUY, "1", 6)
     p = plan_legs(authorized(draft(buy, SELL, net="-9", gross="21"), ("A", "T1", 4)), position())
     book.admit(p, ticket="T2")
     def balances() -> tuple[int, int]:
-        return book.available(p, SELL, ticket="T2"), book.available(p, SELL, ticket="T2", origin="T1")
+        return (book.available(p, SELL, ticket="T2"),
+                book.available(p, SELL, ticket="T2", origin="T1"))
     assert balances() == (0, 4)
     book.reserve(p, SELL, "borrow", 4, ticket="T2", origin="T1")
     book.confirm_buy(p, buy, "own", 6, ticket="T2")
@@ -718,6 +732,7 @@ def test_w8_own_and_borrowed_pools_are_separate() -> None:
 
 
 def test_w9_origin_and_account_must_match() -> None:
+    """A admissão e a consulta verificam identidade, conta e origem."""
     book, _ = surplus_book()
     own = sale_only(4, "T2")
     with pytest.raises(SequenceRefusal, match="boleta de origem não parada"):
@@ -735,6 +750,7 @@ def test_w9_origin_and_account_must_match() -> None:
 
 
 def test_w10_self_grant_cannot_reopen_a_stopped_origin() -> None:
+    """Uma autorização da própria boleta não permite usar sua sobra após a parada."""
     book = ReservationBook()
     p = plan_legs(authorized(draft(BUY, SELL), ("A", "T1", 4)), position())
     book.confirm_buy(p, BUY, "own", 10, ticket="T1")
@@ -748,6 +764,7 @@ def test_w10_self_grant_cannot_reopen_a_stopped_origin() -> None:
 
 
 def test_w11_only_one_borrower_reserves_the_surplus() -> None:
+    """Oito admissões sem reserva podem disputar a mesma sobra; apenas uma reserva vence."""
     from concurrent.futures import ThreadPoolExecutor
     from threading import Barrier
 
@@ -768,6 +785,7 @@ def test_w11_only_one_borrower_reserves_the_surplus() -> None:
 
 
 def test_w12_late_buy_increases_closed_origins_surplus() -> None:
+    """A parada permite conciliar compras que executaram tardiamente."""
     book, origin = surplus_book(bought=6)
     p = sale_only(4)
     with pytest.raises(SequenceRefusal, match="sobra indisponível"):
@@ -778,6 +796,7 @@ def test_w12_late_buy_increases_closed_origins_surplus() -> None:
 
 
 def test_w13_buyback_surplus_can_cover_unwinding() -> None:
+    """A recompra da boleta parada libera a proteção longa para a venda autorizada."""
     book = ReservationBook()
     p = close_plan()
     buy, _ = p.legs
@@ -793,9 +812,11 @@ def test_w13_buyback_surplus_can_cover_unwinding() -> None:
 
 
 def test_w15_one_protective_buy_covers_two_distinct_sales() -> None:
+    """As vendas de B e C concorrem pelas execuções da mesma proteção A."""
     b, c = leg("B", Side.SELL, "1.50", 4), leg("C", Side.SELL, "1.50", 6)
-    pos = Position(account="sim", holdings=tuple(holding(s) for s in "ABC"), pairs=(("A","B"),("A","C")))
-    p = plan_legs(draft(BUY,b,c), pos)
+    pos = Position(account="sim", holdings=tuple(holding(s) for s in "ABC"),
+                   pairs=(("A", "B"), ("A", "C")))
+    p = plan_legs(draft(BUY, b, c), pos)
     book = ReservationBook()
     def balances() -> tuple[int, int]:
         return book.available(p, b, ticket="T1"), book.available(p, c, ticket="T1")
@@ -810,6 +831,7 @@ def test_w15_one_protective_buy_covers_two_distinct_sales() -> None:
 
 
 def test_w16_account_cannot_buy_back_more_than_it_is_short() -> None:
+    """O limite de recompra permanece compartilhado por toda a conta."""
     book = ReservationBook()
     p = close_plan()
     buy, _ = p.legs
