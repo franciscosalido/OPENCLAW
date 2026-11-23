@@ -152,3 +152,51 @@ def test_decimal_price_and_text_symbol_keep_value_semantics_as_group_keys():
     view = partial_view(plan, fills)
     assert view.executed_legs == (call("BUY", 95, 2, "6.90"),)
     assert view.executed.net_entry == D("13.80") and view.pending == ()
+
+
+def partially_filled_condor(*fills):
+    plan = (PlannedLeg("P90", ExpiryLeg("PUT", "BUY", D(90), 1, D(1))),
+            PlannedLeg("P95", ExpiryLeg("PUT", "SELL", D(95), 1, D("2.50"))),
+            PlannedLeg("C105", call("SELL", 105, 1, "2.50")),
+            PlannedLeg("C110", call("BUY", 110, 1, 1)))
+    view = partial_view(plan, fills)
+    assert profile(view.planned) == (D(-3), (F(92), F(108)), D(3), D(-2), False, False)
+    return view
+
+
+def test_g9_iron_condor_only_shorts_filled_has_unlimited_loss():
+    view = partially_filled_condor(trade("P95", 1, "2.50"), trade("C105", 1, "2.50"))
+    assert profile(view.executed) == (D(-5), (F(90), F(110)), D(5), None, False, True)
+    assert spots(view, 0, 90, 100, 110, 120) == (D(-90), D(0), D(5), D(0), D(-10))
+    assert view.executed_legs == (ExpiryLeg("PUT", "SELL", D(95), 1, D("2.50")),
+                                  call("SELL", 105, 1, "2.50"))
+    assert view.pending == (("P90", 1), ("C110", 1))
+
+
+def test_g10_iron_condor_only_put_spread_filled_has_limited_loss():
+    view = partially_filled_condor(trade("P90", 1, 1), trade("P95", 1, "2.50"))
+    assert profile(view.executed) == (D("-1.50"), (F(187, 2),), D("1.50"), D("-3.50"), False, False)
+    assert spots(view, 85, 90, 95, 100) == (D("-3.50"), D("-3.50"), D("1.50"), D("1.50"))
+    assert view.pending == (("C105", 1), ("C110", 1))
+
+
+def test_h1_eight_series_with_and_without_last_fill():
+    plan = [PlannedLeg(f"S{i}", call("BUY", 100 + i, 1, 1)) for i in range(1, 9)]
+    pending = (("S1", 1), ("S2", 1), ("S3", 1), ("S4", 1),
+               ("S5", 1), ("S6", 1), ("S7", 1), ("S8", 1))
+    empty = partial_view(plan, [])
+    assert profile(empty.planned) == (D(8), (F(209, 2),), None, D(-8), True, False)
+    assert empty.executed is None
+    assert empty.pending == pending
+
+    filled = partial_view(plan, [trade("S8", 1, 1)])
+    assert profile(filled.executed) == (D(1), (F(109),), None, D(-1), True, False)
+    assert filled.pending == pending[:-1]
+
+
+@pytest.mark.parametrize("symbol", [95, None, b"P90"])
+def test_h2_non_text_symbol_refused_in_plan_and_execution(symbol):
+    with pytest.raises(PayoffRefusal):
+        PlannedLeg(symbol, PLAN[0].leg)
+    with pytest.raises(PayoffRefusal):
+        Execution(symbol, 1, D(1))

@@ -165,3 +165,58 @@ def test_e10_eight_legs_are_accepted_by_default_in_all_three_functions():
     assert expiry_leg_results(legs, D(100)) == (D(-5),) * 8
     assert expiry_result(legs, D(100)) == D(-40)
     assert expiry_profile(legs).net_entry == D(40)
+
+
+def put_butterfly(wing=1, body=2):
+    return (leg("PUT", "BUY", 95, wing, "2.00"), leg("PUT", "SELL", 100, body, "3.50"),
+            leg("PUT", "BUY", 105, wing, "7.00"))
+
+
+def iron_condor(quantity=1):
+    return (leg("PUT", "BUY", 90, quantity, "1.00"), leg("PUT", "SELL", 95, quantity, "2.50"),
+            leg("CALL", "SELL", 105, quantity, "2.50"), leg("CALL", "BUY", 110, quantity, "1.00"))
+
+
+@pytest.mark.parametrize("legs,multiplier,cost,entry,roots,gain,loss,points", [
+    pytest.param(put_butterfly(), 1, "0", "2", (F(97), F(103)), "3", "-2",
+                 [(90, -2), (95, -2), (97, 0), (100, 3), (103, 0), (105, -2), (110, -2)],
+                 id="G1-put-butterfly"),
+    pytest.param((leg("CALL", "BUY", 100, 1, 5), leg("CALL", "SELL", 105, 1, 3)),
+                 1, "0", "2", (F(102),), "3", "-2",
+                 [(95, -2), (100, -2), (102, 0), (105, 3), (110, 3)], id="G2-bull-call"),
+    pytest.param((leg("CALL", "SELL", 100, 1, 5), leg("CALL", "BUY", 105, 1, 3)),
+                 1, "0", "-2", (F(102),), "2", "-3",
+                 [(95, 2), (100, 2), (102, 0), (105, -3), (110, -3)], id="G3-bear-call"),
+    pytest.param((leg("PUT", "SELL", 100, 1, 4), leg("PUT", "BUY", 95, 1, "2.50")),
+                 1, "0", "-1.50", (F(197, 2),), "1.50", "-3.50",
+                 [(90, "-3.50"), (95, "-3.50"), (100, "1.50"), (105, "1.50")], id="G4-bull-put"),
+    pytest.param((leg("PUT", "BUY", 100, 1, 4), leg("PUT", "SELL", 95, 1, "2.50")),
+                 1, "0", "1.50", (F(197, 2),), "3.50", "-1.50",
+                 [(90, "3.50"), (95, "3.50"), (100, "-1.50"), (105, "-1.50")], id="G5-bear-put"),
+    pytest.param(iron_condor(), 1, "0", "-3", (F(92), F(108)), "3", "-2",
+                 [(85, -2), (90, -2), (92, 0), (95, 3), (100, 3), (105, 3), (108, 0),
+                  (110, -2), (115, -2)], id="G6-iron-condor"),
+    pytest.param(iron_condor(10), 100, "37.60", "-3000", (F(115047, 1250), F(134953, 1250)),
+                 "2962.40", "-2037.60", [(85, "-2037.60"), (90, "-2037.60"), (100, "2962.40"),
+                                         (110, "-2037.60"), (115, "-2037.60")], id="G7-scaled"),
+    pytest.param(put_butterfly(3, 6), 100, "9.90", "600", (F(97033, 1000), F(102967, 1000)),
+                 "890.10", "-609.90", [(95, "-609.90"), (100, "890.10"), (105, "-609.90")],
+                 id="G8-scaled"),
+])
+def test_structure_at_expiry(legs, multiplier, cost, entry, roots, gain, loss, points):
+    assert profile_values(expiry_profile(legs, multiplier=multiplier, costs=D(cost))) == (
+        D(entry), roots, D(gain), D(loss), False, False)
+    for spot, expected in points:
+        assert expiry_result(legs, D(spot), multiplier=multiplier, costs=D(cost)) == D(expected)
+
+
+@pytest.mark.parametrize("legs,multiplier,spot,expected", [
+    pytest.param(put_butterfly(), 1, 100, (-2, 7, -2), id="G1-body"),
+    pytest.param(put_butterfly(), 1, 90, (3, -13, 8), id="G1-below"),
+    pytest.param(iron_condor(), 1, 100, (-1, "2.50", "2.50", -1), id="G6-middle"),
+    pytest.param(iron_condor(), 1, 85, (4, "-7.50", "2.50", -1), id="G6-below"),
+    pytest.param(iron_condor(), 1, 115, (-1, "2.50", "-7.50", 4), id="G6-above"),
+    pytest.param(iron_condor(10), 100, 100, (-1000, 2500, 2500, -1000), id="G7-scaled"),
+])
+def test_leg_results_before_costs_in_plan_order(legs, multiplier, spot, expected):
+    assert expiry_leg_results(legs, D(spot), multiplier=multiplier) == tuple(map(D, expected))
