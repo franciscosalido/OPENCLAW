@@ -282,3 +282,160 @@ Revisar ou aceitar este texto não cria ponte, implementação, credencial,
 assinatura comercial, acesso real, permissão de negociar ou autorização para
 instalar dependências. Implementação e eventual ativação real têm portões
 próprios. Nenhum agente executa ou cancela ordens em nome de Francisco.
+
+---
+
+## Adendo 1 — G3: modalidade com teto de garantia adicional (DP-01)
+
+- **Data do texto:** 23/11/2026.
+- **Aprovação:** Francisco, pelo commit de sua autoria que inclui este adendo
+  no repositório. Antes desse commit, este texto é minuta e não vale.
+- **Origem:** DP-01 do registro de decisões de produto (Revisão 2, 22/11/2026)
+  e pedido de Francisco de 23/11/2026.
+- **Alcance:** desenho, como o restante deste ADR. Não autoriza implementação,
+  acesso real nem ordens. A implementação no simulador (D0) depende de cartão
+  próprio. D1 e D2 continuam decisões separadas (§1 e §8).
+
+### A1.1 O que este adendo complementa e o que substitui
+
+Nenhuma linha do texto original é apagada ou reescrita.
+
+| Trecho original | Efeito deste adendo |
+|---|---|
+| §2, «O clique vale para o que estava na tela» | **Complementa:** três dados a mais vinculados ao clique (A1.6). |
+| §4, G3, limites por perna e pelo conjunto | **Complementa:** modalidade B, com teto de garantia adicional (A1.2 a A1.4). |
+| §4, G3, «Se sair dos limites, parar e mostrar a posição aberta» | **Substitui em um caso só:** na modalidade B, a venda executada a preço melhor (A1.5). Em todos os outros casos, e em toda a modalidade A, a frase original continua valendo. |
+| §4, G1, G2, G3a, G4 e G5 | Não mudam. |
+| §7, provas exigidas | **Complementa:** item 6, com cinco provas (A1.7). |
+| §1, degrau D1, e §5 | **Complementa:** duas condições para a liberação futura do D1 (A1.8). |
+| §7, item 5, critérios do piloto | **Complementa:** uma prova prática de saída do piloto em papel (A1.9). |
+
+### A1.2 Duas modalidades
+
+- **Modalidade A — teto bruto.** É a boleta que existe hoje. O teto bruto
+  (`gross_cap`) limita o volume bruto pelas regras de G3. Nada muda.
+- **Modalidade B — teto bruto e teto de garantia.** Além de todos os limites
+  da modalidade A, Francisco assina um teto, em reais, para o **pico estimado
+  de garantia adicional da conta**.
+
+A modalidade aparece antes do clique e faz parte da versão aprovada. Trocar
+de modalidade cria nova versão e exige outro clique. Uma boleta confirmada
+não muda de modalidade.
+
+### A1.3 O pico de garantia adicional (modalidade B)
+
+- **Referência inicial.** É a garantia exigida da conta exibida na prévia
+  aprovada, antes da primeira ordem. Fica fixa até o fim daquela aprovação.
+- **Estágios.** A prévia estima a garantia exigida da conta em cada estágio
+  relevante da montagem, incluindo execuções parciais, e ao final.
+- **Pico adicional.** É o maior valor, entre os estágios, de garantia estimada
+  menos referência inicial. Se nenhum estágio exigir mais que a referência,
+  o pico é zero.
+- **O que a prévia mostra.** Três valores: a referência inicial, a garantia no
+  pior estágio e a garantia ao final. Mostra também qual execução, ou
+  combinação de execuções, produz o pico.
+- **Exemplo.** A conta exige R$ 10.000,00 antes da primeira ordem, chega a
+  R$ 13.000,00 no meio da montagem e termina em R$ 11.000,00. O pico adicional
+  aprovado é de R$ 3.000,00.
+- **Limite.** Pico estimado menor ou igual ao teto assinado atende. Pico maior
+  que o teto bloqueia o envio.
+- **Revalidação a cada perna.** Antes de enviar cada nova perna, a estimativa
+  é refeita com a situação da conta naquele momento: execuções parciais,
+  ordens abertas, outras boletas e eventual mudança de regime perto do
+  fechamento. A comparação continua sendo com a referência inicial. Um aumento
+  de exigência vindo de outra boleta ou do mercado, portanto, consome o teto
+  desta boleta e pode bloquear a próxima perna.
+- **Folga exclusiva.** A disponibilidade de garantia da conta é reservada de
+  forma exclusiva. Ao confirmar, a boleta reserva o valor do teto assinado e
+  o libera quando termina. Duas boletas não consomem a mesma folga.
+
+### A1.4 De onde vem a estimativa
+
+- **Referência de margem.** A prévia mostra fonte, horário, validade e
+  premissas da estimativa, e a identifica de modo que o recibo aponte para a
+  mesma referência. Ela informa, no mínimo, a garantia exigida da conta e a
+  disponibilidade para novas exigências.
+- **No simulador.** Cenários declarados, que Francisco consiga conferir à mão.
+- **Em uso real futuro.** Só fonte homologada para a conta, a corretora e a
+  modalidade de Francisco, nos termos do §5. Sem estimativa por IA.
+- **Dado ausente, vencido ou insuficiente.** Se a referência faltar, vencer
+  ou não permitir estimar um estágio relevante, o estudo da estrutura
+  continua e **novos envios ficam bloqueados**, inclusive no servidor. O
+  mesmo vale se a posição da conta estiver divergente.
+- **O que o bloqueio não faz.** Ordens já vivas continuam visíveis. Execuções
+  posteriores entram pelo preço real. Francisco preserva a possibilidade de
+  pedir o cancelamento do saldo pelo fluxo humano.
+
+### A1.5 Exceção da venda a preço melhor (só na modalidade B)
+
+Uma venda executada acima do preço-limite assinado aumenta o bruto realizado.
+Nas duas modalidades, ela é registrada pelo preço real.
+
+- **Modalidade A.** Vale G3 como está: se o bruto sair do teto, parar e
+  mostrar a posição aberta.
+- **Modalidade B.** A sequência pode prosseguir quando o excesso de bruto
+  decorrer **integralmente** de venda já executada acima do preço-limite
+  assinado e todos os demais limites continuarem atendidos: limites por
+  perna, débito máximo ou crédito mínimo, exposição parcial, teto de
+  garantia, cobertura (G2) e prazos (G3a).
+- **Como o motor demonstra a origem.** Ele recalcula o bruto projetado
+  contando cada venda executada acima do limite pelo preço-limite assinado.
+  Se esse bruto recalculado couber no teto bruto, o excesso veio inteiro do
+  preço melhor.
+- **Exemplo.** Compra de 10 a R$ 1,00 e venda autorizada de 10 a R$ 1,50: o
+  bruto previsto, sem custos, é R$ 25,00. Se a venda sair a R$ 1,60, o
+  realizado mostra R$ 26,00. Recalculado ao preço-limite, o bruto é R$ 25,00
+  e cabe no teto.
+- **O que a exceção não autoriza.** Aumentar quantidade, mudar outra perna,
+  ampliar o teto de garantia ou afrouxar qualquer outro limite.
+- **Sem demonstração, parar.** Se o motor não conseguir demonstrar a origem
+  da diferença, para antes do próximo envio e mostra a posição e o saldo.
+  Sair dos limites assinados exige nova boleta e nova confirmação.
+
+### A1.6 Complemento ao §2 — dados vinculados ao clique
+
+Somam-se aos dados que o clique vincula:
+
+1. a **modalidade** da boleta (A ou B);
+2. na modalidade B, o **teto de garantia adicional, em reais**;
+3. na modalidade B, a **identificação da referência de margem exibida**.
+
+### A1.7 Complemento ao §7 — item 6, provas da garantia
+
+6. **Garantia (modalidade B):**
+   - Com teto de R$ 3.000,00, um pico estimado de R$ 3.000,00 atende ao
+     limite. R$ 3.000,01 bloqueia.
+   - Uma execução parcial pode exigir mais garantia que a estrutura completa.
+     A prévia identifica esse estágio e seu valor.
+   - Se a margem vencer entre duas pernas, a próxima fica bloqueada e
+     qualquer execução tardia da ordem anterior é registrada.
+   - Duas boletas concorrentes não conseguem usar a mesma disponibilidade.
+   - A mesma venda a preço melhor é registrada pelo preço real nas duas
+     modalidades. Somente a modalidade B admite a exceção de A1.5.
+
+### A1.8 Duas condições para a liberação futura do D1
+
+Estas condições se somam às do §1 e do §5. Cumpri-las não libera o D1: a
+liberação continua sendo decisão assinada e separada.
+
+1. **Confirmação por escrito da OpLab** sobre o que a credencial de leitura
+   consegue fazer, inclusive se pode criar ou alterar ordens de portfólio,
+   habilitar roteamento, enviar ou cancelar. A consulta pergunta também se
+   existe fonte oficial de garantia projetada que considere a carteira e as
+   ordens abertas.
+2. **Captura real e replay ficam no Mac de Francisco**, com acesso e retenção
+   definidos. A revisão remota recebe casos sintéticos equivalentes ou
+   resultados agregados previamente conferidos.
+
+### A1.9 Prova de saída do piloto em papel
+
+Entre os critérios do piloto, que pertencem ao cartão próprio, um é
+obrigatório: introduzir de propósito uma divergência no replay, observar o
+bloqueio e demonstrar que a reconciliação recupera o estado correto.
+
+### A1.10 O que este adendo não faz
+
+Não altera a modalidade A. Não cria implementação, fonte de margem, ponte,
+credencial ou acesso real. Não libera D1 nem D2. Não altera `CLAUDE.md` nem a
+vedação do ADR-007. Até o cartão próprio ser aprovado, a DP-01 continua
+pendente de implementação.
