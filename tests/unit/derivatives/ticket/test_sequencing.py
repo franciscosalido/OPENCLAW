@@ -913,3 +913,120 @@ def test_n4_live_reservation_survives_borrower_stop_until_exact_release() -> Non
     assert balances() == (0, 0)
     book.confirm_release("sim", "borrow", 3)
     assert balances() == (3, 0)
+
+
+def zeroing_draft(n: int, lot: int = 1) -> TicketDraft:
+    """Venda de A a um real por unidade, com limites assinados."""
+    return draft(leg("A", Side.SELL, "1", n, lot), net=str(-n), gross=str(n))
+
+
+def test_z1_free_long_sale_plan_and_partial_exposure() -> None:
+    p = position(holding("A", 10), holding("B", -6))
+    flat = position(holding("A", 10), holding("B"))
+    single = Position(account="sim", holdings=(holding("A", 7),), pairs=())
+    ticket = zeroing_draft(4)
+    for n, photo in [(4, p), (10, flat), (7, single)]:
+        one = zeroing_draft(n)
+        plan = plan_legs(one, photo)
+        assert plan.legs == one.legs and plan.dependencies == (("A", "A", True),)
+        assert plan.protection_for(one.legs[0]) == "A"
+    for n, photo in [(5, p), (11, flat)]:
+        with pytest.raises(SequenceRefusal, match="saldo livre insuficiente"):
+            plan_legs(zeroing_draft(n), photo)
+    for one, photo in [(zeroing_draft(1), position()), (draft(leg("B", Side.SELL, "1.50", 1)), p)]:
+        with pytest.raises(SequenceRefusal, match="pareamento ausente ou ambíguo"):
+            plan_legs(one, photo)
+    assert close_plan().dependencies == (("A", "B", True),)
+    with pytest.raises(SequenceRefusal, match="autorização sem venda correspondente"):
+        plan_legs(authorized(ticket, ("A", "T1", 4)), p)
+    with pytest.raises(SequenceRefusal):
+        partial_exposure(ticket)
+    assert partial_exposure(ticket, zeroing=True) == 0
+    assert partial_exposure(ticket, zeroing=True, known_costs=D(".07")) == D(".07")
+
+
+def test_z2_shared_free_long_balance_is_exclusive() -> None:
+    p = position(holding("A", 10), holding("B", -6))
+    plan = plan_legs(zeroing_draft(4), p)
+    sale, = plan.legs
+    book = ReservationBook()
+    book.admit(plan, ticket="T1")
+
+    def balances() -> tuple[int, int]:
+        return (book.available(plan, sale, ticket="T1"), book.available(plan, sale, ticket="T2"))
+
+    assert balances() == (4, 4)
+    assert book.available(plan, sale, ticket="T1", origin="T9") == 0
+    book.reserve(plan, sale, "one", 3, ticket="T1")
+    assert balances() == (1, 1)
+    book.confirm_sale("sim", "one", "fill", 2)
+    book.confirm_release("sim", "one", 1)
+    assert balances() == (2, 2)
+    book.admit(plan, ticket="T2")
+    book.reserve(plan, sale, "two", 2, ticket="T2")
+    assert balances() == (0, 0)
+    for admission in (book.admissible, book.admit):
+        with pytest.raises(SequenceRefusal, match="saldo livre indisponível"):
+            admission(plan_legs(zeroing_draft(1), p), ticket="T3")
+    with pytest.raises(SequenceRefusal, match="reserva indisponível"):
+        book.reserve(plan, sale, "three", 1, ticket="T1")
+    book.close("sim", "T1")
+    book.confirm_release("sim", "two", 2)
+    assert balances() == (0, 2)
+
+
+def test_z3_limits_by_lot_leg_and_account() -> None:
+    p = position(holding("A", 10), holding("B", -6))
+    book = ReservationBook()
+    one = plan_legs(zeroing_draft(1), p)
+    four = plan_legs(zeroing_draft(4, 2), p)
+    book.reserve(one, one.legs[0], "one", 1, ticket="T9")
+    assert book.available(four, four.legs[0], ticket="T1") == 2
+    book = ReservationBook()
+    p = position(holding("A", 10), holding("B"))
+    two = plan_legs(zeroing_draft(2), p)
+    nine = plan_legs(zeroing_draft(9), p)
+    assert book.available(two, two.legs[0], ticket="T1") == 2
+    book.reserve(two, two.legs[0], "one", 2, ticket="T1")
+    assert book.available(two, two.legs[0], ticket="T1") == 0
+    assert book.available(nine, nine.legs[0], ticket="T2") == 8
+    other = plan_legs(zeroing_draft(9), position(*p.holdings, account="outra"))
+    assert book.available(other, other.legs[0], ticket="T1") == 9
+
+
+def test_z4_free_stock_and_confirmed_buybacks_have_separate_capacity() -> None:
+    p = position(holding("A", 10), holding("B", -6))
+    buy = leg("B", Side.BUY, "1.50", 6)
+    paired_sale = leg("A", Side.SELL, "1", 6)
+    paired = plan_legs(draft(paired_sale, buy, net="3", gross="15"), p)
+    free_sale = plan_legs(zeroing_draft(4), p)
+    book = ReservationBook()
+    book.admit(paired, ticket="T1")
+    book.admit(free_sale, ticket="T2")
+
+    def balances() -> tuple[int, int]:
+        return (book.available(paired, paired_sale, ticket="T1"),
+                book.available(free_sale, free_sale.legs[0], ticket="T2"))
+
+    assert balances() == (0, 4)
+    book.confirm_buy(paired, buy, "fill", 6, ticket="T1")
+    assert balances() == (6, 4)
+    book.reserve(paired, paired_sale, "paired", 6, ticket="T1")
+    assert balances() == (0, 4)
+    book.reserve(free_sale, free_sale.legs[0], "free", 4, ticket="T2")
+    assert balances() == (0, 0)
+    with pytest.raises(SequenceRefusal, match="saldo livre indisponível"):
+        book.admissible(plan_legs(zeroing_draft(1), p), ticket="T3")
+
+
+def test_z3_orders_on_other_free_series_do_not_reduce_capacity() -> None:
+    """Na mesma conta, vender X não compromete o saldo inicial de A nem o inverso."""
+    photo = Position(account="sim", holdings=(holding("A", 4), holding("X", 3)), pairs=())
+    a = plan_legs(zeroing_draft(4), photo)
+    x = plan_legs(draft(leg("X", Side.SELL, "1", 3), net="-3", gross="3"), photo)
+    book = ReservationBook()
+    book.reserve(x, x.legs[0], "x", 2, ticket="T1")
+    book.confirm_sale("sim", "x", "executed-x", 1)
+    assert book.available(a, a.legs[0], ticket="T2") == 4
+    book.reserve(a, a.legs[0], "a", 4, ticket="T2")
+    assert book.available(x, x.legs[0], ticket="T1") == 1

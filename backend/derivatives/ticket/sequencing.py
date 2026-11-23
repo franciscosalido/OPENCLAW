@@ -35,6 +35,15 @@ class Position(_Frozen):
     holdings: tuple[Holding, ...]
     pairs: tuple[tuple[Text, Text], ...]
 
+    def unpledged(self) -> dict[str, int]:
+        """Saldos da foto descontadas todas as posições vendidas que cada série protege."""
+        balances = {row.symbol: row.balance for row in self.holdings}
+        free = balances.copy()
+        for long, short in self.pairs:
+            free[long] -= max(0, -balances[short])
+        return free
+
+
 
 class Fill(_Frozen):
     """Execução confirmada da versão desta boleta, em unidades e reais por unidade."""
@@ -71,7 +80,6 @@ def plan_legs(draft: TicketDraft, position: Position) -> LegPlan:
     rows = {r.symbol: r for r in position.holdings}
     if len(rows) != len(position.holdings) or any(leg.symbol not in rows for leg in draft.legs):
         raise SequenceRefusal("posição ausente ou duplicada")
-    pledged: dict[str, int] = {}
     owners = {short: long for long, short in position.pairs}
     if len(owners) != len(position.pairs) or set(owners) & set(owners.values()):
         raise SequenceRefusal("atribuição de proteção ambígua")
@@ -82,8 +90,8 @@ def plan_legs(draft: TicketDraft, position: Position) -> LegPlan:
         if (a.underlying, a.kind, a.expiry, a.multiplier) != (
                 b.underlying, b.kind, b.expiry, b.multiplier):
             raise SequenceRefusal("séries incompatíveis")
-        pledged[long] = pledged.get(long, 0) + max(0, -b.balance)
-    if any(n > rows[s].balance for s, n in pledged.items()):
+    free = position.unpledged()
+    if any(free[long] < 0 for long in owners.values()):
         raise SequenceRefusal("proteção inicial insuficiente")
     buys = {leg.symbol: leg for leg in draft.legs if leg.side is Side.BUY}
     sales = tuple(leg for leg in draft.legs if leg.side is Side.SELL)
@@ -111,6 +119,11 @@ def plan_legs(draft: TicketDraft, position: Position) -> LegPlan:
             if not closing and (a.balance < 0 or b.balance > 0):
                 continue
             candidates.append((source, closing))
+        if not candidates and rows[sale.symbol].balance > 0:
+            if sale.quantity > free[sale.symbol]:
+                raise SequenceRefusal("saldo livre insuficiente")
+            dependencies.append((sale.symbol, sale.symbol, True))
+            continue
         if len(candidates) != 1:
             raise SequenceRefusal("pareamento ausente ou ambíguo")
         source, closing = candidates[0]
@@ -118,7 +131,7 @@ def plan_legs(draft: TicketDraft, position: Position) -> LegPlan:
         if remaining[source] < 0:
             raise SequenceRefusal("quantidade de proteção insuficiente")
         dependencies.append((sale.symbol, source, closing))
-    if {g.series for g in draft.coverage} - {source for _, source, _ in dependencies}:
+    if {g.series for g in draft.coverage} - {buy for sale, buy, _ in dependencies if sale != buy}:
         raise SequenceRefusal("autorização sem venda correspondente")
     return LegPlan(draft, (*buys.values(), *sales), position, tuple(dependencies))
 
@@ -184,6 +197,11 @@ class ReservationBook:
         self._plans[account, ticket] = plan
         self._positions[account] = plan.position
 
+    def _free_long(self, plan: LegPlan, symbol: str) -> int:
+        committed = sum(o.live + o.filled for (account, _), o in self._orders.items()
+                        if account == plan.position.account and o.leg.symbol == o.source == symbol)
+        return plan.position.unpledged()[symbol] - committed
+
     def _admission(self, plan: LegPlan, ticket: str) -> dict[tuple[str, str, str], int]:
         account = self._check(plan, ticket)
         balances = {h.symbol: h.balance for h in plan.position.holdings}
@@ -192,6 +210,9 @@ class ReservationBook:
                 raise SequenceRefusal("boleta de origem não parada")
             if self._surplus(account, grant.origin, grant.series) <= 0:
                 raise SequenceRefusal("sobra indisponível")
+        for sale, source, _ in plan.dependencies:
+            if sale == source and self._free_long(plan, sale) <= 0:
+                raise SequenceRefusal("saldo livre indisponível")
         occupation = {}
         for leg in plan.legs:
             if leg.side is not Side.BUY:
@@ -256,7 +277,9 @@ class ReservationBook:
         balances = {h.symbol: h.balance for h in plan.position.holdings}
         closing = balances[source] < 0
         orders = [o for (a, _), o in self._orders.items() if a == account]
-        if origin is None:
+        if leg.symbol == source:
+            free = self._free_long(plan, source) if origin is None else 0
+        elif origin is None:
             free = self._surplus(account, ticket, source)
         elif origin == ticket or (account, origin) not in self._closed:
             free = 0
@@ -344,11 +367,12 @@ def gross_amounts(draft: TicketDraft, fills: Sequence[Fill],
         return Gross(draft.gross_cap, executed, projected)
 
 
-def partial_exposure(draft: TicketDraft, *, known_costs: Decimal = Decimal(0)) -> Decimal:
+def partial_exposure(draft: TicketDraft, *, known_costs: Decimal = Decimal(0),
+                     zeroing: bool = False) -> Decimal:
     """Desembolso máximo se nenhuma venda executar, incluindo o custo conhecido."""
     draft = TicketDraft.model_validate(draft)
     buys = tuple(leg for leg in draft.legs if leg.side is Side.BUY)
-    if (not buys and not draft.coverage) or not _valid_cost(known_costs):
+    if (not buys and not draft.coverage and not zeroing) or not _valid_cost(known_costs):
         raise SequenceRefusal("exposição sem compra protetora ou custo válido")
     with localcontext(_exact()):
         return sum((leg.quantity * leg.limit_price for leg in buys), known_costs)
