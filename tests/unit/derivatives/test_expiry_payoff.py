@@ -137,3 +137,24 @@ def test_p9_unreadable_sequence_is_a_typed_refusal():
     values = memoryview(b"abcd").cast("B", shape=(2, 2))
     with pytest.raises(PayoffRefusal):
         expiry_profile(values)
+
+
+@pytest.mark.parametrize("func,args", [
+    (expiry_leg_results, (D(100),)), (expiry_result, (D(100),)), (expiry_profile, ()),
+])
+def test_e10_explicit_leg_budget_and_default(func, args):
+    options = [leg("CALL", "BUY", 100, 1, 5)] * 9
+    with pytest.raises(PayoffRefusal):
+        func(options, *args)
+    result = func(options, *args, max_legs=9)
+    if func is expiry_profile:
+        assert result.net_entry == D(45)
+    elif func is expiry_result:
+        assert result == D(-45)
+    else:
+        assert result == (D(-5),) * 9
+    for invalid in (0, 65, True, 8.0):
+        with pytest.raises(PayoffRefusal):
+            func(options[:1], *args, max_legs=invalid)
+    with pytest.raises(PayoffRefusal):
+        func(options[:2], *args, max_legs=1)
