@@ -321,7 +321,7 @@ O revisor **não executou a suíte, a tipagem nem os mutantes** desta cabeça.
 | mypy estrito e Pyright, nos dois sistemas | 0 erros | implementador; logs conferidos |
 | 13 mutantes, nos dois sistemas | todos detectados | implementador; logs conferidos |
 | Integração | só no contêiner Linux isolado: 31 aprovados, 206 pulados | implementador; evidências conferidas |
-| Manifesto de 100 evidências (`9cf23dfb…9071`) e hashes dos dois relatórios | conferem | revisor (21 arquivos) e Francisco (todos, no Mac) |
+| Manifesto de 101 evidências (`9cf23dfb…9071`) e hashes dos dois relatórios | conferem | revisor (21 arquivos) e Francisco (todos, no Mac) |
 | Diff | três arquivos: `engine.py`, `report_check.py` e `test_engine.py` | revisor |
 | Âncoras e recibos das sessões | iguais byte a byte entre base e cabeça | implementador; log conferido |
 | 13 casos do protótipo do DL3-PR07A4 e 3 sondas do revisor | todos aprovados na cabeça | revisor |

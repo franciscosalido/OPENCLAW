@@ -264,3 +264,40 @@ da estrutura completa, de cada asa isolada e de execuções parciais.
 Depois: DL3-PR07A5 (evento externo, com as decisões 2 e 3 do cabeçalho), que também leva
 as pendências do DL3-PR07A4: três testes de identidade de relato e a conferência do relato
 recebido com a ordem incerta.
+
+## Revisão adversarial (Claude) — GO na primeira rodada, cabeça `4510616`
+
+Pela regra de processo de Francisco, o revisor **não executou a suíte, a tipagem nem os
+mutantes** desta cabeça. Leu o diff, conferiu as evidências pelo SHA-256 e rodou os cenários
+do seu protótipo, escrito antes do cartão.
+
+| Verificação | Resultado | Quem |
+|---|---|---|
+| Suíte sem integração, Linux x86_64 e macOS | 11.486 aprovados, 16 pulados, 261 subtestes nos dois | implementador; logs conferidos |
+| mypy estrito e Pyright, nos dois sistemas | 0 erros | implementador; logs conferidos |
+| Commit vermelho | Z1 a Z7 falham na base; os passos 1 a 4 do Z7 já passavam | implementador; logs conferidos |
+| 16 mutantes do §5 e 1 adicional, nos dois sistemas | todos detectados | implementador; logs conferidos |
+| Integração | só no contêiner Linux isolado: 31 aprovados, 206 pulados | implementador; evidências conferidas |
+| Manifesto de 112 evidências (`4d039e45…ee27`) e hashes dos dois relatórios | conferem | revisor (21 arquivos) e Francisco (todos, no Mac) |
+| Diff | cinco arquivos; `sequencing.py` com 426 linhas (teto 431) e `engine.py` com 485 (teto 487) | revisor |
+| Âncoras e recibos das sessões | iguais byte a byte entre base e cabeça | implementador; log conferido |
+| Cópia do cartão | igual à publicada, salvo a quebra de linha final | revisor |
+| 7 cenários do protótipo do planejador contra os módulos entregues | todos aprovados | revisor |
+
+A implementação é equivalente à do protótipo e mais simples em um ponto: o saldo que cada
+série tem livre na foto virou um método de `Position`, usado pelo plano e pelo livro, e a
+perna de zeragem reaproveita o fim do cálculo que já existia (perna, lote).
+
+Este PR e o #176 saíram da mesma base e foram validados separadamente. Antes de integrar, o
+revisor juntou os dois e rodou a suíte sem integração (11.497 aprovados, 16 pulados) e o
+mypy estrito (0 erros) na árvore combinada, que não tinha portão completo.
+
+Limite desta revisão: sem mutantes próprios do revisor nesta cabeça.
+
+Observação, não bloqueante (skill; lacuna do cartão do planejador): nenhum teste tem um par
+em que a série «vendida» está com saldo positivo. Trocar o sinal da dedução deixaria esse
+saldo aumentar o livre da proteção, e a suíte não perceberia. A cabeça recusa corretamente.
+Uma linha a mais na tabela do Z1 resolve; entra no próximo cartão.
+
+Relatórios da skill lidos depois de formado o parecer, com SHA-256 conferidos
+(`ce5369b8…0948` e `ab968a41…abbd`): sem bloqueante.
