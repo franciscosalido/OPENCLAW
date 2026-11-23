@@ -304,6 +304,9 @@ def test_n1_one_grant_order_from_draft_to_receipt() -> None:
             assert proposal == reference
             shown = Preview.from_draft(proposal, partial_exposure=D("10"))
             assert shown == canonical and shown.digest == expected_digest
+            raw = canonical.model_dump(mode="json", exclude={"digest"})
+            raw["coverage"] = [{"series": s, "origin": o, "quantity": q} for s, o, q in pair]
+            assert Preview.model_validate_json(json.dumps(raw)) == canonical
             assert tuple((g.series, g.origin, g.quantity) for g in shown.coverage) == expected
             receipt = Receipt()
             event = receipt.append_preview(TIME, shown)
