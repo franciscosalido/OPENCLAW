@@ -266,7 +266,7 @@ Observações, nenhuma bloqueante:
 1. **Escala extrema esgota a memória.** Com prêmio `1E-900000000` e preço 5,5, o processo
    é encerrado por falta de memória no ambiente do revisor, em vez de devolver
    `PayoffRefusal`. Até `1E-2000000` a conta sai exata em menos de 0,1 s. É a mesma classe
-   da limitação já registrada do `expiry_payoff`, que nessa entrada não termina. Só é
+   da limitação já registrada do `expiry_payoff`, que nessa entrada não terminou em 20 s. Só é
    alcançável por entrada construída de propósito, e não há dado externo ligado. Fica para
    o cartão do limite de escala, que passa a cobrir os dois módulos. Os dois relatórios da
    skill declaram que não mediram esse consumo.
