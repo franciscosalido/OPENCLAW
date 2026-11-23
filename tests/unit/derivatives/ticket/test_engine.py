@@ -1,9 +1,10 @@
 """Cenários manuais do motor com venue, gate, reservas e recibo reais do simulador."""
 import json
 from collections.abc import Iterator
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal as D
 from unittest.mock import Mock
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -1646,3 +1647,19 @@ def test_y3_reconciled_fill_becomes_known_after_poll(s: Session) -> None:
     e.on_reports([identified], at(4))
     assert s.receipts[0].events == before and e.gross().executed == D("10")
     assert not s.halts.blocked("sim")
+
+
+def test_y3_retransmission_compares_instants_across_dst_fold(s: Session) -> None:
+    """01:30 ocorre às 05:30Z e às 06:30Z na volta do horário de verão."""
+    e = s.confirmed()
+    local = datetime(2026, 11, 1, 1, 30, tzinfo=ZoneInfo("America/New_York"))
+    first = VenueReport(A, E.VENUE_PARTIAL, 3, D("1"), local, fact="fold")
+    e.on_reports([first], at(3))
+    before = s.receipts[0].events
+    e.on_reports([first._replace(ts=datetime(2026, 11, 1, 5, 30, tzinfo=UTC))], at(4))
+    assert s.receipts[0].events == before and not s.halts.divergent("sim")
+    e.on_reports([first._replace(ts=local.replace(fold=1))], at(5))
+    assert_report_divergence(s, A, "fato repetido com conteúdo diferente", 3, {
+        "event": "venue_partial", "quantity": 3, "price": "1", "fact": "fold"},
+        datetime(2026, 11, 1, 6, 30, tzinfo=UTC))
+    assert e.gross().executed == D("3")
