@@ -138,3 +138,17 @@ def test_limit_counts_groups_instead_of_reports():
     v = partial_view(plan, [trade("L", 1, p) for p in range(64)] + [trade("L", 1, 0)])
     assert len(v.executed_legs) == 64 and v.executed_legs[0].quantity == 2
     assert v.pending == ()
+
+
+def test_decimal_price_and_text_symbol_keep_value_semantics_as_group_keys():
+    class SeriesName(str):
+        __hash__ = None
+
+    class Price(D):
+        __hash__ = None
+
+    plan = [PlannedLeg(SeriesName("C95"), call("BUY", 95, 2, 7))]
+    fills = [Execution("C95", 1, D("6.90")), Execution(SeriesName("C95"), 1, Price("6.900"))]
+    view = partial_view(plan, fills)
+    assert view.executed_legs == (call("BUY", 95, 2, "6.90"),)
+    assert view.executed.net_entry == D("13.80") and view.pending == ()

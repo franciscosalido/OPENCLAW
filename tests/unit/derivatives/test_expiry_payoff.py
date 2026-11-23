@@ -158,3 +158,10 @@ def test_e10_explicit_leg_budget_and_default(func, args):
             func(options[:1], *args, max_legs=invalid)
     with pytest.raises(PayoffRefusal):
         func(options[:2], *args, max_legs=1)
+
+
+def test_e10_eight_legs_are_accepted_by_default_in_all_three_functions():
+    legs = [leg("CALL", "BUY", 100, 1, 5)] * 8
+    assert expiry_leg_results(legs, D(100)) == (D(-5),) * 8
+    assert expiry_result(legs, D(100)) == D(-40)
+    assert expiry_profile(legs).net_entry == D(40)
