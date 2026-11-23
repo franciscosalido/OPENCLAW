@@ -312,11 +312,11 @@ class TicketEngine:
         order = self._orders[r.order_id]
         reason = None
         if r.corrects is not None:
-            reason = ("correção oficial" if r.corrects in self._facts
-                      else "correção sem fato original")
+            reason = "correção oficial" if r.corrects in self._facts else "correção sem fato original"
         elif r.fact is not None and (prior := self._facts.get(r.fact)) is not None:
-            if (prior == r._replace(ts=r.ts.astimezone(UTC)) and
-                    type(prior.quantity) is type(r.quantity) and str(prior.price) == str(r.price)):
+            if (prior.order_id == r.order_id and prior.event == r.event and prior.corrects == r.corrects
+                    and type(prior.quantity) is type(r.quantity) and prior.quantity == r.quantity
+                    and str(prior.price) == str(r.price) and prior.ts.astimezone(UTC) == r.ts.astimezone(UTC)):
                 return False
             reason = "fato repetido com conteúdo diferente"
         elif (order.state, r.event) not in ORDER_TRANSITIONS:
@@ -329,10 +329,10 @@ class TicketEngine:
         if reason is None:
             self._apply(r)
             return True
-        report = {k: str(v) if k == "price" else v for k, v in r._asdict().items()
-                  if k not in ("order_id", "ts") and v is not None}
+        report = dict(event=r.event, fact=r.fact, corrects=r.corrects, quantity=r.quantity,
+                      price=None if r.price is None else str(r.price))
         self._record(E.DIVERGENCE, r.ts, order_id=r.order_id, reason=reason,
-                     filled=order.accounted, report=report)
+                     filled=order.accounted, report={k: v for k, v in report.items() if v is not None})
         self._halts.hold(self._account, "divergence")
         return False
 
@@ -363,7 +363,7 @@ class TicketEngine:
         self._record(r.event, r.ts, **data)
         self._account_report(order, r.ts, fill)
         if r.fact is not None:
-            self._facts[r.fact] = r._replace(ts=r.ts.astimezone(UTC))
+            self._facts[r.fact] = r
         if dest == O.UNCERTAIN:
             self._halts.hold(self._account, r.order_id)
             self._move(E.UNCERTAIN, r.ts)
