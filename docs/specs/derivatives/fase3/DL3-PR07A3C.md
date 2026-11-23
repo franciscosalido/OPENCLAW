@@ -332,3 +332,53 @@ seu protótipo contra os módulos entregues.
 DL3-PR07A4 (DP-13: relato contraditório e evento externo) e DL3-PR07B (DP-02 e DP-03:
 zeragem e borboleta no motor). Atrás deles: limite de escala em `expiry_payoff` e
 `pre_expiry`, e a modalidade B de garantia do Adendo 1.
+
+## Revisão adversarial (Claude) — GO na primeira rodada, cabeça `527e070`
+
+Pela regra de processo de Francisco, o revisor **não executou a suíte, a tipagem nem os
+mutantes** desta cabeça. Leu o diff, conferiu as evidências pelo SHA-256 e rodou os cenários
+do seu protótipo, escrito antes do cartão, e quatro sondas próprias.
+
+| Verificação | Resultado | Quem |
+|---|---|---|
+| Suíte sem integração, Linux x86_64 e macOS | 11.456 aprovados, 16 pulados, 261 subtestes nos dois | implementador; logs conferidos |
+| mypy estrito e Pyright, nos dois sistemas | 0 erros | implementador; logs conferidos |
+| Commit vermelho | X1 a X12, K4 e os dois testes alterados falham; K1 a K3 passam na base | implementador; logs conferidos |
+| Testes antigos do motor contra a cabeça | só S08, C6 e W14 mudam de resultado | implementador; log conferido |
+| 19 mutantes do §5 e 3 adicionais, nos dois sistemas | todos detectados | implementador; logs conferidos |
+| Integração | só no contêiner Linux isolado: 31 aprovados, 206 pulados | implementador; evidências conferidas |
+| Manifesto de 116 evidências (`d8885f84…4c37`) e hashes dos dois relatórios | conferem | revisor (28 arquivos) e Francisco (os 116, no Mac) |
+| Diff | seis arquivos; `engine.py` com 447 linhas (teto 451) e `sequencing.py` com 402 (teto 402) | revisor |
+| Âncoras e recibos das sessões | os quatro recibos e os três resumos iguais byte a byte entre base e cabeça | implementador; log conferido |
+| Cópia do cartão | SHA-256 `e1fbe7cf…9703`, igual ao publicado | revisor |
+| 16 cenários do protótipo do planejador contra os módulos entregues | todos aprovados | revisor |
+| 4 sondas do revisor (lista abaixo) | todas aprovadas | revisor |
+
+A implementação é equivalente à do protótipo do planejador.
+
+Sondas do revisor, escritas antes de ler os relatórios da skill: execução parcial durante o
+cancelamento de ordem coberta por sobra (1 executada com origem `T1`; as 3 restantes só
+voltam à sobra depois do cancelamento confirmado); ordem incerta coberta por sobra,
+conciliada como viva; ordem incerta sem registro na venue, que devolve a sobra inteira;
+recibo de boleta sem autorização sem a chave `origin`.
+
+Limite desta revisão: sem mutantes próprios do revisor nesta cabeça.
+
+Observações. A primeira é falha de desenho do planejador e precisa de correção no próximo
+cartão; nenhuma bloqueia esta integração, que cumpre o cartão:
+
+1. **A prioridade entre origens não está presa ao resumo criptográfico (nota da skill;
+   desenho do planejador).** O DL3-PR07A3B fez o resumo ordenar as autorizações por série e
+   origem, de modo que a ordem informada não o altera. Este cartão fez o motor usar as
+   origens «na ordem assinada». Resultado: duas prévias com as mesmas autorizações em ordens
+   diferentes têm o mesmo resumo e prioridades diferentes. A decisão humana é presa ao
+   resumo, então a prioridade que o humano viu não está coberta por ela. Hoje não há efeito
+   operacional (simulador D0; o motor confirma a prévia que ele mesmo guarda; o recibo
+   preserva a prévia inteira). Correção no próximo cartão: o resumo passa a respeitar a
+   ordem informada.
+2. **Execução durante o cancelamento (skill).** Nenhum teste versionado fixa a origem na
+   execução que chega com o cancelamento pedido. A cabeça se comporta corretamente, pela
+   sonda da skill e pela do revisor. O teste entra no próximo cartão.
+
+Relatórios da skill lidos depois de formado o parecer, com SHA-256 conferidos
+(`100b85f2…4624` e `fb596644…46e2`): sem bloqueante.

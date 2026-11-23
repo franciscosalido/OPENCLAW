@@ -4,7 +4,7 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-23 · **Turno:** Claude (DL3-PR07A3B integrado).
+**Última atualização:** 2026-11-23 · **Turno:** Claude (DL3-PR07A3C integrado).
 
 ## Depois da Fase 3 — decisões de produto no simulador (D0) — EM ANDAMENTO
 
@@ -23,8 +23,9 @@ Revisão 1). O PR07A foi cortado em três pelo planejador.
 | [DL3-PR08E](../specs/derivatives/fase3/DL3-PR08E.md) | calendário oficial da B3 de 2027 (OC 057/2026-VNC) | MERGEADO (PR #170) |
 | [DL3-PR07A3](../specs/derivatives/fase3/DL3-PR07A3.md) | cada boleta vende coberta só pelas próprias compras | MERGEADO (PR #171) |
 | [DL3-PR07A3B](../specs/derivatives/fase3/DL3-PR07A3B.md) | autorização para usar a sobra de boleta parada: prévia, resumo, plano e livro | MERGEADO (PR #172) |
-| DL3-PR07A3C | o motor passa a usar a autorização; recibo com origem e quantidade usada | próximo cartão |
-| DL3-PR07A4 | DP-13: relatório contraditório e evento externo | depois do PR07A3C |
+| [DL3-PR07A3C](../specs/derivatives/fase3/DL3-PR07A3C.md) | o motor usa a sobra autorizada de boleta parada; recibo com origem em cada pedido e execução | MERGEADO (PR #173) |
+| DL3-PR07A3D | fechamentos: resumo preso à ordem das autorizações; testes de cancelamento | próximo cartão |
+| DL3-PR07A4 | DP-13: relatório contraditório e evento externo | depois do PR07A3D |
 | DL3-PR07B | DP-02 e DP-03: zeragem e borboleta em simulação | depois do PR07A4 |
 
 Entregue pelo DL3-PR07A1 (37 linhas de produção):
@@ -218,19 +219,51 @@ Entregue pelo DL3-PR07A3B (camada pura; 62 linhas líquidas de produção):
   revisor não repetiu a suíte; conferiu o manifesto de 102 evidências e rodou os 18
   cenários do seu protótipo e sete sondas contra os módulos entregues.
 
-O DL3-PR07A3B original foi dividido em dois pelo planejador. Ordem: PR07A3C, PR07A4,
-PR07B.
+Entregue pelo DL3-PR07A3C (`engine.py` +13 linhas; `sequencing.py` +1):
+- O motor aceita boleta com autorização. Ao entrar em `STOPPED` sem divergência aberta na
+  conta, marca a boleta como parada no livro, e a sobra dela passa a existir. Boleta
+  concluída não cede sobra; conta com divergência não marca.
+- Na venda, o motor usa primeiro as compras próprias e depois cada origem autorizada, na
+  ordem da prévia, com uma ordem e uma reserva exclusiva por origem.
+- O recibo grava `origin` no pedido e em cada execução de ordem coberta por sobra. Ordem
+  coberta por compras próprias não tem a chave; recibos e âncoras de hoje ficam idênticos.
+- Sobra tomada por outra boleta: a confirmação é recusada antes de gastar a decisão. A
+  boleta que depende de sobra indisponível vende o que existe e para.
+- Trava no livro: boleta parada não reserva nada, nem a sobra de outra.
+- As três lacunas de teste do DL3-PR07A3B foram fechadas (K1, K2 e K3).
+- Portão da cabeça `527e070`, pelo implementador: Linux x86_64 e macOS, 11.456 aprovados,
+  16 pulados, 261 subtestes; mypy estrito e Pyright sem erro; 22 mutantes detectados. O
+  revisor não repetiu a suíte; conferiu o manifesto de 116 evidências e rodou os 16 cenários
+  do seu protótipo e quatro sondas contra os módulos entregues.
 
-Pendente para o DL3-PR07A3C, que mexe nos mesmos arquivos:
-- três testes (o código está certo): ordem do resumo entre séries diferentes; contas
-  diferentes com boletas de mesmo nome; teto por origem quando duas origens cedem a mesma
-  série;
-- uma trava no livro: boleta parada não reserva nem a sobra autorizada de outra;
-- decidir se `releasable_quantity`, hoje sem chamador em produção, sai ou fica.
+Decisões de Francisco de 23/11/2026, depois do DL3-PR07A3C (texto completo no projeto, em
+`claude/derivativos/DECISOES_POS_PR07A3C_2026-11-23.md`):
+- As três lacunas de teste e a trava da boleta parada eram condição do PR07A3C: cumpridas.
+- Ordem que já existia antes da parada continua comprometida: execução tardia é
+  contabilizada, e só o cancelamento confirmado devolve o saldo à origem. Os dois casos
+  devem estar em teste.
+- Esquema JSON de saída da prévia: corrigir **antes do primeiro consumidor externo** (tela,
+  API ou gerador de cliente), em cartão próprio.
+- Só boleta parada cede sobra, por enquanto. A apresentação deve dizer quando a boleta parou
+  com montagem parcial e quanto executou em cada perna.
+- Para cartão posterior: repetir, completar ou ajustar uma estrutura, sempre com boleta e
+  autorização novas; boleta concluída cede só o que o livro comprovar livre; uso no pregão
+  seguinte depende de conciliação atualizada; ajuste de delta mostra exposição antes e
+  depois e custo estimado.
 
-Segue para um cartão de testes: o `projection_id` no teste sintético do calendário.
+Pendente para o DL3-PR07A3D (correção, vem antes de qualquer outro cartão):
+- **o resumo criptográfico não prende a prioridade entre origens** (falha de desenho do
+  planejador): o resumo ordena as autorizações, e o motor usa a ordem informada. Correção:
+  o resumo passa a respeitar a ordem informada;
+- teste da execução que chega durante o cancelamento de ordem coberta por sobra, e teste da
+  ordem viva de boleta parada, que segue comprometida até o cancelamento confirmado.
 
-Próxima ação (uma só): Claude publica o supercartão do DL3-PR07A3C e Codex o abre em
+Fila depois do PR07A3D: PR07A4, PR07B. Atrás deles: apresentação da montagem parcial; a
+frente de repetir, completar e ajustar estruturas (boleta concluída cedendo sobra
+comprovada); limite de escala; modalidade B de garantia. O esquema JSON de saída tem gatilho
+próprio. Segue para um cartão de testes: o `projection_id` no teste sintético do calendário.
+
+Próxima ação (uma só): Claude publica o supercartão do DL3-PR07A3D e Codex o abre em
 rascunho.
 
 ## Fase 03 — Motor da boleta em simulador (D0) — FECHADA (estado A)
