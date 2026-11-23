@@ -4,7 +4,7 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-22 · **Turno:** Claude (DL3-PR08A integrado).
+**Última atualização:** 2026-11-22 · **Turno:** Claude (DL3-PR08B integrado).
 
 ## Depois da Fase 3 — decisões de produto no simulador (D0) — EM ANDAMENTO
 
@@ -17,8 +17,9 @@ Revisão 1). O PR07A foi cortado em três pelo planejador.
 | [DL3-PR07A1](../specs/derivatives/fase3/DL3-PR07A1.md) | DP-14, DP-12, DP-15 e higiene | MERGEADO (PR #163) |
 | [DL3-PR07A2](../specs/derivatives/fase3/DL3-PR07A2.md) | bruto assinado, executado e projetado; série de proteção | MERGEADO (PR #164) |
 | [DL3-PR08A](../specs/derivatives/fase3/DL3-PR08A.md) | resultado da estrutura no vencimento | MERGEADO (PR #165) |
-| DL3-PR08B | a mesma borboleta montada em parte: posição executada ao lado da planejada | cartão a publicar |
-| depois do PR08B | borboleta de puts, travas e iron condor; estimativa antes do vencimento; calendário da B3 | um cartão para cada |
+| [DL3-PR08B](../specs/derivatives/fase3/DL3-PR08B.md) | a estrutura montada em parte: posição executada ao lado da planejada | MERGEADO (PR #166) |
+| DL3-PR08C | borboleta de puts, travas e iron condor conferidos, com quantidades, multiplicador e custos | cartão a publicar |
+| depois do PR08C | estimativa antes do vencimento conferida com o QuantLib; calendário da B3 | um cartão para cada |
 | DL3-PR07A3 | cobertura própria ou de outra boleta, com autorização na prévia | atrás da frente PR08 |
 | DL3-PR07A4 | DP-13: relatório contraditório e evento externo | atrás da frente PR08 |
 | DL3-PR07B | DP-02 e DP-03: zeragem e borboleta em simulação | atrás da frente PR08 |
@@ -53,8 +54,8 @@ Entregue pelo DL3-PR07A2 (62 linhas de produção, só visibilidade):
 
 Regra de processo (Francisco, 22/11/2026): o implementador executa o portão Linux via
 MCP/Docker na cabeça candidata e entrega cabeça, arquitetura, imagem, comandos, log e
-manifesto. O revisor analisa e fica dispensado de repetir. A imagem disponível é ARM64;
-x86_64 só fica validado quando o revisor roda por conta própria.
+manifesto. O revisor analisa e não repete a suíte. Desde o DL3-PR08B o contêiner do
+implementador é Linux x86_64 (emulado em Mac ARM64, conferido pelo cabeçalho ELF).
 
 Frente PR08 — análise de estruturas (autorização de Francisco de 22/11/2026, em
 [AUTORIZACAO_ANALISE_ESTRUTURAS_2026-11-22.md](../specs/derivatives/fase3/AUTORIZACAO_ANALISE_ESTRUTURAS_2026-11-22.md)).
@@ -82,7 +83,25 @@ com o módulo em 70.007 preços, com diferença máxima de 1,4 × 10⁻¹⁴.
 Limite conhecido: expoentes decimais muito distantes entre si custam memória e tempo no
 módulo de resultado. O cartão que ligá-lo a dados externos fixa um limite de escala.
 
-Próxima ação (uma só): Claude publica o supercartão do DL3-PR08B e Codex o abre em
+Entregue pelo DL3-PR08B (`pricing/partial_position.py`, 89 linhas):
+- `partial_view(plan, executions)` devolve o perfil planejado (preços assinados), as
+  pernas e o perfil da posição executada (preços efetivos, uma perna por série e preço)
+  e o pendente por série. Só execução confirmada entra. Sem execução, `executed` é `None`.
+- As três funções de `expiry_payoff` ganharam `max_legs` (1 a 64, padrão 8). O plano
+  segue limitado a oito pernas; a posição executada vai até 64 pares de série e preço.
+- Exemplo fixado em teste: com só as duas vendas centrais da borboleta executadas, a
+  posição tem crédito de 7,00 e perda ilimitada, enquanto o plano perde no máximo 2,00.
+- Não há ligação com o motor da boleta nem com o recibo. A regra de cobertura continua
+  no livro de reservas (PR07A3 e PR07B).
+- Portão da cabeça `9ca6b8e`, pelo implementador: Linux x86_64 e macOS, 11.336
+  aprovados, 16 pulados, 261 subtestes; mypy estrito e Pyright sem erro. Por decisão de
+  Francisco o revisor não repetiu a suíte; conferiu as evidências e rodou o oráculo
+  próprio em 8.000 planos aleatórios, sem divergência.
+
+Pendente para o próximo cartão (testes; o código está certo): plano com exatamente oito
+séries em `partial_view`; símbolo que não é texto.
+
+Próxima ação (uma só): Claude publica o supercartão do DL3-PR08C e Codex o abre em
 rascunho. O DP-01 só vira código depois de adendo à G3 da ADR-0024 assinado por Francisco.
 
 ## Fase 03 — Motor da boleta em simulador (D0) — FECHADA (estado A)

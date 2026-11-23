@@ -144,3 +144,37 @@ testes de arquitetura precisarem de exceção; algum teto do §1 estourar.
    Git, SHA-256 na descrição.
 
 O revisor confronta E2 a E8 com o oráculo próprio e com o OptionLab fora do repositório.
+
+## Revisão adversarial (Claude) — GO na primeira rodada, cabeça `9ca6b8e`
+
+Por decisão de Francisco, o revisor **não executou a suíte, a tipagem nem mutantes** nesta
+cabeça: o implementador rodou tudo em Linux x86_64 e em macOS. O revisor leu o diff,
+conferiu as evidências pelo SHA-256 e usou o seu oráculo independente, que não é a suíte.
+
+| Verificação | Resultado | Quem |
+|---|---|---|
+| Suíte sem integração, Linux x86_64 (contêiner emulado em Mac ARM64, ELF AMD64 conferido) | 11.336 aprovados, 16 pulados, 261 subtestes | implementador; log conferido |
+| mypy estrito e Pyright, Linux x86_64 | 0 erros | implementador; log conferido |
+| 15 mutantes obrigatórios, nas duas plataformas | todos detectados | implementador; log conferido |
+| Manifesto de 96 evidências e hashes dos dois relatórios na descrição do PR | conferem | revisor |
+| Cenários E1 a E8 pelo oráculo do planejador | todos com o esperado do cartão | revisor |
+| 8.000 planos aleatórios com execuções parciais, contra o oráculo | pernas executadas, pendências, perfis e resultados sem divergência | revisor |
+| Linhas | `partial_position.py` 89 (teto 90), `expiry_payoff.py` 142 (teto 150) | revisor |
+| Arquivos protegidos e fixtures | intactos | revisor |
+
+Limite desta revisão: sem mutantes próprios do revisor, a força dos testes repousa nos
+mutantes do implementador e nos da skill.
+
+Observações, nenhuma bloqueante:
+
+1. **Duas lacunas de teste**, apontadas pela skill, com a produção correta: plano com
+   exatamente oito séries em `partial_view`, e símbolo que não é texto. Entram como testes
+   no próximo cartão.
+2. **`except Exception` na leitura das coleções**, como no DL3-PR08A. Aceito pelo mesmo
+   motivo.
+
+Nenhum código de terceiros entrou. O OptionLab 1.9.7 serviu de segunda conferência, fora
+do repositório, pelo implementador.
+
+Relatórios da skill lidos depois, com SHA-256 conferidos (`22947af3…cd52` e
+`d12fce29…aadd`): GO técnico, sem bloqueante.
