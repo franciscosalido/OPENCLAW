@@ -4,7 +4,7 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-23 · **Turno:** Claude (DL3-PR08E integrado).
+**Última atualização:** 2026-11-23 · **Turno:** Claude (DL3-PR07A3 integrado).
 
 ## Depois da Fase 3 — decisões de produto no simulador (D0) — EM ANDAMENTO
 
@@ -21,8 +21,9 @@ Revisão 1). O PR07A foi cortado em três pelo planejador.
 | [DL3-PR08C](../specs/derivatives/fase3/DL3-PR08C.md) | borboleta de puts, travas e iron condor conferidos, com quantidades, multiplicador e custos | MERGEADO (PR #167) |
 | [DL3-PR08D](../specs/derivatives/fase3/DL3-PR08D.md) | estimativa antes do vencimento, compondo os preços das pontes da Fase 2 | MERGEADO (PR #169) |
 | [DL3-PR08E](../specs/derivatives/fase3/DL3-PR08E.md) | calendário oficial da B3 de 2027 (OC 057/2026-VNC) | MERGEADO (PR #170) |
-| DL3-PR07A3 | cobertura própria ou de outra boleta, com autorização na prévia | próximo cartão |
-| DL3-PR07A4 | DP-13: relatório contraditório e evento externo | depois do PR07A3 |
+| [DL3-PR07A3](../specs/derivatives/fase3/DL3-PR07A3.md) | cada boleta vende coberta só pelas próprias compras | MERGEADO (PR #171) |
+| DL3-PR07A3B | autorização na prévia para usar a sobra de outra boleta | próximo cartão |
+| DL3-PR07A4 | DP-13: relatório contraditório e evento externo | depois do PR07A3B |
 | DL3-PR07B | DP-02 e DP-03: zeragem e borboleta em simulação | depois do PR07A4 |
 
 Entregue pelo DL3-PR07A1 (37 linhas de produção):
@@ -178,7 +179,32 @@ Com o DL3-PR08E, a frente de análise de estruturas aberta pela carta de 22/11/2
 entregue nos itens 1 a 4, com duas pendências registradas: limite de escala
 (`expiry_payoff` e `pre_expiry`) e vencimentos diferentes na estimativa.
 
-Próxima ação (uma só): Claude publica o supercartão do DL3-PR07A3 e Codex o abre em
+Entregue pelo DL3-PR07A3 (`ticket/sequencing.py`, só `ReservationBook._capacity`):
+- A venda de uma boleta só é liberada por compras executadas dela mesma, na montagem e
+  na desmontagem. Antes, o livro somava as compras de todas as boletas da conta.
+- Dois comportamentos corrigidos, fixados em teste pelo motor: a sobra de uma boleta
+  parada não é mais usada por outra sem autorização; uma boleta pausada conserva a
+  própria proteção e vende ao ser retomada.
+- Continuam por conta: capacidade de recompra de posição vendida, unicidade das
+  execuções, foto de posição e bloqueio por divergência.
+- Motor, prévia, recibo e roteiro de replay não mudaram. As âncoras oficiais das sessões
+  são as mesmas.
+- Portão da cabeça `f0485d0`, pelo implementador: Linux x86_64 e macOS, 11.422
+  aprovados, 16 pulados, 261 subtestes; mypy estrito e Pyright sem erro. O revisor não
+  repetiu a suíte; conferiu o manifesto de 72 evidências e rodou os dez cenários do seu
+  protótipo contra o módulo entregue.
+- Enquanto o DL3-PR07A3B não entra, a sobra de uma boleta não é usada por nenhuma outra.
+
+Decisões de Francisco de 23/11/2026 para o DL3-PR07A3B: só vale a sobra de boleta já
+parada; a boleta que usa a sobra pode ser só de venda. Ordem confirmada por ele:
+PR07A3B, PR07A4, PR07B.
+
+Pendente para o DL3-PR07A3B, que mexe no mesmo livro (testes; o código está certo): uma
+compra que protege duas pernas de venda da mesma boleta (saldo da série e saldo da
+perna); a recompra confirmada que ultrapassaria o total vendido da conta; e o
+`projection_id` no teste sintético do calendário, que segue para um cartão de testes.
+
+Próxima ação (uma só): Claude publica o supercartão do DL3-PR07A3B e Codex o abre em
 rascunho.
 
 ## Fase 03 — Motor da boleta em simulador (D0) — FECHADA (estado A)

@@ -181,3 +181,39 @@ seu protótipo contra o módulo entregue.
 
 A autorização nomeia a série, a boleta de origem e a quantidade máxima, entra na prévia
 assinada, e o recibo registra a origem e a quantidade usada. Depois vêm PR07A4 e PR07B.
+
+## Revisão adversarial (Claude) — GO na primeira rodada, cabeça `f0485d0`
+
+Pela regra de processo de Francisco, o revisor **não executou a suíte, a tipagem nem os
+mutantes** desta cabeça. Leu o diff, conferiu as evidências pelo SHA-256 e rodou os cenários
+do seu protótipo, escrito antes do cartão.
+
+| Verificação | Resultado | Quem |
+|---|---|---|
+| Suíte sem integração, Linux x86_64 e macOS | 11.422 aprovados, 16 pulados, 261 subtestes nos dois | implementador; logs conferidos |
+| mypy estrito e Pyright, nos dois sistemas | 0 erros | implementador; logs conferidos |
+| Commit vermelho | as nove falhas previstas | implementador; log conferido |
+| 8 mutantes do §5, nos dois sistemas | todos detectados | implementador; logs conferidos |
+| Integração | só no contêiner Linux isolado | implementador; evidências conferidas |
+| Manifesto de 72 evidências (`822c733c…9c9f`) e hashes dos dois relatórios | conferem | revisor |
+| Diff | quatro arquivos; em produção, só `_capacity`; `sequencing.py` com 366 linhas (teto 368) | revisor |
+| Âncoras das sessões | nenhum hash tocado no diff dos testes; os testes das âncoras passam nos logs | revisor |
+| Cópia do cartão | SHA-256 `8fde3d6e…8dc1`, igual ao publicado | revisor |
+| Dez cenários do protótipo do planejador contra o módulo entregue | todos aprovados | revisor |
+
+A mudança de produção é equivalente à do protótipo do planejador.
+
+Limite desta revisão: sem mutantes próprios do revisor nesta cabeça.
+
+Observações, nenhuma bloqueante. As duas vêm da skill e são lacunas de teste em
+invariantes que já existiam antes deste cartão; o código trata os dois casos corretamente:
+
+1. **Uma compra protegendo duas pernas de venda da mesma boleta.** Nenhum teste distingue
+   o saldo da série protetora do saldo de cada perna.
+2. **Recompra confirmada acima do total vendido da conta.** Nenhum teste fixa a recusa do
+   livro nesse caminho.
+
+As duas entram no DL3-PR07A3B, que mexe no mesmo livro.
+
+Relatórios da skill lidos depois de formado o parecer, com SHA-256 conferidos
+(`50091562…aa75` e `ab652914…a04e`): GO, sem bloqueante.
