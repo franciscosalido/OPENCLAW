@@ -28,10 +28,13 @@ def draft(*legs: Leg, net: str = "-5", gross: str = "25") -> TicketDraft:
                        send_deadline=TIME, order_validity=TIME, quote_snapshot_id="q")
 
 
-def holding(symbol: str, balance: int = 0, multiplier: int = 1) -> Holding:
+def holding(symbol: str, balance: int = 0, multiplier: int = 1, *,
+            strike: D | None = None) -> Holding:
     """Identidade e exposição explicitamente conciliadas na conta do cenário."""
     return Holding(symbol=symbol, underlying="ETF", kind="CALL", expiry=date(2027, 1, 15),
-                   multiplier=multiplier, balance=balance)
+                   multiplier=multiplier, balance=balance,
+                   strike=strike if strike is not None else D({"A": 10, "B": 11, "C": 12,
+                                                               "D": 13}.get(symbol, 14)))
 
 
 def position(*rows: Holding, account: str = "sim") -> Position:
@@ -1150,6 +1153,6 @@ def test_b1_strike_is_required_positive_exact_money() -> None:
     fields = holding("A").model_dump(exclude={"strike"})
     with pytest.raises(ValidationError):
         Holding.model_validate(fields)
-    for value in (0, -1, 1.5, "0.001"):
+    for value in (D(0), D(-1), 1.5, D("0.001")):
         with pytest.raises(ValidationError):
             Holding.model_validate(fields | {"strike": value})

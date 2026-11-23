@@ -27,7 +27,8 @@ from config.ticket_sim_config_model import load_ticket_sim_config
 from tests.unit.derivatives.ticket.test_guards import NOW, CLOSE, quote
 from tests.unit.derivatives.ticket.test_models import PRICE
 from tests.unit.derivatives.ticket.test_sequencing import (
-    BUY, SELL, authorized, close_plan, draft, holding, leg, position, sale_only, wing_draft, wing_photo,
+    BUY, SELL, authorized, close_plan, draft, holding, leg, position, sale_only,
+    wing_draft, wing_photo,
 )
 from tests.unit.derivatives.ticket.test_trigger import SPEC, trade
 
@@ -1880,7 +1881,8 @@ def wing_market(s: Session, second: int) -> None:
         s.q(symbol, second, bid=bid, ask=ask)
 
 
-def confirm_wings(s: Session, number: int = 1, second: int = 2, reverse: bool = False):
+def confirm_wings(s: Session, number: int = 1, second: int = 2,
+                  reverse: bool = False) -> TicketEngine:
     e = s.engine(f"T{number}", wing_photo())
     d = wing_draft(reverse=reverse).model_copy(update={"send_deadline": END,
                                                        "order_validity": CLOSE})
@@ -1897,7 +1899,7 @@ def wing_fill(s: Session, symbol: str, sec: int, size: int) -> None:
     s.q(symbol, sec, bid=bid, ask=ask, size=size)
 
 
-def body_orders(s: Session, index: int = 0):
+def body_orders(s: Session, index: int = 0) -> list[tuple[str, int, D, object]]:
     return [(oid, qty, price, order_rows(s.receipts[index], oid)[0]["protection"])
             for oid, qty, price, _ in s.submitted() if oid.startswith(f"T{index + 1}:B:")]
 
@@ -1963,3 +1965,29 @@ def test_g2_correction_and_original_in_one_uncertain_batch(s: Session) -> None:
     engine.reconcile(A, at(4))
     assert engine.orders[A] == O.PARTIAL and engine.gross().executed == free(s) == 2
     assert s.halts.divergent("sim")
+
+
+def test_wings_distinguish_source_series_from_ticket_granting_it(s: Session) -> None:
+    photo = wing_photo()
+    donor = plan_legs(wing_draft(), photo)
+    a, c, _ = donor.legs
+    s.res.admit(donor, ticket="origem")
+    s.res.confirm_buy(donor, a, "oa", 3, ticket="origem")
+    s.res.confirm_buy(donor, c, "oc", 2, ticket="origem")
+    s.res.close("sim", "origem")
+    wing_market(s, 1)
+    e = s.engine("T1", photo)
+    t = draft(leg("C", Side.BUY, ".60", 2), leg("B", Side.SELL, "1.20", 7),
+              net="-7.20", gross="9.60")
+    signed = authorized(t, ("A", "origem", 3), ("C", "origem", 2))
+    e.propose(signed.model_copy(update={"send_deadline": END, "order_validity": CLOSE}), at(1))
+    e.confirm(s.dec(e), at(2))
+    assert body_orders(s) == [(B, 2, D("1.20"), "C"), ("T1:B:2", 3, D("1.20"), "A")]
+    wing_fill(s, "C", 3, 2)
+    assert body_orders(s)[2:] == [("T1:B:3", 2, D("1.20"), "C")]
+    wing_fill(s, "B", 4, 7)
+    assert e.state == T.COMPLETED
+    for oid in (B, "T1:B:2"):
+        request, fill = order_rows(s.receipts[0], oid)
+        assert request["origin"] == fill["origin"] == "origem"
+    assert all("origin" not in row for row in order_rows(s.receipts[0], "T1:B:3"))

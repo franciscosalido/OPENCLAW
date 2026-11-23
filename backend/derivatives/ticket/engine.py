@@ -72,6 +72,7 @@ class _Order:
     request: VenueOrder
     leg: Leg
     origin: str | None
+    protection: str | None
     state: O = O.PENDING_SEND
     filled: int = 0
     accounted: int = 0
@@ -250,17 +251,20 @@ class TicketEngine:
         self._drive(now)
 
     @staticmethod
-    def _sources(plan: LegPlan) -> Iterator[tuple[Leg, str | None]]:
+    def _sources(plan: LegPlan) -> Iterator[tuple[Leg, str | None, str | None]]:
         for leg in plan.legs:
-            yield leg, None
-            if leg.side is Side.SELL:
-                protection = plan.protection_for(leg)
+            if leg.side is Side.BUY:
+                yield leg, None, None
+                continue
+            for source in plan.protections_for(leg):
+                yield leg, source, None
                 for grant in plan.draft.coverage:
-                    if grant.series == protection:
-                        yield leg, grant.origin
+                    if grant.series == source:
+                        yield leg, source, grant.origin
 
-    def _available(self, plan: LegPlan, leg: Leg, origin: str | None) -> int:
-        return self._reservations.available(plan, leg, ticket=self._ticket, origin=origin)
+    def _available(self, plan: LegPlan, leg: Leg, source: str | None, origin: str | None) -> int:
+        return self._reservations.available(plan, leg, ticket=self._ticket,
+                                            source=source, origin=origin)
 
     def _rejected(self, leg: Leg) -> bool:
         return any(o.leg == leg and o.state == O.REJECTED for o in self._orders.values())
@@ -272,7 +276,8 @@ class TicketEngine:
                for leg in plan.legs):
             return T.COMPLETED
         if not self._cancelled and _send_window_open(plan.draft, now) and any(
-                self._available(plan, leg, origin) > 0 for leg, origin in self._sources(plan)
+                self._available(plan, leg, source, origin) > 0
+                for leg, source, origin in self._sources(plan)
                 if leg.side is Side.SELL and not self._rejected(leg)):
             return T.WORKING
         return T.STOPPED
@@ -281,7 +286,7 @@ class TicketEngine:
         if self._state != T.WORKING:
             return
         plan = self._require(T.WORKING)
-        for leg, origin in self._sources(plan):
+        for leg, source, origin in self._sources(plan):
             if (self._state != T.WORKING or self._paused or self._halts.blocked(self._account)
                     or self._cancelled or not _send_window_open(plan.draft, now)
                     or self._market_block(plan, now)):
@@ -289,7 +294,8 @@ class TicketEngine:
             previous = sum(o.leg.symbol == leg.symbol for o in self._orders.values())
             if self._rejected(leg) or (leg.side is Side.BUY and previous):
                 continue
-            quantity = leg.quantity if leg.side is Side.BUY else self._available(plan, leg, origin)
+            quantity = (leg.quantity if leg.side is Side.BUY
+                        else self._available(plan, leg, source, origin))
             if not quantity:
                 continue
             next_leg = leg.model_copy(update={"quantity": quantity})
@@ -303,8 +309,8 @@ class TicketEngine:
                              valid_until=plan.draft.order_validity)
             if leg.side is Side.SELL:
                 self._reservations.reserve(plan, leg, oid, quantity, ticket=self._ticket,
-                                           origin=origin)
-            self._orders[oid] = _Order(req, leg, origin)
+                                           origin=origin, source=source)
+            self._orders[oid] = _Order(req, leg, origin, source)
             self._receive(self._venue.submit(req, now))
         if self._state == T.WORKING:
             dest = self._destination(plan, now)
@@ -347,7 +353,7 @@ class TicketEngine:
         if order.state == O.PENDING_SEND:
             data["request"] = order.request.model_dump(mode="json")
             if order.leg.side is Side.SELL:
-                data["protection"] = self._plan.protection_for(order.leg)
+                data["protection"] = order.protection
         if order.origin is not None and (order.state == O.PENDING_SEND or fill is not None):
             data["origin"] = order.origin
         order.state = dest
