@@ -4,7 +4,7 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-23 · **Turno:** Claude (DL3-PR07A3D integrado).
+**Última atualização:** 2026-11-23 · **Turno:** Claude (DL3-PR07A4 integrado).
 
 ## Depois da Fase 3 — decisões de produto no simulador (D0) — EM ANDAMENTO
 
@@ -25,8 +25,9 @@ Revisão 1). O PR07A foi cortado em três pelo planejador.
 | [DL3-PR07A3B](../specs/derivatives/fase3/DL3-PR07A3B.md) | autorização para usar a sobra de boleta parada: prévia, resumo, plano e livro | MERGEADO (PR #172) |
 | [DL3-PR07A3C](../specs/derivatives/fase3/DL3-PR07A3C.md) | o motor usa a sobra autorizada de boleta parada; recibo com origem em cada pedido e execução | MERGEADO (PR #173) |
 | [DL3-PR07A3D](../specs/derivatives/fase3/DL3-PR07A3D.md) | uma só ordem para as autorizações (série, origem); testes de cancelamento | MERGEADO (PR #174) |
-| DL3-PR07A4 | DP-13: relatório contraditório e evento externo | próximo cartão |
-| DL3-PR07B | DP-02 e DP-03: zeragem e borboleta em simulação | depois do PR07A4 |
+| [DL3-PR07A4](../specs/derivatives/fase3/DL3-PR07A4.md) | DP-13, 1ª parte: relato contraditório vira divergência registrada | MERGEADO (PR #175) |
+| DL3-PR07A5 | DP-13, 2ª parte: evento externo legítimo (exercício, enquadramento) | próximo cartão |
+| DL3-PR07B | DP-02 e DP-03: zeragem e borboleta em simulação | depois do PR07A5 |
 
 Entregue pelo DL3-PR07A1 (37 linhas de produção):
 - No instante exato da validade o motor recusa antes de gastar a decisão, ocupar o livro
@@ -270,13 +271,42 @@ Entregue pelo DL3-PR07A3D (`models.py` +6 linhas):
   revisor não repetiu a suíte; conferiu o manifesto de 88 evidências e rodou os cenários do
   seu protótipo contra o módulo entregue.
 
-Fila: PR07A4, PR07B. Atrás deles: apresentação da montagem parcial; a frente de repetir,
-completar e ajustar estruturas (boleta concluída cedendo sobra comprovada); limite de
-escala; modalidade B de garantia. O esquema JSON de saída é corrigido antes do primeiro
-consumidor externo da prévia, junto com a versão de formato do recibo. Segue para um cartão
-de testes: o `projection_id` no teste sintético do calendário.
+Entregue pelo DL3-PR07A4 (`engine.py` +36 linhas; `venue.py` +2):
+- Antes de aplicar um relato da venue, o motor o confere. O contraditório **não é
+  aplicado**: vira registro `divergence` com a mensagem recebida, o motivo e o último
+  executado que o livro aceitou, e bloqueia novos envios da conta. Os relatos seguintes do
+  lote continuam entrando. Antes, o relato impossível levantava exceção e a execução acima
+  da ordem era gravada como execução.
+- Motivos: correção oficial; correção sem fato original; fato repetido com conteúdo
+  diferente; relato impossível para o estado da ordem; execução malformada; execução acima
+  da quantidade da ordem. No simulador, cancelamento não pedido também é relato impossível.
+- `VenueReport` ganhou `fact` e `corrects`, opcionais. Duplicata idêntica com `fact` é
+  ignorada sem efeito. Sem `fact`, dois relatos iguais são dois fatos. A venue de papel não
+  preenche os campos.
+- A correção oficial é registrada com a referência ao fato original e bloqueia a conta; não
+  altera saldo no simulador.
+- Recibos e âncoras das sessões oficiais são os mesmos.
+- Portão da cabeça `4f1afcb`, pelo implementador: Linux x86_64 e macOS, 11.478 aprovados,
+  16 pulados, 261 subtestes; mypy estrito e Pyright sem erro; 18 mutantes detectados. O
+  revisor não repetiu a suíte; conferiu o manifesto de 112 evidências e rodou os 13 casos do
+  seu protótipo e três sondas contra os módulos entregues.
 
-Próxima ação (uma só): Claude publica o supercartão do DL3-PR07A4 e Codex o abre em
+A DP-13 foi dividida em duas pelo planejador. Fila: PR07A5 (evento externo), PR07B. Atrás
+deles: apresentação da montagem parcial; a frente de repetir, completar e ajustar
+estruturas (boleta concluída cedendo sobra comprovada); limite de escala; modalidade B de
+garantia. O esquema JSON de saída é corrigido antes do primeiro consumidor externo da
+prévia, junto com a versão de formato do recibo. Segue para um cartão de testes: o
+`projection_id` no teste sintético do calendário.
+
+Pendente para o DL3-PR07A5, que mexe no mesmo motor:
+- três testes (o código está certo): o mesmo `fact` em outra ordem ou com outro evento; a
+  duplicata no fim de um lote que traz um fato novo; a reapresentação, sem `corrects`, de um
+  relato aplicado pela conciliação;
+- o relato recebido com a ordem incerta passar pela mesma conferência na conciliação;
+- desenho ainda em aberto do evento externo: onde registrar um fato sem boleta de origem,
+  por onde ele entra no simulador e o que acontece com as boletas em execução da conta.
+
+Próxima ação (uma só): Claude publica o supercartão do DL3-PR07A5 e Codex o abre em
 rascunho.
 
 ## Fase 03 — Motor da boleta em simulador (D0) — FECHADA (estado A)

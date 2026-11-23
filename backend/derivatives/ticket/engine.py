@@ -1,7 +1,7 @@
 """Orquestra uma única boleta assinada no replay síncrono D0."""
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 import re
 from types import MappingProxyType
@@ -19,7 +19,8 @@ from backend.derivatives.ticket.sequencing import (
     partial_exposure, plan_legs, within_signed_limits,
 )
 from backend.derivatives.ticket.state import (
-    Event as E, InvalidTransition, OrderState as O, TicketState as T, reconcile, transition,
+    ORDER_TRANSITIONS, Event as E, InvalidTransition, OrderState as O, TicketState as T,
+    reconcile, transition,
 )
 from backend.derivatives.ticket.trigger import Outcome, Trigger, TriggerSpec, spec_digest
 from backend.derivatives.ticket.venue import ExecutionVenue, VenueOrder, VenueReport
@@ -72,6 +73,7 @@ class _Order:
     origin: str | None
     state: O = O.PENDING_SEND
     filled: int = 0
+    accounted: int = 0
     executions: int = 0
     pending: list[VenueReport] = field(default_factory=list)
 
@@ -100,6 +102,7 @@ class TicketEngine:
         self._trigger: Trigger | None = None
         self._orders: dict[str, _Order] = {}
         self._fills: list[Fill] = []
+        self._facts: dict[str, VenueReport] = {}
 
     @property
     def state(self) -> T:
@@ -299,11 +302,39 @@ class TicketEngine:
                 self._reservations.reserve(plan, leg, oid, quantity, ticket=self._ticket,
                                            origin=origin)
             self._orders[oid] = _Order(req, leg, origin)
-            self._apply(self._venue.submit(req, now))
+            self._receive(self._venue.submit(req, now))
         if self._state == T.WORKING:
             dest = self._destination(plan, now)
             if dest != T.WORKING:
                 self._move(E.COMPLETE if dest == T.COMPLETED else E.STOP, now)
+
+    def _receive(self, r: VenueReport) -> bool:
+        order = self._orders[r.order_id]
+        reason = None
+        if r.corrects is not None:
+            reason = "correção oficial" if r.corrects in self._facts else "correção sem fato original"
+        elif r.fact is not None and (prior := self._facts.get(r.fact)) is not None:
+            if (prior.order_id == r.order_id and prior.event == r.event and prior.corrects == r.corrects
+                    and type(prior.quantity) is type(r.quantity) and prior.quantity == r.quantity
+                    and str(prior.price) == str(r.price) and prior.ts.astimezone(UTC) == r.ts.astimezone(UTC)):
+                return False
+            reason = "fato repetido com conteúdo diferente"
+        elif (order.state, r.event) not in ORDER_TRANSITIONS:
+            reason = "relato impossível para o estado da ordem"
+        elif r.event in (E.VENUE_FILL, E.VENUE_PARTIAL):
+            if type(r.quantity) is not int or r.quantity <= 0 or r.price is None:
+                reason = "execução malformada"
+            elif order.filled + r.quantity > order.request.quantity:
+                reason = "execução acima da quantidade da ordem"
+        if reason is None:
+            self._apply(r)
+            return True
+        report = dict(event=r.event, fact=r.fact, corrects=r.corrects, quantity=r.quantity,
+                      price=None if r.price is None else str(r.price))
+        self._record(E.DIVERGENCE, r.ts, order_id=r.order_id, reason=reason,
+                     filled=order.accounted, report={k: v for k, v in report.items() if v is not None})
+        self._halts.hold(self._account, "divergence")
+        return False
 
     def _apply(self, r: VenueReport) -> None:
         order = self._orders[r.order_id]
@@ -331,6 +362,8 @@ class TicketEngine:
             data["gross"] = self.gross().receipt_values()
         self._record(r.event, r.ts, **data)
         self._account_report(order, r.ts, fill)
+        if r.fact is not None:
+            self._facts[r.fact] = r
         if dest == O.UNCERTAIN:
             self._halts.hold(self._account, r.order_id)
             self._move(E.UNCERTAIN, r.ts)
@@ -346,6 +379,7 @@ class TicketEngine:
                 else:
                     self._reservations.confirm_sale(
                         self._account, oid, fill.execution, fill.quantity)
+                order.accounted += fill.quantity
             if order.state in (O.FILLED, O.CANCELLED, O.EXPIRED, O.REJECTED):
                 if order.leg.side is Side.BUY:
                     self._reservations.settle_buy(self._account, self._ticket, order.leg.symbol)
@@ -362,6 +396,7 @@ class TicketEngine:
 
     def on_reports(self, reports: Sequence[VenueReport], now: datetime) -> None:
         """Aplica o lote antes de decidir qualquer envio adicional."""
+        drive = not reports
         for r in reports:
             order = self._orders.get(r.order_id)
             if order is None:
@@ -369,8 +404,9 @@ class TicketEngine:
             if order.state == O.UNCERTAIN:
                 order.pending.append(r)
             else:
-                self._apply(r)
-        self._drive(now)
+                drive = self._receive(r) or drive
+        if drive:
+            self._drive(now)
 
     def on_market(self, event: ReplayEvent) -> None:
         """Avalia um aviso ou a possibilidade de novo envio pela versão confirmada."""

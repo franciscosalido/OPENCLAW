@@ -26,6 +26,8 @@ class VenueReport(NamedTuple):
     quantity: int | None
     price: Decimal | None
     ts: datetime
+    fact: str | None = None
+    corrects: str | None = None
 
 
 class OrderSnapshot(NamedTuple):
