@@ -1109,3 +1109,40 @@ def test_h3_pending_cancel_preserves_open_projection(s: Session) -> None:
     s.cancel(e, "T1:B:1", 7)
     assert e.orders["T1:B:1"] == O.CANCEL_REQUESTED
     assert e.gross() == (D("25.00"), D("7.54"), D("16.04"))
+
+
+def test_v4_stopped_tickets_unused_protection_stays_with_owner(s: Session) -> None:
+    first = s.confirmed()
+    s.q("A", 3, ask="1")
+    s.q("B", 4, bid="1.50", size=6)
+    assert s.paper.poll(B) == (O.PARTIAL, 6, 4)
+    s.cancel(first, B, 4)
+    s.q("B", 5)
+    assert first.state == T.STOPPED and first.orders[B] == O.CANCELLED
+
+    second = s.new()
+    second.confirm(s.dec(second), at(5))
+    assert dict(second.orders) == {"T2:A:1": O.LIVE}
+    requests = [(A, 10, D("1"), at(2)), (B, 10, D("1.50"), at(3)),
+                ("T2:A:1", 10, D("1"), at(5))]
+    assert s.submitted() == requests
+    s.q("A", 6, ask="1", size=3)
+    assert dict(second.orders) == {"T2:A:1": O.PARTIAL, "T2:B:1": O.LIVE}
+    assert s.submitted() == requests + [("T2:B:1", 3, D("1.50"), at(6))]
+
+
+def test_v5_paused_ticket_keeps_its_fills_until_resumed(s: Session) -> None:
+    first = s.confirmed()
+    first.pause(at(2))
+    s.q("A", 3, ask="1")
+    assert first.paused and first.orders[A] == O.FILLED
+    assert (free(s, "T1"), free(s, "T2")) == (10, 0)
+    second = s.new()
+    second.confirm(s.dec(second), at(3))
+    assert dict(second.orders) == {"T2:A:1": O.LIVE}
+    assert (free(s, "T1"), free(s, "T2")) == (10, 0)
+
+    first.resume(s.dec(first, Action.RESUME), at(4))
+    assert first.state == T.WORKING and first.orders[B] == O.LIVE
+    assert s.submitted() == [(A, 10, D("1"), at(2)), ("T2:A:1", 10, D("1"), at(3)),
+                             (B, 10, D("1.50"), at(4))]

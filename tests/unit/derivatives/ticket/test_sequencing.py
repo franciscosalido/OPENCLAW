@@ -69,7 +69,7 @@ def test_s04_rounding() -> None:
 
 
 def test_s09_cancel_and_late_fill() -> None:
-    """Duas boletas da conta disputam uma única cobertura confirmada."""
+    """Só a boleta que comprou recupera o saldo final confirmado."""
     plan = plan_legs(draft(SELL, BUY), position())
     book = ReservationBook()
     assert book.available(plan, SELL, ticket="T2") == 0
@@ -83,9 +83,12 @@ def test_s09_cancel_and_late_fill() -> None:
     book.confirm_sale("sim", "ord1", "sell-fill2", 1)
     assert book.available(plan, SELL, ticket="T2") == 0
     book.confirm_release("sim", "ord1", 1)
-    assert book.available(plan, SELL, ticket="T2") == 1
-    book.reserve(plan, SELL, "ord2", 1, ticket="T2")
+    assert book.available(plan, SELL, ticket="T1") == 1
     assert book.available(plan, SELL, ticket="T2") == 0
+    with pytest.raises(SequenceRefusal):
+        book.reserve(plan, SELL, "ord2", 1, ticket="T2")
+    book.reserve(plan, SELL, "ord2", 1, ticket="T1")
+    assert book.available(plan, SELL, ticket="T1") == 0
 
 
 def test_scope_and_duplicate_fills() -> None:
@@ -135,19 +138,23 @@ def test_supplemental_lot_invariant() -> None:
 def test_reservations_race_and_failed_release() -> None:
     """Somente uma reserva concorrente vence; recibos repetidos não alteram saldos."""
     from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
 
     p = plan_legs(draft(BUY, SELL), position())
     book = ReservationBook()
     book.confirm_buy(p, BUY, "fill", 3, ticket="origin")
 
+    start = Barrier(8)
+
     def reserve(i: int) -> bool:
+        start.wait(timeout=10)
         try:
-            book.reserve(p, SELL, str(i), 3, ticket=str(i))
+            book.reserve(p, SELL, str(i), 3, ticket="origin")
         except SequenceRefusal:
             return False
         return True
 
-    with ThreadPoolExecutor(max_workers=4) as executor:
+    with ThreadPoolExecutor(max_workers=8) as executor:
         results = list(executor.map(reserve, range(8)))
     assert sum(results) == 1
     order = str(results.index(True))
@@ -158,7 +165,8 @@ def test_reservations_race_and_failed_release() -> None:
         book.confirm_release("sim", order, 3)
     assert book.available(p, SELL, ticket="next") == 0
     book.confirm_release("sim", order, 2)
-    assert book.available(p, SELL, ticket="next") == 2
+    assert book.available(p, SELL, ticket="origin") == 2
+    assert book.available(p, SELL, ticket="next") == 0
 
 
 def test_incompatible_evidence_and_shared_initial_protection() -> None:
@@ -210,38 +218,44 @@ def test_signed_projection_rejects_repeats_overfill_wrong_side_and_missing_cost(
     assert partial_exposure(t, known_costs=D(".01")) == D("10.01")
 
 
-def test_partial_execution_sequences_conserve_shared_protection() -> None:
-    """Em cada prefixo, confronta o livro com saldos separados de dois participantes."""
+def test_partial_execution_sequences_conserve_each_tickets_protection() -> None:
+    """Confronta cada prefixo das 6⁴ sequências com a contabilidade por boleta."""
     plan = plan_legs(draft(BUY, SELL), position())
-    for sequence in product(("buy", "reserve-1", "reserve-2", "fill", "release"), repeat=4):
+    for sequence in product(("buy1", "buy2", "reserve1", "reserve2", "fill", "release"), repeat=4):
         book = ReservationBook()
-        bought = sold = 0
-        live: list[str] = []
+        bought = {"T1": 0, "T2": 0}
+        sold = {"T1": 0, "T2": 0}
+        live: list[tuple[str, str]] = []  # (ordem, boleta), na ordem de envio
         for i, event in enumerate(sequence):
             identity = str(i)
-            if event == "buy":
-                book.confirm_buy(plan, BUY, identity, 1, ticket="buyer")
-                bought += 1
-            elif event.startswith("reserve"):
-                if sold + len(live) < bought:
-                    book.reserve(plan, SELL, identity, 1, ticket=event)
-                    live.append(identity)
+            if event in ("buy1", "buy2"):
+                ticket = "T" + event[-1]
+                book.confirm_buy(plan, BUY, identity, 1, ticket=ticket)
+                bought[ticket] += 1
+            elif event in ("reserve1", "reserve2"):
+                ticket = "T" + event[-1]
+                occupied = sold[ticket] + sum(owner == ticket for _, owner in live)
+                if occupied < bought[ticket]:
+                    book.reserve(plan, SELL, identity, 1, ticket=ticket)
+                    live.append((identity, ticket))
                 else:
                     with pytest.raises(SequenceRefusal):
-                        book.reserve(plan, SELL, identity, 1, ticket=event)
+                        book.reserve(plan, SELL, identity, 1, ticket=ticket)
             elif live:
-                order = live.pop(0)
+                order, owner = live.pop(0)
                 if event == "fill":
                     book.confirm_sale("sim", order, identity, 1)
-                    sold += 1
+                    sold[owner] += 1
                 else:
                     book.confirm_release("sim", order, 1)
-            assert sold + len(live) <= bought
-            assert book.available(plan, SELL, ticket="observer") == bought - sold - len(live)
+            for ticket in ("T1", "T2"):
+                reserved = sum(owner == ticket for _, owner in live)
+                assert book.available(plan, SELL, ticket=ticket) == bought[ticket] - sold[ticket] - reserved
+            assert book.available(plan, SELL, ticket="T3") == 0
 
 
 def test_equivalent_position_row_order_preserves_coverage() -> None:
-    """A ordem de apresentação dos registros não altera o saldo por conta e série."""
+    """A ordem das linhas preserva a cobertura própria da boleta."""
     t = draft(BUY, SELL)
     rows = tuple(holding(s) for s in "ABCD")
     pairs = (("A", "B"), ("C", "D"))
@@ -249,8 +263,9 @@ def test_equivalent_position_row_order_preserves_coverage() -> None:
     other = plan_legs(t, Position(account="sim", holdings=rows[::-1], pairs=pairs[::-1]))
     book = ReservationBook()
     book.confirm_buy(p, BUY, "buy1", 3, ticket="T1")
-    assert book.available(other, SELL, ticket="T2") == 3
-    assert book.available(other, SELL, ticket="T1") == 3
+    for equivalent in (p, other):
+        assert book.available(equivalent, SELL, ticket="T1") == 3
+        assert book.available(equivalent, SELL, ticket="T2") == 0
 
 
 CONDOR = (leg("A", Side.BUY, "3.00"), leg("D", Side.BUY, "0.50"),
@@ -509,3 +524,64 @@ def test_g6_admission_remembers_reconciled_position() -> None:
     book.admit(close_plan(), ticket="T1")
     with pytest.raises(SequenceRefusal, match="foto divergente; conciliação necessária"):
         book.admissible(close_plan(long_balance=12), ticket="T2")
+
+
+def test_v1_another_ticket_cannot_reserve_owning_tickets_fills() -> None:
+    plan = plan_legs(draft(BUY, SELL), position())
+    book = ReservationBook()
+    book.confirm_buy(plan, BUY, "buy1", 4, ticket="T1")
+    assert book.available(plan, SELL, ticket="T1") == 4
+    assert book.available(plan, SELL, ticket="T2") == 0
+    with pytest.raises(SequenceRefusal):
+        book.reserve(plan, SELL, "sale2", 1, ticket="T2")
+    assert book.available(plan, SELL, ticket="T1") == 4
+
+
+def test_v2_partial_sale_and_release_affect_only_the_owner() -> None:
+    plan = plan_legs(draft(BUY, SELL), position())
+    book = ReservationBook()
+
+    def balances() -> tuple[int, int]:
+        return book.available(plan, SELL, ticket="T1"), book.available(plan, SELL, ticket="T2")
+
+    book.confirm_buy(plan, BUY, "buy1", 4, ticket="T1")
+    book.confirm_buy(plan, BUY, "buy2", 6, ticket="T2")
+    book.reserve(plan, SELL, "sale1", 3, ticket="T1")
+    assert balances() == (1, 6)
+    book.confirm_sale("sim", "sale1", "fill1", 2)
+    assert balances() == (1, 6)
+    book.confirm_release("sim", "sale1", 1)
+    assert balances() == (2, 6)
+    with pytest.raises(SequenceRefusal):
+        book.reserve(plan, SELL, "sale2", 7, ticket="T2")
+    book.reserve(plan, SELL, "sale2", 6, ticket="T2")
+    assert balances() == (2, 0)
+
+
+def test_v3_only_own_buybacks_release_long_protection() -> None:
+    plan = close_plan()
+    buyback, sale = plan.legs
+    book = ReservationBook()
+    book.confirm_buy(plan, buyback, "repurchase1", 4, ticket="T1")
+    assert book.available(plan, sale, ticket="T1") == 4
+    assert book.available(plan, sale, ticket="T2") == 0
+    book.confirm_buy(plan, buyback, "repurchase2", 6, ticket="T2")
+    book.reserve(plan, sale, "sale1", 4, ticket="T1")
+    assert book.available(plan, sale, ticket="T1") == 0
+    assert book.available(plan, sale, ticket="T2") == 6
+
+
+def test_v6_live_and_filled_sales_consume_only_the_paired_series() -> None:
+    pos = Position(account="sim", holdings=tuple(holding(s) for s in "ABCD"),
+                   pairs=(("A", "B"), ("C", "D")))
+    buy_c, sell_d = leg("C", Side.BUY, "1"), leg("D", Side.SELL, "1.50")
+    plan = plan_legs(draft(BUY, SELL, buy_c, sell_d), pos)
+    book = ReservationBook()
+    book.confirm_buy(plan, BUY, "buyA", 2, ticket="T1")
+    book.confirm_buy(plan, buy_c, "buyC", 2, ticket="T1")
+    book.reserve(plan, SELL, "sellB", 2, ticket="T1")
+    assert book.available(plan, SELL, ticket="T1") == 0
+    assert book.available(plan, sell_d, ticket="T1") == 2
+    book.confirm_sale("sim", "sellB", "fillB", 2)
+    assert book.available(plan, SELL, ticket="T1") == 0
+    assert book.available(plan, sell_d, ticket="T1") == 2
