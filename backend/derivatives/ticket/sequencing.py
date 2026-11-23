@@ -228,9 +228,9 @@ class ReservationBook:
         balances = {h.symbol: h.balance for h in plan.position.holdings}
         closing = balances[source] < 0
         orders = [o for (a, _), o in self._orders.items() if a == account]
-        # Uma recompra só libera uma proteção, inclusive entre boletas.
-        used = sum(o.live + o.filled for o in orders if o.source == source)
-        bought = self._bought(account, source)
+        # Cada boleta vende com as próprias compras ou recompras da série protetora.
+        used = sum(o.live + o.filled for o in orders if o.ticket == ticket and o.source == source)
+        bought = self._buys.get((account, ticket, source), 0)
         free = releasable_quantity(leg, bought, used, 0)
         if closing:
             disposed = sum(o.filled + o.live for o in orders if o.leg.symbol == leg.symbol)
