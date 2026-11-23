@@ -1681,7 +1681,8 @@ def test_identity_conflict_even_if_only_order_or_event_differs(s: Session, field
     e = s.confirmed()
     first = VenueReport(A, E.VENUE_PARTIAL, 3, D("1"), at(3), fact="f")
     e.on_reports([first], at(3))
-    other = first._replace(order_id=B) if field == "order_id" else first._replace(event=E.VENUE_FILL)
+    other = (first._replace(order_id=B) if field == "order_id"
+             else first._replace(event=E.VENUE_FILL))
     e.on_reports([other], at(4))
     assert_report_divergence(s, other.order_id, "fato repetido com conteúdo diferente",
                              0 if field == "order_id" else 3,
@@ -1741,4 +1742,25 @@ def test_pending_corrected_report_is_never_posted_as_original(s: Session) -> Non
     assert e.orders[A] == O.LIVE and e.gross().executed == 0
     e.on_reports([correction._replace(corrects=None)], at(5))
     assert e.orders[A] == O.PARTIAL and e.gross().executed == 2
+    assert s.halts.divergent("sim") and s.receipts[0].verify()
+
+
+@pytest.mark.parametrize(("quantity", "reason"), [
+    (True, "execução malformada"), (11, "execução acima da quantidade da ordem")])
+def test_pending_bad_fill_cannot_hide_valid_fill(s: Session, quantity: int, reason: str) -> None:
+    """Um relato ruim na fila não muda o saldo usado para conferir a execução seguinte."""
+    e = timeout(s)
+    bad = VenueReport(A, E.VENUE_PARTIAL, quantity, D("1"), at(3), fact="bad")
+    good = VenueReport(A, E.VENUE_FILL, 10, D("1"), at(4), fact="good")
+    e.on_reports([bad, good], at(4))
+    s.venue.poll.return_value = OrderSnapshot(O.FILLED, 10, 0)
+    e.reconcile(A, at(5))
+    rows = s.receipts[0].events
+    divergence, = [json.loads(row.payload) for row in rows if row.kind == E.DIVERGENCE]
+    assert (divergence["filled"], divergence["reason"]) == (0, reason)
+    assert type(divergence["report"]["quantity"]) is type(quantity)
+    assert divergence["report"]["quantity"] == quantity
+    assert [row.kind for row in rows if row.kind in (E.VENUE_PARTIAL, E.VENUE_FILL)] == [
+        E.VENUE_FILL]
+    assert e.orders[A] == O.FILLED and e.gross().executed == 10 and free(s) == 10
     assert s.halts.divergent("sim") and s.receipts[0].verify()
