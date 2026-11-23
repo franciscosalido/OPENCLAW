@@ -1,7 +1,7 @@
 """Orquestra uma única boleta assinada no replay síncrono D0."""
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime
 from decimal import Decimal
 import re
 from types import MappingProxyType
@@ -14,12 +14,13 @@ from backend.derivatives.ticket.models import (
 )
 from backend.derivatives.ticket.receipt import Receipt
 from backend.derivatives.ticket.replay import ReplayEvent
+from backend.derivatives.ticket.report_check import ReportCheck, check_report
 from backend.derivatives.ticket.sequencing import (
     Fill, Gross, LegPlan, Position, ReservationBook, SequenceRefusal, gross_amounts,
     partial_exposure, plan_legs, within_signed_limits,
 )
 from backend.derivatives.ticket.state import (
-    ORDER_TRANSITIONS, Event as E, InvalidTransition, OrderState as O, TicketState as T,
+    Event as E, InvalidTransition, OrderState as O, TicketState as T,
     reconcile, transition,
 )
 from backend.derivatives.ticket.trigger import Outcome, Trigger, TriggerSpec, spec_digest
@@ -312,36 +313,26 @@ class TicketEngine:
 
     def _receive(self, r: VenueReport) -> bool:
         order = self._orders[r.order_id]
-        reason = None
-        if r.corrects is not None:
-            reason = "correção oficial" if r.corrects in self._facts else "correção sem fato original"
-        elif r.fact is not None and (prior := self._facts.get(r.fact)) is not None:
-            if (prior.order_id == r.order_id and prior.event == r.event and prior.corrects == r.corrects
-                    and type(prior.quantity) is type(r.quantity) and prior.quantity == r.quantity
-                    and str(prior.price) == str(r.price) and prior.ts.astimezone(UTC) == r.ts.astimezone(UTC)):
-                return False
-            reason = "fato repetido com conteúdo diferente"
-        elif (order.state, r.event) not in ORDER_TRANSITIONS:
-            reason = "relato impossível para o estado da ordem"
-        elif r.event in (E.VENUE_FILL, E.VENUE_PARTIAL):
-            if type(r.quantity) is not int or r.quantity <= 0 or r.price is None:
-                reason = "execução malformada"
-            elif order.filled + r.quantity > order.request.quantity:
-                reason = "execução acima da quantidade da ordem"
-        if reason is None:
-            self._apply(r)
+        result = check_report(r, order.state, order.filled, order.request.quantity, self._facts)
+        return self._commit_report(order, r, result)
+
+    def _commit_report(self, order: _Order, r: VenueReport, result: ReportCheck) -> bool:
+        if result.destination is not None:
+            self._apply(r, result.destination)
             return True
+        if result.reason is None:
+            return False
         report = dict(event=r.event, fact=r.fact, corrects=r.corrects, quantity=r.quantity,
                       price=None if r.price is None else str(r.price))
-        self._record(E.DIVERGENCE, r.ts, order_id=r.order_id, reason=reason,
-                     filled=order.accounted, report={k: v for k, v in report.items() if v is not None})
+        self._record(E.DIVERGENCE, r.ts, order_id=r.order_id, reason=result.reason,
+                     filled=order.accounted,
+                     report={k: v for k, v in report.items() if v is not None})
         self._halts.hold(self._account, "divergence")
         return False
 
-    def _apply(self, r: VenueReport) -> None:
+    def _apply(self, r: VenueReport, dest: O) -> None:
         order = self._orders[r.order_id]
-        dest = transition(order.state, r.event)
-        assert isinstance(dest, O) and self._plan is not None
+        assert self._plan is not None
         data: dict[str, object] = {"order_id": r.order_id, "state": dest.value}
         fill = None
         if r.event in (E.VENUE_FILL, E.VENUE_PARTIAL):
@@ -455,15 +446,23 @@ class TicketEngine:
         snap = self._venue.poll(order_id)
         resolved = O.REJECTED if snap is None else O.LIVE
         simulated, filled = resolved, order.filled
+        facts = self._facts.copy()
+        checked: list[tuple[VenueReport, ReportCheck]] = []
         for r in order.pending:
             if snap is None:
                 raise EngineRefusal("poll sem ordem para execução pendente")
             try:
-                next_state = transition(simulated, r.event)
+                result = check_report(r, simulated, filled, order.request.quantity, facts)
             except InvalidTransition as exc:
                 raise EngineRefusal("fita pendente inconsistente com poll") from exc
-            assert isinstance(next_state, O)
-            simulated, filled = next_state, filled + (r.quantity or 0)
+            checked.append((r, result))
+            if result.destination is not None:
+                simulated = result.destination
+                if r.event in (E.VENUE_FILL, E.VENUE_PARTIAL):
+                    assert r.quantity is not None
+                    filled += r.quantity
+                if r.fact is not None:
+                    facts[r.fact] = r
         if snap is not None and (simulated != snap.state or filled != snap.filled):
             raise EngineRefusal("poll diverge dos relatórios")
         state = reconcile(order.state, resolved, evidence="poll")
@@ -472,8 +471,8 @@ class TicketEngine:
         self._record(E.RECONCILE, now, order_id=order_id, state=resolved.value, evidence="poll")
         if snap is None:
             self._account_report(order, now)
-        for r in order.pending:
-            self._apply(r)
+        for r, result in checked:
+            self._commit_report(order, r, result)
         order.pending.clear()
         self._halts.release(self._account, order_id)
         if not any(o.state == O.UNCERTAIN for o in self._orders.values()):
