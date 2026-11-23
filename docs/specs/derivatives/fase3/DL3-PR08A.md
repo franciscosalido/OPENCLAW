@@ -180,3 +180,39 @@ de arquitetura precisarem de exceção; o módulo passar de 140 linhas.
 
 O revisor confronta P1 a P8 com o OptionLab **fora do repositório** e registra a versão
 usada e qualquer diferença em reais, por perna.
+
+## Revisão adversarial (Claude) — GO na primeira rodada, cabeça `6a8cee4`
+
+Parecer formado antes de ler os relatórios da skill. O portão Linux ARM64 foi executado pelo
+implementador; o revisor conferiu o log e rodou também x86_64.
+
+| Verificação do revisor | Resultado |
+|---|---|
+| Log Linux ARM64 do implementador | 11.303 aprovados, 16 pulados, 261 subtestes; mypy e Pyright sem erro |
+| Pytest sem integração, clone limpo, Linux x86_64 | 11.303 aprovados, 16 pulados, 261 subtestes |
+| `mypy backend/ --strict` e `pyright backend/`, x86_64 | 0 erros |
+| Módulo | 140 linhas (teto 140); só biblioteca padrão; nenhum arquivo existente de `backend/` mudou |
+| Oráculo independente do planejador, 20.000 estruturas aleatórias de 1 a 8 pernas | resultado total, por perna, entrada, extremos e equilíbrios sem nenhuma divergência |
+| OptionLab 1.9.7, fora do repositório, P1 e P3 a P8 em 70.007 preços | maior diferença 1,4 × 10⁻¹⁴ (ruído de ponto flutuante do OptionLab) |
+| 30 mutantes do revisor, um por vez | 30 mortos |
+| Arquivos protegidos e fixtures | intactos |
+
+O P2 ficou fora do confronto com o OptionLab porque custo fixo em reais é convenção deste
+cartão; ele foi conferido pelo oráculo do planejador e à mão.
+
+Observações, nenhuma bloqueante:
+
+1. **Expoentes decimais muito distantes custam memória e tempo.** O módulo converte tudo
+   para inteiros na menor escala. Um strike em `1E+900000000` com prêmio em centavos não
+   vira `PayoffRefusal`: trava ou estoura memória. Quem chama com preços em centavos não
+   chega perto disso. O próximo cartão que ligar este módulo a dados externos fixa um
+   limite de escala.
+2. **`except Exception` na leitura da sequência de pernas.** Converte qualquer falha de
+   leitura em `PayoffRefusal`. Aceito por estar restrito a essa leitura.
+3. **O módulo está no teto.** O PR08B entra em módulo próprio.
+
+Origem: nenhum código de terceiros entrou. A definição é a do §2. O OptionLab 1.9.7 serviu
+só de segunda conferência, fora do repositório, pelo implementador e pelo revisor.
+
+Relatórios da skill lidos depois, com SHA-256 conferidos (`2863051c…0fea` e
+`3b9388d8…ad4e`): sem bloqueante.
