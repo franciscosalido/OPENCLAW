@@ -1453,3 +1453,196 @@ def test_n3_fill_during_cancel_keeps_origin_and_releases_only_remainder(s: Sessi
             assert "origin" not in json.loads(event.payload)
     assert e.state == T.STOPPED and e.orders[oid] == O.CANCELLED
     assert third_party_surplus(s) == 3
+
+
+def assert_report_divergence(s: Session, oid: str, reason: str, filled: int,
+                             report: dict[str, object], ts: datetime) -> None:
+    """Confere o envelope completo, inclusive campos ausentes e o tipo da quantidade."""
+    event = s.receipts[0].events[-1]
+    expected = {"ticket": "T1", "order_id": oid, "reason": reason, "filled": filled,
+                "report": report}
+    assert event.kind == E.DIVERGENCE and event.ts == ts
+    assert json.dumps(json.loads(event.payload), sort_keys=True) == json.dumps(expected,
+                                                                               sort_keys=True)
+    assert s.halts.divergent("sim")
+
+
+def test_y1_overfill_is_quarantined_and_exact_remainder_still_fills(s: Session) -> None:
+    """Seis mais seis excede dez; só as quatro unidades válidas entram depois."""
+    e = s.confirmed()
+    e.on_reports([VenueReport(A, E.VENUE_PARTIAL, 6, D("1"), at(3))], at(3))
+    assert e.orders == {A: O.PARTIAL, B: O.LIVE} and e.gross().executed == D("6")
+    before = len(s.receipts[0].events)
+    e.on_reports([VenueReport(A, E.VENUE_FILL, 6, D("1"), at(4))], at(4))
+    assert len(s.receipts[0].events) == before + 1
+    assert_report_divergence(s, A, "execução acima da quantidade da ordem", 6,
+                             {"event": "venue_fill", "quantity": 6, "price": "1"}, at(4))
+    assert e.orders[A] == O.PARTIAL and e.state == T.WORKING and e.gross().executed == D("6")
+    assert free(s) == 0 and len(s.submitted()) == 2
+    e.on_reports([VenueReport(A, E.VENUE_FILL, 4, D("1"), at(5))], at(5))
+    assert e.orders[A] == O.FILLED and e.gross().executed == D("10") and free(s) == 4
+    assert len(s.submitted()) == 2 and s.receipts[0].verify()
+
+
+def test_y2_impossible_reports_preserve_terminal_and_live_orders(s: Session) -> None:
+    """Execução após preenchimento e cancelamento sem pedido são contradições distintas."""
+    e = s.confirmed()
+    s.q("A", 3, ask="1")
+    e.on_reports([VenueReport(A, E.VENUE_PARTIAL, 1, D("1"), at(4))], at(4))
+    reason = "relato impossível para o estado da ordem"
+    assert_report_divergence(s, A, reason, 10, {"event": "venue_partial", "quantity": 1,
+                                                "price": "1"}, at(4))
+    e.on_reports([VenueReport(B, E.VENUE_CANCELLED, None, None, at(4))], at(4))
+    assert_report_divergence(s, B, reason, 0, {"event": "venue_cancelled"}, at(4))
+    assert e.orders == {A: O.FILLED, B: O.LIVE} and e.gross().executed == D("10")
+
+
+def test_y3_known_fact_is_ignored_only_for_identical_content(s: Session) -> None:
+    """Repetição inclusive no mesmo lote não altera os fatos; reuso divergente bloqueia."""
+    e = s.confirmed()
+    first = VenueReport(A, E.VENUE_PARTIAL, 3, D("1"), at(3), fact="x1")
+    e.on_reports([first], at(3))
+    events = s.receipts[0].events
+    e.on_reports([first], at(3))
+    e.on_reports([first, first], at(3))
+    assert s.receipts[0].events == events and not s.halts.blocked("sim")
+    assert e.gross().executed == D("3") and len(s.submitted()) == 2
+    e.on_reports([first._replace(quantity=4)], at(4))
+    assert_report_divergence(s, A, "fato repetido com conteúdo diferente", 3,
+                             {"event": "venue_partial", "quantity": 4, "price": "1",
+                              "fact": "x1"}, at(3))
+    assert e.gross().executed == D("3") and len(s.submitted()) == 2
+
+
+def test_y4_correction_references_only_previously_applied_facts(s: Session) -> None:
+    """Referências conhecidas e ausentes ficam no recibo sem reescrever o saldo."""
+    e = s.confirmed()
+    first = VenueReport(A, E.VENUE_PARTIAL, 3, D("1"), at(3), fact="x1")
+    e.on_reports([first], at(3))
+    known = VenueReport(A, E.VENUE_PARTIAL, 2, D("1"), at(4), fact="x2", corrects="x1")
+    for report, reason in (
+        (known, "correção oficial"),
+        (known._replace(fact="x3", corrects="zz", ts=at(5)), "correção sem fato original"),
+        (known._replace(fact="x1", corrects="x2", ts=at(6)), "correção sem fato original"),
+    ):
+        e.on_reports([report], report.ts)
+        assert_report_divergence(s, A, reason, 3, {
+            "event": "venue_partial", "quantity": 2, "price": "1",
+            "fact": report.fact, "corrects": report.corrects}, report.ts)
+        assert e.orders[A] == O.PARTIAL and e.gross().executed == D("3")
+
+
+def test_y5_pending_cancel_accepts_valid_fill_while_account_is_blocked(s: Session) -> None:
+    """O bloqueio impede envios e conserva o fill que cruza com o cancelamento."""
+    e = s.confirmed()
+    s.q("A", 3, ask="1")
+    e.on_reports([VenueReport(A, E.VENUE_PARTIAL, 1, D("1"), at(3))], at(3))
+    assert s.halts.divergent("sim")
+    s.cancel(e, B, 4)
+    s.q("B", 5, bid="1.50", size=4)
+    tail = s.receipts[0].events[-4:]
+    assert [r.kind for r in tail] == [
+        E.REQUEST_CANCEL, E.VENUE_PARTIAL, E.VENUE_CANCELLED, E.STOP]
+    fill = json.loads(tail[1].payload)
+    assert (fill["order_id"], fill["quantity"], fill["gross"]["executed"]) == (B, 4, "16.00")
+    assert e.state == T.STOPPED and e.orders[B] == O.CANCELLED and s.halts.divergent("sim")
+    assert third_party_surplus(s) == 0 and len(s.submitted()) == 2
+
+
+def test_y6_batch_continues_after_impossible_report(s: Session) -> None:
+    """A segunda ordem recebe a execução válida do mesmo lote."""
+    e = s.confirmed()
+    s.q("A", 3, ask="1")
+    before = len(s.receipts[0].events)
+    e.on_reports([VenueReport(A, E.VENUE_PARTIAL, 1, D("1"), at(4)),
+                  VenueReport(B, E.VENUE_PARTIAL, 4, D("1.50"), at(4))], at(4))
+    assert [r.kind for r in s.receipts[0].events[before:]] == [E.DIVERGENCE, E.VENUE_PARTIAL]
+    assert e.orders[B] == O.PARTIAL and e.gross().executed == D("16")
+
+
+@pytest.mark.parametrize(("quantity", "price"), [
+    (0, D("1")), (-1, D("1")), (None, D("1")), (3, None), (True, D("1"))])
+def test_y7_malformed_fill_preserves_received_fields(s: Session, quantity: int | None,
+                                                    price: D | None) -> None:
+    """Uma execução malformada não ocupa, libera nem altera o executado da ordem."""
+    e = s.confirmed()
+    e.on_reports([VenueReport(A, E.VENUE_PARTIAL, quantity, price, at(3))], at(3))
+    report: dict[str, object] = {"event": "venue_partial"}
+    if quantity is not None:
+        report["quantity"] = quantity
+    if price is not None:
+        report["price"] = "1"
+    assert_report_divergence(s, A, "execução malformada", 0, report, at(3))
+    assert e.orders == {A: O.LIVE} and e.gross().executed == 0 and len(s.submitted()) == 1
+
+
+def test_y8_identical_reports_without_fact_are_distinct_fills(s: Session) -> None:
+    """Duas execuções sem identificador continuam sendo dois fatos."""
+    e = s.confirmed()
+    r = VenueReport(A, E.VENUE_PARTIAL, 3, D("1"), at(3))
+    e.on_reports([r, r], at(3))
+    fills = [json.loads(row.payload)["execution"] for row in s.receipts[0].events
+             if row.kind == E.VENUE_PARTIAL]
+    assert fills == [A + "#1", A + "#2"] and e.gross().executed == D("6")
+    assert not s.halts.blocked("sim")
+
+
+def test_y9_divergence_blocks_only_the_affected_account(s: Session) -> None:
+    """A segunda boleta da mesma conta é recusada antes do envio."""
+    e = s.confirmed()
+    s.q("A", 3, ask="1")
+    e.on_reports([VenueReport(A, E.VENUE_PARTIAL, 1, D("1"), at(4))], at(4))
+    other = s.new()
+    with pytest.raises(EngineRefusal, match="conta em estado incerto"):
+        other.confirm(s.dec(other), at(5))
+    assert other.state == T.DRAFT and not other.orders and len(s.submitted()) == 2
+    assert not s.halts.blocked("outra")
+
+
+def test_y1_reports_last_quantity_actually_posted_to_book(s: Session) -> None:
+    """Uma recusa contábil anterior separa o bruto factual do saldo conciliado."""
+    s.res = FirstBuyFails()
+    e = s.confirmed()
+    e.on_reports([VenueReport(A, E.VENUE_PARTIAL, 3, D("1"), at(3)),
+                  VenueReport(A, E.VENUE_PARTIAL, 2, D("1"), at(4)),
+                  VenueReport(A, E.VENUE_FILL, 6, D("1"), at(5))], at(5))
+    assert_report_divergence(s, A, "execução acima da quantidade da ordem", 2,
+                             {"event": "venue_fill", "quantity": 6, "price": "1"}, at(5))
+    assert e.gross().executed == D("5") and free(s) == 2
+
+
+def test_y3_reused_fact_with_boolean_quantity_is_not_an_identical_message(s: Session) -> None:
+    """True e 1 representam mensagens distintas, inclusive antes da regra de formato."""
+    e = s.confirmed()
+    first = VenueReport(A, E.VENUE_PARTIAL, 1, D("1"), at(3), fact="x1")
+    e.on_reports([first, first._replace(quantity=True)], at(3))
+    assert_report_divergence(s, A, "fato repetido com conteúdo diferente", 1, {
+        "event": "venue_partial", "price": "1", "quantity": True, "fact": "x1"}, at(3))
+
+
+def test_y3_immediate_submit_fact_is_known_to_later_batch(s: Session) -> None:
+    """Uma resposta identificada já aplicada não pode voltar como transição impossível."""
+    def submit(req: VenueOrder, ts: datetime) -> VenueReport:
+        return s.paper.submit(req, ts)._replace(fact="accepted")
+
+    s.venue.submit.side_effect = submit
+    e = s.confirmed()
+    before = s.receipts[0].events
+    e.on_reports([VenueReport(A, E.VENUE_LIVE, None, None, at(2), fact="accepted")], at(3))
+    assert e.orders == {A: O.LIVE} and s.receipts[0].events == before
+    assert not s.halts.blocked("sim")
+
+
+def test_y3_reconciled_fill_becomes_known_after_poll(s: Session) -> None:
+    """O fato incerto só é aplicado pela conciliação e depois resiste à retransmissão."""
+    e = timeout(s)
+    reports = s.paper.advance(quote("A", ask="1.00").model_copy(update={"ts": at(3)}))
+    fill, = reports
+    identified = fill._replace(fact="late")
+    e.on_reports([identified], at(3))
+    assert e.state == T.UNCERTAIN and e.gross().executed == 0
+    e.reconcile(A, at(3))
+    before = s.receipts[0].events
+    e.on_reports([identified], at(4))
+    assert s.receipts[0].events == before and e.gross().executed == D("10")
+    assert not s.halts.blocked("sim")
