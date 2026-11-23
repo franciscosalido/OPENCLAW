@@ -377,3 +377,61 @@ seu protótipo contra os módulos entregues.
 
 Depois: DL3-PR07A4 (relato contraditório e evento externo) e DL3-PR07B (zeragem e borboleta
 no motor).
+
+## Revisão adversarial (Claude) — GO na primeira rodada, cabeça `361238c`
+
+Pela regra de processo de Francisco, o revisor **não executou a suíte, a tipagem nem os
+mutantes** desta cabeça. Leu o diff, conferiu as evidências pelo SHA-256 e rodou os cenários
+do seu protótipo, escrito antes do cartão, e sete sondas próprias.
+
+| Verificação | Resultado | Quem |
+|---|---|---|
+| Suíte sem integração, Linux x86_64 e macOS | 11.438 aprovados, 16 pulados, 261 subtestes nos dois | implementador; logs conferidos |
+| mypy estrito e Pyright, nos dois sistemas | 0 erros | implementador; logs conferidos |
+| Commit vermelho | W1 a W14 falham; W15 e W16 nascem verdes, como previsto | implementador; log conferido |
+| 24 mutantes do §5, nos dois sistemas | todos detectados | implementador; logs conferidos |
+| Integração | só no contêiner Linux isolado: 31 aprovados, 206 pulados | implementador; evidências conferidas |
+| Manifesto de 102 evidências (`f7dfdbf3…3655`) e hashes dos dois relatórios | conferem | revisor (33 arquivos) e Francisco (os 102, no Mac) |
+| Diff | oito arquivos; produção em `models` 214, `digest` 46, `sequencing` 401 e `engine` 434 linhas, todos dentro dos tetos | revisor |
+| Âncoras e recibos das sessões | os quatro recibos e os três resumos iguais byte a byte entre base e cabeça | implementador; log conferido |
+| Cópia do cartão | SHA-256 `5854ff4d…99ee`, igual ao publicado | revisor |
+| 18 cenários do protótipo do planejador contra os módulos entregues | todos aprovados | revisor |
+| 7 sondas do revisor (lista abaixo) | todas aprovadas | revisor |
+
+A implementação é equivalente à do protótipo do planejador. Uma diferença de forma: o
+livro deixou de chamar `releasable_quantity` e passou a calcular o saldo próprio e a sobra
+com a mesma função interna.
+
+Sondas do revisor, escritas antes de ler os relatórios da skill: ordem do resumo com séries
+diferentes; boletas de mesmo nome em duas contas; duas origens cedendo a mesma série, com
+teto, uso e liberação por origem; arredondamento ao lote com execução em ordem coberta por
+sobra; sobra de quem tomou emprestado não inclui o que veio de terceiros; boleta parada que
+tem autorização; ida e volta da serialização.
+
+Limite desta revisão: sem mutantes próprios do revisor nesta cabeça.
+
+Observações, nenhuma bloqueante. As três primeiras vêm da skill e são lacunas de teste do
+cartão; a cabeça trata os três casos corretamente, pelas sondas da skill e pelas do revisor:
+
+1. **Ordem do resumo entre séries diferentes.** O W2 só usa a série A; ordenar só pela
+   origem passaria na suíte.
+2. **Contas diferentes com boletas de mesmo nome.** Nenhum teste distingue a sobra por
+   conta.
+3. **Teto por origem quando duas origens cedem a mesma série.** Nenhum teste separa o uso
+   de uma origem do teto da outra.
+4. **Boleta parada com autorização (do revisor).** O livro zera a venda com compras
+   próprias de uma boleta parada, mas ainda responde com a sobra autorizada de outra. O
+   cartão não pediu essa trava e o motor não envia depois de parar; a trava no livro entra
+   no DL3-PR07A3C.
+5. **Esquema JSON de saída (da skill).** Com o serializador do modelo,
+   `model_json_schema(mode="serialization")` da prévia descreve um objeto genérico. O
+   esquema de validação segue enumerando os campos e não há consumidor do esquema de saída
+   no projeto. A alternativa `exclude_if` exige Pydantic mais novo que o mínimo declarado
+   (2.10); fica como está.
+6. **`releasable_quantity` sem chamador em produção (do revisor).** Segue pública e
+   testada. Decidir no DL3-PR07A3C se sai ou fica.
+
+Os itens 1 a 4 entram no DL3-PR07A3C, que mexe nos mesmos arquivos.
+
+Relatórios da skill lidos depois de formado o parecer, com SHA-256 conferidos
+(`e6aea1e4…fd75` e `caeba774…8889`): GO, sem bloqueante.
