@@ -1282,7 +1282,7 @@ def test_x5_own_fills_precede_grants_on_resume(s: Session) -> None:
     assert "origin" not in order_rows(r, "T3:B:2")[0]
 
 
-def test_x6_uses_two_origins_in_preview_order(s: Session) -> None:
+def test_x6_uses_two_origins_in_canonical_order(s: Session) -> None:
     stop_origin(s)
     second = s.new()
     second.confirm(s.dec(second), at(5))
@@ -1294,9 +1294,9 @@ def test_x6_uses_two_origins_in_preview_order(s: Session) -> None:
     assert (third_party_surplus(s), third_party_surplus(s, "T2")) == (4, 3)
     e = borrower(s, 5, grants=(("A", "T2", 2), ("A", "T1", 3)))
     e.confirm(s.dec(e), at(8))
-    assert s.submitted()[4:] == [("T3:B:1", 2, D("1.50"), at(8)), ("T3:B:2", 3, D("1.50"), at(8))]
+    assert s.submitted()[4:] == [("T3:B:1", 3, D("1.50"), at(8)), ("T3:B:2", 2, D("1.50"), at(8))]
     assert [order_rows(s.receipts[2], oid)[0]["origin"] for oid in ("T3:B:1", "T3:B:2")] == [
-        "T2", "T1"]
+        "T1", "T2"]
     assert (third_party_surplus(s), third_party_surplus(s, "T2")) == (1, 1)
 
 
@@ -1380,7 +1380,7 @@ def test_x12_exhausted_surplus_stops_after_partial_strategy(s: Session) -> None:
         "signed": "6.00", "executed": "3.00", "projected": "3.00"}
 
 
-def test_x6_interleaved_grants_follow_priority_within_each_series(s: Session) -> None:
+def test_x6_interleaved_grants_use_canonical_priority_within_each_series(s: Session) -> None:
     """A mesma origem em duas séries preserva a prioridade específica da venda."""
     s.q("C", 1)
     s.q("D", 1)
@@ -1399,7 +1399,7 @@ def test_x6_interleaved_grants_follow_priority_within_each_series(s: Session) ->
               net_limit=ticket.net_limit, gross_cap=ticket.gross_cap)
     e.confirm(s.dec(e), at(2))
     assert [(oid, qty, order_rows(s.receipts[0], oid)[0]["origin"])
-            for oid, qty, _, _ in s.submitted()] == [("T1:B:1", 2, "Q"), ("T1:D:1", 2, "P")]
+            for oid, qty, _, _ in s.submitted()] == [("T1:B:1", 2, "P"), ("T1:D:1", 2, "P")]
 
 
 def test_x1_reconciled_stop_makes_owned_fills_available(s: Session) -> None:
@@ -1429,3 +1429,27 @@ def test_x1_uncertain_borrowed_order_keeps_origin_through_poll(s: Session) -> No
     assert e.state == T.COMPLETED and third_party_surplus(s) == 0
     assert [(r["quantity"], r["origin"]) for r in order_rows(s.receipts[1], oid)
             if "execution" in r] == [(3, "T1"), (1, "T1")]
+
+
+def test_n3_fill_during_cancel_keeps_origin_and_releases_only_remainder(s: Session) -> None:
+    """A unidade executada pertence à cedente, inclusive durante o cancelamento."""
+    stop_origin(s)
+    e = borrower(s)
+    e.confirm(s.dec(e), at(5))
+    oid = "T2:B:1"
+    s.cancel(e, oid, 5)
+    assert e.state == T.WORKING and e.orders[oid] == O.CANCEL_REQUESTED
+    assert third_party_surplus(s) == 0
+    s.q("B", 6, bid="1.50", size=1)
+    events = s.receipts[1].events
+    assert [event.kind for event in events] == [
+        E.PREVIEW, E.CONFIRM, E.START, E.VENUE_LIVE, E.REQUEST_CANCEL,
+        E.VENUE_PARTIAL, E.VENUE_CANCELLED, E.STOP]
+    rows = order_rows(s.receipts[1], oid)
+    assert [(r["origin"], r["quantity"], r["state"]) for r in rows if "execution" in r] == [
+        ("T1", 1, O.CANCEL_REQUESTED.value)]
+    for event in events:
+        if event.kind in (E.REQUEST_CANCEL, E.VENUE_CANCELLED):
+            assert "origin" not in json.loads(event.payload)
+    assert e.state == T.STOPPED and e.orders[oid] == O.CANCELLED
+    assert third_party_surplus(s) == 3

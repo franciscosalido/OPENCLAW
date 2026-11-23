@@ -4,7 +4,7 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-23 · **Turno:** Claude (DL3-PR07A3C integrado).
+**Última atualização:** 2026-11-23 · **Turno:** Claude (DL3-PR07A3D integrado).
 
 ## Depois da Fase 3 — decisões de produto no simulador (D0) — EM ANDAMENTO
 
@@ -24,8 +24,8 @@ Revisão 1). O PR07A foi cortado em três pelo planejador.
 | [DL3-PR07A3](../specs/derivatives/fase3/DL3-PR07A3.md) | cada boleta vende coberta só pelas próprias compras | MERGEADO (PR #171) |
 | [DL3-PR07A3B](../specs/derivatives/fase3/DL3-PR07A3B.md) | autorização para usar a sobra de boleta parada: prévia, resumo, plano e livro | MERGEADO (PR #172) |
 | [DL3-PR07A3C](../specs/derivatives/fase3/DL3-PR07A3C.md) | o motor usa a sobra autorizada de boleta parada; recibo com origem em cada pedido e execução | MERGEADO (PR #173) |
-| DL3-PR07A3D | fechamentos: resumo preso à ordem das autorizações; testes de cancelamento | próximo cartão |
-| DL3-PR07A4 | DP-13: relatório contraditório e evento externo | depois do PR07A3D |
+| [DL3-PR07A3D](../specs/derivatives/fase3/DL3-PR07A3D.md) | uma só ordem para as autorizações (série, origem); testes de cancelamento | MERGEADO (PR #174) |
+| DL3-PR07A4 | DP-13: relatório contraditório e evento externo | próximo cartão |
 | DL3-PR07B | DP-02 e DP-03: zeragem e borboleta em simulação | depois do PR07A4 |
 
 Entregue pelo DL3-PR07A1 (37 linhas de produção):
@@ -224,7 +224,8 @@ Entregue pelo DL3-PR07A3C (`engine.py` +13 linhas; `sequencing.py` +1):
   conta, marca a boleta como parada no livro, e a sobra dela passa a existir. Boleta
   concluída não cede sobra; conta com divergência não marca.
 - Na venda, o motor usa primeiro as compras próprias e depois cada origem autorizada, na
-  ordem da prévia, com uma ordem e uma reserva exclusiva por origem.
+  ordem da prévia (desde o DL3-PR07A3D, sempre série e depois origem), com uma ordem e uma
+  reserva exclusiva por origem.
 - O recibo grava `origin` no pedido e em cada execução de ordem coberta por sobra. Ordem
   coberta por compras próprias não tem a chave; recibos e âncoras de hoje ficam idênticos.
 - Sobra tomada por outra boleta: a confirmação é recusada antes de gastar a decisão. A
@@ -251,19 +252,31 @@ Decisões de Francisco de 23/11/2026, depois do DL3-PR07A3C (texto completo no p
   seguinte depende de conciliação atualizada; ajuste de delta mostra exposição antes e
   depois e custo estimado.
 
-Pendente para o DL3-PR07A3D (correção, vem antes de qualquer outro cartão):
-- **o resumo criptográfico não prende a prioridade entre origens** (falha de desenho do
-  planejador): o resumo ordena as autorizações, e o motor usa a ordem informada. Correção:
-  o resumo passa a respeitar a ordem informada;
-- teste da execução que chega durante o cancelamento de ordem coberta por sobra, e teste da
-  ordem viva de boleta parada, que segue comprometida até o cancelamento confirmado.
+Entregue pelo DL3-PR07A3D (`models.py` +6 linhas):
+- Correção de falha de desenho do planejador: o resumo criptográfico ordenava as
+  autorizações e o motor usava a ordem informada, de modo que a prioridade entre origens
+  ficava fora da assinatura. Agora a boleta ordena as autorizações por série e origem na
+  validação. A ordem informada deixou de existir: prévia, recibo, resumo e motor usam a
+  mesma. Nenhum valor de resumo mudou. Vale o critério de Francisco de 23/11/2026: inverter
+  a ordem de entrada mantém o mesmo resumo.
+- Dois testes pedidos por Francisco entraram (o código já estava certo): a execução que
+  chega com o cancelamento pedido conserva a origem; a ordem viva de boleta parada segue
+  comprometida até o cancelamento confirmado.
+- Recibo emitido entre o PR #173 e o PR #174 com autorizações fora da nova ordem não é mais
+  lido pelo leitor atual. Não há recibo real nessa condição. Lição registrada: mudança no
+  corpo canônico da prévia pede versão de formato antes de dados reais.
+- Portão da cabeça `a2ffa68`, pelo implementador: Linux x86_64 e macOS, 11.459 aprovados,
+  16 pulados, 261 subtestes; mypy estrito e Pyright sem erro; 6 mutantes detectados. O
+  revisor não repetiu a suíte; conferiu o manifesto de 88 evidências e rodou os cenários do
+  seu protótipo contra o módulo entregue.
 
-Fila depois do PR07A3D: PR07A4, PR07B. Atrás deles: apresentação da montagem parcial; a
-frente de repetir, completar e ajustar estruturas (boleta concluída cedendo sobra
-comprovada); limite de escala; modalidade B de garantia. O esquema JSON de saída tem gatilho
-próprio. Segue para um cartão de testes: o `projection_id` no teste sintético do calendário.
+Fila: PR07A4, PR07B. Atrás deles: apresentação da montagem parcial; a frente de repetir,
+completar e ajustar estruturas (boleta concluída cedendo sobra comprovada); limite de
+escala; modalidade B de garantia. O esquema JSON de saída é corrigido antes do primeiro
+consumidor externo da prévia, junto com a versão de formato do recibo. Segue para um cartão
+de testes: o `projection_id` no teste sintético do calendário.
 
-Próxima ação (uma só): Claude publica o supercartão do DL3-PR07A3D e Codex o abre em
+Próxima ação (uma só): Claude publica o supercartão do DL3-PR07A4 e Codex o abre em
 rascunho.
 
 ## Fase 03 — Motor da boleta em simulador (D0) — FECHADA (estado A)
