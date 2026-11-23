@@ -24,7 +24,7 @@ from config.ticket_sim_config_model import load_ticket_sim_config
 from tests.unit.derivatives.ticket.test_guards import NOW, CLOSE, quote
 from tests.unit.derivatives.ticket.test_models import PRICE
 from tests.unit.derivatives.ticket.test_sequencing import (
-    BUY, SELL, close_plan, draft, holding, leg, position,
+    BUY, SELL, authorized, close_plan, draft, holding, leg, position, sale_only,
 )
 from tests.unit.derivatives.ticket.test_trigger import SPEC, trade
 
@@ -212,7 +212,8 @@ def test_s08_cancel_partial_sale(s: Session) -> None:
     s.q("A",3,ask="1")
     s.cancel(e,B,3)
     s.q("B",4,bid="1.50",size=4)
-    assert e.state==T.STOPPED and e.orders[B]==O.CANCELLED and free(s)==6
+    assert e.state==T.STOPPED and e.orders[B]==O.CANCELLED and free(s)==0
+    assert third_party_surplus(s) == 6
     assert s.paper.poll(B)==(O.CANCELLED,4,0) and len(s.submitted())==2
     assert [r.kind for r in s.receipts[0].events][-3:]==[E.VENUE_PARTIAL,E.VENUE_CANCELLED,E.STOP]
 
@@ -567,7 +568,8 @@ def test_c6_rejected_sale_is_final(s: Session) -> None:
     assert dict(e.orders) == {A: O.FILLED, B: O.REJECTED} and e.state == T.STOPPED
     s.q("B", 4)
     s.q("A", 5)
-    assert len(s.submitted()) == 2 and free(s) == 10
+    assert len(s.submitted()) == 2 and free(s) == 0
+    assert third_party_surplus(s) == 10
 
 
 def test_l1_recheck_gross_after_favorable_partial(s: Session) -> None:
@@ -1148,14 +1150,282 @@ def test_v5_paused_ticket_keeps_its_fills_until_resumed(s: Session) -> None:
                              (B, 10, D("1.50"), at(4))]
 
 
-def test_w14_engine_refuses_coverage_before_planning_or_recording(s: Session) -> None:
-    """O motor recusa a nova modalidade antes de criar prévia, evento ou ordem."""
-    from tests.unit.derivatives.ticket.test_sequencing import authorized
+def third_party_surplus(s: Session, origin: str = "T1") -> int:
+    """Consulta independente da sobra atribuída à origem."""
+    p = sale_only(10, origin)
+    return s.res.available(p, p.legs[0], ticket="observer", origin=origin)
 
-    s.engine("T1", position())
-    engine = s.engine("T2", position())
-    bare = draft(leg("B", Side.SELL, "1.50", 4), net="-6", gross="6")
-    reason = "autorização de cobertura ainda não disponível no motor"
-    with pytest.raises(EngineRefusal, match=reason):
-        engine.propose(authorized(bare, ("A", "T1", 4)), NOW)
-    assert engine.preview is None and not s.receipts[1].events and not s.submitted()
+
+def stop_origin(s: Session, *, divergent: bool = False) -> TicketEngine:
+    """Compra dez A, vende seis B e concilia o cancelamento do restante."""
+    owner = s.confirmed()
+    s.q("A", 3, ask="1")
+    s.q("B", 4, bid="1.50", size=6)
+    s.cancel(owner, B, 4)
+    if divergent:
+        s.halts.hold("sim", "divergence")
+    s.q("B", 5)
+    assert owner.state == T.STOPPED and owner.orders[B] == O.CANCELLED
+    return owner
+
+
+def borrower(s: Session, qty: int = 4, *, price: str = "1.50", own: int = 0,
+             grants: tuple[tuple[str, str, int], ...] = ()) -> TicketEngine:
+    """Propõe a venda autorizada, com compra própria opcional."""
+    sale = leg("B", Side.SELL, price, qty)
+    legs = (leg("A", Side.BUY, "1", own), sale) if own else (sale,)
+    volume = D(price) * qty
+    ticket = authorized(draft(*legs, net=str(own - volume), gross=str(own + volume)),
+                        *(grants or (("A", "T1", qty - own),)))
+    return s.new(legs=ticket.legs, coverage=ticket.coverage, net_limit=ticket.net_limit,
+                 gross_cap=ticket.gross_cap)
+
+
+def order_rows(receipt: Receipt, oid: str) -> list[dict[str, object]]:
+    """Dados públicos do pedido e dos fatos posteriores da mesma ordem."""
+    return [data for event in receipt.events
+            if (data := json.loads(event.payload)).get("order_id") == oid]
+
+
+def test_x1_authorized_sale_records_origin_for_each_fill(s: Session) -> None:
+    stop_origin(s)
+    assert third_party_surplus(s) == 4
+    e = borrower(s)
+    assert e.preview is not None and e.preview.partial_exposure == D("0")
+    assert [(g.series, g.origin, g.quantity) for g in e.preview.coverage] == [("A", "T1", 4)]
+    e.confirm(s.dec(e), at(5))
+    oid = "T2:B:1"
+    assert e.state == T.WORKING and e.orders == {oid: O.LIVE}
+    assert len(s.submitted()) == 3 and s.submitted()[2] == (oid, 4, D("1.50"), at(5))
+    assert third_party_surplus(s) == 0
+    receipt = s.receipts[1]
+    requested, = order_rows(receipt, oid)
+    assert (requested["protection"], requested["origin"]) == ("A", "T1")
+    assert isinstance(requested["request"], dict) and requested["request"]["quantity"] == 4
+    s.q("B", 6, bid="1.50", size=3)
+    s.q("B", 7, bid="1.50", size=1)
+    _, partial, final = order_rows(receipt, oid)
+    for row, expected in ((partial, ("T2:B:1#1", 3, "1.50", "T1", "4.50")),
+                          (final, ("T2:B:1#2", 1, "1.50", "T1", "6.00"))):
+        gross = row["gross"]
+        assert isinstance(gross, dict)
+        assert (row["execution"], row["quantity"], row["price"], row["origin"],
+                gross["executed"]) == expected
+    assert e.state == T.COMPLETED
+    assert [event.kind for event in receipt.events] == [
+        E.PREVIEW, E.CONFIRM, E.START, E.VENUE_LIVE, E.VENUE_PARTIAL, E.VENUE_FILL, E.COMPLETE]
+    assert all("origin" not in json.loads(row.payload) for row in s.receipts[0].events)
+
+
+def test_x2_confirm_after_release_reuses_unspent_decision(s: Session) -> None:
+    stop_origin(s)
+    first, second = borrower(s), borrower(s)
+    first.confirm(s.dec(first), at(5))
+    decision = s.dec(second)
+    with pytest.raises(SequenceRefusal, match="sobra indisponível"):
+        second.confirm(decision, at(5))
+    assert second.state == T.DRAFT and not second.orders and len(s.submitted()) == 3
+    assert [r.kind for r in s.receipts[2].events] == [E.PREVIEW]
+    s.cancel(first, "T2:B:1", 5)
+    s.q("B", 6)
+    assert first.state == T.STOPPED
+    second.confirm(decision, at(6))
+    assert s.submitted()[3:] == [("T3:B:1", 4, D("1.50"), at(6))]
+
+
+def test_x3_paused_owner_keeps_protection(s: Session) -> None:
+    owner = s.confirmed()
+    owner.pause(at(2))
+    s.q("A", 3, ask="1")
+    e = borrower(s)
+    with pytest.raises(SequenceRefusal, match="boleta de origem não parada"):
+        e.confirm(s.dec(e), at(3))
+    assert e.state == T.DRAFT and not e.orders
+    owner.resume(s.dec(owner, Action.RESUME), at(4))
+    assert owner.orders[B] == O.LIVE and s.submitted()[-1] == (B, 10, D("1.50"), at(4))
+
+
+def test_x4_borrow_now_then_use_own_filled_purchase(s: Session) -> None:
+    stop_origin(s)
+    e = borrower(s, 10, own=6)
+    assert e.preview is not None and e.preview.partial_exposure == D("6")
+    e.confirm(s.dec(e), at(5))
+    first, second = "T2:B:1", "T2:B:2"
+    assert s.submitted()[2:] == [("T2:A:1", 6, D("1"), at(5)), (first, 4, D("1.50"), at(5))]
+    s.q("A", 6, ask="1", size=6)
+    assert e.orders["T2:A:1"] == O.FILLED and s.submitted()[4:] == [(second, 6, D("1.50"), at(6))]
+    s.q("B", 7, bid="1.50", size=10)
+    assert e.state == T.COMPLETED
+    request, fill = order_rows(s.receipts[1], first)
+    assert request["origin"] == fill["origin"] == "T1" and fill["quantity"] == 4
+    request, fill = order_rows(s.receipts[1], second)
+    assert request["protection"] == "A" and fill["quantity"] == 6
+    assert "origin" not in request and "origin" not in fill
+
+
+def test_x5_own_fills_precede_grants_on_resume(s: Session) -> None:
+    stop_origin(s)
+    first, e = borrower(s, 2), borrower(s, 10, own=6)
+    first.confirm(s.dec(first), at(5))
+    e.confirm(s.dec(e), at(5))
+    assert s.submitted()[3:] == [("T3:A:1", 6, D("1"), at(5)), ("T3:B:1", 2, D("1.50"), at(5))]
+    e.pause(at(5))
+    s.q("A", 6, ask="1", size=6)
+    assert e.orders["T3:A:1"] == O.FILLED
+    s.cancel(first, "T2:B:1", 6)
+    s.q("B", 7)
+    assert first.state == T.STOPPED and len(s.submitted()) == 5
+    e.resume(s.dec(e, Action.RESUME), at(8))
+    assert s.submitted()[5:] == [("T3:B:2", 6, D("1.50"), at(8)), ("T3:B:3", 2, D("1.50"), at(8))]
+    r = s.receipts[2]
+    assert order_rows(r, "T3:B:1")[0]["origin"] == order_rows(r, "T3:B:3")[0]["origin"] == "T1"
+    assert "origin" not in order_rows(r, "T3:B:2")[0]
+
+
+def test_x6_uses_two_origins_in_preview_order(s: Session) -> None:
+    stop_origin(s)
+    second = s.new()
+    second.confirm(s.dec(second), at(5))
+    s.q("A", 6, ask="1")
+    s.q("B", 7, bid="1.50", size=7)
+    s.cancel(second, "T2:B:1", 7)
+    s.q("B", 8)
+    assert second.state == T.STOPPED
+    assert (third_party_surplus(s), third_party_surplus(s, "T2")) == (4, 3)
+    e = borrower(s, 5, grants=(("A", "T2", 2), ("A", "T1", 3)))
+    e.confirm(s.dec(e), at(8))
+    assert s.submitted()[4:] == [("T3:B:1", 2, D("1.50"), at(8)), ("T3:B:2", 3, D("1.50"), at(8))]
+    assert [order_rows(s.receipts[2], oid)[0]["origin"] for oid in ("T3:B:1", "T3:B:2")] == [
+        "T2", "T1"]
+    assert (third_party_surplus(s), third_party_surplus(s, "T2")) == (1, 1)
+
+
+def test_x7_stopped_borrower_cannot_reuse_or_lend_borrowed_quantity(s: Session) -> None:
+    stop_origin(s)
+    e = borrower(s)
+    e.confirm(s.dec(e), at(5))
+    s.cancel(e, "T2:B:1", 5)
+    s.q("B", 6)
+    assert e.state == T.STOPPED
+    p = sale_only(4)
+    p = plan_legs(p.draft.model_copy(update=dict(send_deadline=END, order_validity=CLOSE)),
+                  position())
+    assert s.res.available(p, p.legs[0], ticket="T2", origin="T1") == 0
+    assert (third_party_surplus(s), third_party_surplus(s, "T2")) == (4, 0)
+
+
+def test_x8_edit_preserves_grant_and_rejects_insufficient_quantity(s: Session) -> None:
+    stop_origin(s)
+    e = borrower(s)
+    quantity = FieldRef(EditableField.QUANTITY, 0)
+    e.edit(quantity, 2, at(5))
+    assert e.preview is not None and e.preview.version == 2 and e.preview.legs[0].quantity == 2
+    assert [(g.series, g.origin, g.quantity) for g in e.preview.coverage] == [("A", "T1", 4)]
+    with pytest.raises(SequenceRefusal, match="quantidade de proteção insuficiente"):
+        e.edit(quantity, 5, at(5))
+    assert e.preview.version == 2
+
+
+def test_x9_divergence_prevents_lending_even_after_unblock(s: Session) -> None:
+    stop_origin(s, divergent=True)
+    assert third_party_surplus(s) == 0
+    s.halts.release("sim", "divergence")
+    e = borrower(s)
+    with pytest.raises(SequenceRefusal, match="boleta de origem não parada"):
+        e.confirm(s.dec(e), at(5))
+
+
+def test_x10_completed_owner_keeps_unused_protection(s: Session) -> None:
+    owner = s.new(legs=(BUY, leg("B", Side.SELL, "1.50", 6)), net_limit=D("1"), gross_cap=D("19"))
+    owner.confirm(s.dec(owner), at(2))
+    s.q("A", 3, ask="1")
+    s.q("B", 4, bid="1.50", size=6)
+    assert owner.state == T.COMPLETED and third_party_surplus(s) == 0
+    e = borrower(s)
+    with pytest.raises(SequenceRefusal, match="boleta de origem não parada"):
+        e.confirm(s.dec(e), at(5))
+    assert e.state == T.DRAFT
+
+
+def contested_surplus(s: Session) -> tuple[TicketEngine, TicketEngine]:
+    """Primeira boleta ocupa duas unidades com preço que o próximo negócio não alcança."""
+    stop_origin(s)
+    first, second = borrower(s, 2, price="1.60"), borrower(s)
+    first.confirm(s.dec(first), at(5))
+    second.confirm(s.dec(second), at(5))
+    assert s.submitted()[2:] == [("T2:B:1", 2, D("1.60"), at(5)), ("T3:B:1", 2, D("1.50"), at(5))]
+    return first, second
+
+
+def test_x11_paused_borrower_waits_for_returned_surplus(s: Session) -> None:
+    first, second = contested_surplus(s)
+    second.pause(at(5))
+    s.cancel(first, "T2:B:1", 5)
+    s.q("B", 6)
+    assert first.state == T.STOPPED and second.orders == {"T3:B:1": O.LIVE}
+    s.q("B", 7, bid="1.50", size=10)
+    assert second.state == T.WORKING and second.orders == {"T3:B:1": O.FILLED}
+    second.resume(s.dec(second, Action.RESUME), at(8))
+    assert s.submitted()[4:] == [("T3:B:2", 2, D("1.50"), at(8))]
+    assert order_rows(s.receipts[2], "T3:B:2")[0]["origin"] == "T1"
+
+
+def test_x12_exhausted_surplus_stops_after_partial_strategy(s: Session) -> None:
+    first, second = contested_surplus(s)
+    s.q("B", 6, bid="1.50", size=10)
+    assert first.orders == {"T2:B:1": O.LIVE} and second.orders == {"T3:B:1": O.FILLED}
+    assert second.state == T.STOPPED
+    last = s.receipts[2].events[-1]
+    assert last.kind == E.STOP and json.loads(last.payload)["gross"] == {
+        "signed": "6.00", "executed": "3.00", "projected": "3.00"}
+
+
+def test_x6_interleaved_grants_follow_priority_within_each_series(s: Session) -> None:
+    """A mesma origem em duas séries preserva a prioridade específica da venda."""
+    s.q("C", 1)
+    s.q("D", 1)
+    pos = Position(account="sim", holdings=tuple(holding(x) for x in "ABCD"),
+                   pairs=(("A", "B"), ("C", "D")))
+    for origin, symbols in (("P", "AC"), ("Q", "A")):
+        plan = plan_legs(draft(*(leg(symbol, Side.BUY, "1", 2) for symbol in symbols)), pos)
+        s.res.admit(plan, ticket=origin)
+        for buy in plan.legs:
+            s.res.confirm_buy(plan, buy, origin + buy.symbol, 2, ticket=origin)
+        s.res.close("sim", origin)
+    sales = draft(leg("B", Side.SELL, "1.50", 2), leg("D", Side.SELL, "1.50", 2),
+                  net="-6", gross="6")
+    ticket = authorized(sales, ("C", "P", 2), ("A", "Q", 2), ("A", "P", 2))
+    e = s.new(pos=pos, legs=ticket.legs, coverage=ticket.coverage,
+              net_limit=ticket.net_limit, gross_cap=ticket.gross_cap)
+    e.confirm(s.dec(e), at(2))
+    assert [(oid, qty, order_rows(s.receipts[0], oid)[0]["origin"])
+            for oid, qty, _, _ in s.submitted()] == [("T1:B:1", 2, "Q"), ("T1:D:1", 2, "P")]
+
+
+def test_x1_reconciled_stop_makes_owned_fills_available(s: Session) -> None:
+    """O poll sem registro da venda libera as dez compras da origem parada."""
+    owner = s.confirmed()
+    s.step(VenueTimeout(type="timeout", seq=3, ts=at(2), call="submit", registered=False))
+    s.q("A", 3, ask="1")
+    assert owner.orders[B] == O.UNCERTAIN and third_party_surplus(s) == 0
+    owner.reconcile(B, at(4))
+    assert owner.state == T.STOPPED and third_party_surplus(s) == 10
+
+
+def test_x1_uncertain_borrowed_order_keeps_origin_through_poll(s: Session) -> None:
+    """O pedido incerto mantém a origem e o saldo ocupado até conciliar ambos os fills."""
+    stop_origin(s)
+    e = borrower(s)
+    s.step(VenueTimeout(type="timeout", seq=9, ts=at(5), call="submit", registered=True))
+    e.confirm(s.dec(e), at(5))
+    oid = "T2:B:1"
+    assert e.orders == {oid: O.UNCERTAIN} and third_party_surplus(s) == 0
+    request, = order_rows(s.receipts[1], oid)
+    assert request["origin"] == "T1" and request["protection"] == "A"
+    s.q("B", 6, bid="1.50", size=3)
+    s.q("B", 7, bid="1.50", size=1)
+    assert e.state == T.UNCERTAIN
+    e.reconcile(oid, at(7))
+    assert e.state == T.COMPLETED and third_party_surplus(s) == 0
+    assert [(r["quantity"], r["origin"]) for r in order_rows(s.receipts[1], oid)
+            if "execution" in r] == [(3, "T1"), (1, "T1")]

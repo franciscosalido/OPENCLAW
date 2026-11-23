@@ -839,3 +839,54 @@ def test_w16_account_cannot_buy_back_more_than_it_is_short() -> None:
     book.confirm_buy(p, buy, "second", 6, ticket="T2")
     with pytest.raises(SequenceRefusal, match="execuções excedem posição vendida"):
         book.confirm_buy(p, buy, "excess", 1, ticket="T3")
+
+
+def test_k2_same_origin_name_is_isolated_by_account() -> None:
+    book, _ = surplus_book()
+    other = position(account="outra")
+    owner = plan_legs(draft(BUY, SELL), other)
+    book.admit(owner, ticket="T1")
+    book.confirm_buy(owner, BUY, "purchase", 7, ticket="T1")
+    borrowers = (sale_only(8), sale_only(8, pos=other))
+
+    def balances() -> tuple[int, ...]:
+        return tuple(book.available(p, p.legs[0], ticket="T3", origin="T1") for p in borrowers)
+
+    assert balances() == (4, 0)
+    book.close("outra", "T1")
+    assert balances() == (4, 7)
+
+
+def test_k3_each_grant_accounts_for_its_own_fills_and_reservations() -> None:
+    book = ReservationBook()
+    owner = plan_legs(draft(BUY, SELL), position())
+    for name, quantity in (("L1", 5), ("L2", 7)):
+        book.confirm_buy(owner, BUY, name, quantity, ticket=name)
+        book.close("sim", name)
+    sale = leg("B", Side.SELL, "1.50", 8)
+    plan = plan_legs(authorized(draft(sale, net="-12", gross="12"),
+                                ("A", "L2", 5), ("A", "L1", 3)), position())
+    book.admit(plan, ticket="T")
+
+    def balances() -> tuple[int, ...]:
+        return tuple(book.available(plan, sale, ticket="T", origin=name) for name in ("L1", "L2"))
+
+    assert balances() == (3, 5)
+    book.reserve(plan, sale, "borrow", 2, ticket="T", origin="L1")
+    assert balances() == (1, 5)
+    book.confirm_sale("sim", "borrow", "fill", 1)
+    book.confirm_release("sim", "borrow", 1)
+    assert balances() == (2, 5)
+
+
+def test_k4_stopped_borrower_cannot_reserve_another_origin() -> None:
+    book, _ = surplus_book()
+    plan = sale_only(4)
+    sale = plan.legs[0]
+    book.admit(plan, ticket="T2")
+    assert book.available(plan, sale, ticket="T2", origin="T1") == 4
+    book.close("sim", "T2")
+    assert book.available(plan, sale, ticket="T2", origin="T1") == 0
+    with pytest.raises(SequenceRefusal, match="reserva indisponível"):
+        book.reserve(plan, sale, "borrow", 1, ticket="T2", origin="T1")
+    assert book.available(plan, sale, ticket="T3", origin="T1") == 4
