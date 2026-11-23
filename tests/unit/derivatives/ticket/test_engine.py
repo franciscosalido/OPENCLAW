@@ -1673,3 +1673,65 @@ def test_y3_conflicting_price_text_preserved_in_receipt(s: Session) -> None:
     assert_report_divergence(s, A, "fato repetido com conteúdo diferente", 3, {
         "event": "venue_partial", "quantity": 3, "price": "1.00", "fact": "scale"}, at(3))
     assert e.gross().executed == D("3")
+
+
+def zeroing_engine(s: Session, ticket: str, p: Position, n: int) -> TicketEngine:
+    """Propõe venda da série comprada com os prazos da sessão sintética."""
+    e = s.engine(ticket, p)
+    t = draft(leg("A", Side.SELL, "1", n), net=str(-n), gross=str(n))
+    e.propose(t.model_copy(update=dict(send_deadline=END, order_validity=CLOSE)), NOW)
+    return e
+
+
+def test_z5_partial_close_reuses_decision_after_confirmed_release(s: Session) -> None:
+    p = position(holding("A", 10), holding("B", -6))
+    first = zeroing_engine(s, "T1", p, 4)
+    assert first.preview is not None and first.preview.partial_exposure == 0
+    first.confirm(s.dec(first), at(2))
+    assert first.orders == {A: O.LIVE} and s.submitted() == [(A, 4, D("1"), at(2))]
+    request, = order_rows(s.receipts[0], A)
+    assert request["protection"] == "A" and "origin" not in request
+    second = zeroing_engine(s, "T2", p, 4)
+    decision = s.dec(second)
+    with pytest.raises(SequenceRefusal, match="saldo livre indisponível"):
+        second.confirm(decision, at(2))
+    assert second.state == T.DRAFT and len(s.submitted()) == 1
+    s.q("A", 3, bid="1", size=2)
+    assert first.orders[A] == O.PARTIAL
+    s.cancel(first, A, 3)
+    s.q("A", 4)
+    assert first.state == T.STOPPED and first.gross().executed == D("2.00")
+    second.confirm(decision, at(4))
+    assert s.submitted()[-1] == ("T2:A:1", 2, D("1"), at(4))
+    s.q("A", 5, bid="1", size=5)
+    assert second.orders == {"T2:A:1": O.FILLED} and second.state == T.STOPPED
+    assert second.gross().executed == 2 and len(s.submitted()) == 2
+
+
+def test_z6_complete_free_sale_receipt(s: Session) -> None:
+    e = zeroing_engine(s, "T1", position(holding("A", 10), holding("B", -6)), 4)
+    e.confirm(s.dec(e), at(2))
+    s.q("A", 3, bid="1", size=4)
+    assert e.state == T.COMPLETED and e.gross().executed == D("4.00")
+    assert [r.kind for r in s.receipts[0].events[1:]] == [
+        E.CONFIRM, E.START, E.VENUE_LIVE, E.VENUE_FILL, E.COMPLETE]
+
+
+def test_z7_40_confirmed_buybacks_release_only_40(s: Session) -> None:
+    p = position(holding("A", 100), holding("B", -100))
+    e = s.engine("T1", p)
+    t = draft(leg("A", Side.SELL, "1", 100), leg("B", Side.BUY, "1.50", 100),
+              net="50", gross="250")
+    e.propose(t.model_copy(update=dict(send_deadline=END, order_validity=CLOSE)), NOW)
+    e.confirm(s.dec(e), at(2))
+    assert e.orders == {B: O.LIVE} and s.submitted() == [(B, 100, D("1.50"), at(2))]
+    s.q("B", 3, ask="1.50", size=40)
+    assert e.orders == {B: O.PARTIAL, A: O.LIVE}
+    assert s.submitted()[-1] == (A, 40, D("1"), at(3))
+    s.q("A", 4, bid="1", size=100)
+    assert e.orders[A] == O.FILLED and len(s.submitted()) == 2
+    s.cancel(e, B, 4)
+    s.q("B", 5)
+    assert e.state == T.STOPPED and len(s.submitted()) == 2
+    with pytest.raises(SequenceRefusal, match="saldo livre insuficiente"):
+        zeroing_engine(s, "T2", p, 1)
