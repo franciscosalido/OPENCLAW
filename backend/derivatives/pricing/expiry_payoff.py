@@ -77,15 +77,17 @@ def _money(units: int, exponent: int) -> Decimal:
         raise PayoffRefusal("resultado fora da representação Decimal") from exc
 
 
-def _structure(legs: Sequence[ExpiryLeg], multiplier: int,
+def _structure(legs: Sequence[ExpiryLeg], multiplier: int, max_legs: int,
                *amounts: Decimal) -> tuple[tuple[_Position, ...], int]:
     _positive_int(multiplier, "multiplicador")
+    if type(max_legs) is not int or not 1 <= max_legs <= 64:
+        raise PayoffRefusal("max_legs exige inteiro de 1 a 64")
     try:
-        snapshot = tuple(islice(legs, 9)) if isinstance(legs, Sequence) else ()
+        snapshot = tuple(islice(legs, max_legs + 1)) if isinstance(legs, Sequence) else ()
     except Exception as exc:
         raise PayoffRefusal("sequência de pernas ilegível") from exc
-    if not 1 <= len(snapshot) <= 8 or not all(isinstance(leg, ExpiryLeg) for leg in snapshot):
-        raise PayoffRefusal("estrutura exige de uma a oito pernas válidas")
+    if not 1 <= len(snapshot) <= max_legs or not all(isinstance(p, ExpiryLeg) for p in snapshot):
+        raise PayoffRefusal(f"estrutura exige de uma a {max_legs} pernas válidas")
     for value in amounts:
         _nonnegative(value, "preço final ou custos")
     prices = (*amounts, *(v for leg in snapshot for v in (leg.strike, leg.premium)))
@@ -101,23 +103,23 @@ def _results(positions: tuple[_Position, ...], spot: int) -> tuple[int, ...]:
 
 
 def expiry_leg_results(legs: Sequence[ExpiryLeg], spot: Decimal, *,
-                       multiplier: int = 1) -> tuple[Decimal, ...]:
+                       multiplier: int = 1, max_legs: int = 8) -> tuple[Decimal, ...]:
     """Resultado por perna, em ordem de entrada e antes dos custos."""
-    positions, exp = _structure(legs, multiplier, spot)
+    positions, exp = _structure(legs, multiplier, max_legs, spot)
     return tuple(_money(n, exp) for n in _results(positions, _units(spot, exp)))
 
 
 def expiry_result(legs: Sequence[ExpiryLeg], spot: Decimal, *,
-                  multiplier: int = 1, costs: Decimal = Decimal(0)) -> Decimal:
+                  multiplier: int = 1, costs: Decimal = Decimal(0), max_legs: int = 8) -> Decimal:
     """Resultado total da estrutura, descontados os custos uma vez."""
-    positions, exp = _structure(legs, multiplier, spot, costs)
+    positions, exp = _structure(legs, multiplier, max_legs, spot, costs)
     return _money(sum(_results(positions, _units(spot, exp))) - _units(costs, exp), exp)
 
 
 def expiry_profile(legs: Sequence[ExpiryLeg], *, multiplier: int = 1,
-                   costs: Decimal = Decimal(0)) -> ExpiryProfile:
+                   costs: Decimal = Decimal(0), max_legs: int = 8) -> ExpiryProfile:
     """Perfil linear por trechos em todo o semieixo de preços não negativos."""
-    positions, exp = _structure(legs, multiplier, costs)
+    positions, exp = _structure(legs, multiplier, max_legs, costs)
     spots = sorted({0, *(strike for _, strike, _, _ in positions)})
     entry = sum(qty * premium for _, _, qty, premium in positions)
     fee = _units(costs, exp)
