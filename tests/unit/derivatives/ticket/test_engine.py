@@ -1663,3 +1663,13 @@ def test_y3_retransmission_compares_instants_across_dst_fold(s: Session) -> None
         "event": "venue_partial", "quantity": 3, "price": "1", "fact": "fold"},
         datetime(2026, 11, 1, 6, 30, tzinfo=UTC))
     assert e.gross().executed == D("3")
+
+
+def test_y3_conflicting_price_text_preserved_in_receipt(s: Session) -> None:
+    """O preço tem o mesmo valor econômico, mas a representação recebida difere."""
+    e = s.confirmed()
+    first = VenueReport(A, E.VENUE_PARTIAL, 3, D("1.0"), at(3), fact="scale")
+    e.on_reports([first, first._replace(price=D("1.00"))], at(3))
+    assert_report_divergence(s, A, "fato repetido com conteúdo diferente", 3, {
+        "event": "venue_partial", "quantity": 3, "price": "1.00", "fact": "scale"}, at(3))
+    assert e.gross().executed == D("3")
