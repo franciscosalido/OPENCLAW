@@ -1146,3 +1146,16 @@ def test_v5_paused_ticket_keeps_its_fills_until_resumed(s: Session) -> None:
     assert first.state == T.WORKING and first.orders[B] == O.LIVE
     assert s.submitted() == [(A, 10, D("1"), at(2)), ("T2:A:1", 10, D("1"), at(3)),
                              (B, 10, D("1.50"), at(4))]
+
+
+def test_w14_engine_refuses_coverage_before_planning_or_recording(s: Session) -> None:
+    """O motor recusa a nova modalidade antes de criar prévia, evento ou ordem."""
+    from tests.unit.derivatives.ticket.test_sequencing import authorized
+
+    s.engine("T1", position())
+    engine = s.engine("T2", position())
+    bare = draft(leg("B", Side.SELL, "1.50", 4), net="-6", gross="6")
+    reason = "autorização de cobertura ainda não disponível no motor"
+    with pytest.raises(EngineRefusal, match=reason):
+        engine.propose(authorized(bare, ("A", "T1", 4)), NOW)
+    assert engine.preview is None and not s.receipts[1].events and not s.submitted()

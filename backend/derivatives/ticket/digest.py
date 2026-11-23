@@ -35,6 +35,9 @@ def canonical_bytes(preview: "Preview") -> bytes:
         "order_validity": preview.order_validity.isoformat(),
         "quote_snapshot_id": preview.quote_snapshot_id,
     }
+    if preview.coverage:
+        payload["coverage"] = [grant.model_dump() for grant in
+                               sorted(preview.coverage, key=lambda g: (g.series, g.origin))]
     return json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode()
 
 

@@ -88,6 +88,10 @@ def plan_legs(draft: TicketDraft, position: Position) -> LegPlan:
     buys = {leg.symbol: leg for leg in draft.legs if leg.side is Side.BUY}
     sales = tuple(leg for leg in draft.legs if leg.side is Side.SELL)
     remaining = {symbol: leg.quantity for symbol, leg in buys.items()}
+    for grant in draft.coverage:
+        if grant.series not in rows:
+            raise SequenceRefusal("série sem evidência")
+        remaining[grant.series] = remaining.get(grant.series, 0) + grant.quantity
     dependencies: list[tuple[str, str, bool]] = []
     for buy in buys.values():
         balance = rows[buy.symbol].balance
@@ -98,7 +102,7 @@ def plan_legs(draft: TicketDraft, position: Position) -> LegPlan:
         for long, short in position.pairs:
             closing = sale.symbol == long
             source = short if closing else long
-            if (sale.symbol != (long if closing else short) or source not in buys
+            if (sale.symbol != (long if closing else short) or source not in remaining
                     or source == sale.symbol):
                 continue
             a, b = rows[source], rows[sale.symbol]
@@ -114,6 +118,8 @@ def plan_legs(draft: TicketDraft, position: Position) -> LegPlan:
         if remaining[source] < 0:
             raise SequenceRefusal("quantidade de proteção insuficiente")
         dependencies.append((sale.symbol, source, closing))
+    if {g.series for g in draft.coverage} - {source for _, source, _ in dependencies}:
+        raise SequenceRefusal("autorização sem venda correspondente")
     return LegPlan(draft, (*buys.values(), *sales), position, tuple(dependencies))
 
 
@@ -130,6 +136,7 @@ def releasable_quantity(leg: Leg, fills: int, sold: int, reservations: int) -> i
 
 class _Order(NamedTuple):
     ticket: str
+    origin: str
     leg: Leg
     source: str
     filled: int
@@ -148,6 +155,19 @@ class ReservationBook:
         self._orders: dict[tuple[str, str], _Order] = {}
         self._executions: set[tuple[str, str]] = set()
         self._positions: dict[str, Position] = {}
+        self._closed: set[tuple[str, str]] = set()
+
+    def close(self, account: str, ticket: str) -> None:
+        """Encerra a origem sem descartar ordens vivas nem impedir conciliação tardia."""
+        with self._lock:
+            if (account, ticket) not in self._plans:
+                raise SequenceRefusal("boleta desconhecida")
+            self._closed.add((account, ticket))
+
+    def _surplus(self, account: str, origin: str, source: str) -> int:
+        used = sum(o.live + o.filled for (a, _), o in self._orders.items()
+                   if a == account and o.origin == origin and o.source == source)
+        return self._buys.get((account, origin, source), 0) - used
 
     def _check(self, plan: LegPlan, ticket: str) -> str:
         account = plan.position.account
@@ -167,6 +187,11 @@ class ReservationBook:
     def _admission(self, plan: LegPlan, ticket: str) -> dict[tuple[str, str, str], int]:
         account = self._check(plan, ticket)
         balances = {h.symbol: h.balance for h in plan.position.holdings}
+        for grant in plan.draft.coverage:
+            if grant.origin == ticket or (account, grant.origin) not in self._closed:
+                raise SequenceRefusal("boleta de origem não parada")
+            if self._surplus(account, grant.origin, grant.series) <= 0:
+                raise SequenceRefusal("sobra indisponível")
         occupation = {}
         for leg in plan.legs:
             if leg.side is not Side.BUY:
@@ -222,16 +247,24 @@ class ReservationBook:
     def _bought(self, account: str, symbol: str) -> int:
         return sum(n for (a, _, s), n in self._buys.items() if (a, s) == (account, symbol))
 
-    def _capacity(self, plan: LegPlan, leg: Leg, ticket: str) -> tuple[int, str]:
+    def _capacity(self, plan: LegPlan, leg: Leg, ticket: str,
+                  origin: str | None) -> tuple[int, str]:
         account = self._check(plan, ticket)
         source = plan.protection_for(leg)
         balances = {h.symbol: h.balance for h in plan.position.holdings}
         closing = balances[source] < 0
         orders = [o for (a, _), o in self._orders.items() if a == account]
-        # Cada boleta vende com as próprias compras ou recompras da série protetora.
-        used = sum(o.live + o.filled for o in orders if o.ticket == ticket and o.source == source)
-        bought = self._buys.get((account, ticket, source), 0)
-        free = releasable_quantity(leg, bought, used, 0)
+        if origin is None:
+            free = (0 if (account, ticket) in self._closed
+                    else self._surplus(account, ticket, source))
+        elif origin == ticket or (account, origin) not in self._closed:
+            free = 0
+        else:
+            limit = next((g.quantity for g in plan.draft.coverage
+                          if g.series == source and g.origin == origin), 0)
+            used = sum(o.live + o.filled for o in orders
+                       if o.ticket == ticket and o.source == source and o.origin == origin)
+            free = min(self._surplus(account, origin, source), limit - used)
         if closing:
             disposed = sum(o.filled + o.live for o in orders if o.leg.symbol == leg.symbol)
             # Teto redundante: a recompra cabe no vendido, já coberto pelo saldo comprado.
@@ -240,21 +273,23 @@ class ReservationBook:
         room = min(free, leg.quantity - own)
         return max(0, room - room % leg.lot_size), source
 
-    def available(self, plan: LegPlan, leg: Leg, *, ticket: str) -> int:
+    def available(self, plan: LegPlan, leg: Leg, *, ticket: str, origin: str | None = None) -> int:
         """Consulta a quantidade que o livro compartilhado pode reservar agora."""
         with self._lock:
-            return self._capacity(plan, leg, ticket)[0]
+            return self._capacity(plan, leg, ticket, origin)[0]
 
-    def reserve(self, plan: LegPlan, leg: Leg, order: str, quantity: int, *, ticket: str) -> None:
+    def reserve(self, plan: LegPlan, leg: Leg, order: str, quantity: int, *,
+                ticket: str, origin: str | None = None) -> None:
         """Confere e ocupa o saldo na mesma seção crítica."""
         with self._lock:
-            free, source = self._capacity(plan, leg, ticket)
+            free, source = self._capacity(plan, leg, ticket, origin)
             key = plan.position.account, order
             if (not order or key in self._orders or type(quantity) is not int
                     or not 0 < quantity <= free or quantity % leg.lot_size):
                 raise SequenceRefusal("reserva indisponível")
             self._remember(plan, ticket)
-            self._orders[key] = _Order(ticket, leg, source, 0, quantity)
+            owner = ticket if origin is None else origin
+            self._orders[key] = _Order(ticket, owner, leg, source, 0, quantity)
 
     def confirm_sale(self, account: str, order: str, execution: str, quantity: int) -> None:
         """Converte saldo vivo em executado sem creditar novamente a proteção."""
@@ -312,7 +347,7 @@ def partial_exposure(draft: TicketDraft, *, known_costs: Decimal = Decimal(0)) -
     """Desembolso máximo se nenhuma venda executar, incluindo o custo conhecido."""
     draft = TicketDraft.model_validate(draft)
     buys = tuple(leg for leg in draft.legs if leg.side is Side.BUY)
-    if not buys or not _valid_cost(known_costs):
+    if (not buys and not draft.coverage) or not _valid_cost(known_costs):
         raise SequenceRefusal("exposição sem compra protetora ou custo válido")
     with localcontext(_exact()):
         return sum((leg.quantity * leg.limit_price for leg in buys), known_costs)

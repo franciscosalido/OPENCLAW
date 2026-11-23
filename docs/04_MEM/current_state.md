@@ -4,7 +4,7 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-23 · **Turno:** Claude (DL3-PR07A3 integrado).
+**Última atualização:** 2026-11-23 · **Turno:** Claude (DL3-PR07A3B integrado).
 
 ## Depois da Fase 3 — decisões de produto no simulador (D0) — EM ANDAMENTO
 
@@ -22,8 +22,9 @@ Revisão 1). O PR07A foi cortado em três pelo planejador.
 | [DL3-PR08D](../specs/derivatives/fase3/DL3-PR08D.md) | estimativa antes do vencimento, compondo os preços das pontes da Fase 2 | MERGEADO (PR #169) |
 | [DL3-PR08E](../specs/derivatives/fase3/DL3-PR08E.md) | calendário oficial da B3 de 2027 (OC 057/2026-VNC) | MERGEADO (PR #170) |
 | [DL3-PR07A3](../specs/derivatives/fase3/DL3-PR07A3.md) | cada boleta vende coberta só pelas próprias compras | MERGEADO (PR #171) |
-| DL3-PR07A3B | autorização na prévia para usar a sobra de outra boleta | próximo cartão |
-| DL3-PR07A4 | DP-13: relatório contraditório e evento externo | depois do PR07A3B |
+| [DL3-PR07A3B](../specs/derivatives/fase3/DL3-PR07A3B.md) | autorização para usar a sobra de boleta parada: prévia, resumo, plano e livro | MERGEADO (PR #172) |
+| DL3-PR07A3C | o motor passa a usar a autorização; recibo com origem e quantidade usada | próximo cartão |
+| DL3-PR07A4 | DP-13: relatório contraditório e evento externo | depois do PR07A3C |
 | DL3-PR07B | DP-02 e DP-03: zeragem e borboleta em simulação | depois do PR07A4 |
 
 Entregue pelo DL3-PR07A1 (37 linhas de produção):
@@ -199,12 +200,37 @@ Decisões de Francisco de 23/11/2026 para o DL3-PR07A3B: só vale a sobra de bol
 parada; a boleta que usa a sobra pode ser só de venda. Ordem confirmada por ele:
 PR07A3B, PR07A4, PR07B.
 
-Pendente para o DL3-PR07A3B, que mexe no mesmo livro (testes; o código está certo): uma
-compra que protege duas pernas de venda da mesma boleta (saldo da série e saldo da
-perna); a recompra confirmada que ultrapassaria o total vendido da conta; e o
-`projection_id` no teste sintético do calendário, que segue para um cartão de testes.
+Entregue pelo DL3-PR07A3B (camada pura; 62 linhas líquidas de produção):
+- `CoverageGrant` (série, boleta de origem, quantidade máxima) e o campo `coverage` na
+  boleta e na prévia, com até quatro autorizações. A lista entra no resumo criptográfico,
+  ordenada por série e origem, e no corpo da prévia gravado no recibo, na ordem informada.
+  Com a lista vazia, a chave não aparece: recibos e âncoras de hoje ficam idênticos.
+- Plano: o autorizado soma à proteção da série; boleta só de venda tem plano quando a
+  autorização cobre a venda.
+- Livro: `close(conta, boleta)` marca a boleta como parada; `available` e `reserve`
+  aceitam `origin`. A sobra de uma origem parada é reservada com exclusividade, até o teto
+  autorizado. Boleta parada não vende mais com as próprias compras.
+- **O motor ainda recusa boleta com autorização**, antes de gravar a prévia. Nada muda
+  para quem opera até o DL3-PR07A3C.
+- As duas lacunas de teste do DL3-PR07A3 foram fechadas (W15 e W16).
+- Portão da cabeça `361238c`, pelo implementador: Linux x86_64 e macOS, 11.438 aprovados,
+  16 pulados, 261 subtestes; mypy estrito e Pyright sem erro; 24 mutantes detectados. O
+  revisor não repetiu a suíte; conferiu o manifesto de 102 evidências e rodou os 18
+  cenários do seu protótipo e sete sondas contra os módulos entregues.
 
-Próxima ação (uma só): Claude publica o supercartão do DL3-PR07A3B e Codex o abre em
+O DL3-PR07A3B original foi dividido em dois pelo planejador. Ordem: PR07A3C, PR07A4,
+PR07B.
+
+Pendente para o DL3-PR07A3C, que mexe nos mesmos arquivos:
+- três testes (o código está certo): ordem do resumo entre séries diferentes; contas
+  diferentes com boletas de mesmo nome; teto por origem quando duas origens cedem a mesma
+  série;
+- uma trava no livro: boleta parada não reserva nem a sobra autorizada de outra;
+- decidir se `releasable_quantity`, hoje sem chamador em produção, sai ou fica.
+
+Segue para um cartão de testes: o `projection_id` no teste sintético do calendário.
+
+Próxima ação (uma só): Claude publica o supercartão do DL3-PR07A3C e Codex o abre em
 rascunho.
 
 ## Fase 03 — Motor da boleta em simulador (D0) — FECHADA (estado A)
