@@ -203,3 +203,28 @@ def test_k4_european_bridge_refuses_the_american_body():
     assert [mark.supported for mark in marks] == [True, False, True]
     with pytest.raises(PayoffRefusal, match="perna 2"):
         pre_expiry_estimate(legs, marks)
+
+
+def test_exact_mark_beyond_decimal128_precision():
+    legs = [ExpiryLeg("CALL", "BUY", D(100), 1, D(0))]
+    price = D("1.234567890123456789012345678901234567")
+    with localcontext() as ctx:
+        ctx.prec = 2
+        est = pre_expiry_estimate(legs, declared(legs, (price,)))
+    assert (est.theoretical_value, est.result, est.leg_results) == (price, price, (price,))
+
+
+@pytest.mark.parametrize("key", ["spot", "time_years"])
+def test_common_infinite_reference_is_refused(key):
+    legs = butterfly()
+    marks = declared(legs)
+    for mark in marks:
+        mark.inputs_echo[key] = float("inf")
+    with pytest.raises(PayoffRefusal):
+        pre_expiry_estimate(legs, marks)
+
+
+def test_unreadable_sequence_reports_domain_refusal():
+    unreadable = memoryview(b"abcd").cast("B", shape=(2, 2))
+    with pytest.raises(PayoffRefusal):
+        pre_expiry_estimate(unreadable, [])
