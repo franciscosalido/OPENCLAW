@@ -235,3 +235,61 @@ planejador ainda precisa resolver, antes de escrever o cartão:
   atualizada.
 
 Depois: DL3-PR07B (DP-02 e DP-03: zeragem e borboleta no motor).
+
+## Revisão adversarial (Claude) — GO na primeira rodada, cabeça `4f1afcb`
+
+Pela regra de processo de Francisco, o revisor **não executou a suíte, a tipagem nem os
+mutantes** desta cabeça. Leu o diff, conferiu as evidências pelo SHA-256 e rodou os cenários
+do seu protótipo, escrito antes do cartão, e três sondas próprias.
+
+| Verificação | Resultado | Quem |
+|---|---|---|
+| Suíte sem integração, Linux x86_64 e macOS | 11.478 aprovados, 16 pulados, 261 subtestes nos dois | implementador; logs conferidos |
+| mypy estrito e Pyright, nos dois sistemas | 0 erros | implementador; logs conferidos |
+| Commit vermelho | Y1 a Y7 e Y9 falham na base; Y8 passa | implementador; logs conferidos |
+| Testes antigos do motor | 93 funções preservadas, nenhuma muda de resultado | implementador; log conferido |
+| 16 mutantes do §5 e 2 adicionais, nos dois sistemas | todos detectados | implementador; logs conferidos |
+| Integração | só no contêiner Linux isolado: 31 aprovados, 206 pulados | implementador; evidências conferidas |
+| Manifesto de 112 evidências (`60e70f31…7e0e`) e hashes dos dois relatórios | conferem | revisor (31 arquivos) e Francisco (os 112, no Mac) |
+| Diff | quatro arquivos; `engine.py` com 483 linhas (teto 483) e `venue.py` com 57 (teto 58) | revisor |
+| Âncoras e recibos das sessões | os quatro recibos e os três resumos iguais byte a byte entre base e cabeça | implementador; log conferido |
+| Cópia do cartão | SHA-256 `43c6b657…5518`, igual ao publicado | revisor |
+| 13 casos do protótipo do planejador contra os módulos entregues | todos aprovados | revisor |
+| 3 sondas do revisor | todas aprovadas | revisor |
+
+A implementação cumpre o cartão e vai além dele em quatro pontos, todos aceitos:
+
+1. **`filled` é o que o livro aceitou**, não o que a venue relatou. Quando o livro já tinha
+   recusado uma execução, o registro mostra o saldo de antes dela. É a leitura mais fiel de
+   «último saldo conciliado».
+2. **A resposta da venue ao envio passa pela mesma conferência** dos relatos seguintes.
+3. **Um lote em que nada foi aplicado não dispara nova avaliação de envio.** Duplicata e
+   divergência ficam sem efeito colateral. O lote vazio continua avaliando, como antes.
+4. **A comparação de duplicata é campo a campo**: ordem, evento, quantidade com o mesmo tipo,
+   preço pelo texto e instante em UTC. O implementador achou e corrigiu, com teste, um
+   engano na hora repetida do horário de verão, em que dois instantes diferentes pareciam
+   iguais.
+
+Sondas do revisor, escritas antes de ler os relatórios da skill: lote só com duplicata
+depois do prazo de envio não grava nem envia nada; divergência depois de o livro recusar
+uma execução mostra `filled` 0; o mesmo `fact` em outra ordem é divergência.
+
+Limite desta revisão: sem mutantes próprios do revisor nesta cabeça.
+
+Observações, nenhuma bloqueante:
+
+1. **Lacunas de teste (skill).** A suíte versionada não distingue três regressões que a
+   cabeça trata corretamente: o mesmo `fact` reapresentado em outra ordem ou com outro
+   evento; a duplicata no fim de um lote que também traz um fato novo (o envio seguinte
+   ainda precisa ser avaliado); e a reapresentação, sem `corrects`, de um relato aplicado
+   pela conciliação.
+2. **Relato recebido com a ordem incerta não passa pela conferência (limite do cartão do
+   planejador).** O cartão manteve a fila da conciliação como estava. Uma correção ou uma
+   duplicata que chegue nessa janela é aplicada ou barrada só pela comparação com a consulta
+   à venue. Entra no próximo cartão.
+3. **Quatro linhas de `engine.py` passam de 100 colunas** (102 a 111). O teto de linhas do
+   cartão ficou justo demais para o que o implementador acrescentou. Não há regra automática
+   de largura; fica para acerto quando o arquivo for tocado.
+
+Relatórios da skill lidos depois de formado o parecer, com SHA-256 conferidos
+(`6e8a980b…e534` e `7e7e6946…d3af`): sem bloqueante.
