@@ -235,3 +235,42 @@ lugares em que ele aparece.
 
 A frente de análise de estruturas fica com o limite de escala pendente. PR07A3, PR07A4 e
 PR07B seguem na fila, e depois deles o cartão da margem (Adendo 1 da ADR-0024).
+
+## Revisão adversarial (Claude) — GO na primeira rodada, cabeça `34c132e`
+
+Pela regra de processo de Francisco, o revisor **não executou a suíte, a tipagem nem os
+mutantes** desta cabeça. Leu o diff, conferiu as evidências pelo SHA-256 e usou um
+conferidor próprio, que não é a suíte.
+
+| Verificação | Resultado | Quem |
+|---|---|---|
+| Suíte sem integração, Linux x86_64 e macOS | 11.416 aprovados, 16 pulados, 261 subtestes nos dois | implementador; logs conferidos |
+| mypy estrito e Pyright, nos dois sistemas | 0 erros | implementador; logs conferidos |
+| 9 mutantes do §6, nos dois sistemas | todos detectados | implementador; logs conferidos |
+| Integração | só no contêiner Linux isolado | implementador; evidências conferidas |
+| Manifesto de 59 evidências (`0baeecb7…acde`) e hashes dos dois relatórios | conferem | revisor |
+| Diff | seis arquivos; `backend/` e os arquivos de 2026 e 2028 intactos | revisor |
+| Cópia do cartão | SHA-256 `f4df8d7c…43e4`, igual ao publicado | revisor |
+| Quadro A e Quadro B no PDF arquivado (pp. 3 a 5) | lidos pelo revisor: as 12 datas do §2; 25/01 e 09/07 com funcionamento normal | revisor |
+| Hash do PDF (`eec614af…a1e1`) | igual no `SHA256SUMS`, no catálogo de evidências e na auditoria do documento | revisor |
+| Regras 1 a 12 do §3, r4 contra r3 | todas atendidas; 365 de 365 linhas da B3 iguais à projeção da r3; outras cinco identidades e tabelas preservadas | revisor |
+| Quatro hashes internos da r4 | reproduzidos, inclusive `evidence_sha256` pela composição declarada no PR | revisor |
+
+Limite desta revisão: sem mutantes próprios do revisor nesta cabeça.
+
+Observações, nenhuma bloqueante:
+
+1. **Lacuna de teste em N9, achada pela skill e originada no cartão.** O cenário sintético
+   não fixa o `projection_id` que liga a projeção à versão. Um carregador que promovesse só
+   projeções ligadas por esse campo passaria pelos testes. O carregador publicado não lê a
+   projeção. Fica para um próximo cartão de testes.
+2. **Colunas conjuntas do contexto de mercado mudaram** (`b3_open_with_*` e
+   `context_status`), além de `b3_is_trading_day`. São derivadas do pregão da B3 e estão
+   coerentes com ele. As colunas dos Estados Unidos ficaram iguais.
+3. **Regra 13 (formato).** O arquivo mantém o estilo da r3, que não é a saída simples de um
+   serializador com recuo 1; 4.370 das 5.508 linhas da r4 são idênticas às da r3.
+
+Nenhum código de terceiros entrou. A `exchange_calendars` foi usada fora do repositório.
+
+Relatórios da skill lidos depois de formado o parecer, com SHA-256 conferidos
+(`6d6c78c2…b0cf` e `bfb5521c…9aa2`): GO, sem bloqueante.

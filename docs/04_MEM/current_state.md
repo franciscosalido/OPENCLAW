@@ -4,7 +4,7 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-23 · **Turno:** Claude (DL3-PR08D e Adendo 1 da ADR-0024 integrados).
+**Última atualização:** 2026-11-23 · **Turno:** Claude (DL3-PR08E integrado).
 
 ## Depois da Fase 3 — decisões de produto no simulador (D0) — EM ANDAMENTO
 
@@ -20,10 +20,10 @@ Revisão 1). O PR07A foi cortado em três pelo planejador.
 | [DL3-PR08B](../specs/derivatives/fase3/DL3-PR08B.md) | a estrutura montada em parte: posição executada ao lado da planejada | MERGEADO (PR #166) |
 | [DL3-PR08C](../specs/derivatives/fase3/DL3-PR08C.md) | borboleta de puts, travas e iron condor conferidos, com quantidades, multiplicador e custos | MERGEADO (PR #167) |
 | [DL3-PR08D](../specs/derivatives/fase3/DL3-PR08D.md) | estimativa antes do vencimento, compondo os preços das pontes da Fase 2 | MERGEADO (PR #169) |
-| a seguir | calendário da B3: conferir o que já existe frente à carta | planejador confere antes de escrever o cartão |
-| DL3-PR07A3 | cobertura própria ou de outra boleta, com autorização na prévia | atrás da frente PR08 |
-| DL3-PR07A4 | DP-13: relatório contraditório e evento externo | atrás da frente PR08 |
-| DL3-PR07B | DP-02 e DP-03: zeragem e borboleta em simulação | atrás da frente PR08 |
+| [DL3-PR08E](../specs/derivatives/fase3/DL3-PR08E.md) | calendário oficial da B3 de 2027 (OC 057/2026-VNC) | MERGEADO (PR #170) |
+| DL3-PR07A3 | cobertura própria ou de outra boleta, com autorização na prévia | próximo cartão |
+| DL3-PR07A4 | DP-13: relatório contraditório e evento externo | depois do PR07A3 |
+| DL3-PR07B | DP-02 e DP-03: zeragem e borboleta em simulação | depois do PR07A4 |
 
 Entregue pelo DL3-PR07A1 (37 linhas de produção):
 - No instante exato da validade o motor recusa antes de gastar a decisão, ocupar o livro
@@ -154,8 +154,32 @@ adendo é desenho: não autoriza implementação, acesso real nem ordens. Regist
 condições para a liberação futura do D1 e a prova de saída do piloto em papel. A DP-01
 deixa de depender de adendo e passa a depender de cartão próprio, ainda não escrito.
 
-Próxima ação (uma só): Claude confere o calendário da B3 que já existe frente ao item 3
-da carta de Francisco e publica o cartão seguinte.
+Entregue pelo DL3-PR08E (só dados, evidência e testes; nenhuma linha de `backend/` mudou):
+- O pregão da B3 de 2027 passa de `unknown` a oficial, na revisão r4 de
+  `config/calendars/b3_calendar_2027.yaml`, com o Ofício Circular 057/2026-VNC, de
+  17/11/2026, arquivado como evidência. São 249 pregões e 12 fechamentos em dia de semana,
+  iguais, data a data, à projeção que a r3 guardava.
+- A cobertura da B3 é 2026 e 2027. 2028 continua recusado: a B3 não publicou.
+- A Quarta-feira de Cinzas (10/02/2027) conta como dia útil inteiro. Horário intradiário
+  segue fora.
+- Fixado em teste: 35 dias úteis de 23/11/2026 ao vencimento de 15/01/2027; contagens que
+  atravessam o ano; as doze terceiras sextas de 2027.
+- Portão da cabeça `34c132e`, pelo implementador: Linux x86_64 e macOS, 11.416
+  aprovados, 16 pulados, 261 subtestes; mypy estrito e Pyright sem erro. O revisor não
+  repetiu a suíte; conferiu o manifesto de 59 evidências, leu o Quadro A no PDF arquivado
+  e rodou conferidor próprio da r4 contra a r3 (preservação, quatro hashes internos,
+  linhas da B3, hash do PDF).
+
+Pendente para um próximo cartão de testes (o código está certo): o teste sintético da
+projeção não fixa o `projection_id` que liga a projeção à versão. Um carregador que
+promovesse só projeções ligadas por esse campo passaria pelos testes.
+
+Com o DL3-PR08E, a frente de análise de estruturas aberta pela carta de 22/11/2026 fica
+entregue nos itens 1 a 4, com duas pendências registradas: limite de escala
+(`expiry_payoff` e `pre_expiry`) e vencimentos diferentes na estimativa.
+
+Próxima ação (uma só): Claude publica o supercartão do DL3-PR07A3 e Codex o abre em
+rascunho.
 
 ## Fase 03 — Motor da boleta em simulador (D0) — FECHADA (estado A)
 
