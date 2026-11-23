@@ -1,5 +1,10 @@
 {"decision_ttl_s":60,
-"positions":[{"account":"sim","holdings":[{"symbol":"A","strike":"10","underlying":"ETF","kind":"CALL","expiry":"2027-01-15","multiplier":1,"balance":0},{"symbol":"B","strike":"11","underlying":"ETF","kind":"CALL","expiry":"2027-01-15","multiplier":1,"balance":0}],"pairs":[["A","B"]]}],
+"positions":[{"account":"sim","holdings":[
+    {"symbol":"A","strike":"10","underlying":"ETF","kind":"CALL",
+     "expiry":"2027-01-15","multiplier":1,"balance":0},
+    {"symbol":"B","strike":"11","underlying":"ETF","kind":"CALL",
+     "expiry":"2027-01-15","multiplier":1,"balance":0}
+  ],"pairs":[["A","B"]]}],
 "steps":[
 {"after_seq":2,"at":"2026-11-23T14:00:02Z","do":"open","ticket":"T1","account":"sim","draft":{"legs":[{"symbol":"A","side":"BUY","quantity":10,"limit_price":"1.00","lot_size":1},{"symbol":"B","side":"SELL","quantity":10,"limit_price":"1.50","lot_size":1}],"net_limit":"-5.00","gross_cap":"25.00","send_deadline":"2026-11-23T15:00:00Z","order_validity":"2026-11-23T21:00:00Z","quote_snapshot_id":"leilao-2"}},
 {"after_seq":2,"at":"2026-11-23T14:00:02Z","do":"confirm","ticket":"T1"},
