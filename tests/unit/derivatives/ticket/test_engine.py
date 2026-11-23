@@ -3,6 +3,7 @@ import json
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal as D
+from typing import cast
 from unittest.mock import Mock
 from zoneinfo import ZoneInfo
 
@@ -19,6 +20,7 @@ from backend.derivatives.ticket.sequencing import (
     LegPlan, Position, ReservationBook, SequenceRefusal, plan_legs,
 )
 from backend.derivatives.ticket.state import Event as E, OrderState as O, TicketState as T
+from backend.derivatives.ticket.state import InvalidTransition
 from backend.derivatives.ticket.trigger import Source, TriggerSpec, spec_digest
 from backend.derivatives.ticket.venue import OrderSnapshot, VenueOrder, VenueReport
 from config.ticket_sim_config_model import load_ticket_sim_config
@@ -1764,3 +1766,22 @@ def test_pending_bad_fill_cannot_hide_valid_fill(s: Session, quantity: int, reas
         E.VENUE_FILL]
     assert e.orders[A] == O.FILLED and e.gross().executed == 10 and free(s) == 10
     assert s.halts.divergent("sim") and s.receipts[0].verify()
+
+
+@pytest.mark.parametrize("pending", [False, True])
+def test_text_event_refused_before_any_posting(s: Session, pending: bool) -> None:
+    """Um adaptador que quebra o contrato do enum não pode produzir um lançamento órfão."""
+    e = timeout(s) if pending else s.confirmed()
+    before = s.receipts[0].events
+    raw = VenueReport(A, cast(E, "venue_partial"), 3, D("1"), at(3))
+    if pending:
+        e.on_reports([raw], at(3))
+        s.venue.poll.return_value = OrderSnapshot(O.PARTIAL, 3, 7)
+        with pytest.raises(EngineRefusal):
+            e.reconcile(A, at(4))
+    else:
+        with pytest.raises(InvalidTransition):
+            e.on_reports([raw], at(3))
+    assert s.receipts[0].events == before and e.gross().executed == 0 and free(s) == 0
+    assert e.orders[A] == (O.UNCERTAIN if pending else O.LIVE)
+    assert s.halts.blocked("sim") == pending and len(s.submitted()) == 1
