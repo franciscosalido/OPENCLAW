@@ -9,9 +9,10 @@ from backend.derivatives.pricing.expiry_payoff import (
 )
 
 
-def _symbol(value: str) -> None:
-    if not isinstance(value, str) or not value:
+def _symbol(value: str) -> str:
+    if not isinstance(value, str) or not str.__len__(value):
         raise PayoffRefusal("símbolo exige texto não vazio")
+    return str.__str__(value)
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,7 +22,7 @@ class PlannedLeg:
     leg: ExpiryLeg
 
     def __post_init__(self) -> None:
-        _symbol(self.symbol)
+        object.__setattr__(self, "symbol", _symbol(self.symbol))
         if not isinstance(self.leg, ExpiryLeg):
             raise PayoffRefusal("perna planejada inválida")
 
@@ -34,9 +35,11 @@ class Execution:
     price: Decimal
 
     def __post_init__(self) -> None:
-        _symbol(self.symbol)
+        object.__setattr__(self, "symbol", _symbol(self.symbol))
         if type(self.quantity) is not int or self.quantity <= 0:
             raise PayoffRefusal("quantidade executada exige inteiro positivo")
+        if isinstance(self.price, Decimal):
+            object.__setattr__(self, "price", Decimal(self.price))
         if not isinstance(self.price, Decimal) or not self.price.is_finite() or self.price < 0:
             raise PayoffRefusal("preço efetivo exige Decimal finito não negativo")
 
