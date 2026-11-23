@@ -251,12 +251,13 @@ class ReservationBook:
                   origin: str | None) -> tuple[int, str]:
         account = self._check(plan, ticket)
         source = plan.protection_for(leg)
+        if (account, ticket) in self._closed:
+            return 0, source
         balances = {h.symbol: h.balance for h in plan.position.holdings}
         closing = balances[source] < 0
         orders = [o for (a, _), o in self._orders.items() if a == account]
         if origin is None:
-            free = (0 if (account, ticket) in self._closed
-                    else self._surplus(account, ticket, source))
+            free = self._surplus(account, ticket, source)
         elif origin == ticket or (account, origin) not in self._closed:
             free = 0
         else:

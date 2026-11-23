@@ -1,5 +1,5 @@
 """Orquestra uma única boleta assinada no replay síncrono D0."""
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
@@ -69,6 +69,7 @@ class AccountHalts:
 class _Order:
     request: VenueOrder
     leg: Leg
+    origin: str | None
     state: O = O.PENDING_SEND
     filled: int = 0
     executions: int = 0
@@ -157,6 +158,7 @@ class TicketEngine:
         self._state = state
         if state == T.STOPPED and not self._halts.divergent(self._account):
             assert self._plan is not None
+            self._reservations.close(self._account, self._ticket)
             sent = {o.leg.symbol for o in self._orders.values()}
             for leg in self._plan.legs:
                 if leg.side is Side.BUY and leg.symbol not in sent:
@@ -164,8 +166,6 @@ class TicketEngine:
 
     def _propose(self, draft: TicketDraft, now: datetime) -> None:
         draft = TicketDraft.model_validate(draft)
-        if draft.coverage:
-            raise EngineRefusal("autorização de cobertura ainda não disponível no motor")
         for leg in draft.legs:
             _check_id_component(leg.symbol)
         plan = plan_legs(draft, self._position)
@@ -243,8 +243,18 @@ class TicketEngine:
         self._move(E.START, now)
         self._drive(now)
 
-    def _available(self, plan: LegPlan, leg: Leg) -> int:
-        return self._reservations.available(plan, leg, ticket=self._ticket)
+    @staticmethod
+    def _sources(plan: LegPlan) -> Iterator[tuple[Leg, str | None]]:
+        for leg in plan.legs:
+            yield leg, None
+            if leg.side is Side.SELL:
+                protection = plan.protection_for(leg)
+                for grant in plan.draft.coverage:
+                    if grant.series == protection:
+                        yield leg, grant.origin
+
+    def _available(self, plan: LegPlan, leg: Leg, origin: str | None) -> int:
+        return self._reservations.available(plan, leg, ticket=self._ticket, origin=origin)
 
     def _rejected(self, leg: Leg) -> bool:
         return any(o.leg == leg and o.state == O.REJECTED for o in self._orders.values())
@@ -256,8 +266,8 @@ class TicketEngine:
                for leg in plan.legs):
             return T.COMPLETED
         if not self._cancelled and _send_window_open(plan.draft, now) and any(
-                self._available(plan, leg) > 0 for leg in plan.legs if leg.side is Side.SELL
-                and not self._rejected(leg)):
+                self._available(plan, leg, origin) > 0 for leg, origin in self._sources(plan)
+                if leg.side is Side.SELL and not self._rejected(leg)):
             return T.WORKING
         return T.STOPPED
 
@@ -265,7 +275,7 @@ class TicketEngine:
         if self._state != T.WORKING:
             return
         plan = self._require(T.WORKING)
-        for leg in plan.legs:
+        for leg, origin in self._sources(plan):
             if (self._state != T.WORKING or self._paused or self._halts.blocked(self._account)
                     or self._cancelled or not _send_window_open(plan.draft, now)
                     or self._market_block(plan, now)):
@@ -273,7 +283,7 @@ class TicketEngine:
             previous = sum(o.leg.symbol == leg.symbol for o in self._orders.values())
             if self._rejected(leg) or (leg.side is Side.BUY and previous):
                 continue
-            quantity = leg.quantity if leg.side is Side.BUY else self._available(plan, leg)
+            quantity = leg.quantity if leg.side is Side.BUY else self._available(plan, leg, origin)
             if not quantity:
                 continue
             next_leg = leg.model_copy(update={"quantity": quantity})
@@ -286,8 +296,9 @@ class TicketEngine:
                              limit_price=leg.limit_price, lot_size=leg.lot_size,
                              valid_until=plan.draft.order_validity)
             if leg.side is Side.SELL:
-                self._reservations.reserve(plan, leg, oid, quantity, ticket=self._ticket)
-            self._orders[oid] = _Order(req, leg)
+                self._reservations.reserve(plan, leg, oid, quantity, ticket=self._ticket,
+                                           origin=origin)
+            self._orders[oid] = _Order(req, leg, origin)
             self._apply(self._venue.submit(req, now))
         if self._state == T.WORKING:
             dest = self._destination(plan, now)
@@ -313,6 +324,8 @@ class TicketEngine:
             data["request"] = order.request.model_dump(mode="json")
             if order.leg.side is Side.SELL:
                 data["protection"] = self._plan.protection_for(order.leg)
+        if order.origin is not None and (order.state == O.PENDING_SEND or fill is not None):
+            data["origin"] = order.origin
         order.state = dest
         if fill is not None:
             data["gross"] = self.gross().receipt_values()
