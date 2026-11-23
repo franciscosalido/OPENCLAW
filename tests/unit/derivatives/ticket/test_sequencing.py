@@ -585,3 +585,235 @@ def test_v6_live_and_filled_sales_consume_only_the_paired_series() -> None:
     book.confirm_sale("sim", "sellB", "fillB", 2)
     assert book.available(plan, SELL, ticket="T1") == 0
     assert book.available(plan, sell_d, ticket="T1") == 2
+
+
+def authorized(ticket: TicketDraft, *grants: tuple[str, str, int]) -> TicketDraft:
+    coverage = tuple({"series": series, "origin": origin, "quantity": qty}
+                     for series, origin, qty in grants)
+    return TicketDraft.model_validate(dict(ticket) | {"coverage": coverage})
+
+
+def sale_only(n: int, origin: str = "T1", *, pos: Position | None = None) -> LegPlan:
+    amount = str(D("1.50") * n)
+    ticket = draft(leg("B", Side.SELL, "1.50", n), net="-" + amount, gross=amount)
+    return plan_legs(authorized(ticket, ("A", origin, n)), pos or position())
+
+
+def surplus_book(*, bought: int = 10, stopped: bool = True) -> tuple[ReservationBook, LegPlan]:
+    book = ReservationBook()
+    plan = plan_legs(draft(BUY, SELL), position())
+    book.admit(plan, ticket="T1")
+    book.confirm_buy(plan, BUY, "origin-buy", bought, ticket="T1")
+    book.reserve(plan, SELL, "origin-sale", 6, ticket="T1")
+    book.confirm_sale("sim", "origin-sale", "origin-fill", 6)
+    if stopped:
+        book.close("sim", "T1")
+    return book, plan
+
+
+def test_w3_plan_requires_relevant_sufficient_evidenced_coverage() -> None:
+    sell = leg("B", Side.SELL, "1.50", 4)
+    bare = draft(sell, net="-6", gross="6")
+    only = authorized(bare, ("A", "T1", 4))
+    plan = plan_legs(only, position())
+    assert plan.legs == (sell,) and plan.dependencies == (("B", "A", False),)
+    assert plan.protection_for(sell) == "A"
+    assert partial_exposure(only) == D("0")
+    assert partial_exposure(only, known_costs=D(".07")) == D(".07")
+    with pytest.raises(SequenceRefusal):
+        partial_exposure(bare)
+    with pytest.raises(SequenceRefusal, match="pareamento ausente ou ambíguo"):
+        plan_legs(bare, position())
+    five = leg("B", Side.SELL, "1.50", 5)
+    with pytest.raises(SequenceRefusal, match="quantidade de proteção insuficiente"):
+        plan_legs(authorized(draft(five, net="-7.50", gross="7.50"), ("A", "T1", 4)), position())
+    mixed = draft(leg("A", Side.BUY, "1", 1), five, net="-6.50", gross="8.50")
+    assert plan_legs(authorized(mixed, ("A", "T1", 4)), position()).dependencies == plan.dependencies
+    for series, reason in (("B", "autorização sem venda correspondente"), ("Z", "série sem evidência")):
+        with pytest.raises(SequenceRefusal, match=reason):
+            plan_legs(authorized(draft(BUY, SELL), (series, "T1", 4)), position())
+    close = authorized(draft(leg("A", Side.SELL, "1", 4), net="-4", gross="4"), ("B", "T1", 4))
+    assert plan_legs(close, close_plan().position).dependencies == (("A", "B", True),)
+
+
+def test_w4_open_origin_cannot_lend() -> None:
+    book, origin = surplus_book(stopped=False)
+    plan = sale_only(4)
+    for admission in (book.admissible, book.admit):
+        with pytest.raises(SequenceRefusal, match="boleta de origem não parada"):
+            admission(plan, ticket="T2")
+    assert book.available(plan, plan.legs[0], ticket="T2", origin="T1") == 0
+    with pytest.raises(SequenceRefusal):
+        book.reserve(plan, plan.legs[0], "borrow", 1, ticket="T2", origin="T1")
+    assert book.available(origin, SELL, ticket="T1") == 4
+
+
+def test_w5_release_returns_only_unfilled_surplus() -> None:
+    book, origin = surplus_book()
+    book.close("sim", "T1")
+    plan = sale_only(4)
+    sale = plan.legs[0]
+    assert book.available(origin, SELL, ticket="T1") == 0
+    with pytest.raises(SequenceRefusal):
+        book.reserve(origin, SELL, "original", 1, ticket="T1")
+    assert book.available(plan, sale, ticket="T2") == 0
+    assert book.available(plan, sale, ticket="T2", origin="T1") == 4
+    book.admit(plan, ticket="T2")
+    with pytest.raises(SequenceRefusal):
+        book.reserve(plan, sale, "borrow", 4, ticket="T2")
+    book.reserve(plan, sale, "borrow", 4, ticket="T2", origin="T1")
+    assert book.available(plan, sale, ticket="T2", origin="T1") == 0
+    with pytest.raises(SequenceRefusal, match="sobra indisponível"):
+        book.admissible(plan, ticket="T3")
+    book.confirm_sale("sim", "borrow", "sold", 1)
+    book.confirm_release("sim", "borrow", 3)
+    assert book.available(plan, sale, ticket="T2", origin="T1") == 3
+    book.admissible(plan, ticket="T3")
+    assert book.available(plan, sale, ticket="T3", origin="T1") == 3
+
+
+def test_w6_surplus_and_grant_both_bound_a_sale() -> None:
+    book, _ = surplus_book()
+    plan = sale_only(3)
+    sale = plan.legs[0]
+    assert book.available(plan, sale, ticket="T2", origin="T1") == 3
+    book.reserve(plan, sale, "borrow", 2, ticket="T2", origin="T1")
+    assert book.available(plan, sale, ticket="T2", origin="T1") == 1
+    book.confirm_sale("sim", "borrow", "sold", 2)
+    assert book.available(plan, sale, ticket="T2", origin="T1") == 1
+    other = sale_only(8)
+    assert book.available(other, other.legs[0], ticket="T3", origin="T1") == 2
+
+
+def test_w7_used_grant_stays_exhausted_after_execution() -> None:
+    book, _ = surplus_book()
+    buy, sale = leg("A", Side.BUY, "1", 2), leg("B", Side.SELL, "1.50", 5)
+    p = plan_legs(authorized(draft(buy, sale, net="-5.50", gross="9.50"), ("A", "T1", 3)), position())
+    book.admit(p, ticket="T2")
+    def balances() -> tuple[int, int]:
+        return book.available(p, sale, ticket="T2"), book.available(p, sale, ticket="T2", origin="T1")
+    assert balances() == (0, 3)
+    book.reserve(p, sale, "borrow", 3, ticket="T2", origin="T1")
+    book.confirm_sale("sim", "borrow", "sold", 3)
+    assert balances() == (0, 0)
+    book.confirm_buy(p, buy, "own", 2, ticket="T2")
+    assert balances() == (2, 0)
+    other = sale_only(4)
+    assert book.available(other, other.legs[0], ticket="T3", origin="T1") == 1
+
+
+def test_w8_own_and_borrowed_pools_are_separate() -> None:
+    book, _ = surplus_book()
+    buy = leg("A", Side.BUY, "1", 6)
+    p = plan_legs(authorized(draft(buy, SELL, net="-9", gross="21"), ("A", "T1", 4)), position())
+    book.admit(p, ticket="T2")
+    def balances() -> tuple[int, int]:
+        return book.available(p, SELL, ticket="T2"), book.available(p, SELL, ticket="T2", origin="T1")
+    assert balances() == (0, 4)
+    book.reserve(p, SELL, "borrow", 4, ticket="T2", origin="T1")
+    book.confirm_buy(p, buy, "own", 6, ticket="T2")
+    assert balances() == (6, 0)
+    book.reserve(p, SELL, "own-sale", 6, ticket="T2")
+    assert balances() == (0, 0)
+
+
+def test_w9_origin_and_account_must_match() -> None:
+    book, _ = surplus_book()
+    own = sale_only(4, "T2")
+    with pytest.raises(SequenceRefusal, match="boleta de origem não parada"):
+        book.admissible(own, ticket="T2")
+    assert book.available(own, own.legs[0], ticket="T2", origin="T2") == 0
+    for account, ticket in (("sim", "T9"), ("outra", "T1")):
+        with pytest.raises(SequenceRefusal, match="boleta desconhecida"):
+            book.close(account, ticket)
+    wrong = sale_only(4, "T9")
+    assert book.available(wrong, wrong.legs[0], ticket="T2", origin="T1") == 0
+    other = sale_only(4, pos=position(account="outra"))
+    with pytest.raises(SequenceRefusal, match="boleta de origem não parada"):
+        book.admissible(other, ticket="T2")
+    assert book.available(other, other.legs[0], ticket="T2", origin="T1") == 0
+
+
+def test_w10_self_grant_cannot_reopen_a_stopped_origin() -> None:
+    book = ReservationBook()
+    p = plan_legs(authorized(draft(BUY, SELL), ("A", "T1", 4)), position())
+    book.confirm_buy(p, BUY, "own", 10, ticket="T1")
+    assert book.available(p, SELL, ticket="T1") == 10
+    assert book.available(p, SELL, ticket="T1", origin="T1") == 0
+    book.close("sim", "T1")
+    assert book.available(p, SELL, ticket="T1") == 0
+    assert book.available(p, SELL, ticket="T1", origin="T1") == 0
+    with pytest.raises(SequenceRefusal, match="boleta de origem não parada"):
+        book.admissible(p, ticket="T1")
+
+
+def test_w11_only_one_borrower_reserves_the_surplus() -> None:
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+
+    book, _ = surplus_book()
+    p = sale_only(4)
+    barrier = Barrier(8)
+    def reserve(i: int) -> bool:
+        ticket = f"T{i}"
+        book.admit(p, ticket=ticket)
+        barrier.wait(timeout=10)
+        try:
+            book.reserve(p, p.legs[0], f"order-{i}", 4, ticket=ticket, origin="T1")
+        except SequenceRefusal:
+            return False
+        return True
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        assert sum(executor.map(reserve, range(2, 10))) == 1
+
+
+def test_w12_late_buy_increases_closed_origins_surplus() -> None:
+    book, origin = surplus_book(bought=6)
+    p = sale_only(4)
+    with pytest.raises(SequenceRefusal, match="sobra indisponível"):
+        book.admissible(p, ticket="T2")
+    book.confirm_buy(origin, BUY, "late", 2, ticket="T1")
+    book.admissible(p, ticket="T2")
+    assert book.available(p, p.legs[0], ticket="T2", origin="T1") == 2
+
+
+def test_w13_buyback_surplus_can_cover_unwinding() -> None:
+    book = ReservationBook()
+    p = close_plan()
+    buy, _ = p.legs
+    book.admit(p, ticket="T1")
+    book.confirm_buy(p, buy, "buyback", 4, ticket="T1")
+    book.close("sim", "T1")
+    sale = leg("A", Side.SELL, "1", 4)
+    other = plan_legs(authorized(draft(sale, net="-4", gross="4"), ("B", "T1", 4)), p.position)
+    assert book.available(other, sale, ticket="T2", origin="T1") == 4
+    book.admit(other, ticket="T2")
+    book.reserve(other, sale, "release-A", 4, ticket="T2", origin="T1")
+    assert book.available(other, sale, ticket="T2", origin="T1") == 0
+
+
+def test_w15_one_protective_buy_covers_two_distinct_sales() -> None:
+    b, c = leg("B", Side.SELL, "1.50", 4), leg("C", Side.SELL, "1.50", 6)
+    pos = Position(account="sim", holdings=tuple(holding(s) for s in "ABC"), pairs=(("A","B"),("A","C")))
+    p = plan_legs(draft(BUY,b,c), pos)
+    book = ReservationBook()
+    def balances() -> tuple[int, int]:
+        return book.available(p, b, ticket="T1"), book.available(p, c, ticket="T1")
+    book.confirm_buy(p, BUY, "first", 5, ticket="T1")
+    assert balances() == (4, 5)
+    book.reserve(p, b, "sell", 4, ticket="T1")
+    assert balances() == (0, 1)
+    book.confirm_buy(p, BUY, "second", 5, ticket="T1")
+    assert balances() == (0, 6)
+    book.confirm_sale("sim", "sell", "sold", 4)
+    assert balances() == (0, 6)
+
+
+def test_w16_account_cannot_buy_back_more_than_it_is_short() -> None:
+    book = ReservationBook()
+    p = close_plan()
+    buy, _ = p.legs
+    book.confirm_buy(p, buy, "first", 4, ticket="T1")
+    book.confirm_buy(p, buy, "second", 6, ticket="T2")
+    with pytest.raises(SequenceRefusal, match="execuções excedem posição vendida"):
+        book.confirm_buy(p, buy, "excess", 1, ticket="T3")

@@ -218,3 +218,50 @@ def test_lot_validates_quantity_without_changing_signed_content() -> None:
     assert other.digest == p.digest
     with pytest.raises(ValidationError):
         Leg.model_validate(dict(valid) | {"lot_size": 3})
+
+
+def test_w1_coverage_grant_and_ticket_validation() -> None:
+    from backend.derivatives.ticket.models import CoverageGrant
+
+    grant = CoverageGrant(series="a", origin="T1", quantity=4)
+    assert (grant.series, grant.origin, grant.quantity) == ("A", "T1", 4)
+    with pytest.raises(ValidationError):
+        grant.quantity = 2
+    for change in ({"origin": "T 1"}, {"origin": "T1:x"}, {"origin": ""}, {"series": ""},
+                   {"quantity": 0}, {"quantity": True}):
+        with pytest.raises(ValidationError):
+            CoverageGrant.model_validate(dict(grant) | change)
+    assert draft().coverage == ()
+    with pytest.raises(ValidationError, match="autorização de cobertura duplicada"):
+        TicketDraft.model_validate(dict(draft()) | {"coverage": (grant, dict(grant) | {"quantity": 2})})
+    grants = tuple(CoverageGrant(series="A", origin=f"T{i}", quantity=1) for i in range(5))
+    assert TicketDraft.model_validate(dict(draft()) | {"coverage": grants[:4]}).coverage == grants[:4]
+    with pytest.raises(ValidationError):
+        TicketDraft.model_validate(dict(draft()) | {"coverage": grants})
+
+
+def test_w2_signed_coverage_is_sorted_only_in_the_digest() -> None:
+    from backend.derivatives.ticket.receipt import Receipt
+    from tests.unit.derivatives.ticket.test_sequencing import BUY, SELL, draft as reference
+
+    base = reference(BUY, SELL)
+    def signed(*grants: dict[str, object]) -> Preview:
+        ticket = TicketDraft.model_validate(dict(base) | {"coverage": grants})
+        return Preview.from_draft(ticket, partial_exposure=D("10"))
+
+    empty = Preview.from_draft(base, partial_exposure=D("10"))
+    assert empty.digest == "d258890d354ab0aabd95f2ae8e4fee95aa1f05e5afd102082d8f8141bd27c0af"
+    assert "coverage" not in empty.model_dump() and b'"coverage"' not in canonical_bytes(empty)
+    g9 = {"series": "A", "origin": "T9", "quantity": 2}
+    g1 = {"series": "A", "origin": "T1", "quantity": 4}
+    authorized = signed(g9, g1)
+    assert authorized.digest == signed(g1, g9).digest == (
+        "f61d4551b8be2caec9f54774d536acf5fbc2655578555dc4843862de3e86a84e")
+    assert b'"coverage":[{"origin":"T1","quantity":4,"series":"A"},{"origin":"T9","quantity":2,"series":"A"}]' in canonical_bytes(authorized)
+    assert signed(g1 | {"quantity": 5}, g9).digest != authorized.digest
+    receipt = Receipt()
+    plain = receipt.append_preview(TIME, empty)
+    covered = receipt.append_preview(TIME, authorized)
+    assert "coverage" not in json.loads(plain.payload)["preview"]
+    assert json.loads(covered.payload)["preview"]["coverage"] == [g9, g1]
+    assert covered.read_preview() == authorized and receipt.verify()
