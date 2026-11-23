@@ -271,3 +271,15 @@ def test_w2_signed_coverage_is_sorted_only_in_the_digest() -> None:
     assert "coverage" not in json.loads(plain.payload)["preview"]
     assert json.loads(covered.payload)["preview"]["coverage"] == [g9, g1]
     assert covered.read_preview() == authorized and receipt.verify()
+
+
+def test_k1_coverage_digest_orders_series_before_origin() -> None:
+    from tests.unit.derivatives.ticket.test_sequencing import BUY, SELL, authorized, draft as base
+
+    first, second = ("B", "T1", 1), ("A", "T9", 2)
+    fragment = (b'"coverage":[{"origin":"T9","quantity":2,"series":"A"},'
+                b'{"origin":"T1","quantity":1,"series":"B"}]')
+    for grants in ((first, second), (second, first)):
+        p = Preview.from_draft(authorized(base(BUY, SELL), *grants), partial_exposure=D("10"))
+        assert p.digest == "364d378948c544bc1afbe75e4f6b7d50b3c9f7e7fd86386f919adfc9971a601e"
+        assert fragment in canonical_bytes(p)
