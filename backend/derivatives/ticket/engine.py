@@ -20,7 +20,7 @@ from backend.derivatives.ticket.sequencing import (
     partial_exposure, plan_legs, within_signed_limits,
 )
 from backend.derivatives.ticket.state import (
-    Event as E, OrderState as O, TicketState as T,
+    Event as E, InvalidTransition, OrderState as O, TicketState as T,
     reconcile, transition,
 )
 from backend.derivatives.ticket.trigger import Outcome, Trigger, TriggerSpec, spec_digest
@@ -449,7 +449,10 @@ class TicketEngine:
         for r in order.pending:
             if snap is None:
                 raise EngineRefusal("poll sem ordem para execução pendente")
-            result = check_report(r, simulated, filled, order.request.quantity, facts)
+            try:
+                result = check_report(r, simulated, filled, order.request.quantity, facts)
+            except InvalidTransition as exc:
+                raise EngineRefusal("fita pendente inconsistente com poll") from exc
             checked.append((r, result))
             if result.destination is not None:
                 simulated = result.destination
