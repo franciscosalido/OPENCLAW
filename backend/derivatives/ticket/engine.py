@@ -172,7 +172,9 @@ class TicketEngine:
         for leg in draft.legs:
             _check_id_component(leg.symbol)
         plan = plan_legs(draft, self._position)
-        preview = Preview.from_draft(plan.draft, partial_exposure=partial_exposure(plan.draft))
+        zeroing = any(sale == source for sale, source, _ in plan.dependencies)
+        exposure = partial_exposure(plan.draft, zeroing=zeroing)
+        preview = Preview.from_draft(plan.draft, partial_exposure=exposure)
         self._receipt.append_preview(now, preview)
         self._plan, self._preview = plan, preview
 
