@@ -239,3 +239,43 @@ O calendário pedido na carta (item 3) já existe em boa parte no repositório: 
 negociação da B3 com cobertura declarada, contagem de dias úteis e recusa fora da cobertura.
 O planejador confere o que falta frente à carta antes de escrever o cartão seguinte.
 PR07A3, PR07A4 e PR07B continuam atrás desta frente.
+
+## Revisão adversarial (Claude) — GO na primeira rodada, cabeça `0266c58`
+
+Pela regra de processo de Francisco, o revisor **não executou a suíte, a tipagem nem os
+mutantes** desta cabeça. Leu o diff, conferiu as evidências pelo SHA-256 e usou o seu
+protótipo independente, escrito antes do cartão.
+
+| Verificação | Resultado | Quem |
+|---|---|---|
+| Suíte sem integração, Linux x86_64 e macOS | 11.405 aprovados, 16 pulados, 261 subtestes nos dois | implementador; logs conferidos |
+| mypy estrito e Pyright, nos dois sistemas | 0 erros | implementador; logs conferidos |
+| 20 mutantes do §5, mais 5 variantes, nos dois sistemas | todos detectados | implementador; logs conferidos |
+| Commit vermelho | falha por módulo ausente | implementador; log conferido |
+| Integração | só no contêiner Linux isolado, como o cartão manda | implementador; pasta de evidências conferida |
+| Manifesto de 101 evidências (`5fa1d19b…b4b3`) e hashes dos dois relatórios | conferem | revisor |
+| Diff | três arquivos novos; resto de `backend/` e testes existentes intactos; imports dentro do §1; módulo com 90 linhas (teto 90) | revisor |
+| Cópia do cartão | SHA-256 `140ac9f0…8898`, igual ao publicado | revisor |
+| 39 testes do protótipo do planejador contra o módulo entregue | todos aprovados | revisor |
+| Preços das pontes na tabela do QuantLib do implementador | iguais aos do protótipo do planejador; maior diferença R$ 0,00118 por unidade (teto R$ 0,002) | revisor |
+
+Limite desta revisão: sem mutantes próprios do revisor nesta cabeça.
+
+Observações, nenhuma bloqueante:
+
+1. **Escala extrema esgota a memória.** Com prêmio `1E-900000000` e preço 5,5, o processo
+   é encerrado por falta de memória no ambiente do revisor, em vez de devolver
+   `PayoffRefusal`. Até `1E-2000000` a conta sai exata em menos de 0,1 s. É a mesma classe
+   da limitação já registrada do `expiry_payoff`, que nessa entrada não termina. Só é
+   alcançável por entrada construída de propósito, e não há dado externo ligado. Fica para
+   o cartão do limite de escala, que passa a cobrir os dois módulos. Os dois relatórios da
+   skill declaram que não mediram esse consumo.
+2. **`spot` e `time_years` têm de ser `float` finito no eco**, mais estrito que o cartão,
+   que só pedia que fossem iguais. As duas pontes já devolvem `float`. Aceito.
+3. **Terceiro commit, só de testes**, depois do vermelho e do verde, para três lacunas
+   achadas pela skill. Desvio declarado na descrição do PR. Aceito.
+
+Nenhum código de terceiros entrou. QuantLib e OptionLab foram usados fora do repositório.
+
+Relatórios da skill lidos depois de formado o parecer, com SHA-256 conferidos
+(`a07443d0…4c86` e `637949b2…2679`): GO, sem bloqueante.
