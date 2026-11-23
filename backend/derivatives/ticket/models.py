@@ -7,7 +7,8 @@ from typing import Annotated, NamedTuple, Self
 
 from pydantic import (
     AfterValidator, AwareDatetime, BaseModel, BeforeValidator, ConfigDict, Field, ValidationInfo,
-    SerializerFunctionWrapHandler, computed_field, model_serializer, model_validator,
+    SerializerFunctionWrapHandler, computed_field, field_validator, model_serializer,
+    model_validator,
 )
 
 from backend.derivatives.ticket.digest import digest
@@ -115,6 +116,11 @@ class _Ticket(_Frozen):
     quote_snapshot_id: Text
     version: PositiveInt = 1
     coverage: Annotated[tuple[CoverageGrant, ...], Field(max_length=4)] = ()
+
+    @field_validator("coverage", mode="after")
+    @classmethod
+    def _ordered_grants(cls, grants: tuple[CoverageGrant, ...]) -> tuple[CoverageGrant, ...]:
+        return tuple(sorted(grants, key=lambda grant: (grant.series, grant.origin)))
 
     @model_serializer(mode="wrap")
     def _serialize(self, handler: SerializerFunctionWrapHandler) -> dict[str, object]:
