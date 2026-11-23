@@ -293,3 +293,47 @@ Observações, nenhuma bloqueante:
 
 Relatórios da skill lidos depois de formado o parecer, com SHA-256 conferidos
 (`6e8a980b…e534` e `7e7e6946…d3af`): sem bloqueante.
+
+## Acompanhamento — PR #176: conferência dos relatos de ordem incerta
+
+**Origem.** As três observações da revisão acima. Francisco autorizou o implementador a
+resolvê-las sem cartão novo, em 23/11/2026. O escopo aceito é o daquelas observações.
+
+**O que mudou.**
+
+- A conferência do relato saiu do motor para `report_check.py` (43 linhas, função pura) e
+  passou a ser usada também na conciliação da ordem incerta. O motor projeta a fila na ordem
+  de chegada, compara estado e executado com a consulta à venue e só então grava. Consulta
+  incompatível deixa a fila pendente, sem alterar saldo nem recibo.
+- Um evento que não é do tipo `Event` (texto, por exemplo) é recusado com exceção antes de
+  qualquer lançamento. No `main` anterior, um texto igual ao valor do evento passava pela
+  conferência.
+- As quatro linhas acima de 100 colunas foram quebradas. `engine.py` ficou com 482 linhas.
+- As três lacunas de teste viraram testes versionados.
+
+### Revisão adversarial (Claude) — GO, cabeça `b11d492`
+
+O revisor **não executou a suíte, a tipagem nem os mutantes** desta cabeça.
+
+| Verificação | Resultado | Quem |
+|---|---|---|
+| Suíte sem integração, Linux x86_64 e macOS | 11.489 aprovados, 16 pulados, 261 subtestes nos dois | implementador; logs conferidos |
+| mypy estrito e Pyright, nos dois sistemas | 0 erros | implementador; logs conferidos |
+| 13 mutantes, nos dois sistemas | todos detectados | implementador; logs conferidos |
+| Integração | só no contêiner Linux isolado: 31 aprovados, 206 pulados | implementador; evidências conferidas |
+| Manifesto de 100 evidências (`9cf23dfb…9071`) e hashes dos dois relatórios | conferem | revisor (21 arquivos) e Francisco (todos, no Mac) |
+| Diff | três arquivos: `engine.py`, `report_check.py` e `test_engine.py` | revisor |
+| Âncoras e recibos das sessões | iguais byte a byte entre base e cabeça | implementador; log conferido |
+| 13 casos do protótipo do DL3-PR07A4 e 3 sondas do revisor | todos aprovados na cabeça | revisor |
+
+Este PR e o #177 (DL3-PR07B1) saíram da mesma base e foram validados separadamente. A
+árvore com os dois juntos não tinha portão completo. O revisor rodou nela a suíte sem
+integração (11.497 aprovados, 16 pulados) e o mypy estrito (0 erros), porque ninguém mais
+tinha rodado.
+
+Observação, não bloqueante (skill): falta um teste versionado para a correção sem original
+seguida, na mesma fila, do original com a mesma identidade. A cabeça registra a divergência
+e contabiliza a execução uma só vez.
+
+Relatórios da skill lidos depois de formado o parecer, com SHA-256 conferidos
+(`5fe11c09…4a37` e `cf890c39…0948`): sem bloqueante.
