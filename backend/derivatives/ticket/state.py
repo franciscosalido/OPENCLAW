@@ -36,6 +36,7 @@ class Event(StrEnum):
     """Evento de replay aceito por uma máquina ou registrado no recibo."""
 
     DIVERGENCE = "divergence"
+    EXTERNAL = "external"
     PAUSE = "pause"
     RESUME = "resume"
     PREVIEW = "preview"

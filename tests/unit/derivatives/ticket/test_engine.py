@@ -2161,3 +2161,21 @@ def test_external_before_proposal_or_execution_leaves_receipt_untouched(s: Sessi
     with pytest.raises(SequenceRefusal, match="série com fato externo; foto nova necessária"):
         e.confirm(s.dec(e), at(4))
     assert e.state == T.TRIGGERED and s.receipts[0].events == before and not s.submitted()
+
+
+def test_external_pending_cancel_keeps_prior_divergence_and_late_fill(s: Session) -> None:
+    e = s.confirmed()
+    s.q("A", 3, ask="1")
+    s.cancel(e, B, 4)
+    s.halts.hold("sim", "divergence")
+    for symbol in ("B", "A"):
+        s.res.freeze("sim", symbol)
+    e.on_external("f1", at(4))
+    with pytest.raises(EngineRefusal, match="identificador"):
+        e.on_external("f 2", at(4))
+    assert external_rows(s.receipts[0]) == [{"ticket": "T1", "fact": "f1", "series": ["A", "B"]}]
+    assert e.orders[B] == O.CANCEL_REQUESTED
+    s.q("B", 5, bid="1.50", size=2)
+    assert e.orders[B] == O.CANCELLED and e.state == T.STOPPED
+    assert e.gross().executed == D("13") and s.halts.divergent("sim")
+    s.venue.request_cancel.assert_called_once()
