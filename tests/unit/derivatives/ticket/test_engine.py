@@ -2366,3 +2366,22 @@ def test_progress_without_proposal_and_with_two_live_sale_orders(s: Session) -> 
     row = e.legs()[1]
     assert (row.symbol, row.side, row.signed, row.executed, row.live, row.average) == (
         "B", Side.SELL, 10, 1, 3, D("1.5400"))
+
+
+def test_progress_s3_rounds_half_even_at_four_places(s: Session) -> None:
+    """7 × 0,95 e 1 × 1,00 dão 0,95625; na quarta casa o empate conserva o 2."""
+    e = s.confirmed()
+    s.q("A", 3, bid=".94", ask=".95", size=7)
+    s.q("A", 4, ask="1.00", size=1)
+    assert str(e.legs()[0].average) == "0.9562"
+
+
+def test_progress_s6_partial_single_leg_close_has_unwind_label(s: Session) -> None:
+    """Na zeragem, venda e proteção apontam para a mesma série."""
+    e = zeroing_engine(s, "T1", position(holding("A", 10), holding("B", -6)), 4)
+    e.confirm(s.dec(e), at(2))
+    s.q("A", 3, bid="1", size=2)
+    s.cancel(e, A, 3)
+    s.q("A", 4)
+    assert e.state is T.STOPPED and e.label == "Parada · desmontagem parcial"
+    assert e.legs() == (("A", Side.SELL, 4, 2, 0, D("1.0000")),)
