@@ -4,7 +4,7 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-24 · **Turno:** Claude (DL3-PR07B3 integrado).
+**Última atualização:** 2026-11-24 · **Turno:** Claude (DL3-PR07D1 integrado).
 
 ## Depois da Fase 3 — decisões de produto no simulador (D0) — EM ANDAMENTO
 
@@ -33,7 +33,8 @@ Revisão 1). O PR07A foi cortado em três pelo planejador.
 | [DL3-PR07A6](../specs/derivatives/fase3/DL3-PR07A6.md) | DP-13, 2ª parte: entrada do fato pela sessão e pelo roteiro; registro sem boleta de origem; aviso a todas as boletas da conta | MERGEADO (PR #180) |
 | [DL3-PR07C1](../specs/derivatives/fase3/DL3-PR07C1.md) | cota do plano na proteção disputada entre duas vendas | MERGEADO (PR #181) |
 | [DL3-PR07B3](../specs/derivatives/fase3/DL3-PR07B3.md) | DP-03: desmontagem da borboleta com conta exata | MERGEADO (PR #182) |
-| DL3-PR07D1 | apresentação: montagem parcial com executado por perna; projetado depois de cancelamento humano | próximo cartão |
+| [DL3-PR07D1](../specs/derivatives/fase3/DL3-PR07D1.md) | andamento por perna, rótulo da parada e projetado após cancelamento humano | MERGEADO (PR #183) |
+| DL3-PR07E1 | versão de formato do recibo e do resumo; esquema de saída verificável | próximo cartão |
 
 Entregue pelo DL3-PR07A1 (37 linhas de produção):
 - No instante exato da validade o motor recusa antes de gastar a decisão, ocupar o livro
@@ -403,14 +404,24 @@ Entregue pelo DL3-PR07B3 (PR #182; `sequencing.py` +10 linhas):
   revisor não repetiu a suíte; conferiu o manifesto de 81 evidências e rodou os casos do
   seu protótipo e três sondas contra o módulo entregue.
 
-Fila: PR07D1 (apresentação da montagem parcial e do projetado depois de cancelamento
-humano). Atrás dele: a frente de repetir, completar e ajustar estruturas (boleta concluída
-cedendo sobra comprovada); limite de escala; modalidade B de garantia. O esquema JSON de
-saída é corrigido antes do primeiro consumidor externo da prévia, junto com a versão de
-formato do recibo. Segue para um cartão de testes: o `projection_id` no teste sintético do
-calendário. A conferência da foto nova contra a anterior mais execuções mais fatos entra
-com o histórico persistente. Foto em que as proteções não somam a vendida fica para quando
-a foto declarar a quantidade de cada par.
+Entregue pelo DL3-PR07D1 (PR #183; `engine.py` +38 linhas, `session.py` +5, script −1):
+- O motor e o resumo mostram, por perna e na ordem assinada, o assinado, o executado, o
+  saldo vivo e o preço médio ponderado. A contagem segue a convenção do FIX: ordem morta
+  não tem saldo vivo; ordem com cancelamento solicitado ainda tem.
+- Parada com execução vira «Parada · montagem parcial» ou «Parada · desmontagem parcial».
+- Depois de um cancelamento humano, o projetado é o executado mais as ordens vivas.
+- **A âncora da sessão `leilao` mudou**, de `0e95249a…` para `8592cd74…`: o registro 9 do
+  recibo gravava projetado 25,00 e passa a gravar 14,50. As outras três âncoras não mudaram.
+- Portão da cabeça `a0c2730`, pelo implementador: Linux x86_64 e macOS, 11.597 aprovados,
+  16 pulados, 261 subtestes; mypy estrito e Pyright sem erro; 17 mutantes detectados.
+
+Com isso ficam entregues no simulador os assuntos abertos pela DP-03 e pela DP-13.
+
+Fila: PR07E1 (versão de formato do recibo e do resumo, com esquema de saída verificável),
+que fecha a Fase 3 estendida. Depois dele, frentes novas, cada uma com decisão própria de
+Francisco: repetir, completar e ajustar estruturas; limite de escala; modalidade B de
+garantia; histórico persistente com conferência da foto nova; foto com quantidade por par.
+Segue para um cartão de testes: o `projection_id` no teste sintético do calendário.
 
 Manutenção opcional: duas linhas a menos em `Position.unpledged` (relatório de
 simplificação do PR #182).
@@ -418,7 +429,7 @@ simplificação do PR #182).
 Pendente, observado na revisão do DL3-PR07A6: `ReplaySession.receipt(ticket)` devolve o
 recibo interno da boleta, que tem `append` público. O registro de fatos já sai como cópia.
 
-Próxima ação (uma só): Claude publica o supercartão do DL3-PR07D1 e Codex o abre em
+Próxima ação (uma só): Claude publica o supercartão do DL3-PR07E1 e Codex o abre em
 rascunho.
 
 ## Fase 03 — Motor da boleta em simulador (D0) — FECHADA (estado A)

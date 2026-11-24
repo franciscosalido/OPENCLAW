@@ -28,7 +28,7 @@ EXPECTED = {
          "1d50bba66aa2db714bf7006da415c39f083bc9e4374ebdbc9b94305b3356236b", CALMO)], []),
     "leilao": (11, [
         ("T1", "STOPPED", [("A", "EXPIRED", 4), ("B", "FILLED", 3)], 12,
-         "0e95249a66c1eb658d8e34f58ab77e81381cc7d745b6a57de6641def3c488cda", LEILAO)],
+         "8592cd742d265332eddf75ea0f0cb9166e53f4db47dbfdd29901e166a43e7bbe", LEILAO)],
         [(2, "T1", "EngineRefusal")]),
     "rapido": (8, [
         ("T1", "STOPPED", [("B", "CANCELLED", 4), ("A", "FILLED", 4)], 15,
@@ -36,6 +36,26 @@ EXPECTED = {
         ("T2", "DRAFT", [], 1,
          "fbcaafa8eb7934ed7fe77a9f497b676904c5cc1647d42e0b8f5a77da4df3e2b5", "preview")],
         [(4, "T2", "EngineRefusal"), (6, "T2", "SequenceRefusal"), (9, "T2", "EngineRefusal")]),
+}
+
+
+def progress_row(symbol: str, side: str, executed: int, live: int,
+                 average: str | None) -> dict[str, object]:
+    """Linha literal das sessões oficiais; todas as pernas têm dez unidades assinadas."""
+    return {"serie": symbol, "lado": side, "assinado": 10, "executado": executed,
+            "vivo": live, "preco_medio": average}
+
+
+OPENING = [progress_row("A", "BUY", 0, 0, None), progress_row("B", "SELL", 0, 0, None)]
+CLOSING = [progress_row("A", "SELL", 0, 0, None), progress_row("B", "BUY", 0, 0, None)]
+PROGRESS = {
+    ("calmo", "T1"): ("Concluída", [progress_row("A", "BUY", 10, 0, "1.0000"),
+                                    progress_row("B", "SELL", 10, 0, "1.5000")]),
+    ("leilao", "T1"): ("Parada · montagem parcial", [progress_row("A", "BUY", 4, 0, "1.0000"),
+                                                     progress_row("B", "SELL", 3, 0, "1.5000")]),
+    ("rapido", "T1"): ("Parada · desmontagem parcial", [progress_row("A", "SELL", 4, 0, "1.0000"),
+                                                       progress_row("B", "BUY", 4, 0, "1.5000")]),
+    ("rapido", "T2"): ("Proposta", CLOSING),
 }
 
 
@@ -64,7 +84,7 @@ def test_complete_replay(case: str, tmp_path: Path, monkeypatch: pytest.MonkeyPa
               "rapido": ("10.00", "10.00")}
     gross_rows = {
         "calmo": {8: ("10.00", "25.00"), 11: ("25.00", "25.00"), 12: ("25.00", "25.00")},
-        "leilao": {5: ("3.00", "25.00"), 7: ("7.50", "25.00"), 9: ("8.50", "25.00"),
+        "leilao": {5: ("3.00", "25.00"), 7: ("7.50", "25.00"), 9: ("8.50", "14.50"),
                    12: ("8.50", "8.50")},
         "rapido": {7: ("6.00", "25.00"), 12: ("10.00", "25.00"), 15: ("10.00", "10.00")},
     }
@@ -72,7 +92,9 @@ def test_complete_replay(case: str, tmp_path: Path, monkeypatch: pytest.MonkeyPa
     boletas = {}
     for ticket, state, orders, n, head, sequence in tickets:
         ex, proj = totals[case] if ticket == "T1" else ("0.00", "25.00")
+        label, legs = PROGRESS[case, ticket]
         boletas[ticket] = {"conta": "sim", "estado": state, "pausada": False,
+                           "rotulo": label, "pernas": legs,
                            "bruto": {"assinado": "25.00", "executado": ex, "projetado": proj},
                            "ordens": {f"{ticket}:{sym}:1": {"estado": st, "executado": qty}
                                       for sym, st, qty in orders},
@@ -219,7 +241,17 @@ def test_session_cut_at_hand_verified_step(case: str, tmp_path: Path) -> None:
         # B5: o poll em V4 já mostra quatro, mas o motor ainda aguarda a conciliação.
         ex, proj = ("10.00", "10.00") if case == "V5" else ("0.00", "25.00")
         kinds = sequence.split()
+        progress = {
+            ("V3", "T1"): ("Proposta", OPENING),
+            ("V4", "T1"): ("Boleta em estado incerto",
+                           [CLOSING[0], progress_row("B", "BUY", 0, 10, None)]),
+            ("V4", "T2"): ("Proposta", CLOSING),
+            ("V5", "T1"): ("Parada · montagem parcial",
+                           [progress_row("A", "BUY", 10, 0, "1.0000"), OPENING[1]]),
+        }
+        label, legs = progress[case, ticket]
         assert report["boletas"][ticket] == {
+            "rotulo": label, "pernas": legs,
             "conta": "sim", "estado": state, "ordens": orders, "pausada": case == "V5",
             "bruto": {"assinado": "25.00", "executado": ex, "projetado": proj},
             "recibo_eventos": len(kinds), "recibo_hash": head}
@@ -339,8 +371,8 @@ def test_unusable_output_parent_is_a_cli_refusal(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize(("case", "lines"), [
     ("calmo", ["T1: Concluída (COMPLETED)"]),
-    ("leilao", ["T1: Parada (STOPPED)"]),
-    ("rapido", ["T1: Parada (STOPPED)", "T2: Proposta (DRAFT)"]),
+    ("leilao", ["T1: Parada · montagem parcial (STOPPED)"]),
+    ("rapido", ["T1: Parada · desmontagem parcial (STOPPED)", "T2: Proposta (DRAFT)"]),
 ])
 def test_l4_summary_log_names_ticket_state(case: str, lines: list[str], tmp_path: Path) -> None:
     """O log exibe a descrição portuguesa junto do código estável."""

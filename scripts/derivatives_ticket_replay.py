@@ -24,7 +24,6 @@ from backend.derivatives.ticket.models import PositiveInt, TicketDraft, _Frozen
 from backend.derivatives.ticket.replay import Timestamp, load_replay
 from backend.derivatives.ticket.sequencing import Position, SequenceRefusal
 from backend.derivatives.ticket.session import ReplaySession, SessionRefusal
-from backend.derivatives.ticket.state import TICKET_LABELS_PT
 from backend.derivatives.ticket.trigger import TriggerRefusal, TriggerSpec, spec_digest
 from config.ticket_sim_config_model import load_ticket_sim_config
 
@@ -235,8 +234,8 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     logger.info("{}", summary["aviso"])
     for ticket in tickets:
-        state = session.engine(ticket).state
-        logger.info("{}: {} ({})", ticket, TICKET_LABELS_PT[state], state.value)
+        engine = session.engine(ticket)
+        logger.info("{}: {} ({})", ticket, engine.label, engine.state.value)
     return 0
 
 

@@ -162,7 +162,12 @@ class ReplaySession:
             gross = engine.gross()
             bruto = {"assinado": f"{gross.signed:.2f}", "executado": f"{gross.executed:.2f}",
                      "projetado": f"{gross.projected:.2f}"}
+            legs = [{"serie": leg.symbol, "lado": leg.side.value, "assinado": leg.signed,
+                     "executado": leg.executed, "vivo": leg.live,
+                     "preco_medio": str(leg.average) if leg.average is not None else None}
+                    for leg in engine.legs()]
             tickets[name] = {"conta": ticket.account, "estado": engine.state.value,
+                             "rotulo": engine.label, "pernas": legs,
                              "pausada": engine.paused, "ordens": orders, "bruto": bruto,
                              "recibo_eventos": len(events), "recibo_hash": events[-1].hash}
         summary: dict[str, object] = {
