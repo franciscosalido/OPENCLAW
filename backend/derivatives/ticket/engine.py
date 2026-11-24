@@ -36,7 +36,8 @@ class EngineRefusal(ValueError):
     """O estado ou os limites vigentes impedem a ação."""
 
 
-def _check_id_component(value: str) -> None:
+def check_id_component(value: str) -> None:
+    """Confere um componente de identidade usado em boletas, séries e fatos."""
     if not isinstance(value, str) or not _ID_COMPONENT.fullmatch(value):
         raise EngineRefusal("identificador da boleta ou símbolo fora do alfabeto permitido")
 
@@ -85,7 +86,7 @@ class TicketEngine:
     def __init__(self, ticket: str, position: Position, *, venue: ExecutionVenue,
                  book: BookView, reservations: ReservationBook, ledger: DecisionLedger,
                  halts: AccountHalts, receipt: Receipt, config: TicketSimConfig) -> None:
-        _check_id_component(ticket)
+        check_id_component(ticket)
         self._ticket = ticket
         self._position = Position.model_validate(position)
         self._account = position.account
@@ -135,7 +136,7 @@ class TicketEngine:
         if self._plan is None:
             raise EngineRefusal("boleta sem proposta")
         balances: dict[str, int] | None = None
-        if state in (T.COMPLETED, T.STOPPED, T.DENIED, T.EXPIRED):
+        if self._external or state in (T.COMPLETED, T.STOPPED, T.DENIED, T.EXPIRED):
             balances = {}
             for order in self._orders.values():
                 if order.state in _LIVE:
@@ -173,7 +174,7 @@ class TicketEngine:
     def _propose(self, draft: TicketDraft, now: datetime) -> None:
         draft = TicketDraft.model_validate(draft)
         for leg in draft.legs:
-            _check_id_component(leg.symbol)
+            check_id_component(leg.symbol)
         plan = plan_legs(draft, self._position)
         zeroing = any(sale == source for sale, source, _ in plan.dependencies)
         exposure = partial_exposure(plan.draft, zeroing=zeroing)
@@ -398,7 +399,7 @@ class TicketEngine:
 
     def on_external(self, fact: str, now: datetime) -> None:
         """Registra o primeiro fato relevante e encerra novos envios desta boleta."""
-        _check_id_component(fact)
+        check_id_component(fact)
         if self._external or self._plan is None or self._state not in (T.WORKING, T.UNCERTAIN):
             return
         series = self._reservations.frozen(self._plan)

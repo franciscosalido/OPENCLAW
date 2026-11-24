@@ -29,9 +29,21 @@ from backend.derivatives.ticket.trigger import TriggerRefusal, TriggerSpec, spec
 from config.ticket_sim_config_model import load_ticket_sim_config
 
 
-class _Step(_Frozen):
+class _TimedStep(_Frozen):
     after_seq: Annotated[int, Field(ge=0)]
     at: Timestamp
+
+
+class _External(_TimedStep):
+    do: Literal["external"]
+    account: str
+    symbol: str
+    fact: str
+    kind: str
+    quantity: int
+
+
+class _Step(_TimedStep):
     ticket: str
 
 
@@ -55,7 +67,7 @@ class _Simple(_Step):
     do: Literal["confirm", "pause", "resume"]
 
 
-type Step = Annotated[_Open | _Arm | _Order | _Simple, Field(discriminator="do")]
+type Step = Annotated[_Open | _Arm | _Order | _Simple | _External, Field(discriminator="do")]
 
 
 class _Script(_Frozen):
@@ -75,7 +87,7 @@ def _read(path: Path) -> _Script:
     raw = path.read_bytes()
     json.loads(raw, object_pairs_hook=_unique)
     script = _Script.model_validate_json(raw)
-    accounts = {p.account for p in script.positions}
+    accounts = {p.account: {h.symbol for h in p.holdings} for p in script.positions}
     if len(accounts) != len(script.positions):
         raise ValueError("conta repetida")
     opened = set()
@@ -86,6 +98,9 @@ def _read(path: Path) -> _Script:
             if step.account not in accounts:
                 raise ValueError("conta ausente")
             opened.add(step.ticket)
+        elif isinstance(step, _External):
+            if step.account not in accounts or step.symbol not in accounts[step.account]:
+                raise ValueError("conta ou série ausente na foto")
         elif step.ticket not in opened:
             raise ValueError("passo antes da abertura da boleta")
     return script
@@ -118,7 +133,10 @@ def _run(session: ReplaySession, script: _Script) -> list[dict[str, object]]:
     for n, step in enumerate(script.steps, 1):
         session.advance_to(step.after_seq)
         session.check_time(step.at)
-        if isinstance(step, _Open):
+        if isinstance(step, _External):
+            session.external(step.account, step.symbol, step.fact, step.kind,
+                             step.quantity, step.at)
+        elif isinstance(step, _Open):
             try:
                 session.open(step.ticket, positions[step.account], step.draft, step.at)
             except ValueError as exc:
@@ -169,9 +187,12 @@ def _write(out: Path, target: Path, session: ReplaySession, tickets: list[str],
                         continue
                 physical.mkdir(exist_ok=True)
             marker.unlink()
-        for ticket in tickets:
-            with (staged / f"recibo_{ticket}.jsonl").open("x", encoding="utf-8") as stream:
-                for event in session.receipt(ticket).events:
+        receipts = {f"recibo_{name}.jsonl": session.receipt(name) for name in tickets}
+        if session.facts.events:
+            receipts["fatos_externos.jsonl"] = session.facts
+        for filename, receipt in receipts.items():
+            with (staged / filename).open("x", encoding="utf-8") as stream:
+                for event in receipt.events:
                     row = {"seq": event.seq, "ts": event.ts.isoformat(), "kind": event.kind.value,
                            "payload": event.payload.decode("utf-8"), "prev_hash": event.prev_hash,
                            "hash": event.hash}
