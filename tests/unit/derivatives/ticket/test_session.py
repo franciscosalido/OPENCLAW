@@ -328,3 +328,22 @@ def test_external_unrepresentable_utc_is_typed_and_has_no_effect() -> None:
     confirm_fact_ticket(s, "T1", now)
     s.external("sim", "B", "f1", "exercise", 4, now)
     assert fact_rows(s, "T1") == [{"ticket": "T1", "fact": "f1", "series": ["B"]}]
+
+
+def test_external_journal_is_committed_before_freeze(monkeypatch: pytest.MonkeyPatch) -> None:
+    """O livro recebe o congelamento depois de existir prova do fato na sessão."""
+    from backend.derivatives.ticket.sequencing import ReservationBook
+
+    s, _, _, now = fact_session()
+    original = ReservationBook.freeze
+    calls = []
+
+    def observed(book: ReservationBook, account: str, symbol: str) -> None:
+        entry, = s.facts.events
+        assert json.loads(entry.payload)["fact"] == "f1" and s.facts.verify()
+        calls.append((account, symbol))
+        original(book, account, symbol)
+
+    monkeypatch.setattr(ReservationBook, "freeze", observed)
+    s.external("sim", "B", "f1", "exercise", 4, now)
+    assert calls == [("sim", "B")]
