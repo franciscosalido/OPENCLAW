@@ -3,8 +3,10 @@ from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
+from fractions import Fraction
 import re
 from types import MappingProxyType
+from typing import NamedTuple
 
 from backend.derivatives.ticket.gate import Action, DecisionLedger, HumanDecision
 from backend.derivatives.ticket.guards import BookView, assess, check_deadlines
@@ -21,7 +23,7 @@ from backend.derivatives.ticket.sequencing import (
 )
 from backend.derivatives.ticket.state import (
     Event as E, InvalidTransition, OrderState as O, TicketState as T,
-    reconcile, transition,
+    TICKET_LABELS_PT, reconcile, transition,
 )
 from backend.derivatives.ticket.trigger import Outcome, Trigger, TriggerSpec, spec_digest
 from backend.derivatives.ticket.venue import ExecutionVenue, VenueOrder, VenueReport
@@ -30,6 +32,16 @@ from config.ticket_sim_config_model import TicketSimConfig
 _LIVE = {O.PENDING_SEND, O.LIVE, O.PARTIAL, O.CANCEL_REQUESTED, O.UNCERTAIN}
 _ZERO = Decimal(0)
 _ID_COMPONENT = re.compile(r"[A-Za-z0-9._-]+")
+
+
+class LegProgress(NamedTuple):
+    """Execução e saldo das ordens de uma perna na versão assinada."""
+    symbol: str
+    side: Side
+    signed: int
+    executed: int
+    live: int
+    average: Decimal | None
 
 
 class EngineRefusal(ValueError):
@@ -128,6 +140,38 @@ class TicketEngine:
         """Foto dos estados por identificador da venue."""
         return MappingProxyType({oid: o.state for oid, o in self._orders.items()})
 
+    @property
+    def label(self) -> str:
+        """Descreve a parada parcial conforme as dependências da versão assinada."""
+        label = TICKET_LABELS_PT[self._state]
+        if self._state is T.STOPPED and self._fills and self._plan is not None:
+            closing = any(closing for _, _, closing in self._plan.dependencies)
+            return label + (" · desmontagem parcial" if closing else " · montagem parcial")
+        return label
+
+    def _live_balances(self) -> dict[str, int]:
+        balances: dict[str, int] = {}
+        for order in self._orders.values():
+            if order.state in _LIVE:
+                symbol = order.leg.symbol
+                balances[symbol] = balances.get(symbol, 0) + order.request.quantity - order.filled
+        return balances
+
+    def legs(self) -> tuple[LegProgress, ...]:
+        """Mostra as pernas em ordem assinada, com média ponderada arredondada a quatro casas."""
+        if self._plan is None:
+            raise EngineRefusal("boleta sem proposta")
+        live = self._live_balances()
+        rows = []
+        for leg in self._plan.draft.legs:
+            fills = [f for f in self._fills if f.symbol == leg.symbol]
+            executed = sum(f.quantity for f in fills)
+            value = sum((Fraction(f.price) * f.quantity for f in fills), Fraction())
+            average = Decimal(format(value / executed, ".4f")) if executed else None
+            rows.append(LegProgress(leg.symbol, leg.side, leg.quantity, executed,
+                                    live.get(leg.symbol, 0), average))
+        return tuple(rows)
+
     def gross(self) -> Gross:
         """Consulta os três volumes pela versão e pelos fatos já aplicados nesta boleta."""
         return self._gross(self._state)
@@ -135,14 +179,8 @@ class TicketEngine:
     def _gross(self, state: T) -> Gross:
         if self._plan is None:
             raise EngineRefusal("boleta sem proposta")
-        balances: dict[str, int] | None = None
-        if self._external or state in (T.COMPLETED, T.STOPPED, T.DENIED, T.EXPIRED):
-            balances = {}
-            for order in self._orders.values():
-                if order.state in _LIVE:
-                    symbol = order.leg.symbol
-                    live = order.request.quantity - order.filled
-                    balances[symbol] = balances.get(symbol, 0) + live
+        terminal = state in (T.COMPLETED, T.STOPPED, T.DENIED, T.EXPIRED)
+        balances = self._live_balances() if self._cancelled or self._external or terminal else None
         return gross_amounts(self._plan.draft, self._fills, balances)
 
     def _require(self, *states: T) -> LegPlan:
