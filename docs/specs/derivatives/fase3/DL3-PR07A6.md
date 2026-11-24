@@ -309,3 +309,55 @@ depende de histórico persistente. Em seguida, a fila do `current_state.md`:
 - apresentação: montagem parcial com executado por perna, e o projetado depois de
   cancelamento humano;
 - repetir, completar e ajustar estruturas.
+
+## Revisão adversarial (Claude) — GO na primeira rodada, cabeça `7588cf1`
+
+Pela regra de processo de Francisco, o revisor **não executou a suíte, a tipagem nem os
+mutantes** desta cabeça. Leu o diff, conferiu as evidências pelo SHA-256 e rodou os cenários
+do seu protótipo, escrito antes do cartão, mais cinco sondas próprias.
+
+| Verificação | Resultado | Quem |
+|---|---|---|
+| Suíte sem integração, Linux x86_64 e macOS | 11.567 aprovados, 16 pulados, 261 subtestes nos dois | implementador; logs conferidos |
+| mypy estrito e Pyright, nos dois sistemas | 0 erros | implementador; logs conferidos |
+| Commits vermelhos antes dos verdes | F1 a F6, F8 e F10 falham na base; F7, F9 e F11 já passavam, como o cartão previa | implementador; logs conferidos |
+| Testes focais antigos | 585 com resultado idêntico por nome; 38 novos aprovados | implementador; log conferido |
+| 27 mutantes do §5 e 4 adicionais, nos dois sistemas | todos detectados | implementador; logs conferidos |
+| Integração | só no contêiner Linux isolado: 31 aprovados, 206 pulados | implementador; evidência conferida |
+| Manifesto de 144 evidências (`b3d04866…c288`) e hashes dos dois relatórios | conferem | revisor (23 arquivos) e Francisco (todos, no Mac) |
+| `DIFF.patch` das evidências aplicado sobre a base | mesma árvore da cabeça | revisor |
+| Diff | sete arquivos; `session.py` 174 (teto 174), `engine.py` 506 (teto 508), script 244 (teto 252) | revisor |
+| Âncoras, recibos, resumos e lista de arquivos das sessões oficiais | iguais entre base e cabeça | implementador; log conferido |
+| Cópia do cartão | igual à publicada, salvo a quebra de linha final | revisor |
+| 27 casos do protótipo do planejador (F1 a F11) contra os módulos entregues | todos aprovados | revisor |
+| 5 sondas do revisor (abaixo) | todas aprovadas | revisor |
+
+Diferenças em relação ao protótipo do planejador, todas aceitas:
+
+1. `facts` devolve uma **cópia** do registro, não o objeto interno.
+2. O instante é normalizado para `datetime` nativo, preservando o fuso; instante que não
+   cabe em UTC vira recusa da sessão, sem efeito.
+3. O tipo do fato é conferido só na sessão; o roteiro o aceita como texto e a sessão recusa.
+
+Sondas do revisor na cabeça:
+
+1. Escrever na cópia de `facts` não muda o registro nem o resumo.
+2. Subclasse de `datetime` com fuso: gravada como instante nativo, e a boleta é avisada.
+3. Roteiro `rapido` oficial com um fato em B enquanto a ordem da T1 está incerta: a T1
+   grava o fato, concilia, não envia mais nada e para; a T2 é recusada na confirmação.
+4. Passo de fato com instante depois do próximo evento: recusado, nada publicado.
+5. Roteiro só com o fato, sem boleta: publica o resumo e o arquivo de fatos.
+
+Defeito do cartão do planejador, achado pela skill numa cabeça intermediária e corrigido
+pelo implementador antes desta: o §2.1 mandava expor o registro de fatos como o próprio
+`Receipt`, que tem `append` público. Quem consultasse podia acrescentar um fato sem congelar
+a série. O protótipo do planejador tinha o mesmo defeito e os 27 mutantes não o cobriam.
+
+Observação não bloqueante, anterior a este PR: `ReplaySession.receipt(ticket)` ainda devolve
+o recibo interno da boleta, com a mesma exposição. Fica registrada no estado atual.
+
+Limite desta revisão: sem mutantes próprios do revisor nesta cabeça.
+
+Relatórios da skill lidos depois de formado o parecer, com SHA-256 conferidos
+(`cb0e0361…8356` e `01c63a0f…7a4d`): sem bloqueante; nenhuma simplificação qualificada.
+
