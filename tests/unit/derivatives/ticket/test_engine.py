@@ -2273,3 +2273,96 @@ def test_d8_cancel_partial_buyback_leaves_one_covered_vertical(s: Session) -> No
     assert s.paper.poll(B) == (O.CANCELLED, 10, 0)
     assert s.paper.poll(A) == (O.FILLED, 10, 0)
     assert len(s.submitted()) == 2 and s.paper.poll("T1:C:1") is None
+
+
+def test_progress_s1_fills_and_live_orders_through_human_cancel(s: Session) -> None:
+    """Uma execução parcial cria capacidade; pedir cancelamento conserva o saldo vivo."""
+    e = s.new()
+    buy, sell = Side.BUY, Side.SELL
+    a = ("A", buy, 10, 0, 0, None)
+    b = ("B", sell, 10, 0, 0, None)
+    assert (e.label, e.legs()) == ("Proposta", (a, b))
+    e.confirm(s.dec(e), at(2))
+    assert (e.label, e.legs()) == ("Em execução", (("A", buy, 10, 0, 10, None), b))
+    s.q("A", 3, ask="1", size=6)
+    partial = ("A", buy, 10, 6, 4, D("1.0000"))
+    live = ("B", sell, 10, 0, 6, None)
+    assert e.legs() == (partial, live)
+    assert_gross(e, "25", "6", "25")
+    s.cancel(e, B, 3)
+    assert e.orders[B] == O.CANCEL_REQUESTED and e.label == "Em execução"
+    assert e.legs() == (partial, live)
+    assert_gross(e, "25", "6", "19")
+    s.q("B", 4, bid="1.50", size=2)
+    cancelled = ("B", sell, 10, 2, 0, D("1.5000"))
+    assert e.legs() == (partial, cancelled) and e.label == "Em execução"
+    assert_gross(e, "25", "9", "13")
+    s.q("A", 6, ask="1", size=4)
+    assert e.legs() == (("A", buy, 10, 10, 0, D("1.0000")), cancelled)
+    assert e.label == "Parada · montagem parcial"
+    assert_gross(e, "25", "13", "13")
+
+
+def test_progress_s2_projection_at_partial_fill_before_cancel_confirmation(s: Session) -> None:
+    """O recibo registra o bruto na hora do relato de execução."""
+    e = s.confirmed()
+    s.q("A", 3, ask="1", size=6)
+    s.cancel(e, B, 3)
+    s.q("B", 4, bid="1.50", size=2)
+    rows = order_rows(s.receipts[0], B)
+    assert [row["gross"] for row in rows if "gross" in row] == [
+        {"signed": "25.00", "executed": "9.00", "projected": "19.00"}]
+
+
+def test_progress_s3_average_weights_volume_and_preserves_four_places(s: Session) -> None:
+    """A média de 3 a 0,98 e 7 a 1,00 é 0,9940."""
+    e = s.confirmed()
+    s.q("A", 3, ask=".98", size=3)
+    s.q("A", 4, ask="1", size=7)
+    row = e.legs()[0]
+    assert row == ("A", Side.BUY, 10, 10, 0, D(".9940"))
+    assert isinstance(row.average, D) and str(row.average) == "0.9940"
+
+
+def test_progress_s4_stop_without_fills_keeps_plain_label(s: Session) -> None:
+    """Uma compra cancelada sem execução não tem preço médio."""
+    e = s.confirmed()
+    s.cancel(e, A, 3)
+    s.q("A", 4)
+    assert e.state == T.STOPPED and e.label == "Parada"
+    assert e.legs()[0] == ("A", Side.BUY, 10, 0, 0, None)
+
+
+def test_progress_s5_completed_ticket_keeps_plain_label(s: Session) -> None:
+    """O sufixo de montagem parcial é exclusivo da parada."""
+    e = s.confirmed()
+    s.q("A", 3, ask="1")
+    s.q("B", 4, bid="1.50")
+    assert e.label == "Concluída"
+
+
+def test_progress_s6_partial_unwind_follows_signed_order(s: Session) -> None:
+    """Assinam-se A, B, C, embora a recompra de B seja enviada primeiro."""
+    for symbol, bid, ask in (("A", "2", "2.10"), ("B", "1.10", "1.25"), ("C", ".60", ".70")):
+        s.q(symbol, 1, bid=bid, ask=ask)
+    b, a, c = unwind_butterfly().legs
+    e = s.new(open_butterfly(), legs=(a, b, c), net_limit=D("-2"), gross_cap=D("50"))
+    e.confirm(s.dec(e), at(2))
+    s.q("B", 3, bid="1.10", ask="1.20", size=10)
+    s.q("A", 4, bid="2", ask="2.10")
+    s.cancel(e, B, 4)
+    s.q("B", 5, bid="1.10", ask="1.30")
+    assert e.label == "Parada · desmontagem parcial"
+    assert e.legs() == (("A", Side.SELL, 10, 10, 0, D("2.0000")),
+                        ("B", Side.BUY, 20, 10, 0, D("1.2000")),
+                        ("C", Side.SELL, 10, 0, 0, None))
+
+
+def test_progress_without_proposal_and_with_two_live_sale_orders(s: Session) -> None:
+    """A consulta exige proposta e soma os saldos de ordens distintas da série."""
+    with pytest.raises(EngineRefusal, match="boleta sem proposta"):
+        s.engine("T1", position()).legs()
+    e = _stopped_with_two_open_sell_orders(Session())
+    row = e.legs()[1]
+    assert (row.symbol, row.side, row.signed, row.executed, row.live, row.average) == (
+        "B", Side.SELL, 10, 1, 3, D("1.5400"))
