@@ -173,15 +173,15 @@ def _read_row(line: str) -> ReceiptEvent:
         raise ReceiptError("formato de recibo desconhecido")
     try:
         seq, stamp, payload = row["seq"], row["ts"], row["payload"]
-        prev, head = row["prev_hash"], row["hash"]
+        kind, prev, head = row["kind"], row["prev_hash"], row["hash"]
         if type(seq) is not int or not isinstance(stamp, str) or not isinstance(payload, str):
             raise ValueError
-        if not isinstance(prev, str) or not isinstance(head, str):
+        if not isinstance(kind, str) or not isinstance(prev, str) or not isinstance(head, str):
             raise ValueError
         ts = datetime.fromisoformat(stamp)
         if ts.tzinfo is not None and ts.astimezone(UTC).isoformat() != stamp:
             raise ValueError
-        return ReceiptEvent(seq, ts, Event(row["kind"]), payload.encode("utf-8"), prev, head)
+        return ReceiptEvent(seq, ts, Event(kind), payload.encode("utf-8"), prev, head)
     except (ValueError, TypeError, OverflowError, RecursionError) as exc:
         raise ReceiptError("linha de recibo inválida") from exc
 
