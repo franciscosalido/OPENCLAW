@@ -69,8 +69,8 @@ class ReplaySession:
         return self._tickets[ticket].engine
 
     def receipt(self, ticket: str) -> Receipt:
-        """Recibo de uma boleta aberta."""
-        return self._tickets[ticket].receipt
+        """Foto independente do recibo de uma boleta aberta."""
+        return deepcopy(self._tickets[ticket].receipt)
 
     @property
     def facts(self) -> Receipt:
