@@ -349,7 +349,7 @@ class ReservationBook:
             free = min(self._surplus(account, origin, source), limit - used)
         if closing:
             disposed = sum(o.filled + o.live for o in orders if o.leg.symbol == leg.symbol)
-            # Teto redundante: a recompra cabe no vendido, já coberto pelo saldo comprado.
+            # Recompras de boletas distintas disputam o mesmo saldo da asa.
             free = min(free, balances[leg.symbol] - disposed)
         own = [o for o in orders if o.ticket == ticket and o.leg == leg]
         occupied = sum(o.live + o.filled for o in own)

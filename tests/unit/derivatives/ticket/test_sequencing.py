@@ -1436,3 +1436,17 @@ def test_d2_ambiguous_debt_precedes_strike_compatibility(invalid_wing: str) -> N
     ))
     with pytest.raises(SequenceRefusal, match="vendida aberta com mais de uma proteção"):
         plan_legs(wing_draft(), photo)
+
+
+def test_d4_two_buybacks_cannot_dispose_of_the_same_ten_wings() -> None:
+    plan = plan_legs(draft(leg("B", Side.BUY, "1.20"), leg("A", Side.SELL, "2.00"),
+                           net="-8", gross="32"), open_butterfly())
+    b, a = plan.legs
+    book = ReservationBook()
+    for ticket in ("T1", "T2"):
+        book.admit(plan, ticket=ticket)
+        book.confirm_buy(plan, b, ticket, 10, ticket=ticket)
+    book.reserve(plan, a, "first-sale", 10, ticket="T1")
+    assert book.available(plan, a, ticket="T2") == 0
+    with pytest.raises(SequenceRefusal, match="reserva indisponível"):
+        book.reserve(plan, a, "second-sale", 1, ticket="T2")
