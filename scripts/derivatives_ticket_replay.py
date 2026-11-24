@@ -188,8 +188,9 @@ def _write(out: Path, target: Path, session: ReplaySession, tickets: list[str],
                 physical.mkdir(exist_ok=True)
             marker.unlink()
         receipts = {f"recibo_{name}.jsonl": session.receipt(name) for name in tickets}
-        if session.facts.events:
-            receipts["fatos_externos.jsonl"] = session.facts
+        facts = session.facts
+        if facts.events:
+            receipts["fatos_externos.jsonl"] = facts
         for filename, receipt in receipts.items():
             with (staged / filename).open("x", encoding="utf-8") as stream:
                 for event in receipt.events:

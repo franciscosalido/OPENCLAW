@@ -1,4 +1,5 @@
 """Condutor determinístico de boletas sobre uma única fita sintética."""
+from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -9,7 +10,7 @@ from backend.derivatives.ticket.gate import DecisionLedger
 from backend.derivatives.ticket.guards import BookView
 from backend.derivatives.ticket.models import TicketDraft
 from backend.derivatives.ticket.paper_venue import PaperVenue
-from backend.derivatives.ticket.receipt import Receipt
+from backend.derivatives.ticket.receipt import Receipt, ReceiptError
 from backend.derivatives.ticket.replay import Replay
 from backend.derivatives.ticket.sequencing import Position, ReservationBook
 from backend.derivatives.ticket.state import Event
@@ -72,8 +73,8 @@ class ReplaySession:
 
     @property
     def facts(self) -> Receipt:
-        """Registro encadeado dos fatos que chegaram à sessão."""
-        return self._facts
+        """Foto independente do recibo de fatos da sessão."""
+        return deepcopy(self._facts)
 
     def external(self, account: str, symbol: str, fact: str, kind: str, quantity: int,
                  now: datetime) -> None:
@@ -97,9 +98,14 @@ class ReplaySession:
             if previous != content:
                 raise SessionRefusal("fato repetido com conteúdo diferente")
             return
-        self._facts.append(now, Event.EXTERNAL, {
-            "account": account, "symbol": symbol, "fact": fact, "kind": kind, "quantity": quantity,
-        })
+        now = datetime.combine(now.date(), now.timetz())
+        try:
+            self._facts.append(now, Event.EXTERNAL, {
+                "account": account, "symbol": symbol, "fact": fact,
+                "kind": kind, "quantity": quantity,
+            })
+        except ReceiptError as exc:
+            raise SessionRefusal(str(exc)) from exc
         self._seen_facts[fact] = content
         self._reservations.freeze(account, symbol)
         for ticket in self._tickets.values():
