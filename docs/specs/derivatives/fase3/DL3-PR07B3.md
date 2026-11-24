@@ -206,3 +206,51 @@ seu protótipo contra os módulos entregues.
 A fila do `current_state.md`: apresentação da montagem parcial e do projetado depois de
 cancelamento humano; repetir, completar e ajustar estruturas. Asas desiguais ficam para
 quando a foto declarar a quantidade de cada par.
+
+## Revisão adversarial (Claude) — GO na primeira rodada, cabeça `6ad75c6`
+
+Pela regra de processo de Francisco, o revisor **não executou a suíte, a tipagem nem os
+mutantes** desta cabeça. Leu o diff, conferiu as evidências pelo SHA-256 e rodou os cenários
+do seu protótipo, escrito antes do cartão, mais três sondas próprias.
+
+| Verificação | Resultado | Quem |
+|---|---|---|
+| Suíte sem integração, Linux x86_64 e macOS | 11.588 aprovados, 16 pulados, 261 subtestes nos dois | implementador; logs conferidos |
+| mypy estrito e Pyright, nos dois sistemas | 0 erros | implementador; logs conferidos |
+| Commit vermelho antes do verde | 7 falhas e 4 aprovações nos testes novos; D2 já passava | implementador; log conferido |
+| Testes focais antigos | 630 com resultado idêntico por nome; 14 novos aprovados | implementador; log conferido |
+| 10 mutantes do §5 e 1 adicional, nos dois sistemas | todos detectados | implementador; logs conferidos |
+| Integração | só no contêiner Linux isolado: 31 aprovados, 206 pulados | implementador; evidência conferida |
+| Manifesto de 81 evidências (`8d227d91…9d95`) e hashes dos dois relatórios | conferem | revisor (17 arquivos) e Francisco (todos, no Mac) |
+| Diff das evidências aplicado sobre a base | mesma árvore da cabeça | revisor |
+| Diff | quatro arquivos; `sequencing.py` com 487 linhas (teto 487) | revisor |
+| Âncoras, recibos e resumos das sessões oficiais | iguais entre base e cabeça | implementador; log conferido |
+| Cópia do cartão | igual à publicada | revisor |
+| 11 casos do protótipo do planejador (D1 a D8) contra o módulo entregue | todos aprovados | revisor |
+| 3 sondas do revisor (abaixo) | aprovadas | revisor |
+
+A implementação é equivalente à do protótipo do planejador, com a conferência da repartição
+feita antes da de compatibilidade das séries. Aceito.
+
+Sondas do revisor na cabeça:
+
+1. Asas de 8 e 12 contra miolo de 20: foto aceita, saldo livre zero nas duas, partes do
+   plano 8 e 12.
+2. Asa com saldo negativo que fecharia a soma (−5 e 25): recusada, por «proteção inicial
+   insuficiente».
+3. Duas boletas que recompram 10 cada e vendem a mesma asa: reservada por uma, a outra
+   encontra zero.
+
+Erro de redação do planejador, apontado pelo implementador: o §8 diz «asas desiguais ficam
+para depois». A regra do §2 é soma exata e exclusividade; asas de 8 e 12 contra 20 já são
+aceitas. O que fica para depois é a foto em que as asas **não somam** o miolo.
+
+Desvio de processo declarado pelo implementador: os commits vermelho e verde foram feitos
+em separado, mas chegaram ao GitHub no mesmo envio.
+
+Limite desta revisão: sem mutantes próprios do revisor nesta cabeça.
+
+Relatórios da skill lidos depois de formado o parecer, com SHA-256 conferidos
+(`1fddad24…f921` e `dd915213…a812`): sem bloqueante. A simplificação opcional de duas
+linhas em `unpledged` não foi aplicada; fica para manutenção.
+
