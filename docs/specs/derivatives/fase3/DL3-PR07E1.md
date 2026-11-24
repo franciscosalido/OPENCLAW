@@ -252,3 +252,51 @@ O padrão de saída dos quatro campos monetários admite notação exponencial, 
 A correção atua exclusivamente no esquema de serialização. O novo SHA-256 de V1 é
 `a1c0bed2054e0f6af4885fadab8eb2668c739ff6541cf7fb57661b3c48620a2d`.
 O contrato preserva os bytes das prévias e as quatro âncoras.
+
+## Revisão adversarial (Claude) — GO, cabeça `85b744c`, com os dois adendos ratificados
+
+Pela regra de processo de Francisco, o revisor **não executou a suíte completa nem a
+tipagem** desta cabeça. Leu o diff, conferiu as evidências pelo SHA-256 e rodou os cenários
+do seu protótipo. Uma segunda sessão do revisor, em conversa separada, chegou ao mesmo
+veredito, rodou 31 casos do leitor, validou as quatro prévias oficiais contra o esquema e
+derrubou sete mutantes próprios.
+
+**Os dois adendos corrigem erros do cartão do planejador, e o planejador os ratifica.**
+
+1. **Esquema (V1).** O SHA-256 que o cartão fixou (`04108cb0…`) era de um esquema que
+   recusava dinheiro em notação exponencial. `Decimal("1E+2")` é gravado como `"1E+2"`, e o
+   padrão gerado não o aceitava. O planejador fixou o hash sem testar esse caso. O esquema
+   entregue (`a1c0bed2…`) corrige só o padrão de saída dos quatro campos monetários; os
+   bytes das prévias e as âncoras não mudam. Conferido pelo revisor: os dois arquivos só
+   diferem nesses quatro padrões.
+2. **Truncamento (V2).** O cartão dizia que, sem âncora, o recibo sem a última linha é
+   aceito. Em `rapido` T2 há um evento só, e o que sobra é um recibo vazio, que a própria
+   tabela do §3.2 manda recusar. O protótipo do planejador já tratava o caso; o texto do
+   cartão não.
+
+Os adendos estão assinados na cópia como «autorizado por Francisco». Essa atribuição é do
+implementador; a ratificação técnica aqui é do planejador.
+
+| Verificação | Resultado | Quem |
+|---|---|---|
+| Suíte sem integração, Linux x86_64 e macOS, pydantic 2.13.3 | 11.637 aprovados, 16 pulados nos dois | implementador; conferido pela segunda sessão |
+| mypy estrito e Pyright | 0 erros | implementador; conferido pela segunda sessão |
+| Vermelhos antes dos verdes | os três testes do §2 falham com o legado; 38 e 2 falhas nos dois vermelhos | implementador; conferido pela segunda sessão |
+| 17 mutantes, nos dois sistemas | todos detectados | implementador; log conferido |
+| Manifesto de 112 evidências (`4afe4c55…5868`) e hashes dos dois relatórios | conferem | revisor (8 arquivos) |
+| Diff das evidências aplicado sobre a base | mesma árvore da cabeça | revisor |
+| Diff | nove arquivos; `models.py` 217 (teto 220), `receipt.py` 195 (teto 196), `session.py` 181 (teto 183), script 240 (teto 243) | revisor |
+| Âncoras e hashes de evento das sessões oficiais | 40 eventos e 4 âncoras iguais à base | implementador; log conferido; segunda sessão repetiu |
+| 6 casos do protótipo do planejador (V1 a V4), com o esquema entregue | todos aprovados | revisor |
+
+Diferenças em relação ao protótipo, aceitas: o leitor tolera a quebra de linha no fim de
+cada linha; exige o instante na forma canônica em UTC; e confere o tipo de `kind`,
+`prev_hash` e `hash` antes de montar o evento.
+
+Risco que fica, não bloqueante: o `pyproject.toml` aceita pydantic a partir de 2.10 e a
+omissão da cobertura vazia depende do 2.12. Com versão mais antiga a cobertura vazia pode
+voltar a aparecer na prévia e mudar o digest. Não foi testado. Vai para o DL3-PR07F1.
+
+Relatórios da skill lidos depois de formado o parecer, com SHA-256 conferidos
+(`1900897a…61e7` e `1b7db19e…6b97`): sem bloqueante; nenhuma simplificação qualificada.
+
