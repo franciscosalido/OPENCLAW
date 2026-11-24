@@ -275,3 +275,59 @@ seu protótipo contra os módulos entregues.
 - Em seguida, a fila registrada no `current_state.md`: cota por dependência no livro;
   desmontagem e zeragem de borboleta; apresentação da montagem parcial; repetir, completar
   e ajustar estruturas.
+
+## Revisão adversarial (Claude) — GO na primeira rodada, cabeça `a6b1f07`
+
+Pela regra de processo de Francisco, o revisor **não executou a suíte, a tipagem nem os
+mutantes** desta cabeça. Leu o diff, conferiu as evidências pelo SHA-256 e rodou os cenários
+do seu protótipo, escrito antes do cartão, mais quatro sondas próprias.
+
+| Verificação | Resultado | Quem |
+|---|---|---|
+| Suíte sem integração, Linux x86_64 e macOS | 11.529 aprovados, 16 pulados, 261 subtestes nos dois | implementador; logs conferidos |
+| mypy estrito e Pyright, nos dois sistemas | 0 erros | implementador; logs conferidos |
+| Commit vermelho `1ade63f` antes do verde | os 11 cenários falham na base | implementador; log conferido |
+| Testes focais antigos | 569 com resultado idêntico por nome; 16 novos aprovados | implementador; log conferido |
+| 17 mutantes do §5 e 4 adicionais, nos dois sistemas | todos detectados | implementador; logs conferidos |
+| Integração | só no contêiner Linux isolado: 31 aprovados, 206 pulados | implementador; evidência conferida |
+| Manifesto de 126 evidências (`a5399403…b7ce`) e hashes dos dois relatórios | conferem | revisor (26 arquivos) e Francisco (todos, no Mac) |
+| `DIFF.patch` das evidências aplicado sobre a base | mesma árvore da cabeça | revisor |
+| Diff | seis arquivos; `sequencing.py` 462 (teto 466), `engine.py` 505 (teto 512), `state.py` 151 (teto 152) | revisor |
+| Âncoras e recibos das sessões | iguais byte a byte entre base e cabeça | implementador; log conferido |
+| Cópia do cartão | SHA-256 `92fbc4e7…8703`, igual ao publicado | revisor |
+| 11 cenários do protótipo do planejador (E1 a E11) contra os módulos entregues | todos aprovados | revisor |
+| 4 sondas do revisor (abaixo) | todas aprovadas | revisor |
+
+A implementação é equivalente à do protótipo do planejador. Duas diferenças, as duas
+aceitas: o destino `STOPPED` por fato externo é um retorno próprio, depois da conferência
+de conclusão; e o registro no recibo vem **antes** de a boleta marcar que parou, como já é
+na pausa.
+
+Sondas do revisor na cabeça:
+
+1. Primeiro aviso com a boleta já parada: o recibo não muda.
+2. Boleta armada: o aviso não grava; o gatilho dispara; a confirmação é recusada com
+   «série com fato externo; foto nova necessária» e nada é enviado.
+3. Relógio sem fuso no aviso: o recibo recusa, nada é gravado e a boleta **não** fica
+   marcada; o aviso repetido com relógio válido grava e para. Sem efeito sem registro.
+4. Segundo fato, em outra série da mesma boleta: não gera segundo registro.
+
+Lacunas do cartão do planejador, não bloqueantes:
+
+1. **Estado parado sem teste versionado** (achado da skill, reproduzido pela sonda 1). O
+   §5 não tinha mutante que aceitasse `STOPPED` entre os estados que gravam; o E7 só cobre a
+   boleta concluída. A produção está certa. A asserção entra no próximo cartão.
+2. **Estado incerto fora dos cenários do cartão.** O implementador cobriu por conta própria
+   (teste de conciliação da ordem incerta e mutante adicional).
+3. **Bruto projetado durante a parada** (nota da skill). No E4, com a compra de 10 viva, a
+   boleta segue em `WORKING` e o projetado mostra 25, embora a venda de 15 não possa mais
+   sair; ao parar, cai para 10. A regra do DL3-PR07A2 foi respeitada; a apresentação é que
+   fica otimista. Entra no próximo cartão.
+
+Limite desta revisão: sem mutantes próprios do revisor nesta cabeça.
+
+Relatórios da skill lidos depois de formado o parecer, com SHA-256 conferidos
+(`24e0c8bb…ddae` e `b1b34d3c…4e70`): sem bloqueante. A simplificação opcional S1 (fundir o
+retorno de `STOPPED` na condição seguinte) não foi aplicada: o retorno próprio é mais legível
+e custa duas linhas.
+
