@@ -176,6 +176,7 @@ class ReservationBook:
     def __init__(self) -> None:
         """Inicia saldos vazios sem carregar posições externas."""
         self._lock = Lock()
+        self._frozen: set[tuple[str, str]] = set()
         self._plans: dict[tuple[str, str], LegPlan] = {}
         self._occupation: dict[tuple[str, str, str], int] = {}
         self._buys: dict[tuple[str, str, str], int] = {}
@@ -183,6 +184,21 @@ class ReservationBook:
         self._executions: set[tuple[str, str]] = set()
         self._positions: dict[str, Position] = {}
         self._closed: set[tuple[str, str]] = set()
+
+    def freeze(self, account: str, symbol: str) -> None:
+        """Congela novos usos da série nesta conta até a próxima foto."""
+        with self._lock:
+            self._frozen.add((account, symbol))
+
+    def _frozen_in_plan(self, plan: LegPlan) -> tuple[str, ...]:
+        symbols = {leg.symbol for leg in plan.legs}
+        symbols.update(source for _, source, _ in plan.dependencies)
+        return tuple(sorted(s for s in symbols if (plan.position.account, s) in self._frozen))
+
+    def frozen(self, plan: LegPlan) -> tuple[str, ...]:
+        """Lista as séries congeladas que o plano usa em pernas ou proteções."""
+        with self._lock:
+            return self._frozen_in_plan(plan)
 
     def close(self, account: str, ticket: str) -> None:
         """Encerra a origem sem descartar ordens vivas nem impedir conciliação tardia."""
@@ -218,6 +234,8 @@ class ReservationBook:
 
     def _admission(self, plan: LegPlan, ticket: str) -> dict[tuple[str, str, str], int]:
         account = self._check(plan, ticket)
+        if self._frozen_in_plan(plan):
+            raise SequenceRefusal("série com fato externo; foto nova necessária")
         balances = {h.symbol: h.balance for h in plan.position.holdings}
         for grant in plan.draft.coverage:
             if grant.origin == ticket or (account, grant.origin) not in self._closed:
@@ -288,7 +306,8 @@ class ReservationBook:
         sources = plan.protections_for(leg)
         if source is None:
             source = sources[0]
-        if source not in sources or (account, ticket) in self._closed:
+        if (source not in sources or (account, ticket) in self._closed
+                or (account, leg.symbol) in self._frozen or (account, source) in self._frozen):
             return 0, source
         balances = {h.symbol: h.balance for h in plan.position.holdings}
         closing = balances[source] < 0

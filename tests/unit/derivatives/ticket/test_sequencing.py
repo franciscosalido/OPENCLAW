@@ -1172,3 +1172,66 @@ def test_b2_only_allocated_sources_can_reserve_even_if_other_wing_filled() -> No
             book.reserve(plan, sale, "ordem", 1, ticket="T1", source=source)
     assert book.available(plan, sale, ticket="T1") == 5
     book.reserve(plan, sale, "ordem", 5, ticket="T1")
+
+
+def test_external_e1_freeze_scopes_new_reservations_to_account_and_series() -> None:
+    photo = Position(account="sim", holdings=tuple(holding(x) for x in "ABCD"),
+                     pairs=(("A", "B"), ("C", "D")))
+    ticket = draft(BUY, SELL)
+    p = plan_legs(ticket, photo)
+    other = plan_legs(ticket, photo.model_copy(update={"account": "outra"}))
+    book = ReservationBook()
+    for plan in (other, p):
+        book.admit(plan, ticket="T1")
+        book.confirm_buy(plan, BUY, "buy", 10, ticket="T1")
+    book.reserve(p, SELL, "T1:B:1", 4, ticket="T1")
+    assert book.available(p, SELL, ticket="T1") == 6 and book.frozen(p) == ()
+    book.freeze("sim", "B")
+    assert book.frozen(p) == ("B",) and book.available(p, SELL, ticket="T1") == 0
+    with pytest.raises(SequenceRefusal, match="reserva indisponível"):
+        book.reserve(p, SELL, "T1:B:2", 1, ticket="T1")
+    book.confirm_sale("sim", "T1:B:1", "x1", 3)
+    book.confirm_release("sim", "T1:B:1", 1)
+    for check in (book.admissible, book.admit):
+        with pytest.raises(SequenceRefusal, match="série com fato externo; foto nova necessária"):
+            check(p, ticket="T2")
+    independent = plan_legs(draft(leg("C", Side.BUY, "1"), leg("D", Side.SELL, "1.50")), photo)
+    assert book.frozen(independent) == ()
+    book.admissible(independent, ticket="T3")
+    assert book.frozen(other) == () and book.available(other, SELL, ticket="T1") == 10
+
+
+def test_external_e2_frozen_sources_are_sorted_distinct_and_relevant() -> None:
+    plan = plan_legs(draft(BUY, SELL), position())
+    book = ReservationBook()
+    book.confirm_buy(plan, BUY, "buy", 10, ticket="T1")
+    book.freeze("sim", "A")
+    assert book.frozen(plan) == ("A",) and book.available(plan, SELL, ticket="T1") == 0
+    for symbol in ("C", "B", "B"):
+        book.freeze("sim", symbol)
+    assert book.frozen(plan) == ("A", "B")
+
+
+def test_external_book_checks_identity_and_photo_before_freeze_then_grant() -> None:
+    book, plan = surplus_book()
+    book.freeze("sim", "A")
+    with pytest.raises(SequenceRefusal, match="identidade ou plano divergente"):
+        book.admit(plan._replace(dependencies=()), ticket="T1")
+    changed = plan_legs(plan.draft, position(holding("A", 5), holding("B")))
+    with pytest.raises(SequenceRefusal, match="foto divergente"):
+        book.admissible(changed, ticket="T2")
+    missing_origin = sale_only(1, "nunca-admitida")
+    with pytest.raises(SequenceRefusal, match="série com fato externo; foto nova necessária"):
+        book.admit(missing_origin, ticket="T3")
+
+
+def test_external_freezing_one_wing_leaves_other_capacity_until_engine_notified() -> None:
+    plan = plan_legs(wing_draft(), wing_photo())
+    a, c, b = plan.legs
+    book = ReservationBook()
+    for buy in (a, c):
+        book.confirm_buy(plan, buy, buy.symbol, 5, ticket="T1")
+    book.freeze("sim", "A")
+    assert book.available(plan, b, ticket="T1", source="A") == 0
+    assert book.available(plan, b, ticket="T1", source="C") == 5
+    book.reserve(plan, b, "C-only", 5, ticket="T1", source="C")

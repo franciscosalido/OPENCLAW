@@ -1991,3 +1991,191 @@ def test_wings_distinguish_source_series_from_ticket_granting_it(s: Session) -> 
         request, fill = order_rows(s.receipts[0], oid)
         assert request["origin"] == fill["origin"] == "origem"
     assert all("origin" not in row for row in order_rows(s.receipts[0], "T1:B:3"))
+
+
+def external_rows(receipt: Receipt) -> list[dict[str, object]]:
+    """Lê os fatos externos nos mesmos bytes que o revisor recebe."""
+    return [json.loads(row.payload) for row in receipt.events if row.kind.value == "external"]
+
+
+def test_external_e3_live_orders_continue_after_fact_and_account_stays_free(s: Session) -> None:
+    e = s.confirmed()
+    s.q("A", 3, ask="1", size=6)
+    assert e.orders == {A: O.PARTIAL, B: O.LIVE}
+    assert s.submitted()[-1] == (B, 6, D("1.50"), at(3))
+    s.res.freeze("sim", "B")
+    for fact in ("f1", "f1", "outro"):
+        e.on_external(fact, at(4))
+    assert external_rows(s.receipts[0]) == [{"ticket": "T1", "fact": "f1", "series": ["B"]}]
+    assert e.state == T.WORKING and not s.halts.blocked("sim")
+    s.q("A", 5, ask="1", size=4)
+    assert e.orders[A] == O.FILLED and len(s.submitted()) == 2 and free(s) == 0
+    s.q("B", 6, bid="1.50", size=4)
+    assert e.orders[B] == O.PARTIAL and e.gross().executed == D("16.00")
+    s.venue.request_cancel.assert_not_called()
+    s.cancel(e, B, 6)
+    s.q("B", 7)
+    assert e.state == T.STOPPED and len(s.submitted()) == 2
+    s.venue.request_cancel.assert_called_once()
+
+
+def test_external_e4_before_sale_stops_after_confirmed_buy_fill(s: Session) -> None:
+    e = s.confirmed()
+    s.res.freeze("sim", "B")
+    e.on_external("f1", at(3))
+    s.q("A", 4, ask="1")
+    assert e.orders == {A: O.FILLED} and len(s.submitted()) == 1
+    assert e.state == T.STOPPED and e.gross().executed == D("10.00")
+    assert [row.kind.value for row in s.receipts[0].events[-3:]] == [
+        "external", "venue_fill", "stop"]
+
+
+def test_external_e5_unrelated_series_preserves_drive(s: Session) -> None:
+    e = s.confirmed()
+    s.res.freeze("sim", "C")
+    e.on_external("f1", at(3))
+    assert not external_rows(s.receipts[0])
+    s.q("A", 4, ask="1")
+    assert s.submitted()[-1] == (B, 10, D("1.50"), at(4))
+    s.res.freeze("sim", "A")
+    e.on_external("relevante", at(4))
+    assert external_rows(s.receipts[0]) == [{"ticket": "T1", "fact": "relevante", "series": ["A"]}]
+    s.q("B", 5, bid="1.50")
+    assert e.state == T.COMPLETED and e.gross().executed == D("25")
+
+
+def test_external_e6_admission_precedes_decision_consumption(s: Session) -> None:
+    s.res.freeze("sim", "B")
+    e = s.new()
+    decision = s.dec(e)
+    with pytest.raises(SequenceRefusal, match="série com fato externo; foto nova necessária"):
+        e.confirm(decision, at(2))
+    e.on_external("f1", at(2))
+    assert e.state == T.DRAFT and [r.kind for r in s.receipts[0].events] == [E.PREVIEW]
+    s.ledger.consume(decision, action=Action.EXECUTE, ticket="T1", now=at(2), preview=e.preview)
+
+
+def test_external_e7_terminal_receipt_is_stable_but_bad_identifier_refused(s: Session) -> None:
+    e = s.confirmed()
+    s.q("A", 3, ask="1")
+    s.q("B", 4, bid="1.50")
+    before = s.receipts[0].events
+    assert e.state == T.COMPLETED
+    s.res.freeze("sim", "B")
+    e.on_external("f1", at(5))
+    with pytest.raises(EngineRefusal, match="identificador"):
+        e.on_external("f 1", at(5))
+    assert s.receipts[0].events == before
+
+
+def test_external_e8_frozen_surplus_cannot_be_borrowed(s: Session) -> None:
+    e = stop_origin(s)
+    assert third_party_surplus(s) == 4
+    s.res.freeze("sim", "A")
+    e.on_external("f1", at(6))
+    assert third_party_surplus(s) == 0
+    two = borrower(s)
+    with pytest.raises(SequenceRefusal, match="série com fato externo; foto nova necessária"):
+        two.confirm(s.dec(two), at(6))
+
+
+def test_external_e9_pause_and_resume_preserve_the_stop(s: Session) -> None:
+    e = s.confirmed()
+    e.pause(at(2))
+    s.q("A", 3, ask="1")
+    s.res.freeze("sim", "B")
+    e.on_external("f1", at(4))
+    e.resume(s.dec(e, Action.RESUME), at(5))
+    assert e.state == T.STOPPED and len(s.submitted()) == 1
+    assert [r.kind.value for r in s.receipts[0].events[-3:]] == ["external", "stop", "resume"]
+
+
+def test_external_e10_granted_protection_without_buy_leg_is_in_receipt(s: Session) -> None:
+    stop_origin(s)
+    two = borrower(s)
+    two.confirm(s.dec(two), at(5))
+    oid = "T2:B:1"
+    assert two.orders == {oid: O.LIVE}
+    s.res.freeze("sim", "A")
+    two.on_external("f2", at(6))
+    assert two.state == T.WORKING and s.receipts[1].events[-1].kind.value == "external"
+    assert external_rows(s.receipts[1]) == [{"ticket": "T2", "fact": "f2", "series": ["A"]}]
+    s.q("B", 7, bid="1.50", size=1)
+    s.cancel(two, oid, 7)
+    s.q("B", 8)
+    assert two.state == T.STOPPED and two.gross().executed == D("1.50")
+
+
+def test_external_e11_all_legs_stop_including_the_other_pair(s: Session) -> None:
+    s.q("C", 1, bid=".95", ask="1.02")
+    s.q("D", 1)
+    photo = Position(account="sim", holdings=tuple(holding(x) for x in "ABCD"),
+                     pairs=(("A", "B"), ("C", "D")))
+    c, d = leg("C", Side.BUY, "1"), leg("D", Side.SELL, "1.50")
+    ticket = draft(BUY, SELL, c, d, net="-10", gross="50").model_copy(
+        update={"send_deadline": END, "order_validity": CLOSE})
+    e = s.engine("T1", photo)
+    e.propose(ticket, NOW)
+    e.confirm(s.dec(e), at(2))
+    assert e.orders == {A: O.LIVE, "T1:C:1": O.LIVE}
+    s.res.freeze("sim", "B")
+    e.on_external("f1", at(3))
+    s.q("C", 4, bid=".95", ask="1")
+    s.q("A", 5, ask="1")
+    assert e.orders == {A: O.FILLED, "T1:C:1": O.FILLED} and len(s.submitted()) == 2
+    assert e.state == T.STOPPED and not s.halts.blocked("sim")
+    assert external_rows(s.receipts[0]) == [{"ticket": "T1", "fact": "f1", "series": ["B"]}]
+    plan = plan_legs(ticket, photo)
+    assert [s.res.available(plan, sale, ticket="T1") for sale in (SELL, d)] == [0, 0]
+
+
+def test_external_uncertain_order_keeps_its_hold_and_reconciles_the_fill(s: Session) -> None:
+    e = timeout(s)
+    s.res.freeze("sim", "A")
+    e.on_external("f1", at(3))
+    assert e.state == T.UNCERTAIN and s.halts.blocked("sim")
+    assert external_rows(s.receipts[0]) == [{"ticket": "T1", "fact": "f1", "series": ["A"]}]
+    s.q("A", 4, ask="1")
+    e.reconcile(A, at(5))
+    assert e.orders == {A: O.FILLED} and e.state == T.STOPPED
+    assert not s.halts.blocked("sim") and e.gross().executed == D("10")
+    assert len(s.submitted()) == 1
+
+
+def test_external_before_proposal_or_execution_leaves_receipt_untouched(s: Session) -> None:
+    s.res.freeze("sim", "A")
+    e = s.engine("T1", position())
+    with pytest.raises(EngineRefusal, match="identificador"):
+        e.on_external("", NOW)
+    e.on_external("f1", NOW)
+    assert not s.receipts[0].events
+    ticket = draft(BUY, SELL).model_copy(update={"send_deadline": END, "order_validity": CLOSE})
+    e.propose(ticket, NOW)
+    s.arm(e)
+    before = s.receipts[0].events
+    e.on_external("f1", at(2))
+    assert e.state == T.ARMED and s.receipts[0].events == before
+    s.q("A", 3, ask=".99")
+    before = s.receipts[0].events
+    e.on_external("f1", at(3))
+    with pytest.raises(SequenceRefusal, match="série com fato externo; foto nova necessária"):
+        e.confirm(s.dec(e), at(4))
+    assert e.state == T.TRIGGERED and s.receipts[0].events == before and not s.submitted()
+
+
+def test_external_pending_cancel_keeps_prior_divergence_and_late_fill(s: Session) -> None:
+    e = s.confirmed()
+    s.q("A", 3, ask="1")
+    s.cancel(e, B, 4)
+    s.halts.hold("sim", "divergence")
+    for symbol in ("B", "A"):
+        s.res.freeze("sim", symbol)
+    e.on_external("f1", at(4))
+    with pytest.raises(EngineRefusal, match="identificador"):
+        e.on_external("f 2", at(4))
+    assert external_rows(s.receipts[0]) == [{"ticket": "T1", "fact": "f1", "series": ["A", "B"]}]
+    assert e.orders[B] == O.CANCEL_REQUESTED
+    s.q("B", 5, bid="1.50", size=2)
+    assert e.orders[B] == O.CANCELLED and e.state == T.STOPPED
+    assert e.gross().executed == D("13") and s.halts.divergent("sim")
+    s.venue.request_cancel.assert_called_once()

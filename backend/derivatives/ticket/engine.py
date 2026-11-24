@@ -99,6 +99,7 @@ class TicketEngine:
         self._state = T.DRAFT
         self._paused = False
         self._cancelled = False
+        self._external = False
         self._preview: Preview | None = None
         self._plan: LegPlan | None = None
         self._trigger: Trigger | None = None
@@ -275,6 +276,8 @@ class TicketEngine:
         if all(sum(f.quantity for f in self._fills if f.symbol == leg.symbol) == leg.quantity
                for leg in plan.legs):
             return T.COMPLETED
+        if self._external:
+            return T.STOPPED
         if not self._cancelled and _send_window_open(plan.draft, now) and any(
                 self._available(plan, leg, source, origin) > 0
                 for leg, source, origin in self._sources(plan)
@@ -288,7 +291,7 @@ class TicketEngine:
         plan = self._require(T.WORKING)
         for leg, source, origin in self._sources(plan):
             if (self._state != T.WORKING or self._paused or self._halts.blocked(self._account)
-                    or self._cancelled or not _send_window_open(plan.draft, now)
+                    or self._cancelled or self._external or not _send_window_open(plan.draft, now)
                     or self._market_block(plan, now)):
                 break
             previous = sum(o.leg.symbol == leg.symbol for o in self._orders.values())
@@ -392,6 +395,18 @@ class TicketEngine:
         balance = order.request.quantity - order.filled
         if order.leg.side is Side.SELL and balance:
             self._reservations.confirm_release(self._account, order.request.order_id, balance)
+
+    def on_external(self, fact: str, now: datetime) -> None:
+        """Registra o primeiro fato relevante e encerra novos envios desta boleta."""
+        _check_id_component(fact)
+        if self._external or self._plan is None or self._state not in (T.WORKING, T.UNCERTAIN):
+            return
+        series = self._reservations.frozen(self._plan)
+        if not series:
+            return
+        self._record(E.EXTERNAL, now, fact=fact, series=series)
+        self._external = True
+        self._drive(now)
 
     def on_reports(self, reports: Sequence[VenueReport], now: datetime) -> None:
         """Aplica o lote antes de decidir qualquer envio adicional."""
