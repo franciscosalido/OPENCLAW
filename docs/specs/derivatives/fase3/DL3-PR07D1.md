@@ -268,3 +268,40 @@ O que resta na fila do `current_state.md` são frentes novas, cada uma com decis
 de Francisco: repetir, completar e ajustar estruturas; limite de escala; modalidade B de
 garantia; esquema JSON de saída e versão de formato do recibo, antes do primeiro consumidor
 externo.
+
+## Revisão adversarial (Claude) — GO na primeira rodada, cabeça `a0c2730`
+
+Pela regra de processo de Francisco, o revisor **não executou a suíte completa nem a
+tipagem** desta cabeça. Leu o diff, conferiu as evidências pelo SHA-256 e rodou os cenários
+do seu protótipo, escrito antes do cartão, mais três sondas próprias. Uma segunda sessão do
+revisor, em conversa separada e sem o contexto desta, chegou ao mesmo veredito.
+
+| Verificação | Resultado | Quem |
+|---|---|---|
+| Suíte sem integração, Linux x86_64 e macOS | 11.597 aprovados, 16 pulados, 261 subtestes nos dois | implementador; logs conferidos |
+| mypy estrito e Pyright | 0 erros | implementador; logs conferidos |
+| Vermelho publicado antes do verde | exatamente os oito testes do §2 falham com a produção nova e os testes antigos | implementador; conferido pela segunda sessão |
+| 15 mutantes do §6 e 2 adicionais, nos dois sistemas | todos detectados | implementador; logs conferidos |
+| Integração | só no contêiner Linux isolado: 31 aprovados, 206 pulados | implementador; evidência conferida |
+| Manifesto de 89 evidências (`0e6f4a08…4951`) e hashes dos dois relatórios | conferem | revisor (12 arquivos) |
+| Diff das evidências aplicado sobre a base | mesma árvore da cabeça | revisor |
+| Diff | seis arquivos; `engine.py` 544 (teto 550), `session.py` 179 (teto 184), script 243 (teto 248) | revisor |
+| Sessões oficiais rodadas na cabeça | resumos e recibos idênticos byte a byte aos do protótipo do planejador; âncora de `leilao` `8592cd74…`, as outras três inalteradas | revisor |
+| Recibo de `leilao`, base contra cabeça | única diferença: projetado do registro 9, de 25.00 para 14.50 | revisor e segunda sessão |
+| Cópia do cartão | igual à publicada | revisor |
+| 7 cenários do protótipo do planejador (S1 a S7) | todos aprovados | revisor |
+| Seis mutantes próprios, um por vez | todos derrubados | segunda sessão |
+
+Diferenças em relação ao protótipo, aceitas: o preço médio é calculado com fração exata
+antes do arredondamento a quatro casas, e o saldo vivo virou uma função só, usada pelos
+brutos e pelas pernas.
+
+Sondas do revisor na cabeça: em toda perna, executado mais vivo não passa do assinado; o
+projetado é o executado mais o saldo vivo ao preço-limite; o aviso de fato externo segue a
+mesma regra do cancelamento.
+
+Limite: a segunda sessão rodou em Python 3.13, não no 3.12 do projeto.
+
+Relatórios da skill lidos depois de formado o parecer, com SHA-256 conferidos
+(`9ceaed61…618f` e `8ddc9e8c…4743`): sem bloqueante; nenhuma simplificação qualificada.
+
