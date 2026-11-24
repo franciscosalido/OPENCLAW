@@ -284,3 +284,47 @@ def test_external_dispatch_observes_receipt_then_freeze_in_opening_order(
     s.external("sim", "B", "f1", "exercise", 4, now)
     s.external("sim", "B", "f1", "exercise", 4, now.replace(second=3))
     assert order == ["Z", "A"]
+
+
+def test_external_facts_snapshot_cannot_inject_event_or_suppress_freeze() -> None:
+    """Modificar a foto consultada não cria fato na sessão nem consome seu ID."""
+    from backend.derivatives.ticket.state import Event
+
+    s, pos, draft, now = fact_session()
+    forged = s.facts
+    forged.append(now, Event.EXTERNAL, {"account": "sim", "symbol": "B", "fact": "f1",
+                                        "kind": "exercise", "quantity": 4})
+    assert forged.verify() and s.facts.events == () and "fatos_externos" not in s.summary()
+    s.external("sim", "B", "f1", "exercise", 4, now)
+    observed = s.facts
+    observed.append(now, Event.EXTERNAL, {"fact": "f2"})
+    assert len(observed.events) == 2 and len(s.facts.events) == 1
+    s.open("T1", pos, draft, now)
+    with pytest.raises(SequenceRefusal, match="série com fato externo"):
+        confirm_fact_ticket(s, "T1", now)
+
+
+def test_external_accepts_aware_datetime_subclass_in_both_receipts() -> None:
+    """Uma subclasse com fuso descreve o mesmo instante no registro e na boleta."""
+    class ReplayStamp(datetime):
+        """Instante recebido de um consumidor Python do simulador."""
+
+    s, now = three_fact_tickets()
+    stamp = ReplayStamp.fromisoformat("2026-11-23T15:00:03.123456+01:00")
+    s.external("sim", "B", "f1", "exercise", 4, stamp)
+    expected = now.replace(second=3, microsecond=123456)
+    assert s.facts.events[0].ts == s.receipt("T1").events[-1].ts == expected
+    assert s.facts.verify() and s.receipt("T1").verify()
+
+
+def test_external_unrepresentable_utc_is_typed_and_has_no_effect() -> None:
+    """A cadeia UTC recusa um instante que não pode representar."""
+    s, pos, draft, now = fact_session()
+    early = datetime.fromisoformat("0001-01-01T00:00:00+01:00")
+    with pytest.raises(SessionRefusal):
+        s.external("sim", "B", "f1", "exercise", 4, early)
+    assert s.facts.events == ()
+    s.open("T1", pos, draft, now)
+    confirm_fact_ticket(s, "T1", now)
+    s.external("sim", "B", "f1", "exercise", 4, now)
+    assert fact_rows(s, "T1") == [{"ticket": "T1", "fact": "f1", "series": ["B"]}]
