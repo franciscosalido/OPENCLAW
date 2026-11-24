@@ -4,7 +4,7 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-24 · **Turno:** Claude (DL3-PR07E1 integrado; Fase 3 estendida encerrada, falta só o fecho PR07F1).
+**Última atualização:** 2026-11-24 · **Turno:** Claude (DL3-PR07F1 integrado). **Fase 3 estendida encerrada.**
 
 ## Depois da Fase 3 — decisões de produto no simulador (D0) — EM ANDAMENTO
 
@@ -35,7 +35,7 @@ Revisão 1). O PR07A foi cortado em três pelo planejador.
 | [DL3-PR07B3](../specs/derivatives/fase3/DL3-PR07B3.md) | DP-03: desmontagem da borboleta com conta exata | MERGEADO (PR #182) |
 | [DL3-PR07D1](../specs/derivatives/fase3/DL3-PR07D1.md) | andamento por perna, rótulo da parada e projetado após cancelamento humano | MERGEADO (PR #183) |
 | [DL3-PR07E1](../specs/derivatives/fase3/DL3-PR07E1.md) | formato versionado do recibo e do resumo; esquema de saída da prévia | MERGEADO (PR #184) |
-| DL3-PR07F1 | fecho: guarda da versão do pydantic e recibo da sessão como cópia | próximo cartão |
+| [DL3-PR07F1](../specs/derivatives/fase3/DL3-PR07F1.md) | fecho: guarda da versão do pydantic e recibo da sessão como cópia | MERGEADO (PR #185) |
 
 Entregue pelo DL3-PR07A1 (37 linhas de produção):
 - No instante exato da validade o motor recusa antes de gastar a decisão, ocupar o livro
@@ -431,22 +431,42 @@ Entregue pelo DL3-PR07E1 (PR #184):
   o esquema fixado recusava dinheiro em notação exponencial, e o texto do truncamento
   ignorava o recibo de um evento só.
 
-Fila: PR07F1, fecho pequeno com duas pendências de segurança: a prévia depende de um
-recurso do pydantic 2.12 e o `pyproject.toml` aceita 2.10; e `ReplaySession.receipt`
-devolve o recibo interno. Depois dele, só frentes novas, cada uma com decisão própria de
-Francisco: repetir, completar e ajustar estruturas; histórico persistente com conferência
-da foto nova; foto com quantidade por par; limite de escala; modalidade B de garantia;
-esquema do resumo, quando houver consumidor. Segue para um cartão de testes: o
-`projection_id` no teste sintético do calendário.
+Entregue pelo DL3-PR07F1 (PR #185): o módulo da boleta recusa pydantic anterior ao 2.12 na
+importação, e `ReplaySession.receipt` devolve cópia.
+
+### Fase 3 estendida: encerrada em 24/11/2026
+
+Não há cartão na fila. O que foi entregue no simulador D0, entre 22 e 24/11/2026:
+contabilidade dos três brutos; livro de reservas com sobra autorizada; relatos
+contraditórios; fato externo legítimo (DP-13); zeragem, montagem e desmontagem de borboleta
+(DP-03); cota na proteção disputada; andamento por perna; formato versionado e esquema de
+saída da prévia.
+
+O que **não** foi feito e continua valendo como limite:
+
+- **Tudo é simulador, com dados sintéticos.** A ADR-0024 segue sem vigência operacional; as
+  proibições de `CLAUDE.md` e da ADR-007 seguem vigentes; nenhum agente envia ou cancela
+  ordem.
+- A quantidade de um fato externo fica registrada e não altera saldos; a série fica
+  congelada até a foto nova, e a conferência da foto nova não existe.
+- Foto em que as proteções não somam a vendida é recusada.
+- O `pyproject.toml` ainda declara piso 2.10 para o pydantic. A guarda cobre a falha; subir
+  o piso é decisão e commit de Francisco.
+- Não há esquema para o resumo nem para os eventos do recibo além da prévia.
+
+Frentes novas, cada uma só abre com decisão de Francisco: repetir, completar e ajustar
+estruturas; histórico persistente com conferência da foto nova; foto com quantidade por
+par; modalidade B de garantia.
+
+Pendências anteriores a esta fase, que ela não tocou: limite de escala em `expiry_payoff` e
+`pre_expiry`; vencimentos diferentes na estimativa; o `projection_id` no teste sintético do
+calendário.
 
 Manutenção opcional: duas linhas a menos em `Position.unpledged` (relatório de
 simplificação do PR #182).
 
-Pendente, observado na revisão do DL3-PR07A6: `ReplaySession.receipt(ticket)` devolve o
-recibo interno da boleta, que tem `append` público. O registro de fatos já sai como cópia.
-
-Próxima ação (uma só): Claude publica o supercartão do DL3-PR07F1 e Codex o abre em
-rascunho.
+Próxima ação (uma só): Francisco decide se abre alguma frente nova ou se o laboratório
+para aqui.
 
 ## Fase 03 — Motor da boleta em simulador (D0) — FECHADA (estado A)
 

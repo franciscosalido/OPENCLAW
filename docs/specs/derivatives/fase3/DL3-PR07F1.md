@@ -184,3 +184,34 @@ novas, e cada uma só abre com decisão de Francisco:
 - esquema do resumo, quando houver consumidor.
 
 Decisão separada, fora de cartão: subir o piso do pydantic para 2.12 no `pyproject.toml`.
+
+## Revisão adversarial (Claude) — GO na primeira rodada, cabeça `d0530e5`
+
+Pela regra de processo de Francisco, o revisor **não executou a suíte completa nem a
+tipagem** desta cabeça. Leu o diff, conferiu as evidências pelo SHA-256 e rodou os cenários
+do seu protótipo. Uma segunda sessão do revisor, em conversa separada, chegou ao mesmo
+veredito e derrubou sete mutantes próprios.
+
+| Verificação | Resultado | Quem |
+|---|---|---|
+| Suíte sem integração, Linux x86_64 e macOS, pydantic 2.13.3 | 11.652 aprovados, 16 pulados, 261 subtestes nos dois, sem falha | implementador; logs conferidos |
+| Teste de concorrência citado no §7 | passou nos dois portões: era instabilidade do ambiente do planejador | implementador; logs conferidos |
+| mypy estrito e Pyright | 0 erros | implementador; conferido pela segunda sessão |
+| 6 mutantes do §6 e 1 adicional, nos dois sistemas | todos detectados | implementador; log conferido |
+| Manifesto de 84 evidências (`c855c7ec…2a3b`) e hashes dos dois relatórios | conferem | revisor (7 arquivos) |
+| Diff das evidências aplicado sobre a base | mesma árvore da cabeça | revisor |
+| Diff | cinco arquivos; `models.py` 229 (teto 230), `session.py` 181 (teto 181); arquivos protegidos intocados | revisor |
+| Âncoras e saídas das sessões oficiais | idênticas à base | implementador; segunda sessão repetiu |
+| Cópia do cartão | igual à publicada, sem adendo | revisor |
+| 12 casos do protótipo do planejador (G1 a G4) | todos aprovados | revisor |
+| pydantic 2.11.7 instalado de verdade | a cabeça recusa na importação com a mensagem do §3; a base rodava e gravava âncora errada | revisor e segunda sessão |
+
+Diferença em relação ao protótipo, aceita: a guarda vem **antes** dos imports que só
+existem no pydantic 2, de modo que também recusa a série 1.
+
+Limites conhecidos, sem efeito no veredito: uma pré-versão `2.12.0a1` passa pela guarda; uma
+versão malformada como `"2"` dá `ValueError` em vez de `ImportError`.
+
+Relatórios da skill lidos depois de formado o parecer, com SHA-256 conferidos
+(`1ace219a…5cc7` e `4c490096…07b4`): sem bloqueante.
+
