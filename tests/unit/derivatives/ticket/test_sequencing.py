@@ -28,10 +28,13 @@ def draft(*legs: Leg, net: str = "-5", gross: str = "25") -> TicketDraft:
                        send_deadline=TIME, order_validity=TIME, quote_snapshot_id="q")
 
 
-def holding(symbol: str, balance: int = 0, multiplier: int = 1) -> Holding:
+def holding(symbol: str, balance: int = 0, multiplier: int = 1, *,
+            strike: D | None = None) -> Holding:
     """Identidade e exposição explicitamente conciliadas na conta do cenário."""
     return Holding(symbol=symbol, underlying="ETF", kind="CALL", expiry=date(2027, 1, 15),
-                   multiplier=multiplier, balance=balance)
+                   multiplier=multiplier, balance=balance,
+                   strike=strike if strike is not None else D({"A": 10, "B": 11, "C": 12,
+                                                               "D": 13}.get(symbol, 14)))
 
 
 def position(*rows: Holding, account: str = "sim") -> Position:
@@ -1030,3 +1033,142 @@ def test_z3_orders_on_other_free_series_do_not_reduce_capacity() -> None:
     assert book.available(a, a.legs[0], ticket="T2") == 4
     book.reserve(a, a.legs[0], "a", 4, ticket="T2")
     assert book.available(x, x.legs[0], ticket="T1") == 1
+
+
+def wing_photo() -> Position:
+    return Position(account="sim", holdings=tuple(holding(s) for s in "ABC"),
+                    pairs=(("A", "B"), ("C", "B")))
+
+
+def wing_draft(body: int = 10, *, reverse: bool = False,
+               net: str = "1", gross: str = "25") -> TicketDraft:
+    a, c = leg("A", Side.BUY, "2.00", 5), leg("C", Side.BUY, "0.60", 5)
+    b = leg("B", Side.SELL, "1.20", body)
+    legs = (c, b, a) if reverse else (a, b, c)
+    return draft(*legs, net=net, gross=gross)
+
+
+def test_b1_allocation_uses_signed_order_and_only_required_wings() -> None:
+    photo, ticket = wing_photo(), wing_draft()
+    p = plan_legs(ticket, photo)
+    a, b, c = ticket.legs
+    assert p.legs == (a, c, b)
+    both = (("B", "A", False), ("B", "C", False))
+    assert p.dependencies == both
+    assert p.protections_for(b) == ("A", "C") and p.protection_for(b) == "A"
+    assert partial_exposure(ticket) == D("13.00")
+    assert plan_legs(wing_draft(reverse=True), photo).dependencies == both[::-1]
+    assert plan_legs(wing_draft(6, net="5.80", gross="20.20"), photo).dependencies == both
+    assert plan_legs(wing_draft(5, net="7", gross="19"), photo).dependencies == both[:1]
+    with pytest.raises(SequenceRefusal, match="quantidade de proteção insuficiente"):
+        plan_legs(wing_draft(11, net="-0.20", gross="26.20"), photo)
+    assert plan_legs(draft(BUY, SELL), position()).dependencies == both[:1]
+
+
+def test_b1_photo_refuses_ambiguous_attribution_and_incompatible_strikes() -> None:
+    photo = wing_photo()
+    cases = [
+        ({"holdings": (holding("A"), holding("B"), holding("C", strike=D(11)))},
+         "séries incompatíveis"),
+        ({"pairs": (("A", "B"), ("A", "B"))}, "atribuição de proteção ambígua"),
+        ({"pairs": (("A", "B"), ("B", "C"))}, "atribuição de proteção ambígua"),
+        ({"holdings": (holding("A", 1), holding("B", -2), holding("C", 1))},
+         "vendida aberta com mais de uma proteção"),
+    ]
+    for changes, reason in cases:
+        with pytest.raises(SequenceRefusal, match=reason):
+            plan_legs(wing_draft(), photo.model_copy(update=changes))
+
+
+def test_b1_split_buy_cannot_protect_two_bodies_twice() -> None:
+    photo = Position(account="sim", holdings=tuple(holding(s) for s in "ABD"),
+                     pairs=(("A", "B"), ("A", "D")))
+    a, b = leg("A", Side.BUY, "2", 5), leg("B", Side.SELL, "1.20", 3)
+    good = draft(a, b, leg("D", Side.SELL, "1.20", 2), net="4", gross="16")
+    assert plan_legs(good, photo).dependencies == (("B", "A", False), ("D", "A", False))
+    with pytest.raises(SequenceRefusal, match="quantidade de proteção insuficiente"):
+        plan_legs(draft(a, b, leg("D", Side.SELL, "1.20", 3), net="2.80", gross="17.20"), photo)
+
+
+def test_b2_executed_units_and_release_stay_with_their_wing() -> None:
+    p = plan_legs(wing_draft(), wing_photo())
+    a, c, b = p.legs
+    book = ReservationBook()
+    book.admit(p, ticket="T1")
+
+    def available():
+        return tuple(book.available(p, b, ticket="T1", source=s) for s in ("A", "C"))
+
+    assert available() == (0, 0) and book.available(p, b, ticket="T1") == 0
+    book.confirm_buy(p, a, "a", 5, ticket="T1")
+    assert available() == (5, 0) and book.available(p, b, ticket="T1") == 5
+    assert book.available(p, b, ticket="T1", source="Z") == 0
+    book.reserve(p, b, "one", 5, ticket="T1", source="A")
+    assert available() == (0, 0)
+    book.confirm_buy(p, c, "c", 3, ticket="T1")
+    assert available() == (0, 3)
+    with pytest.raises(SequenceRefusal, match="reserva indisponível"):
+        book.reserve(p, b, "two", 3, ticket="T1", source="A")
+    book.reserve(p, b, "two", 3, ticket="T1", source="C")
+    assert available() == (0, 0)
+    book.confirm_buy(p, c, "c2", 2, ticket="T1")
+    assert available() == (0, 2)
+    book.confirm_sale("sim", "one", "partial", 2)
+    book.confirm_release("sim", "one", 3)
+    assert available() == (3, 2)
+
+
+def test_g1_positive_paired_holding_preserves_seven_free_units() -> None:
+    photo = position(holding("A", 7), holding("B", 2))
+    assert plan_legs(zeroing_draft(7), photo).dependencies == (("A", "A", True),)
+    with pytest.raises(SequenceRefusal, match="saldo livre insuficiente"):
+        plan_legs(zeroing_draft(8), photo)
+
+
+def test_b2_all_orders_share_signed_sale_limit_across_sources() -> None:
+    p = plan_legs(wing_draft(6, net="5.80", gross="20.20"), wing_photo())
+    a, c, b = p.legs
+    book = ReservationBook()
+    for buy in (a, c):
+        book.confirm_buy(p, buy, buy.symbol, 5, ticket="T1")
+    book.reserve(p, b, "C-first", 5, ticket="T1", source="C")
+    assert book.available(p, b, ticket="T1", source="A") == 1
+    with pytest.raises(SequenceRefusal, match="reserva indisponível"):
+        book.reserve(p, b, "too-many", 2, ticket="T1", source="A")
+
+
+def test_b1_owned_buy_precedes_alphabetically_ordered_grant_only_sources() -> None:
+    photo = Position(account="sim", holdings=tuple(holding(s) for s in "ABCD"),
+                     pairs=(("D", "B"), ("A", "B"), ("C", "B")))
+    ticket = draft(leg("B", Side.SELL, "1.20", 9), leg("C", Side.BUY, ".60", 3))
+    signed = authorized(ticket, ("D", "T1", 3), ("A", "T2", 3))
+    assert plan_legs(signed, photo).dependencies == (
+        ("B", "C", False), ("B", "A", False), ("B", "D", False),
+    )
+
+
+def test_b1_strike_is_required_positive_exact_money() -> None:
+    from pydantic import ValidationError
+
+    fields = holding("A").model_dump(exclude={"strike"})
+    with pytest.raises(ValidationError):
+        Holding.model_validate(fields)
+    for value in (D(0), D(-1), 1.5, D("0.001")):
+        with pytest.raises(ValidationError):
+            Holding.model_validate(fields | {"strike": value})
+
+
+def test_b2_only_allocated_sources_can_reserve_even_if_other_wing_filled() -> None:
+    plan = plan_legs(wing_draft(5, net="7", gross="19"), wing_photo())
+    a, c, sale = plan.legs
+    book = ReservationBook()
+    book.admit(plan, ticket="T1")
+    book.confirm_buy(plan, a, "fill-a", 5, ticket="T1")
+    book.confirm_buy(plan, c, "fill-c", 5, ticket="T1")
+    assert plan.protections_for(sale) == ("A",)
+    for source in ("C", ""):
+        assert book.available(plan, sale, ticket="T1", source=source) == 0
+        with pytest.raises(SequenceRefusal, match="reserva indisponível"):
+            book.reserve(plan, sale, "ordem", 1, ticket="T1", source=source)
+    assert book.available(plan, sale, ticket="T1") == 5
+    book.reserve(plan, sale, "ordem", 5, ticket="T1")

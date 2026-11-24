@@ -28,6 +28,7 @@ from tests.unit.derivatives.ticket.test_guards import NOW, CLOSE, quote
 from tests.unit.derivatives.ticket.test_models import PRICE
 from tests.unit.derivatives.ticket.test_sequencing import (
     BUY, SELL, authorized, close_plan, draft, holding, leg, position, sale_only,
+    wing_draft, wing_photo,
 )
 from tests.unit.derivatives.ticket.test_trigger import SPEC, trade
 
@@ -1873,3 +1874,120 @@ def test_z7_40_confirmed_buybacks_release_only_40(s: Session) -> None:
     assert e.state == T.STOPPED and len(s.submitted()) == 2
     with pytest.raises(SequenceRefusal, match="saldo livre insuficiente"):
         zeroing_engine(s, "T2", p, 1)
+
+
+def wing_market(s: Session, second: int) -> None:
+    for symbol, bid, ask in (("A", "1.95", "2.05"), ("B", "1.15", "1.25"), ("C", ".55", ".65")):
+        s.q(symbol, second, bid=bid, ask=ask)
+
+
+def confirm_wings(s: Session, number: int = 1, second: int = 2,
+                  reverse: bool = False) -> TicketEngine:
+    e = s.engine(f"T{number}", wing_photo())
+    d = wing_draft(reverse=reverse).model_copy(update={"send_deadline": END,
+                                                       "order_validity": CLOSE})
+    e.propose(d, at(second))
+    assert e.preview is not None and e.preview.partial_exposure == D("13.00")
+    e.confirm(s.dec(e), at(second))
+    assert e.orders == {f"T{number}:A:1": O.LIVE, f"T{number}:C:1": O.LIVE}
+    return e
+
+
+def wing_fill(s: Session, symbol: str, sec: int, size: int) -> None:
+    prices = {"A": ("1.95", "2.00"), "C": ("0.55", "0.60"), "B": ("1.20", "1.25")}
+    bid, ask = prices[symbol]
+    s.q(symbol, sec, bid=bid, ask=ask, size=size)
+
+
+def body_orders(s: Session, index: int = 0) -> list[tuple[str, int, D, object]]:
+    return [(oid, qty, price, order_rows(s.receipts[index], oid)[0]["protection"])
+            for oid, qty, price, _ in s.submitted() if oid.startswith(f"T{index + 1}:B:")]
+
+
+def test_b3_complete_butterfly_audits_each_wing(s: Session) -> None:
+    wing_market(s, 1)
+    e = confirm_wings(s)
+    wing_fill(s, "A", 3, 5)
+    assert body_orders(s) == [(B, 5, D("1.20"), "A")]
+    wing_fill(s, "C", 4, 5)
+    assert body_orders(s) == [(B, 5, D("1.20"), "A"), ("T1:B:2", 5, D("1.20"), "C")]
+    wing_fill(s, "B", 5, 10)
+    assert e.state == T.COMPLETED and e.gross().executed == D("25") and len(s.submitted()) == 4
+
+
+def test_b4_either_wing_can_execute_alone(s: Session) -> None:
+    wing_market(s, 1)
+    e = confirm_wings(s)
+    wing_fill(s, "C", 3, 5)
+    assert body_orders(s) == [(B, 5, D("1.20"), "C")]
+    wing_fill(s, "B", 4, 10)
+    assert e.orders[B] == O.FILLED and e.state == T.WORKING and len(s.submitted()) == 3
+    s.cancel(e, A, 4)
+    wing_market(s, 5)
+    assert e.state == T.STOPPED and e.gross().executed == D("9")
+    confirm_wings(s, 2, 6)
+    wing_fill(s, "A", 7, 5)
+    assert body_orders(s, 1) == [("T2:B:1", 5, D("1.20"), "A")]
+
+
+def test_b5_partial_fills_draw_only_on_the_executed_wing(s: Session) -> None:
+    wing_market(s, 1)
+    confirm_wings(s)
+    for second, (symbol, qty) in enumerate((("A", 2), ("C", 3), ("A", 3), ("C", 2)), 3):
+        wing_fill(s, symbol, second, qty)
+    assert body_orders(s) == [
+        (B, 2, D("1.20"), "A"), ("T1:B:2", 3, D("1.20"), "C"),
+        ("T1:B:3", 3, D("1.20"), "A"), ("T1:B:4", 2, D("1.20"), "C"),
+    ]
+
+
+def test_b6_resume_obeys_each_tickets_signed_buy_order(s: Session) -> None:
+    wing_market(s, 1)
+    one = confirm_wings(s)
+    two = confirm_wings(s, 2, reverse=True)
+    for engine in (one, two):
+        engine.pause(at(2))
+    wing_fill(s, "A", 3, 10)
+    wing_fill(s, "C", 3, 10)
+    for engine in (one, two):
+        engine.resume(s.dec(engine, Action.RESUME), at(4))
+    assert body_orders(s) == [(B, 5, D("1.20"), "A"), ("T1:B:2", 5, D("1.20"), "C")]
+    assert body_orders(s, 1) == [
+        ("T2:B:1", 5, D("1.20"), "C"), ("T2:B:2", 5, D("1.20"), "A"),
+    ]
+
+
+def test_g2_correction_and_original_in_one_uncertain_batch(s: Session) -> None:
+    engine = timeout(s)
+    correction = VenueReport(A, E.VENUE_PARTIAL, 2, D("1"), at(3), fact="new", corrects="absent")
+    engine.on_reports([correction, correction._replace(corrects=None)], at(3))
+    s.venue.poll.return_value = OrderSnapshot(O.PARTIAL, 2, 8)
+    engine.reconcile(A, at(4))
+    assert engine.orders[A] == O.PARTIAL and engine.gross().executed == free(s) == 2
+    assert s.halts.divergent("sim")
+
+
+def test_wings_distinguish_source_series_from_ticket_granting_it(s: Session) -> None:
+    photo = wing_photo()
+    donor = plan_legs(wing_draft(), photo)
+    a, c, _ = donor.legs
+    s.res.admit(donor, ticket="origem")
+    s.res.confirm_buy(donor, a, "oa", 3, ticket="origem")
+    s.res.confirm_buy(donor, c, "oc", 2, ticket="origem")
+    s.res.close("sim", "origem")
+    wing_market(s, 1)
+    e = s.engine("T1", photo)
+    t = draft(leg("C", Side.BUY, ".60", 2), leg("B", Side.SELL, "1.20", 7),
+              net="-7.20", gross="9.60")
+    signed = authorized(t, ("A", "origem", 3), ("C", "origem", 2))
+    e.propose(signed.model_copy(update={"send_deadline": END, "order_validity": CLOSE}), at(1))
+    e.confirm(s.dec(e), at(2))
+    assert body_orders(s) == [(B, 2, D("1.20"), "C"), ("T1:B:2", 3, D("1.20"), "A")]
+    wing_fill(s, "C", 3, 2)
+    assert body_orders(s)[2:] == [("T1:B:3", 2, D("1.20"), "C")]
+    wing_fill(s, "B", 4, 7)
+    assert e.state == T.COMPLETED
+    for oid in (B, "T1:B:2"):
+        request, fill = order_rows(s.receipts[0], oid)
+        assert request["origin"] == fill["origin"] == "origem"
+    assert all("origin" not in row for row in order_rows(s.receipts[0], "T1:B:3"))

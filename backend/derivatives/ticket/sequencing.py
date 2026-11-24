@@ -25,6 +25,7 @@ class Holding(_Frozen):
     kind: Literal["CALL", "PUT"]
     expiry: date
     multiplier: PositiveInt
+    strike: Annotated[Money, Field(gt=0)]
     balance: int
 
 
@@ -42,7 +43,6 @@ class Position(_Frozen):
         for long, short in self.pairs:
             free[long] -= max(0, -balances[short])
         return free
-
 
 
 class Fill(_Frozen):
@@ -63,12 +63,16 @@ class LegPlan(NamedTuple):
     position: Position
     dependencies: tuple[tuple[str, str, bool], ...]
 
+    def protections_for(self, leg: Leg) -> tuple[str, ...]:
+        """Proteções usadas pela venda, na ordem de alocação do plano."""
+        sources = tuple(buy for sale, buy, _ in self.dependencies if sale == leg.symbol)
+        if not sources or leg not in self.legs:
+            raise SequenceRefusal("venda sem proteção no plano")
+        return sources
+
     def protection_for(self, leg: Leg) -> str:
-        """Identifica a compra cuja execução libera a venda desta boleta."""
-        for sale, buy, _ in self.dependencies:
-            if sale == leg.symbol and leg in self.legs:
-                return buy
-        raise SequenceRefusal("venda sem proteção no plano")
+        """Primeira proteção usada pela venda."""
+        return self.protections_for(leg)[0]
 
 
 def plan_legs(draft: TicketDraft, position: Position) -> LegPlan:
@@ -80,18 +84,23 @@ def plan_legs(draft: TicketDraft, position: Position) -> LegPlan:
     rows = {r.symbol: r for r in position.holdings}
     if len(rows) != len(position.holdings) or any(leg.symbol not in rows for leg in draft.legs):
         raise SequenceRefusal("posição ausente ou duplicada")
-    owners = {short: long for long, short in position.pairs}
-    if len(owners) != len(position.pairs) or set(owners) & set(owners.values()):
+    longs = {long for long, _ in position.pairs}
+    if (len(set(position.pairs)) != len(position.pairs)
+            or any(short in longs for _, short in position.pairs)):
         raise SequenceRefusal("atribuição de proteção ambígua")
-    for short, long in owners.items():
+    seen: set[str] = set()
+    for long, short in position.pairs:
         if short not in rows or long not in rows:
             raise SequenceRefusal("série sem evidência")
         a, b = rows[long], rows[short]
-        if (a.underlying, a.kind, a.expiry, a.multiplier) != (
+        if short in seen and b.balance < 0:
+            raise SequenceRefusal("vendida aberta com mais de uma proteção")
+        seen.add(short)
+        if a.strike == b.strike or (a.underlying, a.kind, a.expiry, a.multiplier) != (
                 b.underlying, b.kind, b.expiry, b.multiplier):
             raise SequenceRefusal("séries incompatíveis")
     free = position.unpledged()
-    if any(free[long] < 0 for long in owners.values()):
+    if any(free[long] < 0 for long in longs):
         raise SequenceRefusal("proteção inicial insuficiente")
     buys = {leg.symbol: leg for leg in draft.legs if leg.side is Side.BUY}
     sales = tuple(leg for leg in draft.legs if leg.side is Side.SELL)
@@ -106,7 +115,7 @@ def plan_legs(draft: TicketDraft, position: Position) -> LegPlan:
         if balance < 0 and buy.quantity > -balance:
             raise SequenceRefusal("recompra atravessa saldo conciliado")
     for sale in sales:
-        candidates = []
+        candidates: dict[str, bool] = {}
         for long, short in position.pairs:
             closing = sale.symbol == long
             source = short if closing else long
@@ -118,19 +127,24 @@ def plan_legs(draft: TicketDraft, position: Position) -> LegPlan:
                 continue
             if not closing and (a.balance < 0 or b.balance > 0):
                 continue
-            candidates.append((source, closing))
+            candidates[source] = closing
         if not candidates and rows[sale.symbol].balance > 0:
             if sale.quantity > free[sale.symbol]:
                 raise SequenceRefusal("saldo livre insuficiente")
             dependencies.append((sale.symbol, sale.symbol, True))
             continue
-        if len(candidates) != 1:
+        if not candidates or (len(candidates) > 1 and any(candidates.values())):
             raise SequenceRefusal("pareamento ausente ou ambíguo")
-        source, closing = candidates[0]
-        remaining[source] -= sale.quantity
-        if remaining[source] < 0:
+        # remaining conserva a ordem das compras e depois das séries só autorizadas.
+        needed = sale.quantity
+        for source in remaining:
+            if source in candidates and needed and remaining[source]:
+                take = min(needed, remaining[source])
+                remaining[source] -= take
+                needed -= take
+                dependencies.append((sale.symbol, source, candidates[source]))
+        if needed:
             raise SequenceRefusal("quantidade de proteção insuficiente")
-        dependencies.append((sale.symbol, source, closing))
     if {g.series for g in draft.coverage} - {buy for sale, buy, _ in dependencies if sale != buy}:
         raise SequenceRefusal("autorização sem venda correspondente")
     return LegPlan(draft, (*buys.values(), *sales), position, tuple(dependencies))
@@ -269,10 +283,12 @@ class ReservationBook:
         return sum(n for (a, _, s), n in self._buys.items() if (a, s) == (account, symbol))
 
     def _capacity(self, plan: LegPlan, leg: Leg, ticket: str,
-                  origin: str | None) -> tuple[int, str]:
+                  origin: str | None, source: str | None) -> tuple[int, str]:
         account = self._check(plan, ticket)
-        source = plan.protection_for(leg)
-        if (account, ticket) in self._closed:
+        sources = plan.protections_for(leg)
+        if source is None:
+            source = sources[0]
+        if source not in sources or (account, ticket) in self._closed:
             return 0, source
         balances = {h.symbol: h.balance for h in plan.position.holdings}
         closing = balances[source] < 0
@@ -297,16 +313,17 @@ class ReservationBook:
         room = min(free, leg.quantity - own)
         return max(0, room - room % leg.lot_size), source
 
-    def available(self, plan: LegPlan, leg: Leg, *, ticket: str, origin: str | None = None) -> int:
+    def available(self, plan: LegPlan, leg: Leg, *, ticket: str, origin: str | None = None,
+                  source: str | None = None) -> int:
         """Consulta a quantidade que o livro compartilhado pode reservar agora."""
         with self._lock:
-            return self._capacity(plan, leg, ticket, origin)[0]
+            return self._capacity(plan, leg, ticket, origin, source)[0]
 
     def reserve(self, plan: LegPlan, leg: Leg, order: str, quantity: int, *,
-                ticket: str, origin: str | None = None) -> None:
+                ticket: str, origin: str | None = None, source: str | None = None) -> None:
         """Confere e ocupa o saldo na mesma seção crítica."""
         with self._lock:
-            free, source = self._capacity(plan, leg, ticket, origin)
+            free, source = self._capacity(plan, leg, ticket, origin, source)
             key = plan.position.account, order
             if (not order or key in self._orders or type(quantity) is not int
                     or not 0 < quantity <= free or quantity % leg.lot_size):

@@ -220,3 +220,14 @@ def test_structure_at_expiry(legs, multiplier, cost, entry, roots, gain, loss, p
 ])
 def test_leg_results_before_costs_in_plan_order(legs, multiplier, spot, expected):
     assert expiry_leg_results(legs, D(spot), multiplier=multiplier) == tuple(map(D, expected))
+
+
+def test_b7_dp03_complete_butterfly_and_each_vertical_at_expiry():
+    a = leg("CALL", "BUY", 10, 1, "2.00")
+    center = leg("CALL", "SELL", 11, 1, "1.20")
+    c = leg("CALL", "BUY", 12, 1, "0.60")
+    whole = expiry_profile((a, leg("CALL", "SELL", 11, 2, "1.20"), c))
+    upper, lower = expiry_profile((center, c)), expiry_profile((a, center))
+    assert (whole.net_entry, whole.max_loss, whole.max_gain) == (D(".20"), D("-.20"), D(".80"))
+    assert (upper.net_entry, upper.max_loss) == (D("-.60"), D("-.40"))
+    assert (lower.net_entry, lower.max_loss) == (D(".80"), D("-.80"))
