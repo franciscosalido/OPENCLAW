@@ -21,6 +21,7 @@ from backend.derivatives.ticket.engine import EngineRefusal, TicketEngine
 from backend.derivatives.ticket.gate import Action, DecisionRefusal, issue
 from backend.derivatives.ticket.guards import DeadlineRefusal
 from backend.derivatives.ticket.models import PositiveInt, TicketDraft, _Frozen
+from backend.derivatives.ticket.receipt import dump_rows
 from backend.derivatives.ticket.replay import Timestamp, load_replay
 from backend.derivatives.ticket.sequencing import Position, SequenceRefusal
 from backend.derivatives.ticket.session import ReplaySession, SessionRefusal
@@ -192,12 +193,8 @@ def _write(out: Path, target: Path, session: ReplaySession, tickets: list[str],
             receipts["fatos_externos.jsonl"] = facts
         for filename, receipt in receipts.items():
             with (staged / filename).open("x", encoding="utf-8") as stream:
-                for event in receipt.events:
-                    row = {"seq": event.seq, "ts": event.ts.isoformat(), "kind": event.kind.value,
-                           "payload": event.payload.decode("utf-8"), "prev_hash": event.prev_hash,
-                           "hash": event.hash}
-                    stream.write(json.dumps(row, sort_keys=True, ensure_ascii=False,
-                                            separators=(",", ":")) + "\n")
+                for line in dump_rows(receipt):
+                    stream.write(line + "\n")
         formatted = json.dumps(summary, sort_keys=True, indent=2, ensure_ascii=False)
         (staged / "resumo.json").write_text(formatted + "\n", encoding="utf-8")
         _publish(staged, target)

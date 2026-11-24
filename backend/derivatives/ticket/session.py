@@ -19,6 +19,7 @@ from config.ticket_sim_config_model import TicketSimConfig
 
 
 FACT_KINDS = ("exercise", "compliance")
+SUMMARY_FORMAT = 1
 
 
 class SessionRefusal(ValueError):
@@ -171,6 +172,7 @@ class ReplaySession:
                              "pausada": engine.paused, "ordens": orders, "bruto": bruto,
                              "recibo_eventos": len(events), "recibo_hash": events[-1].hash}
         summary: dict[str, object] = {
+            "formato": SUMMARY_FORMAT,
             "aviso": "SIMULADO — resultado em papel é teto otimista, não previsão.",
             "eventos": self._cursor, "contas_bloqueadas": sorted(blocked), "boletas": tickets,
         }

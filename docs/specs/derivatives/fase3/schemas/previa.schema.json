@@ -1,0 +1,173 @@
+{
+  "$defs": {
+    "CoverageGrant": {
+      "additionalProperties": false,
+      "description": "Quantidade máxima de uma série cedida pela boleta de origem.",
+      "properties": {
+        "origin": {
+          "pattern": "^[A-Za-z0-9._-]+$",
+          "title": "Origin",
+          "type": "string"
+        },
+        "quantity": {
+          "exclusiveMinimum": 0,
+          "title": "Quantity",
+          "type": "integer"
+        },
+        "series": {
+          "minLength": 1,
+          "pattern": "^\\S+$",
+          "title": "Series",
+          "type": "string"
+        }
+      },
+      "required": [
+        "series",
+        "origin",
+        "quantity"
+      ],
+      "title": "CoverageGrant",
+      "type": "object"
+    },
+    "Environment": {
+      "description": "Ambiente admissível na fase D0.",
+      "enum": [
+        "SIMULATED"
+      ],
+      "title": "Environment",
+      "type": "string"
+    },
+    "Leg": {
+      "additionalProperties": false,
+      "description": "Série, sentido, unidades e preço máximo de compra ou mínimo de venda.",
+      "properties": {
+        "limit_price": {
+          "gt": 0,
+          "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+          "title": "Limit Price",
+          "type": "string"
+        },
+        "lot_size": {
+          "exclusiveMinimum": 0,
+          "title": "Lot Size",
+          "type": "integer"
+        },
+        "quantity": {
+          "exclusiveMinimum": 0,
+          "title": "Quantity",
+          "type": "integer"
+        },
+        "side": {
+          "$ref": "#/$defs/Side"
+        },
+        "symbol": {
+          "minLength": 1,
+          "pattern": "^\\S+$",
+          "title": "Symbol",
+          "type": "string"
+        }
+      },
+      "required": [
+        "symbol",
+        "side",
+        "quantity",
+        "limit_price",
+        "lot_size"
+      ],
+      "title": "Leg",
+      "type": "object"
+    },
+    "Side": {
+      "description": "Sentido da perna.",
+      "enum": [
+        "BUY",
+        "SELL"
+      ],
+      "title": "Side",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Conteúdo de aprovação e exposição parcial fornecida pelo chamador.",
+  "properties": {
+    "coverage": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/CoverageGrant"
+      },
+      "maxItems": 4,
+      "title": "Coverage",
+      "type": "array"
+    },
+    "digest": {
+      "description": "Resumo derivado do conteúdo, independente do contador de versão.",
+      "readOnly": true,
+      "title": "Digest",
+      "type": "string"
+    },
+    "environment": {
+      "$ref": "#/$defs/Environment",
+      "default": "SIMULATED"
+    },
+    "gross_cap": {
+      "ge": 0,
+      "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+      "title": "Gross Cap",
+      "type": "string"
+    },
+    "legs": {
+      "items": {
+        "$ref": "#/$defs/Leg"
+      },
+      "maxItems": 4,
+      "minItems": 1,
+      "title": "Legs",
+      "type": "array"
+    },
+    "net_limit": {
+      "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+      "title": "Net Limit",
+      "type": "string"
+    },
+    "order_validity": {
+      "format": "date-time",
+      "title": "Order Validity",
+      "type": "string"
+    },
+    "partial_exposure": {
+      "ge": 0,
+      "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+      "title": "Partial Exposure",
+      "type": "string"
+    },
+    "quote_snapshot_id": {
+      "minLength": 1,
+      "pattern": "^\\S+$",
+      "title": "Quote Snapshot Id",
+      "type": "string"
+    },
+    "send_deadline": {
+      "format": "date-time",
+      "title": "Send Deadline",
+      "type": "string"
+    },
+    "version": {
+      "default": 1,
+      "exclusiveMinimum": 0,
+      "title": "Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "legs",
+    "net_limit",
+    "gross_cap",
+    "send_deadline",
+    "order_validity",
+    "quote_snapshot_id",
+    "partial_exposure",
+    "digest"
+  ],
+  "title": "Preview",
+  "type": "object"
+}

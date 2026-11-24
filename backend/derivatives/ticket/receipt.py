@@ -1,6 +1,6 @@
 """Recibo append-only local, independente das máquinas de estado."""
 import json
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from hashlib import sha256
@@ -10,6 +10,7 @@ from typing import Never
 from backend.derivatives.ticket.models import Preview
 from backend.derivatives.ticket.state import Event
 
+RECEIPT_FORMAT = 1
 _GENESIS = "0" * 64
 
 
@@ -148,3 +149,47 @@ class Receipt:
             return expected_head is None or compare_digest(previous, expected_head)
         except (TypeError, ValueError, OverflowError, RecursionError):
             return False
+
+
+def dump_rows(receipt: Receipt) -> Iterator[str]:
+    """Emite o envelope canônico de cada evento, sem o separador entre linhas."""
+    for event in receipt.events:
+        row = {"formato": RECEIPT_FORMAT, "hash": event.hash, "kind": event.kind.value,
+               "payload": event.payload.decode("utf-8"), "prev_hash": event.prev_hash,
+               "seq": event.seq, "ts": event.ts.isoformat()}
+        yield _encode(row).decode("utf-8")
+
+
+def _read_row(line: str) -> ReceiptEvent:
+    try:
+        if not isinstance(line, str):
+            raise ValueError
+        row = _decode(line.removesuffix("\n").encode("utf-8"))
+        if row.keys() != {"formato", "hash", "kind", "payload", "prev_hash", "seq", "ts"}:
+            raise ValueError
+    except (ValueError, TypeError, RecursionError) as exc:
+        raise ReceiptError("linha de recibo inválida") from exc
+    if type(row["formato"]) is not int or row["formato"] != RECEIPT_FORMAT:
+        raise ReceiptError("formato de recibo desconhecido")
+    try:
+        seq, stamp, payload = row["seq"], row["ts"], row["payload"]
+        prev, head = row["prev_hash"], row["hash"]
+        if type(seq) is not int or not isinstance(stamp, str) or not isinstance(payload, str):
+            raise ValueError
+        if not isinstance(prev, str) or not isinstance(head, str):
+            raise ValueError
+        ts = datetime.fromisoformat(stamp)
+        if ts.tzinfo is not None and ts.astimezone(UTC).isoformat() != stamp:
+            raise ValueError
+        return ReceiptEvent(seq, ts, Event(row["kind"]), payload.encode("utf-8"), prev, head)
+    except (ValueError, TypeError, OverflowError, RecursionError) as exc:
+        raise ReceiptError("linha de recibo inválida") from exc
+
+
+def load_rows(lines: Iterable[str], *,
+              expected_head: str | None = None) -> tuple[ReceiptEvent, ...]:
+    """Valida uma cadeia não vazia e, quando fornecida, sua âncora externa."""
+    events = tuple(_read_row(line) for line in lines)
+    if not events or not Receipt().verify(events, expected_head=expected_head):
+        raise ReceiptError("recibo vazio, adulterado ou incompleto")
+    return events
