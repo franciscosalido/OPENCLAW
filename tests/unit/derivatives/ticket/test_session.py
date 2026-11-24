@@ -12,7 +12,7 @@ from backend.derivatives.ticket.models import TicketDraft
 from backend.derivatives.ticket.replay import load_replay
 from backend.derivatives.ticket.sequencing import Position, SequenceRefusal
 from backend.derivatives.ticket.session import ReplaySession, SessionRefusal
-from backend.derivatives.ticket.state import OrderState, TicketState
+from backend.derivatives.ticket.state import Event, OrderState, TicketState
 from config.ticket_sim_config_model import load_ticket_sim_config
 
 FIXTURES = Path(__file__).resolve().parents[3] / "fixtures/derivatives/synthetic/ticket/sessions"
@@ -36,7 +36,8 @@ def test_n1_ticket_id_unique_across_accounts() -> None:
     receipt = s.receipt("T1")
     with pytest.raises(SessionRefusal):
         s.open("T1", pos.model_copy(update={"account": "sim2"}), draft, now)
-    assert s.engine("T1") is first and s.receipt("T1") is receipt
+    assert s.engine("T1") is first
+    assert s.receipt("T1").events == receipt.events
 
 
 def test_failed_open_does_not_register_ticket() -> None:
@@ -347,3 +348,25 @@ def test_external_journal_is_committed_before_freeze(monkeypatch: pytest.MonkeyP
     monkeypatch.setattr(ReservationBook, "freeze", observed)
     s.external("sim", "B", "f1", "exercise", 4, now)
     assert calls == [("sim", "B")]
+
+
+def test_g4_ticket_receipt_is_an_independent_snapshot() -> None:
+    session, pos, draft, now = session_data()
+    session.advance_to(2)
+    engine = session.open("T1", pos, draft, now)
+    snapshot = session.receipt("T1")
+    original = snapshot.events
+    assert len(original) == 1
+    extra = snapshot.append(now, Event.STOP, {"source": "consulta"})
+    assert snapshot.events == (*original, extra)
+    fresh = session.receipt("T1")
+    assert fresh is not snapshot
+    assert fresh.events == original
+    assert session.summary()["boletas"]["T1"]["recibo_eventos"] == 1
+    assert session.engine("T1") is engine
+
+    decision = issue(Action.EXECUTE, ticket="T1", nonce="G4", preview=engine.preview,
+                     issued_at=now, expires_at=now + timedelta(minutes=1))
+    engine.confirm(decision, now)
+    assert len(session.receipt("T1").events) > len(original)
+    assert fresh.events == original

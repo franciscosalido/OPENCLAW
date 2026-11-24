@@ -5,6 +5,18 @@ from decimal import Decimal, InvalidOperation
 from enum import StrEnum
 from typing import Annotated, NamedTuple, Self
 
+from pydantic import VERSION
+
+
+def require_pydantic(version: str) -> None:
+    """Exige o suporte a exclude_if usado na prévia gravada no recibo."""
+    major, minor, *_ = version.split(".")
+    if (int(major), int(minor)) < (2, 12):
+        raise ImportError("pydantic 2.12 ou mais novo é exigido pela prévia da boleta")
+
+
+require_pydantic(VERSION)
+
 from pydantic import (
     AfterValidator, AwareDatetime, BaseModel, BeforeValidator, ConfigDict, Field, ValidationInfo,
     GetPydanticSchema, computed_field, field_validator, model_validator,

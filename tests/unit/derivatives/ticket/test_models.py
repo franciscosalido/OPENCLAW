@@ -1,6 +1,8 @@
 """Provas do modelo D0, da versão editada e do conteúdo autorizável."""
 import json
 import re
+import subprocess
+import sys
 from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal, localcontext
 from hashlib import sha256
@@ -9,6 +11,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from backend.derivatives.ticket import models
 from backend.derivatives.ticket.digest import canonical_bytes, digest
 from backend.derivatives.ticket.models import (
     EditableField, Environment, FieldRef, Leg, MarketSuggestion, Preview, Side, TicketDraft,
@@ -385,3 +388,51 @@ def test_v1_exponent_pattern_is_specific_to_serialization() -> None:
         money.append(schema["$defs"]["Leg"]["properties"]["limit_price"])
         for field in money:
             assert field["anyOf"] == alternatives and "pattern" not in field
+
+
+_PYDANTIC_REQUIRED = "pydantic 2.12 ou mais novo é exigido pela prévia da boleta"
+
+
+@pytest.mark.parametrize("version", ["2.11.7", "2.10.0", "2.9", "1.10.13", "2.11.99"])
+def test_g1_rejects_older_pydantic(version: str) -> None:
+    with pytest.raises(ImportError) as error:
+        models.require_pydantic(version)
+    assert str(error.value) == _PYDANTIC_REQUIRED
+
+
+@pytest.mark.parametrize("version", ["2.12.0", "2.13.3", "2.100.0", "3.0.0", "2.12.0b1"])
+def test_g2_accepts_supported_pydantic(version: str) -> None:
+    assert models.require_pydantic(version) is None
+
+
+@pytest.mark.parametrize(("version", "expected_code"), [("2.11.7", 1), ("2.12.0", 0)])
+def test_g3_import_enforces_pydantic_version(version: str, expected_code: int) -> None:
+    code = (
+        "import sys, pydantic\n"
+        "pydantic.VERSION = sys.argv[1]\n"
+        "import backend.derivatives.ticket.models"
+    )
+    run = subprocess.run([sys.executable, "-c", code, version], capture_output=True, text=True,
+                         cwd=Path(__file__).resolve().parents[4], timeout=30, check=False)
+    assert run.returncode == expected_code, run.stderr
+    if expected_code:
+        assert run.stderr.splitlines()[-1] == f"ImportError: {_PYDANTIC_REQUIRED}"
+
+
+def test_g3_calmo_draft_omits_empty_coverage() -> None:
+    source = Path(__file__).resolve().parents[3] / "fixtures/derivatives/synthetic/ticket/sessions"
+    step = json.loads((source / "calmo.roteiro.json").read_bytes())["steps"][0]
+    ticket = TicketDraft.model_validate_json(json.dumps(step["draft"]))
+    assert not ticket.coverage
+    assert "coverage" not in ticket.model_dump(mode="json")
+
+
+def test_g3_refuses_old_version_before_importing_v2_only_symbols(tmp_path: Path) -> None:
+    # O módulo mínimo fornece VERSION, mas nenhuma API exclusiva da série 2.
+    (tmp_path / "pydantic.py").write_text('VERSION = "1.10.13"\n', encoding="utf-8")
+    root = Path(__file__).resolve().parents[4]
+    code = "import sys; sys.path[:0] = sys.argv[1:]; import backend.derivatives.ticket.models"
+    run = subprocess.run([sys.executable, "-I", "-c", code, str(tmp_path), str(root)],
+                         capture_output=True, text=True, timeout=30, check=False)
+    assert run.returncode == 1
+    assert run.stderr.splitlines()[-1] == f"ImportError: {_PYDANTIC_REQUIRED}"
