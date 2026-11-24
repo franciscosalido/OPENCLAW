@@ -28,7 +28,7 @@ from tests.unit.derivatives.ticket.test_guards import NOW, CLOSE, quote
 from tests.unit.derivatives.ticket.test_models import PRICE
 from tests.unit.derivatives.ticket.test_sequencing import (
     BUY, SELL, authorized, close_plan, draft, holding, leg, position, sale_only,
-    wing_draft, wing_photo,
+    shared_source_plan, wing_draft, wing_photo,
 )
 from tests.unit.derivatives.ticket.test_trigger import SPEC, trade
 
@@ -2210,3 +2210,25 @@ def test_f7_already_stopped_preserves_receipt_on_first_external(s: Session) -> N
     s.res.freeze("sim", "A")
     e.on_external("f1", at(6))
     assert e.state is T.STOPPED and s.receipts[0].events == before
+
+
+def test_q7_shared_wing_fills_first_and_completes_four_legs(s: Session) -> None:
+    for symbol, bid, ask in (("C", ".55", ".65"), ("D", ".35", ".45"),
+                             ("A", "1.95", "2.05"), ("B", "1.15", "1.25")):
+        s.q(symbol, 1, bid=bid, ask=ask)
+    plan = shared_source_plan()
+    e = s.engine("T1", plan.position)
+    e.propose(plan.draft.model_copy(update={"send_deadline": END, "order_validity": CLOSE}), at(2))
+    e.confirm(s.dec(e), at(2))
+    assert e.orders == {A: O.LIVE, "T1:C:1": O.LIVE}
+    s.q("C", 3, bid=".55", ask=".60")
+    assert s.submitted()[2:] == [(B, 5, D("1.20"), at(3)), ("T1:D:1", 5, D(".40"), at(3))]
+    for order in (B, "T1:D:1"):
+        assert order_rows(s.receipts[0], order)[0]["protection"] == "C"
+    s.q("A", 4, bid="1.95", ask="2.00")
+    assert s.submitted()[4:] == [("T1:B:2", 10, D("1.20"), at(4))]
+    assert order_rows(s.receipts[0], "T1:B:2")[0]["protection"] == "A"
+    s.q("B", 5, bid="1.20", ask="1.30")
+    s.q("D", 6, bid=".40", ask=".50")
+    assert e.state is T.COMPLETED and e.gross().executed == D("46.00")
+    assert len(s.submitted()) == 5 and s.receipts[0].verify()

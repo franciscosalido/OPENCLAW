@@ -62,6 +62,7 @@ class LegPlan(NamedTuple):
     legs: tuple[Leg, ...]
     position: Position
     dependencies: tuple[tuple[str, str, bool], ...]
+    quotas: tuple[int, ...]
 
     def protections_for(self, leg: Leg) -> tuple[str, ...]:
         """Proteções usadas pela venda, na ordem de alocação do plano."""
@@ -69,6 +70,15 @@ class LegPlan(NamedTuple):
         if not sources or leg not in self.legs:
             raise SequenceRefusal("venda sem proteção no plano")
         return sources
+
+    def quota(self, leg: Leg, source: str) -> int:
+        """Limita a venda à parte planejada somente quando outra venda usa a proteção."""
+        if source not in self.protections_for(leg):
+            raise SequenceRefusal("proteção ausente no plano")
+        if any(buy == source and sale != leg.symbol for sale, buy, _ in self.dependencies):
+            return next(q for (sale, buy, _), q in zip(self.dependencies, self.quotas, strict=True)
+                        if (sale, buy) == (leg.symbol, source))
+        return leg.quantity
 
     def protection_for(self, leg: Leg) -> str:
         """Primeira proteção usada pela venda."""
@@ -110,6 +120,7 @@ def plan_legs(draft: TicketDraft, position: Position) -> LegPlan:
             raise SequenceRefusal("série sem evidência")
         remaining[grant.series] = remaining.get(grant.series, 0) + grant.quantity
     dependencies: list[tuple[str, str, bool]] = []
+    quotas: list[int] = []
     for buy in buys.values():
         balance = rows[buy.symbol].balance
         if balance < 0 and buy.quantity > -balance:
@@ -132,6 +143,7 @@ def plan_legs(draft: TicketDraft, position: Position) -> LegPlan:
             if sale.quantity > free[sale.symbol]:
                 raise SequenceRefusal("saldo livre insuficiente")
             dependencies.append((sale.symbol, sale.symbol, True))
+            quotas.append(sale.quantity)
             continue
         if not candidates or (len(candidates) > 1 and any(candidates.values())):
             raise SequenceRefusal("pareamento ausente ou ambíguo")
@@ -143,11 +155,12 @@ def plan_legs(draft: TicketDraft, position: Position) -> LegPlan:
                 remaining[source] -= take
                 needed -= take
                 dependencies.append((sale.symbol, source, candidates[source]))
+                quotas.append(take)
         if needed:
             raise SequenceRefusal("quantidade de proteção insuficiente")
     if {g.series for g in draft.coverage} - {buy for sale, buy, _ in dependencies if sale != buy}:
         raise SequenceRefusal("autorização sem venda correspondente")
-    return LegPlan(draft, (*buys.values(), *sales), position, tuple(dependencies))
+    return LegPlan(draft, (*buys.values(), *sales), position, tuple(dependencies), tuple(quotas))
 
 
 def releasable_quantity(leg: Leg, fills: int, sold: int, reservations: int) -> int:
@@ -328,8 +341,10 @@ class ReservationBook:
             disposed = sum(o.filled + o.live for o in orders if o.leg.symbol == leg.symbol)
             # Teto redundante: a recompra cabe no vendido, já coberto pelo saldo comprado.
             free = min(free, balances[leg.symbol] - disposed)
-        own = sum(o.live + o.filled for o in orders if o.ticket == ticket and o.leg == leg)
-        room = min(free, leg.quantity - own)
+        own = [o for o in orders if o.ticket == ticket and o.leg == leg]
+        occupied = sum(o.live + o.filled for o in own)
+        on_source = sum(o.live + o.filled for o in own if o.source == source)
+        room = min(free, leg.quantity - occupied, plan.quota(leg, source) - on_source)
         return max(0, room - room % leg.lot_size), source
 
     def available(self, plan: LegPlan, leg: Leg, *, ticket: str, origin: str | None = None,

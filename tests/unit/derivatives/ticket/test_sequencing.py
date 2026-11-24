@@ -1235,3 +1235,108 @@ def test_external_freezing_one_wing_leaves_other_capacity_until_engine_notified(
     assert book.available(plan, b, ticket="T1", source="A") == 0
     assert book.available(plan, b, ticket="T1", source="C") == 5
     book.reserve(plan, b, "C-only", 5, ticket="T1", source="C")
+
+
+def shared_source_plan(*, reverse: bool = False) -> LegPlan:
+    """Foto do Q1 e repartição de duas vendas entre A e C."""
+    photo = Position(account="sim", holdings=tuple(holding(s) for s in "ABCD"),
+                     pairs=(("A", "B"), ("C", "B"), ("C", "D")))
+    a, c = leg("A", Side.BUY, "2"), leg("C", Side.BUY, ".60")
+    b, d = leg("B", Side.SELL, "1.20", 15), leg("D", Side.SELL, ".40", 5)
+    legs = (c, d, a, b) if reverse else (a, b, c, d)
+    return plan_legs(draft(*legs, net="6", gross="46"), photo)
+
+
+def test_q1_plan_records_takes_in_signed_order() -> None:
+    plan = shared_source_plan()
+    _, _, b, d = plan.legs
+    assert plan.dependencies == (("B", "A", False), ("B", "C", False), ("D", "C", False))
+    assert plan.quotas == (10, 5, 5)
+    assert (plan.quota(b, "A"), plan.quota(b, "C"), plan.quota(d, "C")) == (15, 5, 5)
+    for sale, source in ((b, "X"), (d, "A")):
+        with pytest.raises(SequenceRefusal, match="proteção ausente no plano"):
+            plan.quota(sale, source)
+    reverse = shared_source_plan(reverse=True)
+    assert reverse.dependencies == (("D", "C", False), ("B", "C", False), ("B", "A", False))
+    assert reverse.quotas == (5, 5, 10)
+    wing = plan_legs(wing_draft(6, net="5.80", gross="20.20"), wing_photo())
+    body = wing.legs[-1]
+    assert wing.quotas == (5, 1) and (wing.quota(body, "A"), wing.quota(body, "C")) == (6, 6)
+    close = plan_legs(zeroing_draft(7), position(holding("A", 7), holding("B", 2)))
+    assert close.dependencies == (("A", "A", True),)
+    assert close.quotas == (7,) and close.quota(close.legs[0], "A") == 7
+
+
+def test_q2_shared_source_keeps_each_sales_quota() -> None:
+    plan, book = shared_source_plan(), ReservationBook()
+    a, c, b, d = plan.legs
+    book.confirm_buy(plan, c, "buy-c", 10, ticket="T1")
+    assert book.available(plan, b, ticket="T1", source="C") == 5
+    assert book.available(plan, d, ticket="T1", source="C") == 5
+    assert book.available(plan, b, ticket="T1", source="A") == 0
+    with pytest.raises(SequenceRefusal, match="reserva indisponível"):
+        book.reserve(plan, b, "too-many", 6, ticket="T1", source="C")
+    book.reserve(plan, b, "b-c", 5, ticket="T1", source="C")
+    assert book.available(plan, b, ticket="T1", source="C") == 0
+    assert book.available(plan, d, ticket="T1", source="C") == 5
+    book.reserve(plan, d, "d-c", 5, ticket="T1", source="C")
+    assert book.available(plan, d, ticket="T1", source="C") == 0
+    book.confirm_buy(plan, a, "buy-a", 10, ticket="T1")
+    assert book.available(plan, b, ticket="T1", source="A") == 10
+    book.reserve(plan, b, "b-a", 10, ticket="T1", source="A")
+    assert book.available(plan, b, ticket="T1", source="A") == 0
+    assert book.available(plan, b, ticket="T1", source="C") == 0
+
+
+def test_q3_reserving_first_wing_preserves_shared_wing_room() -> None:
+    plan, book = shared_source_plan(), ReservationBook()
+    a, c, b, d = plan.legs
+    for buy in (a, c):
+        book.confirm_buy(plan, buy, buy.symbol, 10, ticket="T1")
+    book.reserve(plan, b, "b-a", 10, ticket="T1", source="A")
+    assert book.available(plan, b, ticket="T1", source="A") == 0
+    assert book.available(plan, b, ticket="T1", source="C") == 5
+    assert book.available(plan, d, ticket="T1", source="C") == 5
+    book.reserve(plan, b, "b-c", 5, ticket="T1", source="C")
+    assert book.available(plan, b, ticket="T1", source="C") == 0
+    assert book.available(plan, d, ticket="T1", source="C") == 5
+
+
+def test_q4_confirmed_release_restores_only_the_unfilled_part() -> None:
+    plan, book = shared_source_plan(), ReservationBook()
+    _, c, b, d = plan.legs
+    book.confirm_buy(plan, c, "buy-c", 10, ticket="T1")
+    book.reserve(plan, b, "b-c", 5, ticket="T1", source="C")
+    book.confirm_sale("sim", "b-c", "fill", 2)
+    book.confirm_release("sim", "b-c", 3)
+    assert book.available(plan, b, ticket="T1", source="C") == 3
+    assert book.available(plan, d, ticket="T1", source="C") == 5
+
+
+def test_q5_partial_buy_can_be_claimed_first_by_second_sale() -> None:
+    plan, book = shared_source_plan(), ReservationBook()
+    _, c, b, d = plan.legs
+    book.confirm_buy(plan, c, "partial", 5, ticket="T1")
+    assert book.available(plan, b, ticket="T1", source="C") == 5
+    assert book.available(plan, d, ticket="T1", source="C") == 5
+    book.reserve(plan, d, "d-c", 5, ticket="T1", source="C")
+    assert book.available(plan, b, ticket="T1", source="C") == 0
+    book.confirm_buy(plan, c, "rest", 5, ticket="T1")
+    assert book.available(plan, b, ticket="T1", source="C") == 5
+    assert book.available(plan, d, ticket="T1", source="C") == 0
+
+
+def test_shared_quota_is_per_ticket_and_counts_all_origins() -> None:
+    plan, book = shared_source_plan(), ReservationBook()
+    _, c, b, _ = plan.legs
+    for name in ("T1", "T2"):
+        book.confirm_buy(plan, c, name, 10, ticket=name)
+    book.reserve(plan, b, "first", 5, ticket="T1", source="C")
+    assert book.available(plan, b, ticket="T2", source="C") == 5
+    signed = authorized(plan.draft, ("C", "T1", 5))
+    book.close("sim", "T1")
+    other = plan_legs(signed, plan.position)
+    book.admit(other, ticket="T3")
+    book.confirm_buy(other, c, "third", 3, ticket="T3")
+    book.reserve(other, b, "uses-own", 3, ticket="T3", source="C")
+    assert book.available(other, b, ticket="T3", source="C", origin="T1") == 2
