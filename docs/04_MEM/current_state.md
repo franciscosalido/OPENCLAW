@@ -4,7 +4,7 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-23 · **Turno:** Claude (DL3-PR07B1 e acompanhamento do PR07A4 integrados).
+**Última atualização:** 2026-11-23 · **Turno:** Claude (DL3-PR07B2 integrado).
 
 ## Depois da Fase 3 — decisões de produto no simulador (D0) — EM ANDAMENTO
 
@@ -28,8 +28,8 @@ Revisão 1). O PR07A foi cortado em três pelo planejador.
 | [DL3-PR07A4](../specs/derivatives/fase3/DL3-PR07A4.md) | DP-13, 1ª parte: relato contraditório vira divergência registrada | MERGEADO (PR #175) |
 | DL3-PR07A4, acompanhamento | conferência dos relatos de ordem incerta; `report_check.py` | MERGEADO (PR #176) |
 | [DL3-PR07B1](../specs/derivatives/fase3/DL3-PR07B1.md) | DP-02: zeragem de posição comprada em perna única | MERGEADO (PR #177) |
-| DL3-PR07B2 | DP-03: borboleta (strike na foto; vendida protegida por mais de uma compra) | próximo cartão |
-| DL3-PR07A5 | DP-13, 2ª parte: evento externo legítimo (exercício, enquadramento) | depois do PR07B2 |
+| [DL3-PR07B2](../specs/derivatives/fase3/DL3-PR07B2.md) | DP-03: montagem da borboleta (strike na foto; vendida com mais de uma proteção) | MERGEADO (PR #178) |
+| DL3-PR07A5 | DP-13, 2ª parte: evento externo legítimo (exercício, enquadramento) | próximo cartão |
 
 Entregue pelo DL3-PR07A1 (37 linhas de produção):
 - No instante exato da validade o motor recusa antes de gastar a decisão, ocupar o livro
@@ -321,22 +321,39 @@ Decisões de Francisco de 23/11/2026, em resposta ao planejador:
   mantém as ordens já enviadas e contabiliza as execuções;
 - o fato externo legítimo não bloqueia a conta; só afeta as boletas da série atingida.
 
-O PR07B e a DP-13 foram divididos em dois cada, pelo planejador. Fila: PR07B2 (borboleta),
-PR07A5 (evento externo). Atrás deles: apresentação da montagem parcial; a frente de repetir,
-completar e ajustar estruturas (boleta concluída cedendo sobra comprovada); limite de
-escala; modalidade B de garantia. O esquema JSON de saída é corrigido antes do primeiro
-consumidor externo da prévia, junto com a versão de formato do recibo. Segue para um cartão
-de testes: o `projection_id` no teste sintético do calendário.
+Entregue pelo DL3-PR07B2 (PR #178; `sequencing.py` +17 linhas, `engine.py` +6):
+- A foto de posição tem o strike de cada série; o par só vale com strikes diferentes. Os
+  três roteiros oficiais ganharam strike; recibos e âncoras não mudaram.
+- Uma vendida pode ter mais de uma proteção. O plano reparte a venda entre as compras da
+  boleta, na ordem assinada; cada unidade comprada protege uma só vendida.
+- O motor envia uma ordem de venda por proteção e o recibo diz qual série protegeu cada
+  ordem. Testes da estrutura completa, de cada asa isolada e de execuções parciais.
+- As duas contas da DP-03 estão em teste pela análise de vencimento: borboleta inteira perde
+  no máximo o débito (0,20 no exemplo); asa de cima perde largura menos crédito (0,40).
+- Só a montagem. Foto com vendida aberta e mais de uma proteção é recusada.
+- As duas lacunas de teste dos PRs #176 e #177 foram fechadas (G1 e G2).
+- Portão da cabeça `34aff5f`, pelo implementador: Linux x86_64 e macOS, 11.513 aprovados,
+  16 pulados, 261 subtestes; mypy estrito e Pyright sem erro; 17 mutantes detectados. O
+  revisor não repetiu a suíte; conferiu o manifesto de 114 evidências e rodou os cenários do
+  seu protótipo contra os módulos entregues.
 
-Pendente para o DL3-PR07B2:
-- dois testes (o código está certo): par em que a série «vendida» tem saldo positivo não
-  aumenta o saldo livre da proteção; correção sem original seguida, na mesma fila, do
-  original com a mesma identidade.
+Fila: PR07A5 (evento externo). Atrás dele: cota por dependência no livro; desmontagem e
+zeragem de borboleta; apresentação da montagem parcial; a frente de repetir, completar e
+ajustar estruturas (boleta concluída cedendo sobra comprovada); limite de escala;
+modalidade B de garantia. O esquema JSON de saída é corrigido antes do primeiro consumidor
+externo da prévia, junto com a versão de formato do recibo. Segue para um cartão de testes:
+o `projection_id` no teste sintético do calendário.
+
+Pendente, achado na revisão do DL3-PR07B2: a repartição do plano não é cota no livro.
+Quando duas vendas da mesma boleta usam a mesma proteção, a primeira pode tomar mais do que
+o plano lhe destinou e a estrutura termina parcial. Não há venda descoberta, e a borboleta
+simples não é afetada.
 
 Pendente para o DL3-PR07A5: desenho de onde registrar um fato sem boleta de origem e por
-onde ele entra no simulador.
+onde ele entra no simulador. Decisões já tomadas por Francisco: a boleta da série atingida
+para de enviar; a conta não bloqueia.
 
-Próxima ação (uma só): Claude publica o supercartão do DL3-PR07B2 e Codex o abre em
+Próxima ação (uma só): Claude publica o supercartão do DL3-PR07A5 e Codex o abre em
 rascunho.
 
 ## Fase 03 — Motor da boleta em simulador (D0) — FECHADA (estado A)

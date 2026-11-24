@@ -286,3 +286,46 @@ seu protótipo contra os módulos entregues.
   de uma vendida aberta. Entra na frente de repetir, completar e ajustar estruturas.
 - **DL3-PR07A5:** evento externo legítimo, com as decisões de Francisco de 23/11/2026 (a
   boleta da série para de enviar; a conta não bloqueia).
+
+## Revisão adversarial (Claude) — GO na primeira rodada, cabeça `34aff5f`
+
+Pela regra de processo de Francisco, o revisor **não executou a suíte, a tipagem nem os
+mutantes** desta cabeça. Leu o diff, conferiu as evidências pelo SHA-256 e rodou os cenários
+do seu protótipo, escrito antes do cartão.
+
+| Verificação | Resultado | Quem |
+|---|---|---|
+| Suíte sem integração, Linux x86_64 e macOS | 11.513 aprovados, 16 pulados, 261 subtestes nos dois | implementador; logs conferidos |
+| mypy estrito e Pyright, nos dois sistemas | 0 erros | implementador; logs conferidos |
+| Commit vermelho | os testes de B1 a B6 falham na base; B7, G1 e G2 já passavam | implementador; logs conferidos |
+| Testes focais antigos | 605 com resultado idêntico por nome | implementador; log conferido |
+| 15 mutantes do §5 e 2 adicionais, nos dois sistemas | todos detectados | implementador; logs conferidos |
+| Integração | só no contêiner Linux isolado: 31 aprovados, 206 pulados | implementador; evidências conferidas |
+| Manifesto de 114 evidências (`438c49e6…c6eb`) e hashes dos dois relatórios | conferem | revisor (22 arquivos) e Francisco (todos, no Mac) |
+| Diff | nove arquivos; `sequencing.py` com 443 linhas (teto 448) e `engine.py` com 490 (teto 494) | revisor |
+| Âncoras e recibos das sessões | iguais byte a byte entre base e cabeça | implementador; log conferido |
+| Cópia do cartão | SHA-256 `06c5ec3f…f0ac`, igual ao publicado | revisor |
+| 8 cenários do protótipo do planejador (B1 a B7 e G1) contra os módulos entregues | todos aprovados | revisor |
+
+A implementação é equivalente à do protótipo do planejador. A repartição no plano percorre
+as compras na ordem da boleta e depois as séries que só têm autorização, como o cartão pede.
+
+Erro do cartão: o §1 dava `engine.py` com 485 linhas na base; eram 484. O protótipo tinha 7
+linhas a mais, não 6. O teto de 494 não foi afetado.
+
+Limite desta revisão: sem mutantes próprios do revisor nesta cabeça. O G2 foi conferido
+pelos logs do implementador; o revisor não o rodou.
+
+Observação, não bloqueante, apontada pelo implementador e confirmada na leitura do código
+(limite do cartão do planejador):
+
+1. **A repartição do plano não é cota no livro.** Quando duas vendas da mesma boleta usam a
+   mesma proteção e uma delas tem outra proteção ainda não executada, a primeira venda pode
+   tomar da proteção comum mais do que o plano lhe destinou. A segunda fica sem saldo e a
+   estrutura termina parcial. A exclusividade se mantém: nenhuma unidade comprada protege
+   duas vendidas, e não há venda descoberta. A borboleta simples (uma só vendida) não é
+   afetada. Correção, em cartão posterior: gravar no plano a quantidade de cada dependência
+   e fazer o livro respeitá-la.
+
+Relatórios da skill lidos depois de formado o parecer, com SHA-256 conferidos
+(`a9f4b66a…a1ab` e `32d5fbba…dd76`): sem bloqueante.
