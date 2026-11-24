@@ -1426,3 +1426,13 @@ def test_d6_mount_another_butterfly_on_exact_open_position() -> None:
     plan = plan_legs(wing_draft(), open_butterfly())
     assert plan.dependencies == (("B", "A", False), ("B", "C", False))
     assert plan.quotas == (5, 5)
+
+
+@pytest.mark.parametrize("invalid_wing", ["A", "C"])
+def test_d2_ambiguous_debt_precedes_strike_compatibility(invalid_wing: str) -> None:
+    photo = Position(account="sim", pairs=(("A", "B"), ("C", "B")), holdings=(
+        holding("A", 1, strike=D(11 if invalid_wing == "A" else 10)), holding("B", -2),
+        holding("C", 2, strike=D(11 if invalid_wing == "C" else 12)),
+    ))
+    with pytest.raises(SequenceRefusal, match="vendida aberta com mais de uma proteção"):
+        plan_legs(wing_draft(), photo)
