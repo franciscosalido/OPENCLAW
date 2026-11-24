@@ -182,7 +182,7 @@ def test_v3_unknown_version_in_any_row(replay_outputs: Path, version: object) ->
 
 @pytest.mark.parametrize("change", [
     "missing", "extra", "trailing", "space", "array", "broken", "blank", "duplicate", "kind",
-    "timestamp", "seq_text", "seq_bool", "payload_type", "timestamp_alias",
+    "timestamp", "seq_text", "seq_bool", "payload_type", "timestamp_alias", "hash_type", "link_type",
 ])
 def test_v3_invalid_row(replay_outputs: Path, change: str) -> None:
     """O leitor distingue erro de representação de adulteração da cadeia."""
@@ -198,6 +198,8 @@ def test_v3_invalid_row(replay_outputs: Path, change: str) -> None:
         "kind": canonical(row | {"kind": "nope"}), "timestamp": canonical(row | {"ts": "ontem"}),
         "seq_text": canonical(row | {"seq": "2"}), "seq_bool": canonical(row | {"seq": True}),
         "payload_type": canonical(row | {"payload": 3}),
+        "hash_type": canonical(row | {"hash": 0}),
+        "link_type": canonical(row | {"prev_hash": None}),
         "timestamp_alias": canonical(row | {"ts": row["ts"].replace("+00:00", "Z")}),
     }
     lines[1] = invalid[change]
@@ -245,3 +247,15 @@ def test_v4_only_version_added_to_canonical_event(replay_outputs: Path) -> None:
                     "hash": event.hash}
         assert line.startswith('{"formato":1,"hash":"')
         assert line.removeprefix('{"formato":1,') == canonical(previous)[1:]
+
+
+def test_v2_external_fact_uses_same_format_and_anchor(tmp_path: Path) -> None:
+    """O fato de exercício também pode ser lido diretamente do arquivo gravado."""
+    from tests.unit.derivatives.test_ticket_replay_script import external_scenario, run_external
+
+    assert run_external(external_scenario(), tmp_path) == 0
+    out = tmp_path / "out"
+    summary = json.loads((out / "resumo.json").read_bytes())
+    with (out / "fatos_externos.jsonl").open(encoding="utf-8") as stream:
+        event, = wire.load_rows(stream, expected_head=summary["fatos_externos"]["hash"])
+    assert event.kind is Event.EXTERNAL and json.loads(event.payload)["kind"] == "exercise"

@@ -1,5 +1,6 @@
 """Provas do modelo D0, da versão editada e do conteúdo autorizável."""
 import json
+import re
 from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal, localcontext
 from hashlib import sha256
@@ -337,7 +338,35 @@ def test_v1_preview_serialization_schema_matches_published_bytes() -> None:
     assert TicketDraft.model_json_schema(mode="serialization")["additionalProperties"] is False
     generated = (json.dumps(schema, sort_keys=True, indent=2, ensure_ascii=False) + "\n").encode()
     assert sha256(generated).hexdigest() == (
-        "04108cb0c5ecdb33f20608916c86ae12e3c34b5bd48ca272dda7afcae93d6e31")
+        "a1c0bed2054e0f6af4885fadab8eb2668c739ff6541cf7fb57661b3c48620a2d")
     root = Path(__file__).resolve().parents[4]
     assert (root / "docs/specs/derivatives/fase3/schemas/previa.schema.json").read_bytes() == (
         generated)
+
+
+def test_v1_output_schema_accepts_exponents_as_written_in_the_receipt() -> None:
+    """Todos os quatro campos monetários aceitam os bytes decimais da prévia."""
+    from backend.derivatives.ticket.receipt import Receipt
+
+    base = preview()
+    priced = Leg.model_validate(dict(base.legs[0]) | {"limit_price": D("1E+2")})
+    p = Preview.model_validate(dict(base) | {
+        "legs": (priced, base.legs[1]), "net_limit": D("-1E+2"),
+        "gross_cap": D("1E+100000"), "partial_exposure": D("-0E-10"),
+    })
+    event = Receipt().append_preview(TIME, p)
+    data = json.loads(event.payload)["preview"]
+    assert event.read_preview() == p
+    schema = Preview.model_json_schema(mode="serialization")
+    fields = schema["properties"]
+    for value, literal, field in (
+        (data["net_limit"], "-1E+2", fields["net_limit"]),
+        (data["gross_cap"], "1E+100000", fields["gross_cap"]),
+        (data["partial_exposure"], "-0E-10", fields["partial_exposure"]),
+        (data["legs"][0]["limit_price"], "1E+2",
+         schema["$defs"]["Leg"]["properties"]["limit_price"]),
+    ):
+        assert value == literal
+        assert re.fullmatch(field["pattern"], value)
+        for invalid in ("E2", "1E", "1E+-2", "NaN", "Infinity", "1,00", ""):
+            assert re.fullmatch(field["pattern"], invalid) is None
