@@ -2179,3 +2179,34 @@ def test_external_pending_cancel_keeps_prior_divergence_and_late_fill(s: Session
     assert e.orders[B] == O.CANCELLED and e.state == T.STOPPED
     assert e.gross().executed == D("13") and s.halts.divergent("sim")
     s.venue.request_cancel.assert_called_once()
+
+
+def test_f5_external_projects_live_buy_and_records_partial_gross(s: Session) -> None:
+    e = s.confirmed()
+    assert e.gross().projected == D("25.00")
+    s.res.freeze("sim", "B")
+    e.on_external("f1", at(3))
+    assert e.state is T.WORKING and e.gross() == (D("25"), D("0"), D("10"))
+    s.q("A", 4, ask="1", size=6)
+    assert e.orders == {A: O.PARTIAL}
+    assert e.gross() == (D("25"), D("6.00"), D("10.00"))
+    assert json.loads(s.receipts[0].events[-1].payload)["gross"] == {
+        "signed": "25.00", "executed": "6.00", "projected": "10.00",
+    }
+
+
+def test_f6_external_projection_includes_both_live_orders(s: Session) -> None:
+    e = s.confirmed()
+    s.q("A", 3, ask="1", size=6)
+    assert e.orders == {A: O.PARTIAL, B: O.LIVE}
+    s.res.freeze("sim", "B")
+    e.on_external("f1", at(4))
+    assert e.gross() == (D("25"), D("6.00"), D("19.00"))
+
+
+def test_f7_already_stopped_preserves_receipt_on_first_external(s: Session) -> None:
+    e = stop_origin(s)
+    before = s.receipts[0].events
+    s.res.freeze("sim", "A")
+    e.on_external("f1", at(6))
+    assert e.state is T.STOPPED and s.receipts[0].events == before

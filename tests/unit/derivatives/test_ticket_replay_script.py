@@ -375,3 +375,114 @@ def test_h3c_unrepresentable_decision_lifetime(tmp_path: Path) -> None:
     script.write_text(json.dumps(data))
     assert main(args(FIXTURES / "calmo.replay.json", script, tmp_path / "out")) == 2
     assert list(tmp_path.iterdir()) == [script]
+
+
+def external_scenario() -> dict:
+    """Compõe o F8 em memória a partir dos modelos do roteiro calmo."""
+    plan = json.loads((FIXTURES / "calmo.roteiro.json").read_bytes())
+    pos = plan["positions"][0]
+    for row in pos["holdings"]:
+        row["balance"] = {"A": 10, "B": -10}[row["symbol"]]
+    plan["positions"].append(dict(pos, account="outra"))
+    opening = plan["steps"][0]
+    confirm = dict(after_seq=2, at=opening["at"], do="confirm", ticket="T1")
+    fact = dict(after_seq=4, at="2026-11-23T14:00:07Z", do="external", account="sim",
+                symbol="B", fact="f1", kind="exercise", quantity=4)
+    later = dict(after_seq=4, at="2026-11-23T14:00:08Z", ticket="T4")
+    plan["steps"] = [opening, dict(opening, ticket="T3", account="outra"), confirm,
+                     dict(confirm, ticket="T3"), fact, opening | later, confirm | later]
+    return plan
+
+
+def run_external(plan: dict, tmp_path: Path) -> int:
+    """Executa pela entrada pública que publica os JSON e JSONL."""
+    path = tmp_path / "roteiro.json"
+    path.write_text(json.dumps(plan))
+    return main(args(FIXTURES / "calmo.replay.json", path, tmp_path / "out"))
+
+
+def test_f8_script_publishes_account_fact_and_refuses_late_confirmation(tmp_path: Path) -> None:
+    assert run_external(external_scenario(), tmp_path) == 0
+    out = tmp_path / "out"
+    assert {p.name for p in out.iterdir()} == {
+        "fatos_externos.jsonl", "recibo_T1.jsonl", "recibo_T3.jsonl", "recibo_T4.jsonl",
+        "resumo.json",
+    }
+    line, = (out / "fatos_externos.jsonl").read_bytes().splitlines()
+    row = json.loads(line)
+    assert (row["seq"], row["kind"], row["ts"]) == (1, "external", "2026-11-23T14:00:07+00:00")
+    assert json.loads(row["payload"]) == {
+        "account": "sim", "symbol": "B", "fact": "f1", "kind": "exercise", "quantity": 4,
+    }
+    event = ReceiptEvent(row["seq"], datetime.fromisoformat(row["ts"]), Event.EXTERNAL,
+                         row["payload"].encode(), row["prev_hash"], row["hash"])
+    assert Receipt().verify([event])
+    summary = json.loads((out / "resumo.json").read_bytes())
+    assert summary["fatos_externos"] == {"eventos": 1, "hash": row["hash"]}
+    assert summary["recusas"] == [
+        {"passo": 7, "acao": "confirm", "boleta": "T4", "erro": "SequenceRefusal"},
+    ]
+    tickets = summary["boletas"]
+    assert [tickets[t]["estado"] for t in ("T1", "T3", "T4")] == ["STOPPED", "COMPLETED", "DRAFT"]
+    assert tickets["T1"]["bruto"] == {
+        "assinado": "25.00", "executado": "10.00", "projetado": "10.00",
+    }
+
+
+@pytest.mark.parametrize(("field", "value"), [
+    ("account", "ausente"), ("symbol", "Z"), ("symbol", "B:1"), ("kind", "assignment"),
+    ("quantity", 0), ("quantity", "4"), ("quantity", 1.5), ("quantity", True),
+    ("fact", "f 1"), ("ticket", "T1"),
+])
+def test_f9_invalid_external_script_never_publishes(tmp_path: Path, field: str, value: object
+                                                    ) -> None:
+    plan = external_scenario()
+    plan["steps"][4][field] = value
+    assert run_external(plan, tmp_path) == 2
+    assert not (tmp_path / "out").exists()
+
+
+@pytest.mark.parametrize("conflict", [True, False])
+def test_f10_duplicate_external_script(tmp_path: Path, conflict: bool) -> None:
+    plan = external_scenario()
+    fact = plan["steps"][4]
+    plan["steps"].insert(5, dict(fact, quantity=5 if conflict else 4))
+    code = run_external(plan, tmp_path)
+    if conflict:
+        assert code == 2 and not (tmp_path / "out").exists()
+    else:
+        assert code == 0
+        assert len((tmp_path / "out/fatos_externos.jsonl").read_bytes().splitlines()) == 1
+
+
+def test_f11_official_session_omits_external_artifacts(tmp_path: Path) -> None:
+    out = tmp_path / "out"
+    assert main(_official("calmo", out)) == 0
+    assert {p.name for p in out.iterdir()} == {"recibo_T1.jsonl", "resumo.json"}
+    assert "fatos_externos" not in json.loads((out / "resumo.json").read_bytes())
+
+
+def test_external_only_script_has_a_verifiable_session_record(tmp_path: Path) -> None:
+    plan = external_scenario()
+    plan["steps"] = [plan["steps"][4]]
+    assert run_external(plan, tmp_path) == 0
+    out = tmp_path / "out"
+    assert {p.name for p in out.iterdir()} == {"fatos_externos.jsonl", "resumo.json"}
+    summary = json.loads((out / "resumo.json").read_bytes())
+    assert summary["boletas"] == {} and summary["fatos_externos"]["eventos"] == 1
+
+
+def test_external_script_checks_instrument_in_its_own_photo(tmp_path: Path) -> None:
+    plan = external_scenario()
+    other = plan["positions"][1]
+    other["holdings"] = [dict(other["holdings"][0], symbol="X")]
+    other["pairs"] = []
+    plan["steps"] = [dict(plan["steps"][4], symbol="X")]
+    assert run_external(plan, tmp_path) == 2 and not (tmp_path / "out").exists()
+
+
+@pytest.mark.parametrize("second", ["05", "11"])
+def test_external_step_obeys_tape_time_window(tmp_path: Path, second: str) -> None:
+    plan = external_scenario()
+    plan["steps"] = [dict(plan["steps"][4], at=f"2026-11-23T14:00:{second}Z")]
+    assert run_external(plan, tmp_path) == 2 and not (tmp_path / "out").exists()
