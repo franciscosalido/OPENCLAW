@@ -3,6 +3,7 @@ import json
 from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal, localcontext
 from hashlib import sha256
+from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
@@ -317,3 +318,26 @@ def test_n1_one_grant_order_from_draft_to_receipt() -> None:
     for series in ("b", "B"):
         proposal = authorized(ticket, (series, "T1", 1), ("a", "T9", 2))
         assert proposal == authorized(ticket, a9, b1)
+
+
+def test_v1_preview_serialization_schema_matches_published_bytes() -> None:
+    """Confere o contrato de saída e o arquivo fixado com o pydantic do lock."""
+    schema = Preview.model_json_schema(mode="serialization")
+    assert schema["type"] == "object" and schema["additionalProperties"] is False
+    assert sorted(schema["properties"]) == [
+        "coverage", "digest", "environment", "gross_cap", "legs", "net_limit", "order_validity",
+        "partial_exposure", "quote_snapshot_id", "send_deadline", "version",
+    ]
+    assert schema["required"] == [
+        "legs", "net_limit", "gross_cap", "send_deadline", "order_validity", "quote_snapshot_id",
+        "partial_exposure", "digest",
+    ]
+    assert schema["$defs"]["Leg"]["additionalProperties"] is False
+    assert schema["$defs"]["CoverageGrant"]["required"] == ["series", "origin", "quantity"]
+    assert TicketDraft.model_json_schema(mode="serialization")["additionalProperties"] is False
+    generated = (json.dumps(schema, sort_keys=True, indent=2, ensure_ascii=False) + "\n").encode()
+    assert sha256(generated).hexdigest() == (
+        "04108cb0c5ecdb33f20608916c86ae12e3c34b5bd48ca272dda7afcae93d6e31")
+    root = Path(__file__).resolve().parents[4]
+    assert (root / "docs/specs/derivatives/fase3/schemas/previa.schema.json").read_bytes() == (
+        generated)

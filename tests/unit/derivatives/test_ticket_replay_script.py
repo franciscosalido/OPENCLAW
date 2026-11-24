@@ -103,7 +103,8 @@ def test_complete_replay(case: str, tmp_path: Path, monkeypatch: pytest.MonkeyPa
         events = []
         for line in rows:
             row = json.loads(line)
-            assert set(row) == {"seq", "ts", "kind", "payload", "prev_hash", "hash"}
+            assert set(row) == {"seq", "ts", "kind", "payload", "prev_hash", "hash", "formato"}
+            assert type(row["formato"]) is int and row["formato"] == 1
             assert line == (json.dumps(row, ensure_ascii=False, sort_keys=True,
                                        separators=(",", ":")) + "\n").encode()
             events.append(ReceiptEvent(row["seq"], datetime.fromisoformat(row["ts"]),
@@ -117,7 +118,8 @@ def test_complete_replay(case: str, tmp_path: Path, monkeypatch: pytest.MonkeyPa
             protection[case] if ticket == "T1" else {})
         assert [r.kind.value for r in events] == sequence.split()
         assert Receipt().verify(events, expected_head=head)
-    expected = {"aviso": AVISO, "eventos": count, "contas_bloqueadas": [], "boletas": boletas,
+    expected = {"formato": 1, "aviso": AVISO, "eventos": count, "contas_bloqueadas": [],
+                "boletas": boletas,
                 "recusas": [{"passo": n, "acao": "confirm", "boleta": t, "erro": err}
                             for n, t, err in refusals]}
     assert a["resumo.json"] == (json.dumps(expected, ensure_ascii=False, sort_keys=True,

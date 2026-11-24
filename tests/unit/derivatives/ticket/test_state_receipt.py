@@ -1,10 +1,14 @@
 """Contrato de transições, integridade e leitura do recibo simulado."""
+import json
 from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
+from hashlib import sha256
+from pathlib import Path
 
 import pytest
 
+from backend.derivatives.ticket import receipt as wire
 from backend.derivatives.ticket.models import Leg, Preview, Side
 from backend.derivatives.ticket.receipt import Receipt, ReceiptError
 from backend.derivatives.ticket.state import (
@@ -118,3 +122,126 @@ def test_receipt_rejects_bad_event_without_consuming_sequence() -> None:
         receipt.append(NOW, Event.PREVIEW, {"digest": "inventado"})
     assert receipt.events == ()
     assert receipt.append(NOW, Event.VENUE_FILL, {"units": 10}).seq == 1
+
+
+def canonical(value: object) -> str:
+    """Representação usada nos esperados do envelope de disco."""
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+@pytest.fixture(scope="module")
+def replay_outputs(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """Produz as três sessões oficiais pela interface pública do script."""
+    from scripts.derivatives_ticket_replay import main
+    from tests.unit.derivatives.ticket.test_session import FIXTURES
+
+    root = tmp_path_factory.mktemp("formato")
+    for name in ("calmo", "leilao", "rapido"):
+        assert main(["--replay", str(FIXTURES / f"{name}.replay.json"),
+                     "--roteiro", str(FIXTURES / f"{name}.roteiro.json"),
+                     "--out", str(root / name)]) == 0
+    return root
+
+
+@pytest.mark.parametrize(("name", "ticket", "anchor"), [
+    ("calmo", "T1", "1d50bba66aa2db714bf7006da415c39f083bc9e4374ebdbc9b94305b3356236b"),
+    ("leilao", "T1", "8592cd742d265332eddf75ea0f0cb9166e53f4db47dbfdd29901e166a43e7bbe"),
+    ("rapido", "T1", "9ebc9cd5b584f12b7e67be1ba7ba9a7da94c7a42a531c0d0105409404ba60344"),
+    ("rapido", "T2", "fbcaafa8eb7934ed7fe77a9f497b676904c5cc1647d42e0b8f5a77da4df3e2b5"),
+])
+def test_v2_round_trip_and_truncation(replay_outputs: Path, name: str, ticket: str,
+                                      anchor: str) -> None:
+    """Prefixo precisa de um evento; a âncora distingue prefixo de recibo completo."""
+    folder = replay_outputs / name
+    summary = json.loads((folder / "resumo.json").read_bytes())
+    assert type(summary["formato"]) is int and summary["formato"] == 1
+    lines = (folder / f"recibo_{ticket}.jsonl").read_text().splitlines(keepends=True)
+    events = wire.load_rows(iter(lines), expected_head=anchor)
+    assert isinstance(events, tuple) and len(events) == summary["boletas"][ticket]["recibo_eventos"]
+    assert events[-1].hash == anchor
+    assert events[0].read_preview().digest == json.loads(events[0].payload)["digest"]
+    with pytest.raises(ReceiptError, match="recibo vazio, adulterado ou incompleto"):
+        wire.load_rows(lines[:-1], expected_head=anchor)
+    if len(events) == 1:
+        with pytest.raises(ReceiptError, match="recibo vazio, adulterado ou incompleto"):
+            wire.load_rows(lines[:-1])
+    else:
+        assert wire.load_rows(lines[:-1]) == events[:-1]
+
+
+@pytest.mark.parametrize("version", [2, 0, "1", True, 1.0, None])
+def test_v3_unknown_version_in_any_row(replay_outputs: Path, version: object) -> None:
+    """Cada mensagem carrega a própria versão, de tipo inteiro estrito."""
+    lines = (replay_outputs / "calmo/recibo_T1.jsonl").read_text().splitlines()
+    for index in (0, 1):
+        changed = lines.copy()
+        changed[index] = canonical(json.loads(lines[index]) | {"formato": version})
+        with pytest.raises(ReceiptError, match="formato de recibo desconhecido"):
+            wire.load_rows(changed)
+
+
+@pytest.mark.parametrize("change", [
+    "missing", "extra", "trailing", "space", "array", "broken", "blank", "duplicate", "kind",
+    "timestamp", "seq_text", "seq_bool", "payload_type", "timestamp_alias",
+])
+def test_v3_invalid_row(replay_outputs: Path, change: str) -> None:
+    """O leitor distingue erro de representação de adulteração da cadeia."""
+    lines = (replay_outputs / "calmo/recibo_T1.jsonl").read_text().splitlines()
+    row = json.loads(lines[1])
+    missing = row.copy()
+    missing.pop("formato", None)
+    invalid = {
+        "missing": canonical(missing), "extra": canonical(row | {"extra": 1}),
+        "trailing": lines[1] + " ", "space": lines[1].replace('"formato":', '"formato": '),
+        "array": "[]", "broken": "{", "blank": "",
+        "duplicate": lines[1].replace('"formato":1', '"formato":1,"formato":1'),
+        "kind": canonical(row | {"kind": "nope"}), "timestamp": canonical(row | {"ts": "ontem"}),
+        "seq_text": canonical(row | {"seq": "2"}), "seq_bool": canonical(row | {"seq": True}),
+        "payload_type": canonical(row | {"payload": 3}),
+        "timestamp_alias": canonical(row | {"ts": row["ts"].replace("+00:00", "Z")}),
+    }
+    lines[1] = invalid[change]
+    with pytest.raises(ReceiptError, match="linha de recibo inválida"):
+        wire.load_rows(lines)
+
+
+@pytest.mark.parametrize("change", [
+    "seq", "ts", "kind", "link", "payload", "empty", "swap", "naive", "forged_preview",
+])
+def test_v3_chain_or_preview_mismatch(replay_outputs: Path, change: str) -> None:
+    """Inclui prévia com conteúdo editado e hash externo da linha recalculado."""
+    lines = (replay_outputs / "calmo/recibo_T1.jsonl").read_text().splitlines()
+    first, second = map(json.loads, lines[:2])
+    if change == "empty":
+        lines = []
+    elif change == "swap":
+        lines[:2] = reversed(lines[:2])
+    elif change == "naive":
+        lines[0] = canonical(first | {"ts": first["ts"].removesuffix("+00:00")})
+    elif change == "forged_preview":
+        payload = json.loads(first["payload"])
+        payload["preview"]["quote_snapshot_id"] += "-alterada"
+        first["payload"] = canonical(payload)
+        body = [first[k] for k in ("seq", "ts", "kind", "payload", "prev_hash")]
+        first["hash"] = sha256(canonical(body).encode()).hexdigest()
+        lines = [canonical(first)]
+    else:
+        altered = {"seq": 5, "ts": "2026-11-23T14:00:03+00:00", "kind": "stop",
+                   "link": "0" * 64, "payload": second["payload"].replace("T1", "T2")}
+        key = "prev_hash" if change == "link" else change
+        assert second[key] != altered[change]
+        lines[1] = canonical(second | {key: altered[change]})
+    with pytest.raises(ReceiptError, match="recibo vazio, adulterado ou incompleto"):
+        wire.load_rows(lines)
+
+
+def test_v4_only_version_added_to_canonical_event(replay_outputs: Path) -> None:
+    """Cada evento conserva o envelope anterior ao retirar a chave de versão."""
+    lines = (replay_outputs / "rapido/recibo_T1.jsonl").read_text().splitlines()
+    events = wire.load_rows(lines)
+    for line, event in zip(lines, events, strict=True):
+        previous = {"seq": event.seq, "ts": event.ts.isoformat(), "kind": event.kind.value,
+                    "payload": event.payload.decode(), "prev_hash": event.prev_hash,
+                    "hash": event.hash}
+        assert line.startswith('{"formato":1,"hash":"')
+        assert line.removeprefix('{"formato":1,') == canonical(previous)[1:]
