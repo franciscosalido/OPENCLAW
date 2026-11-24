@@ -108,16 +108,17 @@ def plan_legs(draft: TicketDraft, position: Position) -> LegPlan:
     for long, short in position.pairs:
         if short not in rows or long not in rows:
             raise SequenceRefusal("série sem evidência")
-        a, b = rows[long], rows[short]
         sources.setdefault(short, []).append(long)
-        if a.strike == b.strike or (a.underlying, a.kind, a.expiry, a.multiplier) != (
-                b.underlying, b.kind, b.expiry, b.multiplier):
-            raise SequenceRefusal("séries incompatíveis")
     for short, wings in sources.items():
         debt = -rows[short].balance
         if debt > 0 and len(wings) > 1 and (sum(rows[w].balance for w in wings) != debt
                                              or any(uses[w] > 1 for w in wings)):
             raise SequenceRefusal("vendida aberta com mais de uma proteção")
+    for long, short in position.pairs:
+        a, b = rows[long], rows[short]
+        if a.strike == b.strike or (a.underlying, a.kind, a.expiry, a.multiplier) != (
+                b.underlying, b.kind, b.expiry, b.multiplier):
+            raise SequenceRefusal("séries incompatíveis")
     free = position.unpledged()
     if any(free[long] < 0 for long in longs):
         raise SequenceRefusal("proteção inicial insuficiente")
