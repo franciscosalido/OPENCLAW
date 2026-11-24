@@ -431,8 +431,8 @@ def test_g3_refuses_old_version_before_importing_v2_only_symbols(tmp_path: Path)
     # O módulo mínimo fornece VERSION, mas nenhuma API exclusiva da série 2.
     (tmp_path / "pydantic.py").write_text('VERSION = "1.10.13"\n', encoding="utf-8")
     root = Path(__file__).resolve().parents[4]
-    code = "import sys; sys.path.append(sys.argv[1]); import backend.derivatives.ticket.models"
-    run = subprocess.run([sys.executable, "-c", code, str(root)], cwd=tmp_path, capture_output=True,
-                         text=True, timeout=30, check=False)
+    code = "import sys; sys.path[:0] = sys.argv[1:]; import backend.derivatives.ticket.models"
+    run = subprocess.run([sys.executable, "-I", "-c", code, str(tmp_path), str(root)],
+                         capture_output=True, text=True, timeout=30, check=False)
     assert run.returncode == 1
     assert run.stderr.splitlines()[-1] == f"ImportError: {_PYDANTIC_REQUIRED}"
