@@ -4,7 +4,7 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-23 · **Turno:** Claude (DL3-PR07A5 integrado).
+**Última atualização:** 2026-11-24 · **Turno:** Claude (DL3-PR07A6 integrado).
 
 ## Depois da Fase 3 — decisões de produto no simulador (D0) — EM ANDAMENTO
 
@@ -30,7 +30,8 @@ Revisão 1). O PR07A foi cortado em três pelo planejador.
 | [DL3-PR07B1](../specs/derivatives/fase3/DL3-PR07B1.md) | DP-02: zeragem de posição comprada em perna única | MERGEADO (PR #177) |
 | [DL3-PR07B2](../specs/derivatives/fase3/DL3-PR07B2.md) | DP-03: montagem da borboleta (strike na foto; vendida com mais de uma proteção) | MERGEADO (PR #178) |
 | [DL3-PR07A5](../specs/derivatives/fase3/DL3-PR07A5.md) | DP-13, 2ª parte: fato externo legítimo, reação do livro e do motor | MERGEADO (PR #179) |
-| DL3-PR07A6 | DP-13, 2ª parte: entrada do fato pela sessão e pelo roteiro; registro na conta; aviso a todos os motores | próximo cartão |
+| [DL3-PR07A6](../specs/derivatives/fase3/DL3-PR07A6.md) | DP-13, 2ª parte: entrada do fato pela sessão e pelo roteiro; registro sem boleta de origem; aviso a todas as boletas da conta | MERGEADO (PR #180) |
+| DL3-PR07C1 | cota por dependência no livro | próximo cartão |
 
 Entregue pelo DL3-PR07A1 (37 linhas de produção):
 - No instante exato da validade o motor recusa antes de gastar a decisão, ocupar o livro
@@ -354,25 +355,43 @@ Entregue pelo DL3-PR07A5 (PR #179; `sequencing.py` +19 linhas, `engine.py` +15, 
   revisor não repetiu a suíte; conferiu o manifesto de 126 evidências e rodou os cenários do
   seu protótipo e quatro sondas contra os módulos entregues.
 
-Fila: PR07A6 (entrada do fato externo). Atrás dele: cota por dependência no livro;
-desmontagem e zeragem de borboleta; apresentação da montagem parcial; a frente de repetir,
-completar e ajustar estruturas (boleta concluída cedendo sobra comprovada); limite de
-escala; modalidade B de garantia. O esquema JSON de saída é corrigido antes do primeiro
-consumidor externo da prévia, junto com a versão de formato do recibo. Segue para um cartão
-de testes: o `projection_id` no teste sintético do calendário.
+Entregue pelo DL3-PR07A6 (PR #180; `session.py` +55 linhas, `engine.py` +1, script +22):
+- A sessão tem uma entrada única para o fato externo: confere, grava no registro de fatos,
+  congela a série na conta e avisa todas as boletas daquela conta, na ordem de abertura.
+- O registro de fatos é uma cadeia própria da sessão, sem boleta de origem, com conta,
+  série, tipo (exercício ou enquadramento), quantidade com sinal e instante. Repetição
+  idêntica conta uma vez; mesmo identificador com conteúdo diferente é recusado.
+- O roteiro ganhou o passo `external`. A saída ganha `fatos_externos.jsonl` e a chave
+  `fatos_externos` no resumo só quando há fato; as sessões oficiais não mudaram.
+- O bruto projetado de boleta avisada passa a ser o executado mais as ordens vivas.
+- Limites: a quantidade do fato fica registrada e não altera saldos; a série segue
+  congelada até a foto nova; a conferência da foto seguinte depende de histórico entre
+  sessões.
+- Portão da cabeça `7588cf1`, pelo implementador: Linux x86_64 e macOS, 11.567 aprovados,
+  16 pulados, 261 subtestes; mypy estrito e Pyright sem erro; 31 mutantes detectados. O
+  revisor não repetiu a suíte; conferiu o manifesto de 144 evidências e rodou os casos do
+  seu protótipo e cinco sondas contra os módulos entregues.
+
+A DP-13 está entregue no simulador, menos a conferência da foto nova.
+
+Fila: PR07C1 (cota por dependência no livro). Atrás dele: desmontagem e zeragem de
+borboleta; apresentação da montagem parcial e do projetado depois de cancelamento humano;
+a frente de repetir, completar e ajustar estruturas (boleta concluída cedendo sobra
+comprovada); limite de escala; modalidade B de garantia. O esquema JSON de saída é
+corrigido antes do primeiro consumidor externo da prévia, junto com a versão de formato do
+recibo. Segue para um cartão de testes: o `projection_id` no teste sintético do calendário.
+A conferência da foto nova contra a anterior mais execuções mais fatos entra com o
+histórico persistente.
 
 Pendente, achado na revisão do DL3-PR07B2: a repartição do plano não é cota no livro.
 Quando duas vendas da mesma boleta usam a mesma proteção, a primeira pode tomar mais do que
 o plano lhe destinou e a estrutura termina parcial. Não há venda descoberta, e a borboleta
 simples não é afetada.
 
-Pendente para o DL3-PR07A6, da revisão do DL3-PR07A5:
-- teste versionado de que a boleta já parada não ganha registro com o primeiro aviso;
-- o bruto projetado de uma boleta avisada ainda conta a venda que não pode mais sair,
-  enquanto houver ordem viva;
-- o aviso tem de chegar a todos os motores da conta no mesmo passo do congelamento.
+Pendente, observado na revisão do DL3-PR07A6: `ReplaySession.receipt(ticket)` devolve o
+recibo interno da boleta, que tem `append` público. O registro de fatos já sai como cópia.
 
-Próxima ação (uma só): Claude publica o supercartão do DL3-PR07A6 e Codex o abre em
+Próxima ação (uma só): Claude publica o supercartão do DL3-PR07C1 e Codex o abre em
 rascunho.
 
 ## Fase 03 — Motor da boleta em simulador (D0) — FECHADA (estado A)
