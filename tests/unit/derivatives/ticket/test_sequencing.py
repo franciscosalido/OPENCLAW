@@ -1253,6 +1253,9 @@ def test_q1_plan_records_takes_in_signed_order() -> None:
     assert plan.dependencies == (("B", "A", False), ("B", "C", False), ("D", "C", False))
     assert plan.quotas == (10, 5, 5)
     assert (plan.quota(b, "A"), plan.quota(b, "C"), plan.quota(d, "C")) == (15, 5, 5)
+    for sale, source in ((b, "X"), (d, "A")):
+        with pytest.raises(SequenceRefusal, match="proteção ausente no plano"):
+            plan.quota(sale, source)
     reverse = shared_source_plan(reverse=True)
     assert reverse.dependencies == (("D", "C", False), ("B", "C", False), ("B", "A", False))
     assert reverse.quotas == (5, 5, 10)
