@@ -197,3 +197,41 @@ seu protótipo contra os módulos entregues.
 A fila do `current_state.md`: desmontagem e zeragem de borboleta; apresentação da montagem
 parcial e do projetado depois de cancelamento humano; repetir, completar e ajustar
 estruturas.
+
+## Revisão adversarial (Claude) — GO na primeira rodada, cabeça `ee572b6`
+
+Pela regra de processo de Francisco, o revisor **não executou a suíte, a tipagem nem os
+mutantes** desta cabeça. Leu o diff, conferiu as evidências pelo SHA-256 e rodou os cenários
+do seu protótipo, escrito antes do cartão, mais duas sondas próprias.
+
+| Verificação | Resultado | Quem |
+|---|---|---|
+| Suíte sem integração, Linux x86_64 e macOS | 11.574 aprovados, 16 pulados, 261 subtestes nos dois | implementador; logs conferidos |
+| mypy estrito e Pyright, nos dois sistemas | 0 erros | implementador; logs conferidos |
+| Commit vermelho `aacd5f0` antes do verde | Q1, Q2, Q4 e Q7 falham na base; Q3, Q5 e Q6 já passavam, como o cartão previa | implementador; log conferido |
+| Testes focais antigos | 623 com resultado idêntico por nome; 7 novos aprovados | implementador; log conferido |
+| 13 mutantes do §5 e 1 adicional, nos dois sistemas | todos detectados | implementador; logs conferidos |
+| Integração | só no contêiner Linux isolado: 31 aprovados, 206 pulados | implementador; evidência conferida |
+| Manifesto de 108 evidências (`718d2245…b0de`) e hashes dos dois relatórios | conferem | revisor (18 arquivos) e Francisco (todos, no Mac) |
+| `DIFF.patch` das evidências aplicado sobre a base | mesma árvore da cabeça | revisor |
+| Diff | quatro arquivos; `sequencing.py` com 477 linhas (teto 480) | revisor |
+| Âncoras, recibos e resumos das sessões oficiais | iguais entre base e cabeça | implementador; log conferido |
+| Cópia do cartão | igual à publicada | revisor |
+| 7 cenários do protótipo do planejador contra o módulo entregue | todos aprovados | revisor |
+| 2 sondas do revisor (abaixo) | aprovadas | revisor |
+
+A implementação é equivalente à do protótipo do planejador. Uma diferença, aceita:
+`quota` recusa com «proteção ausente no plano» quando a proteção consultada não é da venda.
+O livro já devolvia zero antes de chegar a essa consulta; a recusa protege a chamada direta.
+
+Sondas do revisor na cabeça:
+
+1. Duas boletas com o mesmo plano na mesma conta: cada uma tem as suas partes; a reserva de
+   uma não consome a parte da outra.
+2. Reserva parcial dentro da parte (3 de 5): sobram 2; proteção que não é da venda dá zero.
+
+Limite desta revisão: sem mutantes próprios do revisor nesta cabeça.
+
+Relatórios da skill lidos depois de formado o parecer, com SHA-256 conferidos
+(`054fee48…d222` e `36d88eeb…70f7`): sem bloqueante; nenhuma simplificação qualificada.
+
