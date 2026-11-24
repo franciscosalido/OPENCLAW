@@ -244,3 +244,11 @@ que mudou.
 
 Em V2, sem âncora, retirar a última linha é aceito se restar ao menos um evento.
 Se o recibo ficar vazio, o leitor o recusa, com ou sem âncora. Isso inclui T2 de `rapido`.
+
+## Adendo a V1 autorizado por Francisco — 24/11/2026
+
+O padrão de saída dos quatro campos monetários admite notação exponencial, inclusive em
+`Leg.limit_price`. Uma prévia de valor `Decimal("1E+2")` grava o texto `"1E+2"`.
+A correção atua exclusivamente no esquema de serialização. O novo SHA-256 de V1 é
+`a1c0bed2054e0f6af4885fadab8eb2668c739ff6541cf7fb57661b3c48620a2d`.
+O contrato preserva os bytes das prévias e as quatro âncoras.

@@ -7,8 +7,7 @@ from typing import Annotated, NamedTuple, Self
 
 from pydantic import (
     AfterValidator, AwareDatetime, BaseModel, BeforeValidator, ConfigDict, Field, ValidationInfo,
-    computed_field, field_validator,
-    model_validator,
+    GetPydanticSchema, computed_field, field_validator, model_validator,
 )
 
 from backend.derivatives.ticket.digest import digest
@@ -54,7 +53,12 @@ def _exact_input(value: object, info: ValidationInfo) -> object:
     raise ValueError("esperado Decimal ou texto decimal em JSON")
 
 
-Money = Annotated[Decimal, BeforeValidator(_exact_input), AfterValidator(_cent_amount)]
+_MONEY_PATTERN = r"^[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[Ee][+-]?[0-9]+)?$"
+Money = Annotated[
+    Decimal, BeforeValidator(_exact_input), AfterValidator(_cent_amount),
+    GetPydanticSchema(get_pydantic_json_schema=lambda core, handler: handler(core) | (
+        {"pattern": _MONEY_PATTERN} if handler.mode == "serialization" else {})),
+]
 Text = Annotated[str, Field(min_length=1, pattern=r"^\S+$")]
 PositiveInt = Annotated[int, Field(gt=0)]
 Instant = Annotated[AwareDatetime, AfterValidator(lambda value: value.astimezone(UTC))]
