@@ -370,3 +370,18 @@ def test_v1_output_schema_accepts_exponents_as_written_in_the_receipt() -> None:
         assert re.fullmatch(field["pattern"], value)
         for invalid in ("E2", "1E", "1E+-2", "NaN", "Infinity", "1,00", ""):
             assert re.fullmatch(field["pattern"], invalid) is None
+
+
+def test_v1_exponent_pattern_is_specific_to_serialization() -> None:
+    """A correção do texto de saída conserva as alternativas de entrada do Pydantic."""
+    from pydantic import TypeAdapter
+
+    alternatives = TypeAdapter(Decimal).json_schema(mode="validation")["anyOf"]
+    for model in (TicketDraft, Preview):
+        schema = model.model_json_schema(mode="validation")
+        money = [schema["properties"][name] for name in ("net_limit", "gross_cap")]
+        if model is Preview:
+            money.append(schema["properties"]["partial_exposure"])
+        money.append(schema["$defs"]["Leg"]["properties"]["limit_price"])
+        for field in money:
+            assert field["anyOf"] == alternatives and "pattern" not in field
