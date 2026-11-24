@@ -1072,7 +1072,7 @@ def test_b1_photo_refuses_ambiguous_attribution_and_incompatible_strikes() -> No
          "séries incompatíveis"),
         ({"pairs": (("A", "B"), ("A", "B"))}, "atribuição de proteção ambígua"),
         ({"pairs": (("A", "B"), ("B", "C"))}, "atribuição de proteção ambígua"),
-        ({"holdings": (holding("A", 1), holding("B", -2), holding("C", 1))},
+        ({"holdings": (holding("A", 1), holding("B", -2), holding("C", 2))},
          "vendida aberta com mais de uma proteção"),
     ]
     for changes, reason in cases:
@@ -1340,3 +1340,113 @@ def test_shared_quota_is_per_ticket_and_counts_all_origins() -> None:
     book.confirm_buy(other, c, "third", 3, ticket="T3")
     book.reserve(other, b, "uses-own", 3, ticket="T3", source="C")
     assert book.available(other, b, ticket="T3", source="C", origin="T1") == 2
+
+
+def open_butterfly(c: int = 10, pairs: tuple[tuple[str, str], ...] = (("A", "B"), ("C", "B")),
+                   ) -> Position:
+    return Position(account="sim", pairs=pairs, holdings=(
+        holding("A", 10), holding("B", -20), holding("C", c), holding("D"),
+    ))
+
+
+def unwind_butterfly() -> TicketDraft:
+    return draft(leg("B", Side.BUY, "1.20", 20), leg("A", Side.SELL, "2.00"),
+                 leg("C", Side.SELL, ".60"), net="-2", gross="50")
+
+
+def test_d1_exact_wings_are_fully_pledged_and_unwind_in_signed_order() -> None:
+    photo, ticket = open_butterfly(), unwind_butterfly()
+    assert photo.unpledged() == {"A": 0, "B": -20, "C": 0, "D": 0}
+    plan = plan_legs(ticket, photo)
+    assert plan.legs == ticket.legs
+    assert plan.dependencies == (("A", "B", True), ("C", "B", True))
+    assert plan.quotas == (10, 10)
+    assert (plan.quota(plan.legs[1], "B"), plan.quota(plan.legs[2], "B")) == (10, 10)
+
+
+@pytest.mark.parametrize(("c", "pairs"), [
+    (15, (("A", "B"), ("C", "B"))),
+    (5, (("A", "B"), ("C", "B"))),
+    (10, (("A", "B"), ("C", "B"), ("C", "D"))),
+    (10, (("C", "B"), ("A", "B"), ("A", "D"))),
+])
+def test_d2_ambiguous_open_wings_are_refused(c: int, pairs: tuple[tuple[str, str], ...]) -> None:
+    with pytest.raises(SequenceRefusal, match="vendida aberta com mais de uma proteção"):
+        plan_legs(unwind_butterfly(), open_butterfly(c, pairs))
+
+
+def test_d3_wing_sales_require_sufficient_signed_buyback() -> None:
+    b, a, c = unwind_butterfly().legs
+    buy_ten = leg("B", Side.BUY, "1.20")
+    photo = open_butterfly()
+    with pytest.raises(SequenceRefusal, match="saldo livre insuficiente"):
+        plan_legs(draft(a, net="-20", gross="20"), photo)
+    with pytest.raises(SequenceRefusal, match="quantidade de proteção insuficiente"):
+        plan_legs(draft(buy_ten, a, c, net="-14", gross="38"), photo)
+    with pytest.raises(SequenceRefusal, match="recompra atravessa saldo conciliado"):
+        plan_legs(draft(leg("B", Side.BUY, "1.20", 21), a, c, net="-.80", gross="51.20"), photo)
+    assert plan_legs(draft(b, a, net="4", gross="44"), photo).dependencies == (("A", "B", True),)
+    half = draft(buy_ten, leg("A", Side.SELL, "2", 5), leg("C", Side.SELL, ".60", 5),
+                 net="-1", gross="25")
+    assert plan_legs(half, photo).quotas == (5, 5)
+
+
+def test_d4_wings_compete_for_the_same_executed_buybacks() -> None:
+    plan, book = plan_legs(unwind_butterfly(), open_butterfly()), ReservationBook()
+    b, a, c = plan.legs
+    book.admit(plan, ticket="T1")
+
+    def available() -> tuple[int, int]:
+        return book.available(plan, a, ticket="T1"), book.available(plan, c, ticket="T1")
+
+    assert available() == (0, 0)
+    book.confirm_buy(plan, b, "first", 10, ticket="T1")
+    assert available() == (10, 10)
+    book.reserve(plan, c, "c1", 6, ticket="T1")
+    assert available() == (4, 4)
+    book.confirm_buy(plan, b, "second", 10, ticket="T1")
+    assert available() == (10, 4)
+    book.reserve(plan, a, "a1", 10, ticket="T1")
+    book.reserve(plan, c, "c2", 4, ticket="T1")
+    assert available() == (0, 0)
+
+
+def test_d5_preserve_uncovered_balance_and_reverse_exact_pairs() -> None:
+    assert position(holding("A", 10), holding("B", -10)).unpledged()["A"] == 0
+    assert position(holding("A", 5), holding("B", -10)).unpledged()["A"] == -5
+    shared = Position(account="sim", holdings=(holding("A", 12), holding("B", -10),
+                                              holding("D", -1)), pairs=(("A", "B"), ("A", "D")))
+    assert shared.unpledged()["A"] == 1
+    assert open_butterfly(pairs=(("C", "B"), ("A", "B"))).unpledged() == {
+        "A": 0, "B": -20, "C": 0, "D": 0,
+    }
+
+
+def test_d6_mount_another_butterfly_on_exact_open_position() -> None:
+    plan = plan_legs(wing_draft(), open_butterfly())
+    assert plan.dependencies == (("B", "A", False), ("B", "C", False))
+    assert plan.quotas == (5, 5)
+
+
+@pytest.mark.parametrize("invalid_wing", ["A", "C"])
+def test_d2_ambiguous_debt_precedes_strike_compatibility(invalid_wing: str) -> None:
+    photo = Position(account="sim", pairs=(("A", "B"), ("C", "B")), holdings=(
+        holding("A", 1, strike=D(11 if invalid_wing == "A" else 10)), holding("B", -2),
+        holding("C", 2, strike=D(11 if invalid_wing == "C" else 12)),
+    ))
+    with pytest.raises(SequenceRefusal, match="vendida aberta com mais de uma proteção"):
+        plan_legs(wing_draft(), photo)
+
+
+def test_d4_two_buybacks_cannot_dispose_of_the_same_ten_wings() -> None:
+    plan = plan_legs(draft(leg("B", Side.BUY, "1.20"), leg("A", Side.SELL, "2.00"),
+                           net="-8", gross="32"), open_butterfly())
+    b, a = plan.legs
+    book = ReservationBook()
+    for ticket in ("T1", "T2"):
+        book.admit(plan, ticket=ticket)
+        book.confirm_buy(plan, b, ticket, 10, ticket=ticket)
+    book.reserve(plan, a, "first-sale", 10, ticket="T1")
+    assert book.available(plan, a, ticket="T2") == 0
+    with pytest.raises(SequenceRefusal, match="reserva indisponível"):
+        book.reserve(plan, a, "second-sale", 1, ticket="T2")

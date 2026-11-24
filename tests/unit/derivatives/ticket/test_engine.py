@@ -28,7 +28,7 @@ from tests.unit.derivatives.ticket.test_guards import NOW, CLOSE, quote
 from tests.unit.derivatives.ticket.test_models import PRICE
 from tests.unit.derivatives.ticket.test_sequencing import (
     BUY, SELL, authorized, close_plan, draft, holding, leg, position, sale_only,
-    shared_source_plan, wing_draft, wing_photo,
+    open_butterfly, shared_source_plan, unwind_butterfly, wing_draft, wing_photo,
 )
 from tests.unit.derivatives.ticket.test_trigger import SPEC, trade
 
@@ -2232,3 +2232,44 @@ def test_q7_shared_wing_fills_first_and_completes_four_legs(s: Session) -> None:
     s.q("D", 6, bid=".40", ask=".50")
     assert e.state is T.COMPLETED and e.gross().executed == D("46.00")
     assert len(s.submitted()) == 5 and s.receipts[0].verify()
+
+
+def partially_unwind_butterfly(s: Session) -> TicketEngine:
+    for symbol, bid, ask in (("A", "2", "2.10"), ("B", "1.10", "1.25"), ("C", ".60", ".70")):
+        s.q(symbol, 1, bid=bid, ask=ask)
+    engine = s.engine("T1", open_butterfly())
+    ticket = unwind_butterfly().model_copy(update={"send_deadline": END, "order_validity": CLOSE})
+    engine.propose(ticket, at(1))
+    engine.confirm(s.dec(engine), at(2))
+    assert engine.orders == {B: O.LIVE}
+    s.q("B", 3, bid="1.10", ask="1.20", size=10)
+    assert engine.orders == {B: O.PARTIAL, A: O.LIVE}
+    assert s.submitted() == [(B, 20, D("1.20"), at(2)), (A, 10, D("2.00"), at(3))]
+    return engine
+
+
+def test_d7_full_buyback_releases_both_wings_and_completes(s: Session) -> None:
+    engine = partially_unwind_butterfly(s)
+    c = "T1:C:1"
+    s.q("B", 4, bid="1.10", ask="1.20", size=10)
+    assert engine.orders == {B: O.FILLED, A: O.LIVE, c: O.LIVE}
+    assert s.submitted()[2:] == [(c, 10, D(".60"), at(4))]
+    s.q("A", 5, bid="2", ask="2.10")
+    s.q("C", 5, bid=".60", ask=".70")
+    assert engine.orders == {B: O.FILLED, A: O.FILLED, c: O.FILLED}
+    assert engine.state == T.COMPLETED and engine.gross().executed == D("50.00")
+    assert len(s.submitted()) == 3
+    for order in (A, c):
+        assert order_rows(s.receipts[0], order)[0]["protection"] == "B"
+
+
+def test_d8_cancel_partial_buyback_leaves_one_covered_vertical(s: Session) -> None:
+    engine = partially_unwind_butterfly(s)
+    s.q("A", 4, bid="2", ask="2.10")
+    s.cancel(engine, B, 4)
+    s.q("B", 5, bid="1.10", ask="1.30")
+    assert engine.state == T.STOPPED and engine.gross().executed == D("32.00")
+    assert engine.orders == {B: O.CANCELLED, A: O.FILLED}
+    assert s.paper.poll(B) == (O.CANCELLED, 10, 0)
+    assert s.paper.poll(A) == (O.FILLED, 10, 0)
+    assert len(s.submitted()) == 2 and s.paper.poll("T1:C:1") is None

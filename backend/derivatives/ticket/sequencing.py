@@ -1,4 +1,5 @@
 """Sequenciamento e contabilidade local de execuções conciliadas do simulador D0."""
+from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
@@ -40,8 +41,12 @@ class Position(_Frozen):
         """Saldos da foto descontadas todas as posições vendidas que cada série protege."""
         balances = {row.symbol: row.balance for row in self.holdings}
         free = balances.copy()
+        last = {short: long for long, short in self.pairs}
+        owed = {short: max(0, -balances[short]) for short in last}
         for long, short in self.pairs:
-            free[long] -= max(0, -balances[short])
+            debit = owed[short] if long == last[short] else min(max(0, free[long]), owed[short])
+            free[long] -= debit
+            owed[short] -= debit
         return free
 
 
@@ -98,14 +103,19 @@ def plan_legs(draft: TicketDraft, position: Position) -> LegPlan:
     if (len(set(position.pairs)) != len(position.pairs)
             or any(short in longs for _, short in position.pairs)):
         raise SequenceRefusal("atribuição de proteção ambígua")
-    seen: set[str] = set()
+    sources: dict[str, list[str]] = {}
+    uses = Counter(long for long, _ in position.pairs)
     for long, short in position.pairs:
         if short not in rows or long not in rows:
             raise SequenceRefusal("série sem evidência")
-        a, b = rows[long], rows[short]
-        if short in seen and b.balance < 0:
+        sources.setdefault(short, []).append(long)
+    for short, wings in sources.items():
+        debt = -rows[short].balance
+        if debt > 0 and len(wings) > 1 and (sum(rows[w].balance for w in wings) != debt
+                                             or any(uses[w] > 1 for w in wings)):
             raise SequenceRefusal("vendida aberta com mais de uma proteção")
-        seen.add(short)
+    for long, short in position.pairs:
+        a, b = rows[long], rows[short]
         if a.strike == b.strike or (a.underlying, a.kind, a.expiry, a.multiplier) != (
                 b.underlying, b.kind, b.expiry, b.multiplier):
             raise SequenceRefusal("séries incompatíveis")
@@ -339,7 +349,7 @@ class ReservationBook:
             free = min(self._surplus(account, origin, source), limit - used)
         if closing:
             disposed = sum(o.filled + o.live for o in orders if o.leg.symbol == leg.symbol)
-            # Teto redundante: a recompra cabe no vendido, já coberto pelo saldo comprado.
+            # Recompras de boletas distintas disputam o mesmo saldo da asa.
             free = min(free, balances[leg.symbol] - disposed)
         own = [o for o in orders if o.ticket == ticket and o.leg == leg]
         occupied = sum(o.live + o.filled for o in own)
