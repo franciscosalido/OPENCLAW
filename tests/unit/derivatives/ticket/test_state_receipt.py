@@ -182,7 +182,8 @@ def test_v3_unknown_version_in_any_row(replay_outputs: Path, version: object) ->
 
 @pytest.mark.parametrize("change", [
     "missing", "extra", "trailing", "space", "array", "broken", "blank", "duplicate", "kind",
-    "timestamp", "seq_text", "seq_bool", "payload_type", "timestamp_alias", "hash_type", "link_type",
+    "timestamp", "seq_text", "seq_bool", "payload_type", "timestamp_alias",
+    "hash_type", "link_type",
 ])
 def test_v3_invalid_row(replay_outputs: Path, change: str) -> None:
     """O leitor distingue erro de representação de adulteração da cadeia."""
