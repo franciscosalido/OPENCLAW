@@ -1,8 +1,10 @@
 """Provas do modelo D0, da versão editada e do conteúdo autorizável."""
 import json
+import re
 from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal, localcontext
 from hashlib import sha256
+from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
@@ -317,3 +319,69 @@ def test_n1_one_grant_order_from_draft_to_receipt() -> None:
     for series in ("b", "B"):
         proposal = authorized(ticket, (series, "T1", 1), ("a", "T9", 2))
         assert proposal == authorized(ticket, a9, b1)
+
+
+def test_v1_preview_serialization_schema_matches_published_bytes() -> None:
+    """Confere o contrato de saída e o arquivo fixado com o pydantic do lock."""
+    schema = Preview.model_json_schema(mode="serialization")
+    assert schema["type"] == "object" and schema["additionalProperties"] is False
+    assert sorted(schema["properties"]) == [
+        "coverage", "digest", "environment", "gross_cap", "legs", "net_limit", "order_validity",
+        "partial_exposure", "quote_snapshot_id", "send_deadline", "version",
+    ]
+    assert schema["required"] == [
+        "legs", "net_limit", "gross_cap", "send_deadline", "order_validity", "quote_snapshot_id",
+        "partial_exposure", "digest",
+    ]
+    assert schema["$defs"]["Leg"]["additionalProperties"] is False
+    assert schema["$defs"]["CoverageGrant"]["required"] == ["series", "origin", "quantity"]
+    assert TicketDraft.model_json_schema(mode="serialization")["additionalProperties"] is False
+    generated = (json.dumps(schema, sort_keys=True, indent=2, ensure_ascii=False) + "\n").encode()
+    assert sha256(generated).hexdigest() == (
+        "a1c0bed2054e0f6af4885fadab8eb2668c739ff6541cf7fb57661b3c48620a2d")
+    root = Path(__file__).resolve().parents[4]
+    assert (root / "docs/specs/derivatives/fase3/schemas/previa.schema.json").read_bytes() == (
+        generated)
+
+
+def test_v1_output_schema_accepts_exponents_as_written_in_the_receipt() -> None:
+    """Todos os quatro campos monetários aceitam os bytes decimais da prévia."""
+    from backend.derivatives.ticket.receipt import Receipt
+
+    base = preview()
+    priced = Leg.model_validate(dict(base.legs[0]) | {"limit_price": D("1E+2")})
+    p = Preview.model_validate(dict(base) | {
+        "legs": (priced, base.legs[1]), "net_limit": D("-1E+2"),
+        "gross_cap": D("1E+100000"), "partial_exposure": D("-0E-10"),
+    })
+    event = Receipt().append_preview(TIME, p)
+    data = json.loads(event.payload)["preview"]
+    assert event.read_preview() == p
+    schema = Preview.model_json_schema(mode="serialization")
+    fields = schema["properties"]
+    for value, literal, field in (
+        (data["net_limit"], "-1E+2", fields["net_limit"]),
+        (data["gross_cap"], "1E+100000", fields["gross_cap"]),
+        (data["partial_exposure"], "-0E-10", fields["partial_exposure"]),
+        (data["legs"][0]["limit_price"], "1E+2",
+         schema["$defs"]["Leg"]["properties"]["limit_price"]),
+    ):
+        assert value == literal
+        assert re.fullmatch(field["pattern"], value)
+        for invalid in ("E2", "1E", "1E+-2", "NaN", "Infinity", "1,00", ""):
+            assert re.fullmatch(field["pattern"], invalid) is None
+
+
+def test_v1_exponent_pattern_is_specific_to_serialization() -> None:
+    """A correção do texto de saída conserva as alternativas de entrada do Pydantic."""
+    from pydantic import TypeAdapter
+
+    alternatives = TypeAdapter(Decimal).json_schema(mode="validation")["anyOf"]
+    for model in (TicketDraft, Preview):
+        schema = model.model_json_schema(mode="validation")
+        money = [schema["properties"][name] for name in ("net_limit", "gross_cap")]
+        if model is Preview:
+            money.append(schema["properties"]["partial_exposure"])
+        money.append(schema["$defs"]["Leg"]["properties"]["limit_price"])
+        for field in money:
+            assert field["anyOf"] == alternatives and "pattern" not in field

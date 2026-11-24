@@ -7,8 +7,7 @@ from typing import Annotated, NamedTuple, Self
 
 from pydantic import (
     AfterValidator, AwareDatetime, BaseModel, BeforeValidator, ConfigDict, Field, ValidationInfo,
-    SerializerFunctionWrapHandler, computed_field, field_validator, model_serializer,
-    model_validator,
+    GetPydanticSchema, computed_field, field_validator, model_validator,
 )
 
 from backend.derivatives.ticket.digest import digest
@@ -54,7 +53,12 @@ def _exact_input(value: object, info: ValidationInfo) -> object:
     raise ValueError("esperado Decimal ou texto decimal em JSON")
 
 
-Money = Annotated[Decimal, BeforeValidator(_exact_input), AfterValidator(_cent_amount)]
+_MONEY_PATTERN = r"^[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[Ee][+-]?[0-9]+)?$"
+Money = Annotated[
+    Decimal, BeforeValidator(_exact_input), AfterValidator(_cent_amount),
+    GetPydanticSchema(get_pydantic_json_schema=lambda core, handler: handler(core) | (
+        {"pattern": _MONEY_PATTERN} if handler.mode == "serialization" else {})),
+]
 Text = Annotated[str, Field(min_length=1, pattern=r"^\S+$")]
 PositiveInt = Annotated[int, Field(gt=0)]
 Instant = Annotated[AwareDatetime, AfterValidator(lambda value: value.astimezone(UTC))]
@@ -115,20 +119,13 @@ class _Ticket(_Frozen):
     order_validity: Instant
     quote_snapshot_id: Text
     version: PositiveInt = 1
-    coverage: Annotated[tuple[CoverageGrant, ...], Field(max_length=4)] = ()
+    coverage: Annotated[tuple[CoverageGrant, ...],
+                        Field(max_length=4, exclude_if=lambda grants: not grants)] = ()
 
     @field_validator("coverage", mode="after")
     @classmethod
     def _ordered_grants(cls, grants: tuple[CoverageGrant, ...]) -> tuple[CoverageGrant, ...]:
         return tuple(sorted(grants, key=lambda grant: (grant.series, grant.origin)))
-
-    @model_serializer(mode="wrap")
-    def _serialize(self, handler: SerializerFunctionWrapHandler) -> dict[str, object]:
-        """Mantém o corpo histórico dos recibos sem autorização."""
-        fields: dict[str, object] = handler(self)
-        if not self.coverage:
-            fields.pop("coverage", None)
-        return fields
 
     @model_validator(mode="after")
     def _distinct_symbols_and_grants(self) -> Self:

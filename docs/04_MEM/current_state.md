@@ -4,7 +4,7 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-24 · **Turno:** Claude (DL3-PR07D1 integrado).
+**Última atualização:** 2026-11-24 · **Turno:** Claude (DL3-PR07E1 integrado; Fase 3 estendida encerrada, falta só o fecho PR07F1).
 
 ## Depois da Fase 3 — decisões de produto no simulador (D0) — EM ANDAMENTO
 
@@ -34,7 +34,8 @@ Revisão 1). O PR07A foi cortado em três pelo planejador.
 | [DL3-PR07C1](../specs/derivatives/fase3/DL3-PR07C1.md) | cota do plano na proteção disputada entre duas vendas | MERGEADO (PR #181) |
 | [DL3-PR07B3](../specs/derivatives/fase3/DL3-PR07B3.md) | DP-03: desmontagem da borboleta com conta exata | MERGEADO (PR #182) |
 | [DL3-PR07D1](../specs/derivatives/fase3/DL3-PR07D1.md) | andamento por perna, rótulo da parada e projetado após cancelamento humano | MERGEADO (PR #183) |
-| DL3-PR07E1 | versão de formato do recibo e do resumo; esquema de saída verificável | próximo cartão |
+| [DL3-PR07E1](../specs/derivatives/fase3/DL3-PR07E1.md) | formato versionado do recibo e do resumo; esquema de saída da prévia | MERGEADO (PR #184) |
+| DL3-PR07F1 | fecho: guarda da versão do pydantic e recibo da sessão como cópia | próximo cartão |
 
 Entregue pelo DL3-PR07A1 (37 linhas de produção):
 - No instante exato da validade o motor recusa antes de gastar a decisão, ocupar o livro
@@ -417,11 +418,26 @@ Entregue pelo DL3-PR07D1 (PR #183; `engine.py` +38 linhas, `session.py` +5, scri
 
 Com isso ficam entregues no simulador os assuntos abertos pela DP-03 e pela DP-13.
 
-Fila: PR07E1 (versão de formato do recibo e do resumo, com esquema de saída verificável),
-que fecha a Fase 3 estendida. Depois dele, frentes novas, cada uma com decisão própria de
-Francisco: repetir, completar e ajustar estruturas; limite de escala; modalidade B de
-garantia; histórico persistente com conferência da foto nova; foto com quantidade por par.
-Segue para um cartão de testes: o `projection_id` no teste sintético do calendário.
+Entregue pelo DL3-PR07E1 (PR #184):
+- O esquema de saída da prévia enumera os campos e está versionado em
+  `docs/specs/derivatives/fase3/schemas/previa.schema.json` (SHA-256 `a1c0bed2…0a2d`),
+  preso por teste ao que o código gera.
+- Cada linha de recibo e o resumo trazem `formato` 1. **A partir daqui, mudança de formato
+  sobe o número e diz o que mudou.**
+- `load_rows` lê as linhas gravadas e recusa formato desconhecido, linha alterada, cadeia
+  quebrada e recibo vazio; confere a âncora quando informada.
+- Nenhuma âncora mudou.
+- Dois erros do cartão do planejador foram corrigidos por adendo e ratificados na revisão:
+  o esquema fixado recusava dinheiro em notação exponencial, e o texto do truncamento
+  ignorava o recibo de um evento só.
+
+Fila: PR07F1, fecho pequeno com duas pendências de segurança: a prévia depende de um
+recurso do pydantic 2.12 e o `pyproject.toml` aceita 2.10; e `ReplaySession.receipt`
+devolve o recibo interno. Depois dele, só frentes novas, cada uma com decisão própria de
+Francisco: repetir, completar e ajustar estruturas; histórico persistente com conferência
+da foto nova; foto com quantidade por par; limite de escala; modalidade B de garantia;
+esquema do resumo, quando houver consumidor. Segue para um cartão de testes: o
+`projection_id` no teste sintético do calendário.
 
 Manutenção opcional: duas linhas a menos em `Position.unpledged` (relatório de
 simplificação do PR #182).
@@ -429,7 +445,7 @@ simplificação do PR #182).
 Pendente, observado na revisão do DL3-PR07A6: `ReplaySession.receipt(ticket)` devolve o
 recibo interno da boleta, que tem `append` público. O registro de fatos já sai como cópia.
 
-Próxima ação (uma só): Claude publica o supercartão do DL3-PR07E1 e Codex o abre em
+Próxima ação (uma só): Claude publica o supercartão do DL3-PR07F1 e Codex o abre em
 rascunho.
 
 ## Fase 03 — Motor da boleta em simulador (D0) — FECHADA (estado A)
