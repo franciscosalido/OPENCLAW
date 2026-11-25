@@ -1,0 +1,43 @@
+name: DL4-PR00 lock evidence
+on:
+  push:
+    branches: [ci/dl4-pr00-validation]
+permissions:
+  contents: read
+jobs:
+  resolve:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Resolve the approved dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/uv"
+          "$RUNNER_TEMP/uv/bin/pip" install 'uv==0.11.32'
+          export PATH="$RUNNER_TEMP/uv/bin:$PATH"
+          sed -i 's/"pydantic>=2.10.0"/"pydantic>=2.14.4,<3"/' pyproject.toml
+          uv lock --upgrade-package 'pydantic==2.14.4'
+          uv lock --check
+          python3 - <<'PY'
+          import subprocess, tomllib
+          from pathlib import Path
+          def versions(data):
+              return {p["name"]: p["version"] for p in data["package"]}
+          base = versions(tomllib.loads(subprocess.check_output(["git","show","HEAD:uv.lock"], text=True)))
+          candidate = versions(tomllib.loads(Path("uv.lock").read_text()))
+          assert candidate.keys() == base.keys()
+          delta = {k: v for k,v in candidate.items() if base[k] != v}
+          assert delta == {"pydantic":"2.14.4","pydantic-core":"2.50.5","typing-inspection":"0.4.5","typing-extensions":"4.16.0"}, delta
+          PY
+          sha256sum uv.lock pyproject.toml
+      - uses: actions/upload-artifact@v4
+        with:
+          name: resolved-manifest
+          path: |
+            uv.lock
+            pyproject.toml
+          retention-days: 5
