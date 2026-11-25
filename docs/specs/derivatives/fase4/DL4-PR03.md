@@ -77,7 +77,8 @@ Importa **só** `datetime`, `decimal`, `html` e `backend.derivatives.ticket.view
 
 **`brl(value: Decimal) -> str`**
 
-- `adjusted() > 15`: devolve `"R$ "` mais o texto decimal do motor, sem reformatar.
+- Qualquer zero sai `R$ 0,00`. Para `adjusted() > 15`, use `to_sci_string` sobre o valor
+  absoluto com contexto explícito e `capitals=1`; sinal antes de `R$`.
 - Senão: duas casas, vírgula decimal, ponto de milhar, sinal antes do `R$`.
 - Zero negativo não leva sinal. Não depende do contexto decimal de quem chama.
 
@@ -92,7 +93,9 @@ Importa **só** `datetime`, `decimal`, `html` e `backend.derivatives.ticket.view
 | `-0.00` | `R$ 0,00` |
 | `1E+15` | `R$ 1.000.000.000.000.000,00` |
 | `1E+16` | `R$ 1E+16` |
-| `-1E+16` | `R$ -1E+16` |
+| `-1E+16` | `-R$ 1E+16` |
+| `0E+16` | `R$ 0,00` |
+| `-0E+16` | `R$ 0,00` |
 
 **`seconds(value: float) -> str`**: uma casa, vírgula, sufixo ` s`. `4.96` dá `5,0 s`;
 `0.05` dá `0,1 s`; `25186.0` dá `25186,0 s`.
@@ -400,3 +403,13 @@ blueprint: confirmar pelo terminal ou por página local.
 
 Pendências sem cartão: as 4 falhas de `tests/integration`; a docstring de `series_code`
 (nota N-1 do parecer do DL4-PR02); a fonte do spread do DL4-PR07.
+
+
+## Adendo 1 — autorizado por Francisco em 25/11/2026
+
+A tela independe do contexto decimal do chamador e do DefaultContext. O S3 inclui as três
+linhas atualizadas da tabela. O S7 compara os bytes da visão bova_calmo com teto 1E+16 no
+contexto padrão e com capitals=0. A contagem permanece em 20 testes focais.
+
+30. O texto científico usa o contexto do chamador (S7).
+31. O zero no ramo científico mantém o sinal (S3).
