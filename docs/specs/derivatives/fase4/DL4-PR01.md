@@ -424,3 +424,7 @@ adverso), com o gabarito das 18 respostas escrito antes do GREEN e conferido por
 
 Pendência separada, sem cartão aberto: as 4 falhas de `tests/integration` na `main`.
 Precisam de cartão próprio antes do M4.
+
+## Adendo 1
+
+DL4-PR01 — Adendo 1, autorizado por Francisco em 25/11/2026. `ticket_view` não depende do contexto decimal do chamador. Em `view.py`, strike e preço-limite são quantizados a 0,01 com contexto explícito `Context(prec=MAX_PREC, Emin=MIN_EMIN, Emax=MAX_EMAX)`, como em `guards.py` e `sequencing.py`. Como `Money` já está no passo de 0,01, a quantização é exata e não escolhe arredondamento. Teste novo **V16**: na sessão `calmo`, passo 1, às 14:00:02, a visão gerada com precisão 3 (armadilhas padrão) e com precisão 3 sem a armadilha `InvalidOperation` é igual byte a byte à gerada no contexto padrão, com pior resultado `5.00` e melhor resultado `15.00`. **Mutante 25**: quantizar sem contexto explícito faz o V16 falhar. Contagem esperada: 28 testes focais e **11.685 aprovados, 16 pulados**. Nenhum outro arquivo muda. Depois, retomar os portões do §8.
