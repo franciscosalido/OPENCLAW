@@ -1,0 +1,38 @@
+name: DL4-PR01 reproduction
+on:
+  pull_request:
+    branches: [codex/dl4-pr01-visao]
+permissions:
+  contents: read
+jobs:
+  evidence:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ec6d30311a74d1ea0a940c92303f655276c80548
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: '0.11.32'
+          enable-cache: false
+      - run: |
+          uv python install 3.12.13
+          uv lock --check
+          uv sync --locked --python 3.12.13
+          uv pip check
+          .venv/bin/python -m pytest tests/unit/derivatives/ticket/test_view.py -q
+          .venv/bin/python - <<'PY'
+          from decimal import localcontext
+          from importlib.metadata import version
+          from tests.unit.derivatives.ticket.test_view import official, at, ticket_view
+          assert version("pydantic") == "2.14.4"
+          session = official("calmo", 1)
+          now = at("14:00:02")
+          before = ticket_view(session, "T1", now)
+          print("DEFAULT", before.risco.vencimento.model_dump_json())
+          with localcontext() as ctx:
+              ctx.prec = 3
+              after = ticket_view(session, "T1", now)
+              assert after == before
+          PY
