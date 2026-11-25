@@ -179,7 +179,7 @@ def test_s3_brl_and_seconds_formats_at_the_edges() -> None:
              ("1E+2", "R$ 100,00"), ("15E-1", "R$ 1,50"), ("-0.00", "R$ 0,00"),
              ("999.99", "R$ 999,99"), ("1000", "R$ 1.000,00"),
              ("1E+15", "R$ 1.000.000.000.000.000,00"), ("1E+16", "R$ 1E+16"),
-             ("-1E+16", "R$ -1E+16")]
+             ("-1E+16", "-R$ 1E+16"), ("0E+16", "R$ 0,00"), ("-0E+16", "R$ 0,00")]
     for trap in (None, True, False):
         with localcontext(Context(prec=3) if trap is not None else None) as context:
             if trap is not None:
@@ -269,6 +269,14 @@ def test_s6_states_outside_confirmation_and_pause() -> None:
 
 def test_s7_page_is_inert_escaped_and_deterministic() -> None:
     """Sem script, rede ou recurso externo; texto hostil sai escapado; bytes estáveis."""
+    calm = view_at("bova_calmo", 1, 2, "2026-11-25T14:00:02+00:00")
+    data = json.loads(calm.model_dump_json())
+    data["custo"]["bruto_teto"] = "1E+16"
+    large = TicketView.model_validate_json(json.dumps(data))
+    baseline = render_ticket(large).encode("utf-8")
+    with localcontext() as context:
+        context.capitals = 0
+        assert render_ticket(large).encode("utf-8") == baseline
     view = view_at("bova_adverso", 1, 2, "2026-11-25T14:00:02+00:00")
     page = render_ticket(view)
     assert page == render_ticket(view)
