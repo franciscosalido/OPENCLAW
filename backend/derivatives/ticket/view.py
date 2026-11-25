@@ -1,6 +1,6 @@
 """Visão de leitura da boleta: traduz fatos do motor, sem decidir nem recalcular guardas."""
 from datetime import date, datetime
-from decimal import Decimal
+from decimal import MAX_EMAX, MAX_PREC, MIN_EMIN, Context, Decimal
 from enum import StrEnum
 from typing import Final, Literal
 
@@ -153,10 +153,12 @@ def _expiry(preview: Preview, reading: Reading) -> tuple[ExpiryView | None, str 
                for v in (row.strike, leg.limit_price)]
     if any(v.adjusted() > _MAX_ADJUSTED for v in amounts):
         return None, "valores fora da escala do perfil"
+    exact = Context(prec=MAX_PREC, Emin=MIN_EMIN, Emax=MAX_EMAX)
     try:
         profile = expiry_profile([
-            ExpiryLeg(row.kind, leg.side.value, row.strike.quantize(_CENT), leg.quantity,
-                      leg.limit_price.quantize(_CENT))
+            ExpiryLeg(row.kind, leg.side.value, row.strike.quantize(_CENT, context=exact),
+                      leg.quantity,
+                      leg.limit_price.quantize(_CENT, context=exact))
             for leg, row in zip(preview.legs, held, strict=True)], max_legs=len(held))
     except PayoffRefusal as exc:
         return None, str(exc)
