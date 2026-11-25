@@ -1,0 +1,72 @@
+name: DL4-PR01 reviewer evidence
+on:
+  pull_request:
+    branches: [codex/dl4-pr01-visao]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: af60eee455cddfecb8063e97ae60d26e7929742d
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 45647661457
+          name: dl4-pr01-macos-15
+          path: ${{ runner.temp }}/handoff/mac-arm64
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 45649819619
+          name: dl4-pr01-ubuntu-24.04
+          path: ${{ runner.temp }}/incoming
+      - name: Verify evidence against the published head
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/handoff"
+          mkdir "$out/linux-x86_64"
+          git diff 128e78d2011584c4cada29c1e0bdbf6ae2245a33 af60eee455cddfecb8063e97ae60d26e7929742d > "$out/candidate.diff"
+          git show 781a6c7b7176a60acf5e43eed12f6d2f010be042:.github/workflows/dl4-pr01.yml > "$out/qualification.yml"
+          git show 71373deccce45d050f2bccc05ad66667cf647bfe:.github/workflows/dl4-pr01.yml > "$out/qualification-linux.yml"
+          cp docs/specs/derivatives/fase4/DL4-PR01.md "$out/"
+          cd "$out"
+          tar -xzf "$RUNNER_TEMP/incoming/verified-results.tgz" -C linux-x86_64
+          diff -ru mac-arm64/base linux-x86_64/candidate
+          diff -ru linux-x86_64/base mac-arm64/candidate
+          for os in mac-arm64 linux-x86_64; do
+            test "$(cat "$os/head")" = af60eee455cddfecb8063e97ae60d26e7929742d
+            test "$(wc -l < "$os/candidate.sha256")" = 7
+            diff -u "$os/base.sha256" "$os/candidate.sha256"
+            (cd "$os/candidate" && sha256sum -c ../candidate.sha256)
+            test "$(cat "$os/schema")" = a63d4508c126fabd38a8cb3eea01b30616f92cef99234da4cc7a3da166eb9275
+            grep -F '11685 passed, 16 skipped, 261 subtests passed' "$os/unit.log"
+            grep -F '28 passed' "$os/restored.log"
+            grep -F '136 passed' "$os/architecture.log"
+            grep -F 'no issues found in 183 source files' "$os/mypy.log"
+            grep -F '0 errors, 0 warnings' "$os/pyright.log"
+            for i in $(seq -w 1 25); do grep -q '^FAILED ' "$os/M$i.log"; done
+            grep -E '^FAILED .*::test_v16_' "$os/M25.log"
+          done
+          grep '4 failed, 215 passed, 18 skipped' linux-x86_64/integration.log
+          test "$(wc -l < linux-x86_64/integration-ids)" = 4
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          for path,n,h in [('calmo/recibo_T1',12,'1d50bba66aa2'),('leilao/recibo_T1',12,'8592cd742d26'),('rapido/recibo_T1',15,'9ebc9cd5b584'),('rapido/recibo_T2',1,'fbcaafa8eb79')]:
+              rows=Path('mac-arm64/candidate',path+'.jsonl').read_bytes().splitlines()
+              assert len(rows)==n and json.loads(rows[-1])['hash'].startswith(h)
+          PY
+          printf '%s\n' 'Head af60eee455cddfecb8063e97ae60d26e7929742d' 'RED inicial 96e0d88d69d1922a2285de162710a8fb100b29b1' 'GREEN inicial 86a32afb0ecabe3e2a85b5e26a8c8700ccb47b98' 'RED V16 749a389238d04a0f2662e9235f70ef0fa761cf61' 'GREEN V16 a9b87e42aeb797451fb04b89bc3e7f4d6e0c15ea' 'Pareceres locais no diretório de evidências do head.' 'lab.md SHA-256 7c7a2b1377ed30b9c5864d711d54f4a4053dff2b6a942ad806506b8dabfc980d' 'simplificacao.md SHA-256 c79eb3b7be8eaa83fbce34e85639cf48a1d8382644fdb0282e8d7b97fb5e7e2b' 'Conferir após extrair: shasum -a 256 -c SHA256SUMS' > LEIA-ME.txt
+          find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+          sha256sum -c SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DL4-PR01-af60eee
+          path: ${{ runner.temp }}/handoff
