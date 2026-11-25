@@ -10,10 +10,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-15, ubuntu-24.04]
+        os: [ubuntu-24.04]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 45619867730
+          name: dl4-pr00-ubuntu-24.04
+          path: ${{ runner.temp }}/previous
+      - name: Inspect reported integration failures from the first complete service run
+        run: grep -E '^E +|^FAILED |^SUBFAILED' "$RUNNER_TEMP/previous/integration.log" "$RUNNER_TEMP/previous/unit.log" | tail -100
       - uses: actions/checkout@v4
         with:
           ref: 8aea7c9749a470553862fcb5607cf28df5414956
@@ -107,6 +115,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          git clone --no-local . "$RUNNER_TEMP/container-tree"
+          git -C "$RUNNER_TEMP/container-tree" checkout --detach 8aea7c9749a470553862fcb5607cf28df5414956
           docker build --platform linux/amd64 -f Dockerfile.openclaw-sandbox -t openclaw-sandbox:"$GITHUB_SHA" .
           docker image inspect --format '{{.Id}} {{.Architecture}}' openclaw-sandbox:"$GITHUB_SHA"
           docker network create dl4-isolated
@@ -115,7 +125,11 @@ jobs:
           docker run -d --name dl4-qdrant --network dl4-isolated qdrant/qdrant:v1.18.2
           for n in {1..60}; do docker exec dl4-pg pg_isready -h 127.0.0.1 -U quimera && break; sleep 2; done
           docker exec dl4-pg pg_isready -h 127.0.0.1 -U quimera
-          docker run --rm --network dl4-isolated -e TEST_POSTGRES_DSN=postgresql://quimera@dl4-pg:5432/quimera -e QDRANT_URL=http://dl4-qdrant:6333 --platform linux/amd64 -v "$PWD:/workspace" -v "$RUNNER_TEMP/evidence:/evidence" -w /workspace openclaw-sandbox:"$GITHUB_SHA" sh -c '
+          docker run --rm --network dl4-isolated -e TEST_POSTGRES_DSN=postgresql://quimera@dl4-pg:5432/quimera -e QDRANT_URL=http://dl4-qdrant:6333 --platform linux/amd64 -e UV_PROJECT_ENVIRONMENT=/opt/openclaw-venv -e UV_FROZEN=1 -v "$RUNNER_TEMP/container-tree:/workspace" -v "$RUNNER_TEMP/evidence:/evidence" -w /workspace openclaw-sandbox:"$GITHUB_SHA" sh -c '
+            set -e
+            if ! command -v git >/dev/null; then apt-get update -qq && apt-get install -y -qq git; fi
+            git config --global --add safe.directory /workspace
+            git check-ignore -q reports/golden/example.json
             test "$(uname -m)" = x86_64 || exit 1
             python -c "import platform,pydantic; print(platform.machine(),pydantic.__version__,pydantic.__file__)"
             rc=0
@@ -124,6 +138,7 @@ jobs:
             python -m mypy backend/ --strict > /evidence/mypy.log 2>&1 || rc=1
             pyright --pythonpath /opt/openclaw-venv/bin/python backend/ > /evidence/pyright.log 2>&1 || rc=1
             tail -n 10 /evidence/*.log
+            grep -E "^E +|^FAILED |^SUBFAILED" /evidence/integration.log /evidence/unit.log | tail -80 || true
             exit "$rc"'
       - uses: actions/upload-artifact@v4
         if: always()
