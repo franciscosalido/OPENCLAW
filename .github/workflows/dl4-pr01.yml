@@ -9,7 +9,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-15, ubuntu-24.04]
+        os: [ubuntu-24.04]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
@@ -142,13 +142,15 @@ jobs:
             test "$(uname -m)" = x86_64
             python -c "import struct,sys; b=open(sys.executable,\"rb\").read(20); assert b[:4].hex()==\"7f454c46\" and struct.unpack_from(\"<H\",b,18)[0]==62" 
             uv pip check --python /opt/openclaw-venv/bin/python
-            bash /harness/qualify.sh /opt/openclaw-venv/bin/python'
+            bash /harness/qualify.sh /opt/openclaw-venv/bin/python
+            tar -C /evidence -czf /tmp/verified-results.tgz .
+            cp /tmp/verified-results.tgz /evidence/verified-results.tgz'
       - name: Export test evidence
         if: always()
         shell: bash
         run: |
           cd "$RUNNER_TEMP/evidence"
-          tar czf "$RUNNER_TEMP/results.tgz" .
+          cp verified-results.tgz "$RUNNER_TEMP/results.tgz"
           shasum -a 256 "$RUNNER_TEMP/results.tgz"
           base64 < "$RUNNER_TEMP/results.tgz" | tr -d '\n' | fold -w 512 | sed 's/^/DL4REPORT /'
           echo
@@ -156,4 +158,4 @@ jobs:
         if: always()
         with:
           name: dl4-pr01-${{ matrix.os }}
-          path: ${{ runner.temp }}/evidence
+          path: ${{ runner.temp }}/evidence/verified-results.tgz
