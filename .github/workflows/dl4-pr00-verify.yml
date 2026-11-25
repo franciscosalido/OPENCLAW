@@ -1,43 +1,130 @@
-name: DL4-PR00 lock evidence
+name: DL4-PR00 candidate qualification
 on:
   push:
     branches: [ci/dl4-pr00-validation]
 permissions:
   contents: read
 jobs:
-  resolve:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
+  qualify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: e86cf910a32c8659113fca11359865c1a1c5cd1b
+          fetch-depth: 0
           persist-credentials: false
-      - name: Resolve the approved dependency
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 45617236912
+          name: resolved-manifest
+          path: ${{ runner.temp }}/resolved
+      - name: Read candidate files and emit reproducible patch
+        shell: bash
+        run: |
+          cp "$RUNNER_TEMP/resolved/"{pyproject.toml,uv.lock} .
+          git diff --check
+          git diff -- pyproject.toml uv.lock | gzip -c | base64 | tr -d '\n' | fold -w 512 | sed 's/^/DL4DATA /'
+          echo
+          shasum -a 256 uv.lock pyproject.toml
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.13'
+      - name: Prepare exact interpreter and base worktree
+        run: |
+          set -eu
+          mkdir -p "$RUNNER_TEMP/evidence"
+          uname -sm | tee "$RUNNER_TEMP/evidence/platform"
+          if [ "$RUNNER_OS" = macOS ]; then test "$(uname -m)" = arm64; else test "$(uname -m)" = x86_64; fi
+          python -m pip install uv==0.11.32
+          git worktree add --detach "$RUNNER_TEMP/base" 1361724d3d85575137315fdf0729277990f1f04e
+      - name: Compare replays, schemas and service imports
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m venv "$RUNNER_TEMP/uv"
-          "$RUNNER_TEMP/uv/bin/pip" install 'uv==0.11.32'
-          export PATH="$RUNNER_TEMP/uv/bin:$PATH"
-          sed -i 's/"pydantic>=2.10.0"/"pydantic>=2.14.4,<3"/' pyproject.toml
-          uv lock --upgrade-package 'pydantic==2.14.4'
-          uv lock --check
-          python3 - <<'PY'
-          import subprocess, tomllib
-          from pathlib import Path
-          def versions(data):
-              return {p["name"]: p["version"] for p in data["package"]}
-          base = versions(tomllib.loads(subprocess.check_output(["git","show","HEAD:uv.lock"], text=True)))
-          candidate = versions(tomllib.loads(Path("uv.lock").read_text()))
-          assert candidate.keys() == base.keys()
-          delta = {k: v for k,v in candidate.items() if base[k] != v}
-          assert delta == {"pydantic":"2.14.4","pydantic-core":"2.50.5","typing-inspection":"0.4.5","typing-extensions":"4.16.0"}, delta
+          for tree in base candidate; do
+            if test "$tree" = base; then cd "$RUNNER_TEMP/base"; else cd "$GITHUB_WORKSPACE"; fi
+            out="$RUNNER_TEMP/evidence/$tree"
+            mkdir -p "$out"
+            uv lock --check
+            uv sync --locked --python "$(command -v python)"
+            uv pip check
+            .venv/bin/python -c 'import platform,sys,pydantic,pydantic_core,fastmcp,mcp,pydantic_settings; from importlib.metadata import version; print(platform.machine(),sys.version,[(p,version(p)) for p in ("pydantic","pydantic-core","fastmcp","mcp","pydantic-settings")],pydantic.__file__)' | tee "$out/runtime"
+            .venv/bin/python -m pytest tests/unit/derivatives/ticket/test_models.py tests/unit/derivatives/test_vendor_models.py -q > "$out/models.log"
+            p=tests/fixtures/derivatives/synthetic/ticket/sessions
+            for scenario in calmo leilao rapido; do
+              .venv/bin/python -m scripts.derivatives_ticket_replay --replay "$p/$scenario.replay.json" --roteiro "$p/$scenario.roteiro.json" --out "$out/replays/$scenario"
+            done
+            (cd "$out/replays" && find . -type f | sort | xargs shasum -a 256) > "$out/hashes"
+          done
+          cd "$RUNNER_TEMP/evidence"
+          diff -ru base/replays candidate/replays
+          test "$(wc -l < candidate/hashes)" -eq 7
+      - name: Test six independent mutations and restore files
+        shell: bash
+        run: |
+          set -euo pipefail
+          .venv/bin/python - <<'PY'
+          import os, pathlib, subprocess
+          test = "tests/architecture/test_pydantic_floor.py"
+          base = pathlib.Path(os.environ["RUNNER_TEMP"]) / "base/.venv/bin/python"
+          cases = [
+              ("pyproject.toml", "pydantic>=2.14.4,<3", "pydantic>=2.14.1,<3", {1}),
+              ("pyproject.toml", "pydantic>=2.14.4,<3", "pydantic>=2.14.4", {1}),
+              ("uv.lock", 'name = "pydantic"\nversion = "2.14.4"', 'name = "pydantic"\nversion = "2.13.3"', {2,3,4}),
+              (None, "", "", {4}),
+              (test, "^(>=|<)", "^(>=|<|==)", {5}),
+              (test, "^pydantic(?![A-Za-z0-9_.-])", "^pydantic", {1,2}),
+          ]
+          out = pathlib.Path(os.environ["RUNNER_TEMP"]) / "evidence"
+          for n,(file,old,new,expected) in enumerate(cases,1):
+              path = pathlib.Path(file) if file else None
+              original = path.read_bytes() if path else b""
+              try:
+                  if path:
+                      assert original.count(old.encode()) == 1
+                      path.write_bytes(original.replace(old.encode(),new.encode()))
+                  p = subprocess.run([str(base) if n==4 else ".venv/bin/python","-m","pytest",test,"-q"],stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True)
+                  (out/f"mutant-{n}.log").write_text(p.stdout)
+                  assert p.returncode == 1 and all(f"::test_p{i}_" in p.stdout for i in expected), p.stdout
+              finally:
+                  if path: path.write_bytes(original)
           PY
-          sha256sum uv.lock pyproject.toml
+          .venv/bin/python -m pytest tests/architecture/test_pydantic_floor.py -q
+      - name: macOS unit and type gates
+        if: runner.os == 'macOS' && !cancelled()
+        shell: bash
+        run: |
+          out="$RUNNER_TEMP/evidence"; rc=0
+          .venv/bin/python -m pytest tests/ -q --ignore=tests/integration --timeout=120 > "$out/unit.log" 2>&1 || rc=1
+          .venv/bin/python -m mypy backend/ --strict > "$out/mypy.log" 2>&1 || rc=1
+          .venv/bin/pyright backend/ > "$out/pyright.log" 2>&1 || rc=1
+          tail -n 10 "$out/"*.log
+          exit "$rc"
+      - name: Build and run Linux x86_64 sandbox gates
+        if: runner.os == 'Linux' && !cancelled()
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --platform linux/amd64 -f Dockerfile.openclaw-sandbox -t openclaw-sandbox:"$GITHUB_SHA" .
+          docker image inspect --format '{{.Id}} {{.Architecture}}' openclaw-sandbox:"$GITHUB_SHA"
+          docker run --rm --platform linux/amd64 -v "$PWD:/workspace" -v "$RUNNER_TEMP/evidence:/evidence" -w /workspace openclaw-sandbox:"$GITHUB_SHA" sh -c '
+            test "$(uname -m)" = x86_64 || exit 1
+            python -c "import platform,pydantic; print(platform.machine(),pydantic.__version__,pydantic.__file__)"
+            rc=0
+            python -m pytest tests/ -q --ignore=tests/integration --timeout=120 > /evidence/unit.log 2>&1 || rc=1
+            python -m pytest tests/integration -q --timeout=120 > /evidence/integration.log 2>&1 || rc=1
+            python -m mypy backend/ --strict > /evidence/mypy.log 2>&1 || rc=1
+            pyright --pythonpath /opt/openclaw-venv/bin/python backend/ > /evidence/pyright.log 2>&1 || rc=1
+            tail -n 10 /evidence/*.log
+            exit "$rc"'
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: resolved-manifest
-          path: |
-            uv.lock
-            pyproject.toml
-          retention-days: 5
+          name: dl4-pr00-${{ matrix.os }}
+          path: ${{ runner.temp }}/evidence
