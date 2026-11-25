@@ -1,6 +1,6 @@
 """Tela estática da boleta: só formata a visão; não calcula, não decide, não lê o motor."""
 from datetime import datetime
-from decimal import MAX_EMAX, MAX_PREC, MIN_EMIN, Context, Decimal
+from decimal import MAX_EMAX, MAX_PREC, MIN_EMIN, ROUND_HALF_EVEN, Context, Decimal
 from html import escape
 
 from backend.derivatives.ticket.view import (
@@ -8,7 +8,8 @@ from backend.derivatives.ticket.view import (
 )
 
 _CENT = Decimal("0.01")
-_EXACT = Context(prec=MAX_PREC, Emin=MIN_EMIN, Emax=MAX_EMAX)
+_EXACT = Context(prec=MAX_PREC, Emin=MIN_EMIN, Emax=MAX_EMAX, capitals=1,
+                 rounding=ROUND_HALF_EVEN, clamp=0, flags=[], traps=[])
 _MAX_ADJUSTED = 15
 LEVEL_LABELS_PT = {"OK": "Sem aviso", "CAUTION": "Cautela", "BLOCKED": "Bloqueado"}
 PHASE_LABELS_PT = {"CONTINUOUS": "Contínuo", "AUCTION": "Leilão", "SUSPENDED": "Suspenso"}
@@ -31,11 +32,15 @@ _STYLE = (
 
 def brl(value: Decimal) -> str:
     """Reais em pt-BR com sinal; fora da escala exibível, o texto decimal do motor."""
+    if value.is_zero():
+        return "R$ 0,00"
+    sign = "-" if value.is_signed() else ""
+    magnitude = value.copy_abs()
     if value.adjusted() > _MAX_ADJUSTED:
-        return f"R$ {value}"
-    whole, cents = format(value.copy_abs().quantize(_CENT, context=_EXACT), "f").split(".")
+        return f"{sign}R$ {_EXACT.to_sci_string(magnitude)}"
+    whole, cents = format(magnitude.quantize(_CENT, context=_EXACT), "f").split(".")
     groups = f"{int(whole):,}".replace(",", ".")
-    return f"{'-' if value.is_signed() and value else ''}R$ {groups},{cents}"
+    return f"{sign}R$ {groups},{cents}"
 
 
 def clock(value: datetime) -> str:
