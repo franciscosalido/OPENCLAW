@@ -1,161 +1,72 @@
-name: DL4-PR01 qualification
+name: DL4-PR01 reviewer evidence
 on:
   pull_request:
     branches: [codex/dl4-pr01-visao]
 permissions:
   contents: read
+  actions: read
 jobs:
-  qualify:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-24.04]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
+  verify:
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
           ref: af60eee455cddfecb8063e97ae60d26e7929742d
           fetch-depth: 0
           persist-credentials: false
-      - uses: astral-sh/setup-uv@v7
+      - uses: actions/download-artifact@v4
         with:
-          version: '0.11.32'
-          enable-cache: false
-      - name: Prepare exact base and validation scripts
+          github-token: ${{ github.token }}
+          run-id: 45647661457
+          name: dl4-pr01-macos-15
+          path: ${{ runner.temp }}/handoff/mac-arm64
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 45649819619
+          name: dl4-pr01-ubuntu-24.04
+          path: ${{ runner.temp }}/incoming
+      - name: Verify evidence against the published head
         shell: bash
         run: |
-          set -eu
-          git clone --quiet --no-hardlinks . "$RUNNER_TEMP/base"
-          git -C "$RUNNER_TEMP/base" checkout --detach 128e78d2011584c4cada29c1e0bdbf6ae2245a33
-          git diff 8aea7c9749a470553862fcb5607cf28df5414956 128e78d2011584c4cada29c1e0bdbf6ae2245a33 --exit-code
-          mkdir -p "$RUNNER_TEMP/harness" "$RUNNER_TEMP/evidence"
-          cd "$RUNNER_TEMP/harness"
-          cat > mutantes.py <<'PYCODE'
-          import json, pathlib, subprocess, sys, os, tempfile
-          cases = [["exposicao_montagem=preview.partial_exposure","exposicao_montagem=net"],["elif reading.refusal is None:","elif True:"],["        return None\n    return QuoteView","        return QuoteView(compra=Decimal(0), compra_qtd=0, venda=Decimal(0), venda_qtd=0, fase='CONTINUOUS', instante=now, idade_s=0.0)\n    return QuoteView"],["elif reading.refusal is None:","elif reading.refusal is None and reading.market.level != 'CAUTION':"],["Nature.DEBIT if net > 0 else Nature.CREDIT","Nature.CREDIT if net > 0 else Nature.DEBIT"],["now - snapshot.ts","snapshot.ts - now"],["engine.state not in CONFIRMABLE","engine.state not in (*CONFIRMABLE, TicketState.ARMED)"],["if any(row.balance for row in held):","if False:"],["if any(row.multiplier != 1 for row in held):","if False:"],["if any(v.adjusted() > _MAX_ADJUSTED for v in amounts):","if False:"],["row.strike.quantize(_CENT, context=exact)","row.strike"],["pior_resultado=profile.max_loss","pior_resultado=profile.max_gain"],["    session.check_time(now)\n",""],["mercado=_guard(reading.market)","mercado=_guard(reading.guards[0])"],["reading.quotes, reading.guards, strict=True","reading.quotes, reversed(reading.guards), strict=True"],["formato=VIEW_FORMAT","formato=2"],["    formato: Literal[1]","    model_config = dict(extra='allow')\n    formato: Literal[1]"],["rotulo=engine.label","rotulo=__import__('backend.derivatives.ticket.state', fromlist=['TICKET_LABELS_PT']).TICKET_LABELS_PT[engine.state]"],["            self._admissible(now)","            plan = self._admissible(now)\n            self._reservations.admit(plan, ticket=self._ticket)"],["        if self._paused:\n            raise EngineRefusal(\"boleta pausada\")","        if False:\n            raise EngineRefusal(\"boleta pausada\")"],["except (EngineRefusal, DeadlineRefusal, SequenceRefusal) as exc:","except (EngineRefusal, DeadlineRefusal) as exc:"],["except (EngineRefusal, DeadlineRefusal, SequenceRefusal) as exc:","except (EngineRefusal, SequenceRefusal) as exc:"],["        check_deadlines(plan.draft, now, self._venue)\n        if reason := self._market_block(plan, now):\n            raise EngineRefusal(reason)","        if reason := self._market_block(plan, now):\n            raise EngineRefusal(reason)\n        check_deadlines(plan.draft, now, self._venue)"],["tuple(assess((leg,), self._book, now, self._config) for leg in legs)","tuple(assess(legs, self._book, now, self._config) for leg in legs)"]]
-          cases.append((', context=exact)', ')'))
-          for n, (old, new) in enumerate(cases, 1):
-              path = pathlib.Path('backend/derivatives/ticket') / ('view.py' if n < 19 or n == 25 else 'engine.py')
-              original = path.read_bytes()
-              try:
-                  assert original.count(old.encode()) == (2 if n == 25 else 1), (n, original.count(old.encode()))
-                  mutant = original.replace(old.encode(), new.encode())
-                  compile(mutant, str(path), 'exec')
-                  path.write_bytes(mutant)
-                  with tempfile.TemporaryDirectory() as cache:
-                      env = dict(os.environ, PYTHONPYCACHEPREFIX=cache)
-                      p = subprocess.run([sys.executable, '-m','pytest','tests/unit/derivatives/ticket/test_view.py','-q','--tb=line'], env=env, capture_output=True, text=True)
-                  (pathlib.Path(os.environ['OUT']) / f'M{n:02}.log').write_text(p.stdout + p.stderr)
-                  failed = [line for line in p.stdout.splitlines() if line.startswith('FAILED ')]
-                  assert p.returncode == 1 and failed, (n, p.stdout[-2000:])
-                  if n == 25:
-                      assert any('test_v16_' in line for line in failed), failed
-                  print(n, failed[0])
-              finally:
-                  path.write_bytes(original)
-          PYCODE
-          cat > qualify.sh <<'SHELL'
           set -euo pipefail
-          py="$1"
-          candidate="$PWD"
-          out="$OUT"
-          mkdir -p "$out"
-          test "$(git rev-parse HEAD)" = af60eee455cddfecb8063e97ae60d26e7929742d
-          uname -sm | tee "$out/platform"
-          "$py" -c 'import importlib.metadata as m, platform, sys, pydantic_core._pydantic_core as c; print(sys.version,sys.executable,platform.machine(),c.__file__,[(n,m.version(n)) for n in ("pydantic","pydantic-core")]); assert m.version("pydantic") == "2.14.4"' | tee "$out/runtime"
-          git rev-parse HEAD > "$out/head"
-          for tree in base candidate; do
-            if test "$tree" = base; then cd "$BASE_TREE"; else cd "$candidate"; fi
-            mkdir -p "$out/$tree"
-            dep=tests/fixtures/derivatives/synthetic/ticket/sessions
-            for session in calmo leilao rapido; do
-              "$py" -m scripts.derivatives_ticket_replay --replay "$dep/$session.replay.json" --roteiro "$dep/$session.roteiro.json" --out "$out/$tree/$session"
-            done
-            (cd "$out/$tree" && find calmo leilao rapido -type f | sort | xargs shasum -a 256) > "$out/$tree.sha256"
+          out="$RUNNER_TEMP/handoff"
+          mkdir "$out/linux-x86_64"
+          git diff 128e78d2011584c4cada29c1e0bdbf6ae2245a33 af60eee455cddfecb8063e97ae60d26e7929742d > "$out/candidate.diff"
+          git show 781a6c7b7176a60acf5e43eed12f6d2f010be042:.github/workflows/dl4-pr01.yml > "$out/qualification.yml"
+          git show 71373deccce45d050f2bccc05ad66667cf647bfe:.github/workflows/dl4-pr01.yml > "$out/qualification-linux.yml"
+          cp docs/specs/derivatives/fase4/DL4-PR01.md "$out/"
+          cd "$out"
+          tar -xzf "$RUNNER_TEMP/incoming/verified-results.tgz" -C linux-x86_64
+          diff -ru mac-arm64/base linux-x86_64/candidate
+          diff -ru linux-x86_64/base mac-arm64/candidate
+          for os in mac-arm64 linux-x86_64; do
+            test "$(cat "$os/head")" = af60eee455cddfecb8063e97ae60d26e7929742d
+            test "$(wc -l < "$os/candidate.sha256")" = 7
+            diff -u "$os/base.sha256" "$os/candidate.sha256"
+            (cd "$os/candidate" && sha256sum -c ../candidate.sha256)
+            test "$(cat "$os/schema")" = a63d4508c126fabd38a8cb3eea01b30616f92cef99234da4cc7a3da166eb9275
+            grep -F '11685 passed, 16 skipped, 261 subtests passed' "$os/unit.log"
+            grep -F '28 passed' "$os/restored.log"
+            grep -F '136 passed' "$os/architecture.log"
+            grep -F 'no issues found in 183 source files' "$os/mypy.log"
+            grep -F '0 errors, 0 warnings' "$os/pyright.log"
+            for i in $(seq -w 1 25); do grep -q '^FAILED ' "$os/M$i.log"; done
+            grep -E '^FAILED .*::test_v16_' "$os/M25.log"
           done
-          diff -ru "$out/base" "$out/candidate"
-          diff -u "$out/base.sha256" "$out/candidate.sha256"
-          test "$(wc -l < "$out/candidate.sha256")" -eq 7
-          "$py" - <<'PY' | tee "$out/schema"
-          import hashlib,json,pathlib
-          from backend.derivatives.ticket.view import TicketView
-          data=(json.dumps(TicketView.model_json_schema(mode="serialization"),sort_keys=True,indent=2,ensure_ascii=False)+"\n").encode()
-          assert data==pathlib.Path("docs/specs/derivatives/fase4/schemas/visao.schema.json").read_bytes()
-          print(hashlib.sha256(data).hexdigest())
+          grep '4 failed, 215 passed, 18 skipped' linux-x86_64/integration.log
+          test "$(wc -l < linux-x86_64/integration-ids)" = 4
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          for path,n,h in [('calmo/recibo_T1',12,'1d50bba66aa2'),('leilao/recibo_T1',12,'8592cd742d26'),('rapido/recibo_T1',15,'9ebc9cd5b584'),('rapido/recibo_T2',1,'fbcaafa8eb79')]:
+              rows=Path('mac-arm64/candidate',path+'.jsonl').read_bytes().splitlines()
+              assert len(rows)==n and json.loads(rows[-1])['hash'].startswith(h)
           PY
-          "$py" -m pytest tests/unit/derivatives/ticket/test_view.py -q | tee "$out/focal.log"
-          "$py" -m pytest tests/architecture -q | tee "$out/architecture.log"
-          "$py" "$HARNESS/mutantes.py" > "$out/mutantes.log" || { tail -15 "$out/mutantes.log"; exit 1; }
-          "$py" -m pytest tests/unit/derivatives/ticket/test_view.py -q | tee "$out/restored.log"
-          git diff --exit-code
-          "$py" -m pytest tests/ -q --ignore=tests/integration --timeout=120 > "$out/unit.log" 2>&1 || { tail -15 "$out/unit.log"; exit 1; }
-          tail -2 "$out/unit.log"
-          grep -Eq '11685 passed, 16 skipped' "$out/unit.log"
-          "$py" -m mypy backend/ --strict | tee "$out/mypy.log"
-          "$(dirname "$py")/pyright" --pythonpath "$py" backend/ | tee "$out/pyright.log"
-          if test "$(uname -s)" = Linux; then
-            rc=0
-            "$py" -m pytest tests/integration -q --timeout=120 > "$out/integration.log" 2>&1 || rc=$?
-            tail -8 "$out/integration.log"
-            test "$rc" = 1
-            grep -E '4 failed, 215 passed, 18 skipped' "$out/integration.log"
-            awk '/^FAILED /{print $2}' "$out/integration.log" | sort > "$out/integration-ids"
-            diff -u "$HARNESS/known-ids" "$out/integration-ids"
-          fi
-          SHELL
-          cat > known-ids <<'IDS'
-          tests/integration/test_check_finlib_readiness_live.py::test_finlib_readiness_live_is_ready_and_idempotent
-          tests/integration/test_finlib_continuous_aggregates_live.py::test_finlib_closeout_views_and_cagg_roundtrip
-          tests/integration/test_finlib_repositories_assets_live.py::test_finlib_asset_repositories_flow_idempotency_and_atomicity
-          tests/integration/test_pr09_pg_stat_statements_live.py::test_pr09_pg_stat_report_live_parseable
-          IDS
-          cd "$GITHUB_WORKSPACE"
-          uv python install 3.12.13
-          uv lock --check
-      - name: Qualify macOS ARM64
-        if: runner.os == 'macOS'
-        shell: bash
-        run: |
-          set -eu
-          test "$(uname -m)" = arm64
-          uv sync --locked --python 3.12.13
-          uv pip check
-          HARNESS="$RUNNER_TEMP/harness" OUT="$RUNNER_TEMP/evidence" BASE_TREE="$RUNNER_TEMP/base" bash "$RUNNER_TEMP/harness/qualify.sh" "$PWD/.venv/bin/python"
-      - name: Qualify isolated Linux x86_64
-        if: runner.os == 'Linux'
-        shell: bash
-        run: |
-          set -euo pipefail
-          docker build --platform linux/amd64 -f Dockerfile.openclaw-sandbox -t openclaw-sandbox:pr01 .
-          docker image inspect --format '{{.Id}} {{.Architecture}}' openclaw-sandbox:pr01 | tee "$RUNNER_TEMP/evidence/image"
-          docker network create dl4-isolated
-          docker build -f infra/postgres/Dockerfile -t dl4-pg .
-          docker run -d --name dl4-pg --network dl4-isolated -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_USER=quimera -e POSTGRES_DB=quimera -v "$PWD/infra/postgres/initdb:/docker-entrypoint-initdb.d:ro" dl4-pg postgres -c shared_preload_libraries=timescaledb,pg_stat_statements
-          docker run -d --name dl4-qdrant --network dl4-isolated qdrant/qdrant:v1.18.2
-          for n in {1..60}; do docker exec dl4-pg pg_isready -h 127.0.0.1 -U quimera && break; sleep 2; done
-          docker exec dl4-pg pg_isready -h 127.0.0.1 -U quimera
-          docker run --rm --platform linux/amd64 --network dl4-isolated -e TEST_POSTGRES_DSN=postgresql://quimera@dl4-pg:5432/quimera -e QDRANT_URL=http://dl4-qdrant:6333 -e UV_PROJECT_ENVIRONMENT=/opt/openclaw-venv -e UV_FROZEN=1 -e OUT=/evidence -e HARNESS=/harness -e BASE_TREE=/base -v "$PWD:/workspace" -v "$RUNNER_TEMP/base:/base" -v "$RUNNER_TEMP/evidence:/evidence" -v "$RUNNER_TEMP/harness:/harness:ro" -w /workspace openclaw-sandbox:pr01 bash -ec '
-            if ! command -v git >/dev/null; then apt-get update -qq && apt-get install -y -qq git; fi
-            git config --global --add safe.directory /workspace
-            git config --global --add safe.directory /base
-            test "$(uname -m)" = x86_64
-            python -c "import struct,sys; b=open(sys.executable,\"rb\").read(20); assert b[:4].hex()==\"7f454c46\" and struct.unpack_from(\"<H\",b,18)[0]==62" 
-            uv pip check --python /opt/openclaw-venv/bin/python
-            bash /harness/qualify.sh /opt/openclaw-venv/bin/python
-            tar -C /evidence -czf /tmp/verified-results.tgz .
-            cp /tmp/verified-results.tgz /evidence/verified-results.tgz'
-      - name: Export test evidence
-        if: always()
-        shell: bash
-        run: |
-          cd "$RUNNER_TEMP/evidence"
-          cp verified-results.tgz "$RUNNER_TEMP/results.tgz"
-          shasum -a 256 "$RUNNER_TEMP/results.tgz"
-          base64 < "$RUNNER_TEMP/results.tgz" | tr -d '\n' | fold -w 512 | sed 's/^/DL4REPORT /'
-          echo
+          printf '%s\n' 'Head af60eee455cddfecb8063e97ae60d26e7929742d' 'RED inicial 96e0d88d69d1922a2285de162710a8fb100b29b1' 'GREEN inicial 86a32afb0ecabe3e2a85b5e26a8c8700ccb47b98' 'RED V16 749a389238d04a0f2662e9235f70ef0fa761cf61' 'GREEN V16 a9b87e42aeb797451fb04b89bc3e7f4d6e0c15ea' 'Pareceres locais no diretório de evidências do head.' 'lab.md SHA-256 7c7a2b1377ed30b9c5864d711d54f4a4053dff2b6a942ad806506b8dabfc980d' 'simplificacao.md SHA-256 c79eb3b7be8eaa83fbce34e85639cf48a1d8382644fdb0282e8d7b97fb5e7e2b' 'Conferir após extrair: shasum -a 256 -c SHA256SUMS' > LEIA-ME.txt
+          find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+          sha256sum -c SHA256SUMS
       - uses: actions/upload-artifact@v4
-        if: always()
         with:
-          name: dl4-pr01-${{ matrix.os }}
-          path: ${{ runner.temp }}/evidence/verified-results.tgz
+          name: DL4-PR01-af60eee
+          path: ${{ runner.temp }}/handoff
