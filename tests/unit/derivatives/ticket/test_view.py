@@ -2,7 +2,7 @@
 import json
 from collections.abc import Sequence
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal as D
+from decimal import Context, Decimal as D, InvalidOperation, localcontext
 from hashlib import sha256
 from pathlib import Path
 
@@ -468,3 +468,17 @@ def test_v15_json_round_trip_and_published_schema() -> None:
     assert SCHEMA.read_bytes() == generated
     assert sha256(generated).hexdigest() == (
         "a63d4508c126fabd38a8cb3eea01b30616f92cef99234da4cc7a3da166eb9275")
+
+
+def test_v16_view_is_independent_of_the_callers_decimal_context() -> None:
+    """A visão completa conserva os bytes sob precisão reduzida, com e sem armadilha."""
+    session = official("calmo", 1)
+    now = at("14:00:02")
+    with localcontext(Context()):
+        expected = ticket_view(session, "T1", now).model_dump_json().encode()
+    expiry = json.loads(expected)["risco"]["vencimento"]
+    assert (expiry["pior_resultado"], expiry["melhor_resultado"]) == ("5.00", "15.00")
+    for trap in (True, False):
+        with localcontext(Context(prec=3)) as context:
+            context.traps[InvalidOperation] = trap
+            assert ticket_view(session, "T1", now).model_dump_json().encode() == expected
