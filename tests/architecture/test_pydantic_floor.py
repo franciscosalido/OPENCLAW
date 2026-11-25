@@ -71,7 +71,11 @@ def test_p4_environment_matches_lock() -> None:
 
 def test_p5_bounds_parser_refuses_unknown_forms() -> None:
     """O leitor não aceita formas que ele não sabe comparar."""
-    for text in ("pydantic~=2.14", "pydantic>=2.14.4,>=2.15", "pydantic==2.14.4", "pydantic"):
+    assert _pad(_release("2.14.4.0")) == _pad(_release("2.14.4"))
+    for text in (
+        "pydantic~=2.14", "pydantic>=2.14.4,>=2.15", "pydantic==2.14.4", "pydantic",
+        "pydantic>=2.1 4.4,<3",
+    ):
         try:
             _bounds(text)
         except AssertionError:
