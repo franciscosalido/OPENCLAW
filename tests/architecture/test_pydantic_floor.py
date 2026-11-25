@@ -16,10 +16,10 @@ def _release(text: str) -> tuple[int, ...]:
 
 def _bounds(requirement: str) -> dict[str, tuple[int, ...]]:
     """Lê somente as formas `>=X` e `<Y`; qualquer outra recusa o manifesto."""
-    clauses = requirement.removeprefix("pydantic").replace(" ", "").split(",")
+    clauses = requirement.removeprefix("pydantic").split(",")
     bounds: dict[str, tuple[int, ...]] = {}
     for clause in clauses:
-        match = _BOUND.fullmatch(clause)
+        match = _BOUND.fullmatch(clause.strip())
         assert match is not None and match[1] not in bounds, requirement
         bounds[match[1]] = _release(match[2])
     return bounds
@@ -39,29 +39,31 @@ def _locked() -> str:
     return str(rows[0])
 
 
-def _pad(value: tuple[int, ...]) -> tuple[int, ...]:
-    return value + (0,) * (3 - len(value))
+def _comparable(value: tuple[int, ...]) -> tuple[int, ...]:
+    while len(value) > 1 and value[-1] == 0:
+        value = value[:-1]
+    return value
 
 
 def test_p1_declared_floor_covers_patched_release() -> None:
     """O manifesto exige a versão corrigida e recusa a próxima maior."""
     bounds = _bounds(_declared())
     assert set(bounds) == {">=", "<"}
-    assert _pad(bounds[">="]) >= _PATCHED
+    assert _comparable(bounds[">="]) >= _PATCHED
     assert bounds["<"] == (3,)
 
 
 def test_p2_lock_satisfies_manifest() -> None:
     """A versão travada está dentro do intervalo declarado; sem teto, o intervalo é aberto."""
     bounds = _bounds(_declared())
-    locked = _pad(_release(_locked()))
-    assert _pad(bounds[">="]) <= locked
-    assert "<" not in bounds or locked < _pad(bounds["<"])
+    locked = _comparable(_release(_locked()))
+    assert _comparable(bounds[">="]) <= locked
+    assert "<" not in bounds or locked < _comparable(bounds["<"])
 
 
 def test_p3_lock_covers_patched_release() -> None:
     """O lock instala a versão corrigida dos avisos."""
-    assert _pad(_release(_locked())) >= _PATCHED
+    assert _comparable(_release(_locked())) >= _PATCHED
 
 
 def test_p4_environment_matches_lock() -> None:
@@ -71,7 +73,7 @@ def test_p4_environment_matches_lock() -> None:
 
 def test_p5_bounds_parser_refuses_unknown_forms() -> None:
     """O leitor não aceita formas que ele não sabe comparar."""
-    assert _pad(_release("2.14.4.0")) == _pad(_release("2.14.4"))
+    assert _comparable(_release("2.14.4.0")) == _comparable(_release("2.14.4"))
     for text in (
         "pydantic~=2.14", "pydantic>=2.14.4,>=2.15", "pydantic==2.14.4", "pydantic",
         "pydantic>=2.1 4.4,<3",
