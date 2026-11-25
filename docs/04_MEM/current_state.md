@@ -4,7 +4,7 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-25 · **Turno:** Claude (planejador). **Fase 4 em andamento:** DL4-PR00 e DL4-PR01 integrados; DL4-PR02 com cartão escrito.
+**Última atualização:** 2026-11-25 · **Turno:** Claude (planejador). **Fase 4 em andamento:** DL4-PR00, DL4-PR01 e DL4-PR02 integrados; DL4-PR03 com cartão escrito.
 
 ## Fase 04 — A boleta que Francisco consegue usar — EM ANDAMENTO
 
@@ -19,8 +19,8 @@ Fila decidida por Francisco em 24/11/2026:
 |---|---|---|
 | DL4-PR00 | piso e lock do pydantic em 2.14.4 | integrado, PR #186, `128e78d` |
 | DL4-PR01 | contrato de visão (`ticket_view`, `formato` 1) | integrado, PR #188, `565136d` |
-| DL4-PR02 | três roteiros de trava de BOVA11 e gabarito do M1 | cartão escrito em 25/11/2026 |
-| DL4-PR03 | tela HTML estática; prova de uso do M1 (18 de 18) | — |
+| DL4-PR02 | três roteiros de trava de BOVA11 e gabarito do M1 | integrado, PR #191, `6ca0e5f` |
+| DL4-PR03 | tela HTML estática; prova de uso do M1 (18 de 18) | cartão escrito em 25/11/2026 |
 | DL4-PR04 a PR06 | confirmar uma versão, acompanhar por perna, visor de recibo (M2) | — |
 | DL4-PR07 | alvo de spread que só avisa (M3) | — |
 | DL4-PR08 e PR09 | leitura OpLab e confiabilidade da VI (M4) | condicionais; exigem liberação assinada do D1 |
@@ -44,6 +44,16 @@ Entregue pelo DL4-PR01:
   quem chama.
 - Portão da cabeça `af60eee`: 11.685 aprovados, 16 pulados; mypy estrito e Pyright limpos.
 
+Entregue pelo DL4-PR02:
+- Três sessões sintéticas de trava de BOVA11 em
+  `tests/fixtures/derivatives/synthetic/ticket/sessions/`: `bova_calmo` (call a débito,
+  termina Concluída), `bova_vencida` (put a crédito, recusada por cotação vencida e depois
+  Concluída) e `bova_adverso` (call a débito, recusada por leilão, termina Proposta).
+- `bova.gabarito.json`: 6 perguntas e 18 respostas da prova de uso do M1, uma foto por
+  sessão. Bytes presos por SHA-256 em `test_bova_sessions.py`.
+- Nenhum arquivo de produção mudou: o simulador já produzia as três situações.
+- Portão da cabeça `c9311f9`: 11.697 aprovados, 16 pulados; mypy estrito e Pyright limpos.
+
 Decisões de Francisco que valem para os próximos cartões:
 - L3: mercado adverso é só o que `guards.assess` já emite. Condição nova é cartão de motor.
 - L4: o risco aparece em dois números, com rótulos distintos: desembolso se só a compra
@@ -58,20 +68,22 @@ Pendências sem cartão:
   correção antes do M4. Até lá, a linha de base de cada cartão é «as mesmas 4, pelos IDs».
 - `Literal[1]` do `formato` da visão aceita `true` e `1.0` na leitura. Endurecer quando a
   tela (DL4-PR03) passar a ler a visão.
+- A docstring de `series_code` em `test_bova_sessions.py` diz «formato B3», mas o número
+  `strike × 10` é convenção sintética do projeto. Corrigir no próximo PR que tocar o arquivo.
 - A fonte do spread para o gatilho do DL4-PR07 não está decidida: o gatilho atual olha uma
   série só.
 
 ### Próximo turno (aviso ao implementador e ao revisor)
 
-- **Implementador (Codex):** o próximo cartão é o **DL4-PR02**
-  (`claude/derivativos/cards/DL4-PR02_SUPERCARD.md`, no projeto), com o patch
-  `DL4-PR02_PROTOTIPO.patch`. Só fixtures e testes; nenhum arquivo de produção muda. Os
-  sete SHA-256 do §2 do cartão decidem os bytes. A base é a `main` com este commit de
-  documentação: em relação a `565136d`, só `docs/04_MEM/current_state.md` difere.
+- **Implementador (Codex):** o próximo cartão é o **DL4-PR03**
+  (`claude/derivativos/cards/DL4-PR03_SUPERCARD.md`, no projeto): a tela HTML estática da
+  boleta, lendo só a visão, e o roteiro da prova de uso do M1. A base é a `main` em
+  `6ca0e5f` mais este commit de documentação.
 - **Revisor:** em chat próprio do PR. Recebe cartão, diff e evidências; roda por conta
-  própria o B3, o B5 e os mutantes 1, 9 e 11; não repete o portão nem escreve o próximo
+  própria as provas que o cartão lhe atribui; não repete o portão nem escreve o próximo
   cartão. Linha de base da integração: as mesmas 4 falhas conhecidas, pelos IDs.
-- **Planejador:** escreve o DL4-PR03 (tela HTML e prova de uso do M1) depois do GO.
+- **Francisco:** depois da integração do DL4-PR03, faz a prova de uso do M1 (3 telas, 6
+  perguntas cada). O M1 só está aceito com 18 de 18.
 
 ## Depois da Fase 3 — decisões de produto no simulador (D0) — EM ANDAMENTO
 
