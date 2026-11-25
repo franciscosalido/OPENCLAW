@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 4702373889b8010ed5b81f366ad830d7724d608c
+          ref: 8aea7c9749a470553862fcb5607cf28df5414956
           fetch-depth: 0
           persist-credentials: false
       - uses: astral-sh/setup-uv@v7
@@ -30,6 +30,7 @@ jobs:
           uname -sm | tee "$RUNNER_TEMP/evidence/platform"
           if [ "$RUNNER_OS" = macOS ]; then test "$(uname -m)" = arm64; else test "$(uname -m)" = x86_64; fi
           uv python install 3.12.13
+          git rev-parse HEAD | tee "$RUNNER_TEMP/evidence/head"
           git worktree add --detach "$RUNNER_TEMP/base" 1361724d3d85575137315fdf0729277990f1f04e
       - name: Compare replays, schemas and service imports
         shell: bash
@@ -43,11 +44,18 @@ jobs:
             uv sync --locked --python 3.12.13
             uv pip check
             .venv/bin/python -c 'import platform,sys,pydantic,pydantic_core,fastmcp,mcp,pydantic_settings; from importlib.metadata import version; print(platform.machine(),sys.version,[(p,version(p)) for p in ("pydantic","pydantic-core","fastmcp","mcp","pydantic-settings")],pydantic.__file__)' | tee "$out/runtime"
+            shasum -a 256 docs/specs/derivatives/fase3/schemas/previa.schema.json > "$out/schema.sha256"
             .venv/bin/python -m pytest tests/unit/derivatives/ticket/test_models.py tests/unit/derivatives/test_vendor_models.py -q > "$out/models.log"
             p=tests/fixtures/derivatives/synthetic/ticket/sessions
             for scenario in calmo leilao rapido; do
               .venv/bin/python -m scripts.derivatives_ticket_replay --replay "$p/$scenario.replay.json" --roteiro "$p/$scenario.roteiro.json" --out "$out/replays/$scenario"
             done
+            if test "$tree" = base; then
+              set +e
+              .venv/bin/python -m pytest tests/ -q --ignore=tests/integration --timeout=120 > "$out/unit.log" 2>&1
+              echo "$?" > "$out/unit.rc"
+              set -e
+            fi
             (cd "$out/replays" && find . -type f | sort | xargs shasum -a 256) > "$out/hashes"
           done
           cd "$RUNNER_TEMP/evidence"
