@@ -1,38 +1,159 @@
-name: DL4-PR01 reproduction
+name: DL4-PR01 qualification
 on:
   pull_request:
     branches: [codex/dl4-pr01-visao]
 permissions:
   contents: read
 jobs:
-  evidence:
-    runs-on: ubuntu-24.04
+  qualify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ec6d30311a74d1ea0a940c92303f655276c80548
+          ref: af60eee455cddfecb8063e97ae60d26e7929742d
+          fetch-depth: 0
           persist-credentials: false
       - uses: astral-sh/setup-uv@v7
         with:
           version: '0.11.32'
           enable-cache: false
-      - run: |
+      - name: Prepare exact base and validation scripts
+        shell: bash
+        run: |
+          set -eu
+          git clone --quiet --no-hardlinks . "$RUNNER_TEMP/base"
+          git -C "$RUNNER_TEMP/base" checkout --detach 128e78d2011584c4cada29c1e0bdbf6ae2245a33
+          git diff 8aea7c9749a470553862fcb5607cf28df5414956 128e78d2011584c4cada29c1e0bdbf6ae2245a33 --exit-code
+          mkdir -p "$RUNNER_TEMP/harness" "$RUNNER_TEMP/evidence"
+          cd "$RUNNER_TEMP/harness"
+          cat > mutantes.py <<'PYCODE'
+          import json, pathlib, subprocess, sys, os, tempfile
+          cases = [["exposicao_montagem=preview.partial_exposure","exposicao_montagem=net"],["elif reading.refusal is None:","elif True:"],["        return None\n    return QuoteView","        return QuoteView(compra=Decimal(0), compra_qtd=0, venda=Decimal(0), venda_qtd=0, fase='CONTINUOUS', instante=now, idade_s=0.0)\n    return QuoteView"],["elif reading.refusal is None:","elif reading.refusal is None and reading.market.level != 'CAUTION':"],["Nature.DEBIT if net > 0 else Nature.CREDIT","Nature.CREDIT if net > 0 else Nature.DEBIT"],["now - snapshot.ts","snapshot.ts - now"],["engine.state not in CONFIRMABLE","engine.state not in (*CONFIRMABLE, TicketState.ARMED)"],["if any(row.balance for row in held):","if False:"],["if any(row.multiplier != 1 for row in held):","if False:"],["if any(v.adjusted() > _MAX_ADJUSTED for v in amounts):","if False:"],["row.strike.quantize(_CENT, context=exact)","row.strike"],["pior_resultado=profile.max_loss","pior_resultado=profile.max_gain"],["    session.check_time(now)\n",""],["mercado=_guard(reading.market)","mercado=_guard(reading.guards[0])"],["reading.quotes, reading.guards, strict=True","reading.quotes, reversed(reading.guards), strict=True"],["formato=VIEW_FORMAT","formato=2"],["    formato: Literal[1]","    model_config = dict(extra='allow')\n    formato: Literal[1]"],["rotulo=engine.label","rotulo=__import__('backend.derivatives.ticket.state', fromlist=['TICKET_LABELS_PT']).TICKET_LABELS_PT[engine.state]"],["            self._admissible(now)","            plan = self._admissible(now)\n            self._reservations.admit(plan, ticket=self._ticket)"],["        if self._paused:\n            raise EngineRefusal(\"boleta pausada\")","        if False:\n            raise EngineRefusal(\"boleta pausada\")"],["except (EngineRefusal, DeadlineRefusal, SequenceRefusal) as exc:","except (EngineRefusal, DeadlineRefusal) as exc:"],["except (EngineRefusal, DeadlineRefusal, SequenceRefusal) as exc:","except (EngineRefusal, SequenceRefusal) as exc:"],["        check_deadlines(plan.draft, now, self._venue)\n        if reason := self._market_block(plan, now):\n            raise EngineRefusal(reason)","        if reason := self._market_block(plan, now):\n            raise EngineRefusal(reason)\n        check_deadlines(plan.draft, now, self._venue)"],["tuple(assess((leg,), self._book, now, self._config) for leg in legs)","tuple(assess(legs, self._book, now, self._config) for leg in legs)"]]
+          cases.append((', context=exact)', ')'))
+          for n, (old, new) in enumerate(cases, 1):
+              path = pathlib.Path('backend/derivatives/ticket') / ('view.py' if n < 19 or n == 25 else 'engine.py')
+              original = path.read_bytes()
+              try:
+                  assert original.count(old.encode()) == (2 if n == 25 else 1), (n, original.count(old.encode()))
+                  mutant = original.replace(old.encode(), new.encode())
+                  compile(mutant, str(path), 'exec')
+                  path.write_bytes(mutant)
+                  with tempfile.TemporaryDirectory() as cache:
+                      env = dict(os.environ, PYTHONPYCACHEPREFIX=cache)
+                      p = subprocess.run([sys.executable, '-m','pytest','tests/unit/derivatives/ticket/test_view.py','-q','--tb=line'], env=env, capture_output=True, text=True)
+                  (pathlib.Path(os.environ['OUT']) / f'M{n:02}.log').write_text(p.stdout + p.stderr)
+                  failed = [line for line in p.stdout.splitlines() if line.startswith('FAILED ')]
+                  assert p.returncode == 1 and failed, (n, p.stdout[-2000:])
+                  if n == 25:
+                      assert any('test_v16_' in line for line in failed), failed
+                  print(n, failed[0])
+              finally:
+                  path.write_bytes(original)
+          PYCODE
+          cat > qualify.sh <<'SHELL'
+          set -euo pipefail
+          py="$1"
+          candidate="$PWD"
+          out="$OUT"
+          mkdir -p "$out"
+          test "$(git rev-parse HEAD)" = af60eee455cddfecb8063e97ae60d26e7929742d
+          uname -sm | tee "$out/platform"
+          "$py" -c 'import importlib.metadata as m, platform, sys, pydantic_core._pydantic_core as c; print(sys.version,sys.executable,platform.machine(),c.__file__,[(n,m.version(n)) for n in ("pydantic","pydantic-core")]); assert m.version("pydantic") == "2.14.4"' | tee "$out/runtime"
+          git rev-parse HEAD > "$out/head"
+          for tree in base candidate; do
+            if test "$tree" = base; then cd "$BASE_TREE"; else cd "$candidate"; fi
+            mkdir -p "$out/$tree"
+            dep=tests/fixtures/derivatives/synthetic/ticket/sessions
+            for session in calmo leilao rapido; do
+              "$py" -m scripts.derivatives_ticket_replay --replay "$dep/$session.replay.json" --roteiro "$dep/$session.roteiro.json" --out "$out/$tree/$session"
+            done
+            (cd "$out/$tree" && find calmo leilao rapido -type f | sort | xargs shasum -a 256) > "$out/$tree.sha256"
+          done
+          diff -ru "$out/base" "$out/candidate"
+          diff -u "$out/base.sha256" "$out/candidate.sha256"
+          test "$(wc -l < "$out/candidate.sha256")" -eq 7
+          "$py" - <<'PY' | tee "$out/schema"
+          import hashlib,json,pathlib
+          from backend.derivatives.ticket.view import TicketView
+          data=(json.dumps(TicketView.model_json_schema(mode="serialization"),sort_keys=True,indent=2,ensure_ascii=False)+"\n").encode()
+          assert data==pathlib.Path("docs/specs/derivatives/fase4/schemas/visao.schema.json").read_bytes()
+          print(hashlib.sha256(data).hexdigest())
+          PY
+          "$py" -m pytest tests/unit/derivatives/ticket/test_view.py -q | tee "$out/focal.log"
+          "$py" -m pytest tests/architecture -q | tee "$out/architecture.log"
+          "$py" "$HARNESS/mutantes.py" > "$out/mutantes.log" || { tail -15 "$out/mutantes.log"; exit 1; }
+          "$py" -m pytest tests/unit/derivatives/ticket/test_view.py -q | tee "$out/restored.log"
+          git diff --exit-code
+          "$py" -m pytest tests/ -q --ignore=tests/integration --timeout=120 > "$out/unit.log" 2>&1 || { tail -15 "$out/unit.log"; exit 1; }
+          tail -2 "$out/unit.log"
+          grep -Eq '11685 passed, 16 skipped' "$out/unit.log"
+          "$py" -m mypy backend/ --strict | tee "$out/mypy.log"
+          "$(dirname "$py")/pyright" --pythonpath "$py" backend/ | tee "$out/pyright.log"
+          if test "$(uname -s)" = Linux; then
+            rc=0
+            "$py" -m pytest tests/integration -q --timeout=120 > "$out/integration.log" 2>&1 || rc=$?
+            tail -8 "$out/integration.log"
+            test "$rc" = 1
+            grep -E '4 failed, 215 passed, 18 skipped' "$out/integration.log"
+            awk '/^FAILED /{print $2}' "$out/integration.log" | sort > "$out/integration-ids"
+            diff -u "$HARNESS/known-ids" "$out/integration-ids"
+          fi
+          SHELL
+          cat > known-ids <<'IDS'
+          tests/integration/test_check_finlib_readiness_live.py::test_finlib_readiness_live_is_ready_and_idempotent
+          tests/integration/test_finlib_continuous_aggregates_live.py::test_finlib_closeout_views_and_cagg_roundtrip
+          tests/integration/test_finlib_repositories_assets_live.py::test_finlib_asset_repositories_flow_idempotency_and_atomicity
+          tests/integration/test_pr09_pg_stat_statements_live.py::test_pr09_pg_stat_report_live_parseable
+          IDS
+          cd "$GITHUB_WORKSPACE"
           uv python install 3.12.13
           uv lock --check
+      - name: Qualify macOS ARM64
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -eu
+          test "$(uname -m)" = arm64
           uv sync --locked --python 3.12.13
           uv pip check
-          .venv/bin/python -m pytest tests/unit/derivatives/ticket/test_view.py -q
-          .venv/bin/python - <<'PY'
-          from decimal import localcontext
-          from importlib.metadata import version
-          from tests.unit.derivatives.ticket.test_view import official, at, ticket_view
-          assert version("pydantic") == "2.14.4"
-          session = official("calmo", 1)
-          now = at("14:00:02")
-          before = ticket_view(session, "T1", now)
-          print("DEFAULT", before.risco.vencimento.model_dump_json())
-          with localcontext() as ctx:
-              ctx.prec = 3
-              after = ticket_view(session, "T1", now)
-              assert after == before
-          PY
+          HARNESS="$RUNNER_TEMP/harness" OUT="$RUNNER_TEMP/evidence" BASE_TREE="$RUNNER_TEMP/base" bash "$RUNNER_TEMP/harness/qualify.sh" "$PWD/.venv/bin/python"
+      - name: Qualify isolated Linux x86_64
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --platform linux/amd64 -f Dockerfile.openclaw-sandbox -t openclaw-sandbox:pr01 .
+          docker image inspect --format '{{.Id}} {{.Architecture}}' openclaw-sandbox:pr01 | tee "$RUNNER_TEMP/evidence/image"
+          docker network create dl4-isolated
+          docker build -f infra/postgres/Dockerfile -t dl4-pg .
+          docker run -d --name dl4-pg --network dl4-isolated -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_USER=quimera -e POSTGRES_DB=quimera -v "$PWD/infra/postgres/initdb:/docker-entrypoint-initdb.d:ro" dl4-pg postgres -c shared_preload_libraries=timescaledb,pg_stat_statements
+          docker run -d --name dl4-qdrant --network dl4-isolated qdrant/qdrant:v1.18.2
+          for n in {1..60}; do docker exec dl4-pg pg_isready -h 127.0.0.1 -U quimera && break; sleep 2; done
+          docker exec dl4-pg pg_isready -h 127.0.0.1 -U quimera
+          docker run --rm --platform linux/amd64 --network dl4-isolated -e TEST_POSTGRES_DSN=postgresql://quimera@dl4-pg:5432/quimera -e QDRANT_URL=http://dl4-qdrant:6333 -e UV_PROJECT_ENVIRONMENT=/opt/openclaw-venv -e UV_FROZEN=1 -e OUT=/evidence -e HARNESS=/harness -e BASE_TREE=/base -v "$PWD:/workspace" -v "$RUNNER_TEMP/base:/base" -v "$RUNNER_TEMP/evidence:/evidence" -v "$RUNNER_TEMP/harness:/harness:ro" -w /workspace openclaw-sandbox:pr01 bash -ec '
+            if ! command -v git >/dev/null; then apt-get update -qq && apt-get install -y -qq git; fi
+            git config --global --add safe.directory /workspace
+            git config --global --add safe.directory /base
+            test "$(uname -m)" = x86_64
+            python -c "import struct,sys; b=open(sys.executable,\"rb\").read(20); assert b[:4].hex()==\"7f454c46\" and struct.unpack_from(\"<H\",b,18)[0]==62" 
+            uv pip check --python /opt/openclaw-venv/bin/python
+            bash /harness/qualify.sh /opt/openclaw-venv/bin/python'
+      - name: Export test evidence
+        if: always()
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP/evidence"
+          tar czf "$RUNNER_TEMP/results.tgz" .
+          shasum -a 256 "$RUNNER_TEMP/results.tgz"
+          base64 < "$RUNNER_TEMP/results.tgz" | tr -d '\n' | fold -w 512 | sed 's/^/DL4REPORT /'
+          echo
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dl4-pr01-${{ matrix.os }}
+          path: ${{ runner.temp }}/evidence
