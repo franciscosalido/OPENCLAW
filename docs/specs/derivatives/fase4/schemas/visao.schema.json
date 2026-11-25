@@ -1,0 +1,465 @@
+{
+  "$defs": {
+    "Advance": {
+      "description": "Situação da confirmação humana neste instante.",
+      "enum": [
+        "PODE_CONFIRMAR",
+        "BLOQUEADA",
+        "NAO_SE_APLICA"
+      ],
+      "title": "Advance",
+      "type": "string"
+    },
+    "AdvanceView": {
+      "additionalProperties": false,
+      "description": "Situação e recusa literal que a confirmação receberia agora.",
+      "properties": {
+        "motivo": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Motivo"
+        },
+        "situacao": {
+          "$ref": "#/$defs/Advance"
+        }
+      },
+      "required": [
+        "situacao",
+        "motivo"
+      ],
+      "title": "AdvanceView",
+      "type": "object"
+    },
+    "CostView": {
+      "additionalProperties": false,
+      "description": "Limites em reais da versão exibida; o líquido conserva o sinal do motor.",
+      "properties": {
+        "bruto_teto": {
+          "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[Ee][+-]?[0-9]+)?$",
+          "title": "Bruto Teto",
+          "type": "string"
+        },
+        "liquido_assinado": {
+          "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[Ee][+-]?[0-9]+)?$",
+          "title": "Liquido Assinado",
+          "type": "string"
+        },
+        "natureza": {
+          "$ref": "#/$defs/Nature"
+        }
+      },
+      "required": [
+        "liquido_assinado",
+        "natureza",
+        "bruto_teto"
+      ],
+      "title": "CostView",
+      "type": "object"
+    },
+    "ExpiryView": {
+      "additionalProperties": false,
+      "description": "Extremos com sinal do resultado no vencimento, aos preços-limite da versão.",
+      "properties": {
+        "ganho_ilimitado": {
+          "title": "Ganho Ilimitado",
+          "type": "boolean"
+        },
+        "melhor_resultado": {
+          "anyOf": [
+            {
+              "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[Ee][+-]?[0-9]+)?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Melhor Resultado"
+        },
+        "perda_ilimitada": {
+          "title": "Perda Ilimitada",
+          "type": "boolean"
+        },
+        "pior_resultado": {
+          "anyOf": [
+            {
+              "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[Ee][+-]?[0-9]+)?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Pior Resultado"
+        }
+      },
+      "required": [
+        "pior_resultado",
+        "perda_ilimitada",
+        "melhor_resultado",
+        "ganho_ilimitado"
+      ],
+      "title": "ExpiryView",
+      "type": "object"
+    },
+    "GuardView": {
+      "additionalProperties": false,
+      "description": "Nível e motivos literais da guarda do motor.",
+      "properties": {
+        "motivos": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Motivos",
+          "type": "array"
+        },
+        "nivel": {
+          "enum": [
+            "OK",
+            "CAUTION",
+            "BLOCKED"
+          ],
+          "title": "Nivel",
+          "type": "string"
+        }
+      },
+      "required": [
+        "nivel",
+        "motivos"
+      ],
+      "title": "GuardView",
+      "type": "object"
+    },
+    "LegView": {
+      "additionalProperties": false,
+      "description": "Perna assinada, identidade da série na foto, cotação e guarda próprias.",
+      "properties": {
+        "ativo": {
+          "title": "Ativo",
+          "type": "string"
+        },
+        "cotacao": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/QuoteView"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "guarda": {
+          "$ref": "#/$defs/GuardView"
+        },
+        "lado": {
+          "$ref": "#/$defs/Side"
+        },
+        "lado_rotulo": {
+          "title": "Lado Rotulo",
+          "type": "string"
+        },
+        "lote": {
+          "title": "Lote",
+          "type": "integer"
+        },
+        "preco_limite": {
+          "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[Ee][+-]?[0-9]+)?$",
+          "title": "Preco Limite",
+          "type": "string"
+        },
+        "quantidade": {
+          "title": "Quantidade",
+          "type": "integer"
+        },
+        "serie": {
+          "title": "Serie",
+          "type": "string"
+        },
+        "strike": {
+          "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[Ee][+-]?[0-9]+)?$",
+          "title": "Strike",
+          "type": "string"
+        },
+        "tipo": {
+          "enum": [
+            "CALL",
+            "PUT"
+          ],
+          "title": "Tipo",
+          "type": "string"
+        },
+        "vencimento": {
+          "format": "date",
+          "title": "Vencimento",
+          "type": "string"
+        }
+      },
+      "required": [
+        "serie",
+        "lado",
+        "lado_rotulo",
+        "quantidade",
+        "lote",
+        "preco_limite",
+        "ativo",
+        "tipo",
+        "strike",
+        "vencimento",
+        "cotacao",
+        "guarda"
+      ],
+      "title": "LegView",
+      "type": "object"
+    },
+    "Nature": {
+      "description": "Sentido do líquido assinado.",
+      "enum": [
+        "DEBITO",
+        "CREDITO",
+        "ZERO"
+      ],
+      "title": "Nature",
+      "type": "string"
+    },
+    "Phase": {
+      "enum": [
+        "CONTINUOUS",
+        "AUCTION",
+        "SUSPENDED"
+      ],
+      "type": "string"
+    },
+    "QuoteView": {
+      "additionalProperties": false,
+      "description": "Última cotação da série e sua idade no instante da visão.",
+      "properties": {
+        "compra": {
+          "anyOf": [
+            {
+              "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[Ee][+-]?[0-9]+)?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Compra"
+        },
+        "compra_qtd": {
+          "title": "Compra Qtd",
+          "type": "integer"
+        },
+        "fase": {
+          "$ref": "#/$defs/Phase"
+        },
+        "idade_s": {
+          "title": "Idade S",
+          "type": "number"
+        },
+        "instante": {
+          "format": "date-time",
+          "title": "Instante",
+          "type": "string"
+        },
+        "venda": {
+          "anyOf": [
+            {
+              "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[Ee][+-]?[0-9]+)?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Venda"
+        },
+        "venda_qtd": {
+          "title": "Venda Qtd",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "compra",
+        "compra_qtd",
+        "venda",
+        "venda_qtd",
+        "fase",
+        "instante",
+        "idade_s"
+      ],
+      "title": "QuoteView",
+      "type": "object"
+    },
+    "RiskView": {
+      "additionalProperties": false,
+      "description": "Duas grandezas distintas: desembolso da montagem e resultado no vencimento.",
+      "properties": {
+        "exposicao_montagem": {
+          "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[Ee][+-]?[0-9]+)?$",
+          "title": "Exposicao Montagem",
+          "type": "string"
+        },
+        "vencimento": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ExpiryView"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "vencimento_indisponivel": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Vencimento Indisponivel"
+        }
+      },
+      "required": [
+        "exposicao_montagem",
+        "vencimento",
+        "vencimento_indisponivel"
+      ],
+      "title": "RiskView",
+      "type": "object"
+    },
+    "Side": {
+      "description": "Sentido da perna.",
+      "enum": [
+        "BUY",
+        "SELL"
+      ],
+      "title": "Side",
+      "type": "string"
+    },
+    "TicketState": {
+      "description": "Estado do conjunto, independente dos estados de cada perna.",
+      "enum": [
+        "DRAFT",
+        "ARMED",
+        "TRIGGERED",
+        "CONFIRMED",
+        "WORKING",
+        "COMPLETED",
+        "STOPPED",
+        "DENIED",
+        "EXPIRED",
+        "UNCERTAIN"
+      ],
+      "title": "TicketState",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Modelo de tela versionado de uma boleta em replay.",
+  "properties": {
+    "avanco": {
+      "$ref": "#/$defs/AdvanceView"
+    },
+    "aviso": {
+      "title": "Aviso",
+      "type": "string"
+    },
+    "boleta": {
+      "title": "Boleta",
+      "type": "string"
+    },
+    "conta": {
+      "title": "Conta",
+      "type": "string"
+    },
+    "custo": {
+      "$ref": "#/$defs/CostView"
+    },
+    "estado": {
+      "$ref": "#/$defs/TicketState"
+    },
+    "formato": {
+      "const": 1,
+      "title": "Formato",
+      "type": "integer"
+    },
+    "foto_cotacao": {
+      "title": "Foto Cotacao",
+      "type": "string"
+    },
+    "instante": {
+      "format": "date-time",
+      "title": "Instante",
+      "type": "string"
+    },
+    "mercado": {
+      "$ref": "#/$defs/GuardView"
+    },
+    "pausada": {
+      "title": "Pausada",
+      "type": "boolean"
+    },
+    "pernas": {
+      "items": {
+        "$ref": "#/$defs/LegView"
+      },
+      "title": "Pernas",
+      "type": "array"
+    },
+    "prazo_envio": {
+      "format": "date-time",
+      "title": "Prazo Envio",
+      "type": "string"
+    },
+    "resumo": {
+      "title": "Resumo",
+      "type": "string"
+    },
+    "risco": {
+      "$ref": "#/$defs/RiskView"
+    },
+    "rotulo": {
+      "title": "Rotulo",
+      "type": "string"
+    },
+    "validade_ordens": {
+      "format": "date-time",
+      "title": "Validade Ordens",
+      "type": "string"
+    },
+    "versao": {
+      "title": "Versao",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "formato",
+    "aviso",
+    "boleta",
+    "conta",
+    "instante",
+    "estado",
+    "rotulo",
+    "pausada",
+    "versao",
+    "resumo",
+    "foto_cotacao",
+    "prazo_envio",
+    "validade_ordens",
+    "pernas",
+    "custo",
+    "risco",
+    "mercado",
+    "avanco"
+  ],
+  "title": "TicketView",
+  "type": "object"
+}

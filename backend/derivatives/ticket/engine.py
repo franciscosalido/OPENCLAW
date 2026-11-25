@@ -9,7 +9,9 @@ from types import MappingProxyType
 from typing import NamedTuple
 
 from backend.derivatives.ticket.gate import Action, DecisionLedger, HumanDecision
-from backend.derivatives.ticket.guards import BookView, assess, check_deadlines
+from backend.derivatives.ticket.guards import (
+    BookSnapshot, BookView, DeadlineRefusal, GuardResult, assess, check_deadlines,
+)
 from backend.derivatives.ticket.models import (
     FieldRef, Leg, MarketSuggestion, Preview, Side, TicketDraft, apply_human_edit,
     apply_market_refresh,
@@ -32,6 +34,7 @@ from config.ticket_sim_config_model import TicketSimConfig
 _LIVE = {O.PENDING_SEND, O.LIVE, O.PARTIAL, O.CANCEL_REQUESTED, O.UNCERTAIN}
 _ZERO = Decimal(0)
 _ID_COMPONENT = re.compile(r"[A-Za-z0-9._-]+")
+CONFIRMABLE = (T.DRAFT, T.TRIGGERED)
 
 
 class LegProgress(NamedTuple):
@@ -42,6 +45,15 @@ class LegProgress(NamedTuple):
     executed: int
     live: int
     average: Decimal | None
+
+
+class Reading(NamedTuple):
+    """Fatos de leitura no instante: foto, cotação e guarda por perna, e a recusa vigente."""
+    position: Position
+    quotes: tuple[BookSnapshot | None, ...]
+    guards: tuple[GuardResult, ...]
+    market: GuardResult
+    refusal: str | None
 
 
 class EngineRefusal(ValueError):
@@ -271,9 +283,8 @@ class TicketEngine:
         result = assess(plan.draft.legs, self._book, now, self._config)
         return ", ".join(result.reasons) if result.level == "BLOCKED" else None
 
-    def confirm(self, decision: HumanDecision, now: datetime) -> None:
-        """Confere estado, conta, prazos, mercado, limites e por último a decisão."""
-        plan = self._require(T.DRAFT, T.TRIGGERED)
+    def _admissible(self, now: datetime) -> LegPlan:
+        plan = self._require(*CONFIRMABLE)
         if self._paused:
             raise EngineRefusal("boleta pausada")
         if self._halts.blocked(self._account):
@@ -284,6 +295,26 @@ class TicketEngine:
         if not within_signed_limits(plan.draft, (), plan.legs[0], known_costs=_ZERO):
             raise EngineRefusal("limites assinados")
         self._reservations.admissible(plan, ticket=self._ticket)
+        return plan
+
+    def reading(self, now: datetime) -> Reading:
+        """Consulta, sem efeito, o que a confirmação conferiria antes da decisão."""
+        if self._plan is None:
+            raise EngineRefusal("boleta sem proposta")
+        legs = self._plan.draft.legs
+        refusal = None
+        try:
+            self._admissible(now)
+        except (EngineRefusal, DeadlineRefusal, SequenceRefusal) as exc:
+            refusal = str(exc)
+        return Reading(
+            self._position, tuple(self._book.snapshot(leg.symbol) for leg in legs),
+            tuple(assess((leg,), self._book, now, self._config) for leg in legs),
+            assess(legs, self._book, now, self._config), refusal)
+
+    def confirm(self, decision: HumanDecision, now: datetime) -> None:
+        """Confere estado, conta, prazos, mercado, limites e por último a decisão."""
+        plan = self._admissible(now)
         auth = self._consume(decision, Action.EXECUTE, now)
         self._reservations.admit(plan, ticket=self._ticket)
         self._move(E.CONFIRM, now, **auth)
