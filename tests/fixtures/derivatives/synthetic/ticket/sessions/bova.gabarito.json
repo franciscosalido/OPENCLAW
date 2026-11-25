@@ -1,0 +1,60 @@
+{
+ "formato": 1,
+ "natureza": "SINTETICO",
+ "aviso": "Dados sintéticos; não são observações de mercado.",
+ "perguntas": [
+  "O que a boleta compra e o que vende, em que quantidade e a que preço-limite?",
+  "Quanto paga ou recebe no líquido, e qual é o teto bruto?",
+  "Quanto desembolsa se só a compra executar, e qual é o pior resultado no vencimento?",
+  "Qual é a idade da cotação de cada perna, e de que foto veio a proposta?",
+  "Como está o mercado para esta boleta?",
+  "A boleta pode ser confirmada agora? Se não, por quê?"
+ ],
+ "fotos": [
+  {
+   "sessao": "bova_calmo",
+   "passos": 1,
+   "avanca_ate": 2,
+   "boleta": "T1",
+   "instante": "2026-11-25T14:00:02Z",
+   "respostas": [
+    "Compra 100 BOVAA1500 (CALL 150.00) a 4.20; Venda 100 BOVAA1550 (CALL 155.00) a 2.10",
+    "paga no máximo 210.00; bruto até 630.00",
+    "desembolso se só a compra executar 420.00; pior resultado no vencimento -210.00",
+    "BOVAA1500 2.0 s, BOVAA1550 1.0 s; foto bova-calmo-2",
+    "OK: sem aviso",
+    "pode confirmar"
+   ]
+  },
+  {
+   "sessao": "bova_vencida",
+   "passos": 1,
+   "avanca_ate": 3,
+   "boleta": "T1",
+   "instante": "2026-11-25T14:00:10Z",
+   "respostas": [
+    "Compra 200 BOVAM1450 (PUT 145.00) a 1.90; Venda 200 BOVAM1500 (PUT 150.00) a 3.90",
+    "recebe no mínimo 400.00; bruto até 1160.00",
+    "desembolso se só a compra executar 380.00; pior resultado no vencimento -600.00",
+    "BOVAM1450 10.0 s, BOVAM1500 1.0 s; foto bova-vencida-2",
+    "BLOCKED: cotação vencida",
+    "não avança: cotação vencida"
+   ]
+  },
+  {
+   "sessao": "bova_adverso",
+   "passos": 1,
+   "avanca_ate": 2,
+   "boleta": "T1",
+   "instante": "2026-11-25T14:00:02Z",
+   "respostas": [
+    "Compra 200 BOVAA1550 (CALL 155.00) a 2.15; Venda 200 BOVAA1600 (CALL 160.00) a 0.95",
+    "paga no máximo 240.00; bruto até 620.00",
+    "desembolso se só a compra executar 430.00; pior resultado no vencimento -240.00",
+    "BOVAA1550 2.0 s, BOVAA1600 1.0 s; foto bova-adverso-2",
+    "BLOCKED: spread aberto, pouca profundidade, leilão",
+    "não avança: spread aberto, pouca profundidade, leilão"
+   ]
+  }
+ ]
+}
