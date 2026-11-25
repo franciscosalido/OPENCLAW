@@ -1,0 +1,5 @@
+{"session_close":"2026-11-25T21:00:00Z","events":[
+{"seq":1,"ts":"2026-11-25T14:00:00Z","type":"quote","symbol":"BOVAA1550","bid":"1.80","bid_size":500,"ask":"2.15","ask_size":100,"phase":"CONTINUOUS"},
+{"seq":2,"ts":"2026-11-25T14:00:01Z","type":"quote","symbol":"BOVAA1600","bid":"0.95","bid_size":500,"ask":"1.00","ask_size":500,"phase":"AUCTION"},
+{"seq":3,"ts":"2026-11-25T14:00:04Z","type":"quote","symbol":"BOVAA1600","bid":"0.95","bid_size":500,"ask":"1.00","ask_size":500,"phase":"CONTINUOUS"},
+{"seq":4,"ts":"2026-11-25T14:00:05Z","type":"quote","symbol":"BOVAA1550","bid":"1.80","bid_size":500,"ask":"2.15","ask_size":100,"phase":"CONTINUOUS"}]}
