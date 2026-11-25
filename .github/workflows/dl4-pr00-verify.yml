@@ -16,33 +16,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: e86cf910a32c8659113fca11359865c1a1c5cd1b
+          ref: 4702373889b8010ed5b81f366ad830d7724d608c
           fetch-depth: 0
           persist-credentials: false
-      - uses: actions/download-artifact@v4
+      - uses: astral-sh/setup-uv@v7
         with:
-          github-token: ${{ github.token }}
-          run-id: 45617236912
-          name: resolved-manifest
-          path: ${{ runner.temp }}/resolved
-      - name: Read candidate files and emit reproducible patch
-        shell: bash
-        run: |
-          cp "$RUNNER_TEMP/resolved/"{pyproject.toml,uv.lock} .
-          git diff --check
-          git diff -- pyproject.toml uv.lock | gzip -c | base64 | tr -d '\n' | fold -w 512 | sed 's/^/DL4DATA /'
-          echo
-          shasum -a 256 uv.lock pyproject.toml
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12.13'
+          version: '0.11.32'
+          enable-cache: false
       - name: Prepare exact interpreter and base worktree
         run: |
           set -eu
           mkdir -p "$RUNNER_TEMP/evidence"
           uname -sm | tee "$RUNNER_TEMP/evidence/platform"
           if [ "$RUNNER_OS" = macOS ]; then test "$(uname -m)" = arm64; else test "$(uname -m)" = x86_64; fi
-          python -m pip install uv==0.11.32
+          uv python install 3.12.13
           git worktree add --detach "$RUNNER_TEMP/base" 1361724d3d85575137315fdf0729277990f1f04e
       - name: Compare replays, schemas and service imports
         shell: bash
@@ -53,7 +40,7 @@ jobs:
             out="$RUNNER_TEMP/evidence/$tree"
             mkdir -p "$out"
             uv lock --check
-            uv sync --locked --python "$(command -v python)"
+            uv sync --locked --python 3.12.13
             uv pip check
             .venv/bin/python -c 'import platform,sys,pydantic,pydantic_core,fastmcp,mcp,pydantic_settings; from importlib.metadata import version; print(platform.machine(),sys.version,[(p,version(p)) for p in ("pydantic","pydantic-core","fastmcp","mcp","pydantic-settings")],pydantic.__file__)' | tee "$out/runtime"
             .venv/bin/python -m pytest tests/unit/derivatives/ticket/test_models.py tests/unit/derivatives/test_vendor_models.py -q > "$out/models.log"
@@ -114,7 +101,13 @@ jobs:
           set -euo pipefail
           docker build --platform linux/amd64 -f Dockerfile.openclaw-sandbox -t openclaw-sandbox:"$GITHUB_SHA" .
           docker image inspect --format '{{.Id}} {{.Architecture}}' openclaw-sandbox:"$GITHUB_SHA"
-          docker run --rm --platform linux/amd64 -v "$PWD:/workspace" -v "$RUNNER_TEMP/evidence:/evidence" -w /workspace openclaw-sandbox:"$GITHUB_SHA" sh -c '
+          docker network create dl4-isolated
+          docker build -f infra/postgres/Dockerfile -t dl4-pg .
+          docker run -d --name dl4-pg --network dl4-isolated -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_USER=quimera -e POSTGRES_DB=quimera -v "$PWD/infra/postgres/initdb:/docker-entrypoint-initdb.d:ro" dl4-pg postgres -c shared_preload_libraries=timescaledb,pg_stat_statements
+          docker run -d --name dl4-qdrant --network dl4-isolated qdrant/qdrant:v1.18.2
+          for n in {1..60}; do docker exec dl4-pg pg_isready -h 127.0.0.1 -U quimera && break; sleep 2; done
+          docker exec dl4-pg pg_isready -h 127.0.0.1 -U quimera
+          docker run --rm --network dl4-isolated -e TEST_POSTGRES_DSN=postgresql://quimera@dl4-pg:5432/quimera -e QDRANT_URL=http://dl4-qdrant:6333 --platform linux/amd64 -v "$PWD:/workspace" -v "$RUNNER_TEMP/evidence:/evidence" -w /workspace openclaw-sandbox:"$GITHUB_SHA" sh -c '
             test "$(uname -m)" = x86_64 || exit 1
             python -c "import platform,pydantic; print(platform.machine(),pydantic.__version__,pydantic.__file__)"
             rc=0
