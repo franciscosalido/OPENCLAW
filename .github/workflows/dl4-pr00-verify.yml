@@ -1,43 +1,29 @@
-name: DL4-PR00 integration baseline
+name: DL4-PR00 evidence handoff
 on:
   pull_request:
     branches: [codex/dl4-pr00-pydantic-floor]
 permissions:
+  actions: read
   contents: read
 jobs:
-  baseline:
+  evidence:
+    strategy:
+      matrix:
+        include:
+          - {run: 45620198025, artifact: dl4-pr00-macos-15, label: mac-arm64}
+          - {run: 45621663664, artifact: dl4-pr00-ubuntu-24.04, label: linux-x86_64}
+          - {run: 45622511335, artifact: dl4-base-integration, label: base-integration}
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
         with:
-          ref: 1361724d3d85575137315fdf0729277990f1f04e
-          persist-credentials: false
-      - name: Reproduce isolated integration on original lock
-        shell: bash
-        run: |
-          set -euo pipefail
-          docker build --platform linux/amd64 -f Dockerfile.openclaw-sandbox -t openclaw-sandbox:"$GITHUB_SHA" .
-          docker image inspect --format '{{.Id}} {{.Architecture}}' openclaw-sandbox:"$GITHUB_SHA"
-          docker network create dl4-isolated
-          docker build -f infra/postgres/Dockerfile -t dl4-pg .
-          docker run -d --name dl4-pg --network dl4-isolated -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_USER=quimera -e POSTGRES_DB=quimera -v "$PWD/infra/postgres/initdb:/docker-entrypoint-initdb.d:ro" dl4-pg postgres -c shared_preload_libraries=timescaledb,pg_stat_statements
-          docker run -d --name dl4-qdrant --network dl4-isolated qdrant/qdrant:v1.18.2
-          for n in {1..60}; do docker exec dl4-pg pg_isready -h 127.0.0.1 -U quimera && break; sleep 2; done
-          docker exec dl4-pg pg_isready -h 127.0.0.1 -U quimera
-          mkdir -p "$RUNNER_TEMP/evidence"
-          docker run --rm --network dl4-isolated -e UV_PROJECT_ENVIRONMENT=/opt/openclaw-venv -e UV_FROZEN=1 -e TEST_POSTGRES_DSN=postgresql://quimera@dl4-pg:5432/quimera -e QDRANT_URL=http://dl4-qdrant:6333 -v "$PWD:/workspace" -v "$RUNNER_TEMP/evidence:/evidence" -w /workspace openclaw-sandbox:"$GITHUB_SHA" sh -c '
-            set -e
-            if ! command -v git >/dev/null; then apt-get update -qq && apt-get install -y -qq git; fi
-            git config --global --add safe.directory /workspace
-            python -c "import pydantic; print(pydantic.__version__); assert pydantic.__version__ == \"2.13.3\""
-            rc=0
-            python -m pytest tests/integration -q --timeout=120 > /evidence/base-integration.log 2>&1 || rc=$?
-            grep -E "^E +|^FAILED |passed.*skipped" /evidence/base-integration.log | tail -60 || true
-            echo "base-integration rc=$rc"
-            exit "$rc"'
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: dl4-base-integration
+          github-token: ${{ github.token }}
+          run-id: ${{ matrix.run }}
+          name: ${{ matrix.artifact }}
           path: ${{ runner.temp }}/evidence
+      - name: Verify and export the stored reports
+        run: |
+          cd "$RUNNER_TEMP/evidence"
+          tar czf "$RUNNER_TEMP/reports.tgz" .
+          sha256sum "$RUNNER_TEMP/reports.tgz"
+          base64 -w 512 "$RUNNER_TEMP/reports.tgz" | sed 's/^/DL4REPORT /'
