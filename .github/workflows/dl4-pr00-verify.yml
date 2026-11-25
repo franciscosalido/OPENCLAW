@@ -1,8 +1,9 @@
 name: DL4-PR00 candidate qualification
 on:
-  push:
-    branches: [ci/dl4-pr00-validation]
+  pull_request:
+    branches: [codex/dl4-pr00-pydantic-floor]
 permissions:
+  actions: read
   contents: read
 jobs:
   qualify:
