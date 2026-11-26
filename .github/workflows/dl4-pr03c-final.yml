@@ -1,0 +1,302 @@
+name: DL4-PR03C qualification
+on:
+  pull_request:
+    branches: [feat/dl4-pr03c-tela-v3]
+permissions:
+  contents: read
+jobs:
+  qualify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 94dd28103f4a640d101d793fe5b96cea952e674c
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: '0.11.32'
+          enable-cache: false
+      - name: Prepare exact base and validation scripts
+        shell: bash
+        run: |
+          set -eu
+          git clone --quiet --no-hardlinks . "$RUNNER_TEMP/base"
+          git -C "$RUNNER_TEMP/base" checkout --detach 2bd661341113a588048855cb338d6ab2ea063af0
+          mkdir -p "$RUNNER_TEMP/harness" "$RUNNER_TEMP/evidence"
+          cd "$RUNNER_TEMP/harness"
+          cat > qualify.sh <<'SHELL'
+          set -euo pipefail
+          py="$1"
+          candidate="$PWD"
+          out="$OUT"
+          mkdir -p "$out"
+          test "$(git rev-parse HEAD)" = 94dd28103f4a640d101d793fe5b96cea952e674c
+          uname -sm | tee "$out/platform"
+          "$py" -c 'import importlib.metadata as m, platform, sys, pydantic_core._pydantic_core as c; print(sys.version,sys.executable,platform.machine(),c.__file__,[(n,m.version(n)) for n in ("pydantic","pydantic-core")]); assert m.version("pydantic") == "2.14.4"' | tee "$out/runtime"
+          git rev-parse HEAD > "$out/head"
+          for tree in base candidate; do
+            if test "$tree" = base; then cd "$BASE_TREE"; else cd "$candidate"; fi
+            mkdir -p "$out/$tree"
+            dep=tests/fixtures/derivatives/synthetic/ticket/sessions
+            for session in calmo leilao rapido bova_calmo bova_vencida bova_adverso; do
+              "$py" -m scripts.derivatives_ticket_replay --replay "$dep/$session.replay.json" --roteiro "$dep/$session.roteiro.json" --out "$out/$tree/$session"
+            done
+            (cd "$out/$tree" && find calmo leilao rapido bova* -type f | sort | xargs shasum -a 256) > "$out/$tree.sha256"
+          done
+          diff -ru "$out/base" "$out/candidate"
+          diff -u "$out/base.sha256" "$out/candidate.sha256"
+          test "$(wc -l < "$out/candidate.sha256")" -eq 13
+          "$py" -m pytest tests/unit/derivatives/ticket/test_screen.py -q | tee "$out/focal.log"
+          "$py" -m pytest tests/architecture -q | tee "$out/architecture.log"
+          "$py" - <<'PYCODE' | tee "$out/schema.sha256"
+          import json, hashlib, pathlib
+          from backend.derivatives.ticket.view import TicketView
+          raw=(json.dumps(TicketView.model_json_schema(mode="serialization"),sort_keys=True,indent=2,ensure_ascii=False)+"\n").encode()
+          assert raw == pathlib.Path("docs/specs/derivatives/fase4/schemas/visao.schema.json").read_bytes()
+          digest=hashlib.sha256(raw).hexdigest()
+          assert digest == "0655d7ef91caec03e35c573901854b4a2fe8c26c9232b4e0cf9230991e556e4f"
+          print(digest)
+          PYCODE
+          mkdir -p "$out/telas"
+          for name in bova_calmo bova_vencida bova_adverso; do
+            seq=2; sec=02
+            if test "$name" = bova_vencida; then seq=3; sec=10; fi
+            "$py" scripts/derivatives_ticket_screen.py --replay "$dep/$name.replay.json" --roteiro "$dep/$name.roteiro.json" --passos 1 --avanca-ate "$seq" --boleta T1 --instante "2026-11-25T14:00:${sec}Z" --out "$out/telas/$name.html"
+          done
+          (cd "$out/telas" && shasum -a 256 *.html) > "$out/html.sha256"
+          git diff --exit-code
+          "$py" -m pytest tests/ -q --ignore=tests/integration --timeout=120 > "$out/unit.log" 2>&1 || { tail -15 "$out/unit.log"; exit 1; }
+          tail -2 "$out/unit.log"
+          grep -Eq '11733 passed, 16 skipped' "$out/unit.log"
+          "$py" -m mypy backend/ --strict | tee "$out/mypy.log"
+          "$(dirname "$py")/pyright" --pythonpath "$py" backend/ | tee "$out/pyright.log"
+          if test "$(uname -s)" = Linux; then
+            rc=0
+            "$py" -m pytest tests/integration -q --timeout=120 > "$out/integration.log" 2>&1 || rc=$?
+            tail -8 "$out/integration.log"
+            test "$rc" = 1
+            grep -E '4 failed, 215 passed, 18 skipped' "$out/integration.log"
+            awk '/^FAILED /{print $2}' "$out/integration.log" | sort > "$out/integration-ids"
+            diff -u "$HARNESS/known-ids" "$out/integration-ids"
+          fi
+          SHELL
+          cat > known-ids <<'IDS'
+          tests/integration/test_check_finlib_readiness_live.py::test_finlib_readiness_live_is_ready_and_idempotent
+          tests/integration/test_finlib_continuous_aggregates_live.py::test_finlib_closeout_views_and_cagg_roundtrip
+          tests/integration/test_finlib_repositories_assets_live.py::test_finlib_asset_repositories_flow_idempotency_and_atomicity
+          tests/integration/test_pr09_pg_stat_statements_live.py::test_pr09_pg_stat_report_live_parseable
+          IDS
+          cd "$GITHUB_WORKSPACE"
+          uv python install 3.12.13
+          uv lock --check
+      - name: Qualify macOS ARM64
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -eu
+          test "$(uname -m)" = arm64
+          uv sync --locked --python 3.12.13
+          uv pip check
+          HARNESS="$RUNNER_TEMP/harness" OUT="$RUNNER_TEMP/evidence" BASE_TREE="$RUNNER_TEMP/base" bash "$RUNNER_TEMP/harness/qualify.sh" "$PWD/.venv/bin/python"
+      - name: Qualify isolated Linux x86_64
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --platform linux/amd64 -f Dockerfile.openclaw-sandbox -t openclaw-sandbox:pr03 .
+          docker image inspect --format '{{.Id}} {{.Architecture}}' openclaw-sandbox:pr03 | tee "$RUNNER_TEMP/evidence/image"
+          docker network create dl4-isolated
+          docker build -f infra/postgres/Dockerfile -t dl4-pg .
+          docker run -d --name dl4-pg --network dl4-isolated -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_USER=quimera -e POSTGRES_DB=quimera -v "$PWD/infra/postgres/initdb:/docker-entrypoint-initdb.d:ro" dl4-pg postgres -c shared_preload_libraries=timescaledb,pg_stat_statements
+          docker run -d --name dl4-qdrant --network dl4-isolated qdrant/qdrant:v1.18.2
+          for n in {1..60}; do docker exec dl4-pg pg_isready -h 127.0.0.1 -U quimera && break; sleep 2; done
+          docker exec dl4-pg pg_isready -h 127.0.0.1 -U quimera
+          docker run --rm --platform linux/amd64 --network dl4-isolated -e TEST_POSTGRES_DSN=postgresql://quimera@dl4-pg:5432/quimera -e QDRANT_URL=http://dl4-qdrant:6333 -e UV_PROJECT_ENVIRONMENT=/opt/openclaw-venv -e UV_FROZEN=1 -e OUT=/evidence -e HARNESS=/harness -e BASE_TREE=/base -v "$PWD:/workspace" -v "$RUNNER_TEMP/base:/base" -v "$RUNNER_TEMP/evidence:/evidence" -v "$RUNNER_TEMP/harness:/harness:ro" -w /workspace openclaw-sandbox:pr03 bash -ec '
+            if ! command -v git >/dev/null; then apt-get update -qq && apt-get install -y -qq git; fi
+            git config --global --add safe.directory /workspace
+            git config --global --add safe.directory /base
+            test "$(uname -m)" = x86_64
+            python -c "import struct,sys; b=open(sys.executable,\"rb\").read(20); assert b[:4].hex()==\"7f454c46\" and struct.unpack_from(\"<H\",b,18)[0]==62" 
+            uv pip check --python /opt/openclaw-venv/bin/python
+            bash /harness/qualify.sh /opt/openclaw-venv/bin/python
+            tar -C /evidence -czf /tmp/verified-results.tgz .
+            cp /tmp/verified-results.tgz /evidence/verified-results.tgz'
+      - name: Export test evidence
+        if: always()
+        shell: bash
+        run: |
+          set -eu
+          cd "$RUNNER_TEMP/evidence"
+          if test -e verified-results.tgz; then sudo chown -R "$(id -u):$(id -g)" .; rm verified-results.tgz; fi
+          chrome=google-chrome
+          if test "$(uname -s)" = Darwin; then chrome="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"; fi
+          "$chrome" --version > browser.txt
+          for page in telas/*.html; do
+            "$chrome" --headless --disable-gpu --no-sandbox --hide-scrollbars --window-size=1500,1050 --user-data-dir="$RUNNER_TEMP/chrome-$(basename "$page")" --screenshot="$PWD/${page%.html}.png" "file://$PWD/$page"
+            test -s "${page%.html}.png"
+          done
+          (cd telas && shasum -a 256 *.png) > png.sha256
+          tar -czf "$RUNNER_TEMP/results.tgz" .
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dl4-pr03c-${{ matrix.os }}
+          path: |
+            ${{ runner.temp }}/results.tgz
+            ${{ runner.temp }}/evidence/telas/
+  review:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 94dd28103f4a640d101d793fe5b96cea952e674c
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: '0.11.32'
+          enable-cache: false
+      - name: Independent review of the published candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/review"
+          out="$RUNNER_TEMP/review"
+          git rev-parse HEAD | tee "$out/head"
+          test "$(cat "$out/head")" = 94dd28103f4a640d101d793fe5b96cea952e674c
+          uv sync --locked --python 3.12.13
+          uv pip check
+          .venv/bin/python -m pytest tests/ -q --ignore=tests/integration --timeout=120 > "$out/unit.log" 2>&1 || { tail -20 "$out/unit.log"; exit 1; }
+          tail -2 "$out/unit.log"
+          grep -q '11733 passed, 16 skipped' "$out/unit.log"
+          .venv/bin/python -m mypy backend/ --strict | tee "$out/mypy.log"
+          .venv/bin/pyright --pythonpath "$PWD/.venv/bin/python" backend/ | tee "$out/pyright.log"
+          cat > "$out/mutantes.py" <<'MUTANTS'
+          """Use em clone descartável limpo: python mutantes.py OUT [--head SHA]."""
+          import argparse
+          import ast
+          import csv
+          import hashlib
+          import os
+          from pathlib import Path
+          import subprocess
+          import sys
+          import xml.etree.ElementTree as ET
+
+          HEAD = "d62f5d1d3fabc87ec1b59946a9ce7a1aef27db9c"
+          S = Path("backend/derivatives/ticket/screen.py")
+          D = S.with_name("screen_draw.py")
+          V = S.with_name("view.py")
+          bid = '_cell(f"{prefix}.cotacao.compra", _side(quote.compra, quote.compra_qtd), "num")'
+          ask = bid.replace("compra", "venda")
+          aged = 'mark if STALE in leg.guarda.motivos else ""'
+          breakeven = '", ".join(num(v) for v in risk.vencimento.equilibrios) or "não há"'
+          quantity = '    if len({leg.quantidade for leg in legs}) != 1:\n        return None, "quantidades diferentes por perna"\n'
+          multiplier = '    if multipliers != {1}:\n        return None, "multiplicador diferente de 1"\n'
+          # Cada sublista representa um defeito isolado, inclusive quando exige propagar um parâmetro.
+          M = [
+          (S,[('DESTINATIONS_PT[view.ambiente]', 'DESTINATIONS_PT["SIMULATED"]')]),
+          (S,[('for leg in view.pernas)', 'for leg in view.pernas if leg.guarda.motivos)')]),
+          (S,[('_leg_row(index: int, leg: LegView)', '_leg_row(index: int, leg: LegView, limit: float)'), ('_leg_row(i, leg)', '_leg_row(i, leg, view.limite_idade_s)'),(aged, '"alerta" if quote.idade_s > limit else ""')]),
+          (S,[(aged,'mark if leg.guarda.nivel != "OK" else ""')]),
+          (S,[(aged,'"alerta" if STALE in leg.guarda.motivos else ""')]),
+          (S,[(bid+',\n                  '+ask, ask+',\n                  '+bid)]),
+          (S,[('">Bid × qtd",\n            ">Ask × qtd"', '">Ask × qtd",\n            ">Bid × qtd"')]),
+          (S,[(bid,bid.replace('_side(quote.compra, quote.compra_qtd)', '_side(quote.venda, quote.venda_qtd)')), (ask,ask.replace('_side(quote.venda, quote.venda_qtd)', '_side(quote.compra, quote.compra_qtd)'))]),
+          (S,[('num(quote.meio)', 'num(quote.meio.quantize(_CENT, context=_EXACT))')]),
+          (S,[('exponent > -2', 'exponent != -2')]),
+          (S,[('magnitude = magnitude.quantize(_CENT, context=_EXACT)', 'magnitude = magnitude.quantize(_CENT)')]),
+          (S,[('side = "compra" if leg.lado == "BUY" else "venda"', 'side = "compra"')]),
+          (S,[('("🇺🇸", "Americana"), "EUROPEAN": ("🇪🇺", "Europeia")','("🇪🇺", "Americana"), "EUROPEAN": ("🇺🇸", "Europeia")')]),
+          (S,[('title="{style}" ', ''),('aria-label="{style}">{flag}', '>{flag}')]),
+          (S,[("'pior' if gap > 0 else 'melhor'", "'melhor' if gap > 0 else 'pior'")]),
+          (S,[('brl(gap.copy_abs())', 'brl(gap)')]),
+          (S,[('"no meio" if gap.is_zero()', '"R$ 0,00 pior que o meio" if gap.is_zero()')]),
+          (S,[('("Natural", unit.natural, num(unit.natural))', '("Natural", unit.limite, num(unit.natural))')]),
+          (S,[('"preco_unidade", f"indisponível: {reason}"', '"preco_unidade", "indisponível"')]),
+          (S,[(breakeven, '"não há"')]),
+          (S,[(breakeven,breakeven.split(' or ')[0])]),
+          (S,[('"risco.curva", f"indisponível: {reason}"', '"risco.curva", "indisponível"')]),
+          (S,[('expiry.inclinacao_final,', 'Decimal(0),')]),
+          (S,[('<table><caption>Cotações da foto ', '<table>Cotações da foto '),('view.foto_cotacao), ", vistas em "', 'view.foto_cotacao), "<caption>, vistas em "')]),
+          (S,[('seconds(view.limite_idade_s)', 'seconds(5.0)')]),
+          (D,[('for value in sorted(merged):\n        names, shown = merged[value]', 'for name, value, shown in sorted(marks, key=lambda m: m[1]):\n        names = [name]')]),
+          (D,[('Fraction(min(merged)), Fraction(max(merged))','Fraction(0), Fraction(max(merged))')]),
+          (D,[('(start + end) / 2', 'start')]),
+          (D,[('max(first - margin, Fraction(0)), last + margin','first, last + margin')]),
+          (D,[('results[-1] + Fraction(final_slope) * margin', 'results[-1]')]),
+          (D,[('min(Fraction(0), *(y for _, y in line))','min(y for _, y in line)'),('max(Fraction(0), *(y for _, y in line))','max(y for _, y in line)')]),
+          (D,[('result, ceiling, floor, CURVE_TOP','result, floor, ceiling, CURVE_TOP')]),
+          (D,[('if low <= Fraction(value) <= high:', 'if True:')]),
+          (D,[('if low <= Fraction(value) <= high:', 'if low < Fraction(value) < high:')]),
+          (D,[('("v neg", 16)', '("v", 16)')]),
+          (V,[(multiplier,'')]),
+          (V,[(quantity+multiplier, multiplier+quantity)]),
+          (V,[('round(value * 100)', '(value * 100 + Fraction(1, 2)).__floor__()')]),
+          (V,[('round(value * 100)', '(value * 100 - Fraction(1, 2)).__ceil__()')]),
+          (S,[('</small></p></body></html>', '</small></p><script></script></body></html>')]),
+          ]
+
+          def main():
+              parser = argparse.ArgumentParser(description=__doc__)
+              parser.add_argument("out", type=Path)
+              parser.add_argument("--head", default=HEAD)
+              args = parser.parse_args()
+              out = args.out.resolve()
+              out.mkdir(parents=True, exist_ok=True)
+              git = lambda *args: subprocess.check_output(["git", *args], text=True).strip()
+              assert git("rev-parse", "HEAD") == args.head and not git("status", "--porcelain")
+              tests = [f"tests/unit/derivatives/ticket/test_{name}.py" for name in ("screen","view")]
+              env = os.environ | {"PYTHONDONTWRITEBYTECODE":"1","PYTHONPYCACHEPREFIX":str(out/"no-cache")}
+              def run(label, test_files):
+                  xml = out / (label + ".xml")
+                  with (out/(label+".log")).open("w") as log:
+                      proc = subprocess.run([sys.executable, "-B", "-m", "pytest", "-q", *test_files, f"--junitxml={xml}"], env=env, stdout=log, stderr=subprocess.STDOUT)
+                  cases = ET.parse(xml).findall(".//testcase")
+                  assert cases and not any(case.find("error") is not None for case in cases), label
+                  failures = [case.attrib["name"] for case in cases if case.find("failure") is not None]
+                  assert (proc.returncode == 1 and failures) or (proc.returncode == 0 and not failures)
+                  return len(cases), failures
+              baseline, failures = run("controle", tests)
+              assert not failures
+              with (out/"matriz.tsv").open("w") as table:
+                  writer = csv.writer(table, delimiter="\t")
+                  writer.writerow(["id","status","n_tests","falhas","source_sha256"])
+                  for i,(file, replacements) in enumerate(M,1):
+                      label = f"M{i:02}"
+                      original = file.read_bytes()
+                      mutated = original.decode()
+                      for a,b in replacements:
+                          assert mutated.count(a) == 1, (label,a)
+                          mutated = mutated.replace(a,b)
+                      ast.parse(mutated)
+                      try:
+                          data = mutated.encode()
+                          file.write_bytes(data)
+                          count, failures = run(label, tests)
+                          assert count == baseline, (label,count,baseline)
+                          writer.writerow([label,"morto" if failures else "sobreviveu",count,",".join(failures),hashlib.sha256(data).hexdigest()])
+                          table.flush()
+                      finally:
+                          file.write_bytes(original)
+                      assert not git("diff", "--name-only")
+              assert run("restaurado", tests) == (baseline, [])
+              assert not git("status","--porcelain")
+
+          if __name__ == "__main__":
+              main()
+          MUTANTS
+          .venv/bin/python "$out/mutantes.py" "$out/mutants" --head 94dd28103f4a640d101d793fe5b96cea952e674c
+          test "$(awk -F '\t' '$2=="morto"{n++} END{print n}' "$out/mutants/matriz.tsv")" = 40
+          git diff --exit-code
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dl4-pr03c-review
+          path: ${{ runner.temp }}/review
