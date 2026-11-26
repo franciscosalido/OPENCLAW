@@ -28,6 +28,7 @@ class Holding(_Frozen):
     multiplier: PositiveInt
     strike: Annotated[Money, Field(gt=0)]
     balance: int
+    style: Literal["AMERICAN", "EUROPEAN"] | None = None
 
 
 class Position(_Frozen):
