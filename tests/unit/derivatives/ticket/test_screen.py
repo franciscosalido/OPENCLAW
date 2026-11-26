@@ -2,17 +2,18 @@
 import ast
 import json
 from datetime import datetime
+import re
 from decimal import Context, Decimal as D, InvalidOperation, localcontext
 from html.parser import HTMLParser
 from pathlib import Path
 
 import pytest
 
-from backend.derivatives.ticket.screen import brl, render_ticket, seconds
+from backend.derivatives.ticket.screen import brl, num, render_ticket, seconds
 from backend.derivatives.ticket.view import TicketView, ticket_view
 from scripts.derivatives_ticket_screen import main
 from tests.unit.derivatives.ticket.test_session import FIXTURES
-from tests.unit.derivatives.ticket.test_view import CALM, CREDIT, custom, official
+from tests.unit.derivatives.ticket.test_view import CALM, CREDIT, at, custom, official
 
 ROOT = Path(__file__).resolve().parents[4]
 GABARITO = FIXTURES / "bova.gabarito.json"
@@ -26,10 +27,13 @@ class Fields(HTMLParser):
         self.text: dict[str, str] = {}
         self.classes: dict[str, set[str]] = {}
         self.tags: list[str] = []
+        self.policies: list[str | None] = []
         self._open: str | None = None
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         self.tags.append(tag)
+        if tag == "meta" and dict(attrs).get("http-equiv") == "Content-Security-Policy":
+            self.policies.append(dict(attrs).get("content"))
         found = dict(attrs)
         field = found.get("data-campo")
         if field is not None:
@@ -62,15 +66,21 @@ def view_at(name: str, steps: int, seq: int, instant: str) -> TicketView:
 
 
 def from_brl(text: str) -> D:
-    """Desfaz o formato de reais da tela."""
+    """Desfaz o formato de reais ou de número da tela."""
     sign = -1 if text.startswith("-") else 1
     return sign * D(text.lstrip("-").removeprefix("R$ ").replace(".", "").replace(",", "."))
 
 
+def shapes(page: str, css: str) -> list[str]:
+    """Coordenadas dos elementos SVG de uma classe, na ordem do documento."""
+    return [" ".join(re.findall(r'(?:x1|x2|points)="([^"]*)"', tag))
+            for tag in re.findall(r"<(?:line|polyline)[^>]*>", page) if f'class="{css}"' in tag]
+
+
 SCREENS = {
     "bova_calmo": [
-        "Compra 100 BOVAA1500 Call BOVA11 R$ 150,00 a R$ 4,20; "
-        "Venda 100 BOVAA1550 Call BOVA11 R$ 155,00 a R$ 2,10",
+        "Compra 100 BOVAA1500 Call BOVA11 150,00 a 4,20; "
+        "Venda 100 BOVAA1550 Call BOVA11 155,00 a 2,10",
         "Paga no máximo R$ 210,00; teto bruto R$ 630,00",
         "desembolso R$ 420,00; pior resultado -R$ 210,00",
         "2,0 s e 1,0 s; foto bova-calmo-2",
@@ -78,8 +88,8 @@ SCREENS = {
         "Pode confirmar",
     ],
     "bova_vencida": [
-        "Compra 200 BOVAM1450 Put BOVA11 R$ 145,00 a R$ 1,90; "
-        "Venda 200 BOVAM1500 Put BOVA11 R$ 150,00 a R$ 3,90",
+        "Compra 200 BOVAM1450 Put BOVA11 145,00 a 1,90; "
+        "Venda 200 BOVAM1500 Put BOVA11 150,00 a 3,90",
         "Recebe no mínimo R$ 400,00; teto bruto R$ 1.160,00",
         "desembolso R$ 380,00; pior resultado -R$ 600,00",
         "10,0 s e 1,0 s; foto bova-vencida-2",
@@ -87,8 +97,8 @@ SCREENS = {
         "Não avança: cotação vencida",
     ],
     "bova_adverso": [
-        "Compra 200 BOVAA1550 Call BOVA11 R$ 155,00 a R$ 2,15; "
-        "Venda 200 BOVAA1600 Call BOVA11 R$ 160,00 a R$ 0,95",
+        "Compra 200 BOVAA1550 Call BOVA11 155,00 a 2,15; "
+        "Venda 200 BOVAA1600 Call BOVA11 160,00 a 0,95",
         "Paga no máximo R$ 240,00; teto bruto R$ 620,00",
         "desembolso R$ 430,00; pior resultado -R$ 240,00",
         "2,0 s e 1,0 s; foto bova-adverso-2",
@@ -136,11 +146,20 @@ def test_s2_every_field_is_the_view_field() -> None:
         expected = {"aviso", "boleta", "conta", "instante", "rotulo", "versao", "resumo",
                     "foto_cotacao", "prazo_envio", "validade_ordens", "avanco", "mercado",
                     "custo.liquido_assinado", "custo.bruto_teto", "risco.exposicao_montagem",
-                    "risco.vencimento.pior_resultado", "risco.vencimento.melhor_resultado"}
+                    "risco.vencimento.pior_resultado", "risco.vencimento.melhor_resultado",
+                    "ambiente", "veredito.pernas", "limite_idade_s", "preco_unidade.meio",
+                    "preco_unidade.limite", "preco_unidade.natural",
+                    "preco_unidade.acima_do_meio", "risco.vencimento.equilibrios"}
         for i, leg in enumerate(view.pernas):
             expected |= {f"pernas.{i}.{k}" for k in (
                 "lado", "quantidade", "serie", "tipo", "strike", "vencimento", "preco_limite",
-                "cotacao.compra", "cotacao.venda", "cotacao.fase", "cotacao.idade_s", "guarda")}
+                "cotacao.compra", "cotacao.venda", "cotacao.fase", "cotacao.idade_s", "guarda",
+                "modalidade", "cotacao.meio", "cotacao.data", "cotacao.hora")}
+            assert leg.cotacao is not None and leg.cotacao.meio is not None
+            assert from_brl(text[f"pernas.{i}.cotacao.meio"]) == leg.cotacao.meio
+            assert (text[f"pernas.{i}.cotacao.data"], text[f"pernas.{i}.cotacao.hora"]) == (
+                leg.cotacao.instante.strftime("%d/%m/%Y"),
+                leg.cotacao.instante.strftime("%H:%M:%S"))
             assert leg.cotacao is not None and leg.cotacao.compra is not None
             assert leg.cotacao.venda is not None
             assert (text[f"pernas.{i}.lado"], text[f"pernas.{i}.serie"]) == (
@@ -150,9 +169,9 @@ def test_s2_every_field_is_the_view_field() -> None:
             assert from_brl(text[f"pernas.{i}.preco_limite"]) == leg.preco_limite
             assert text[f"pernas.{i}.vencimento"] == leg.vencimento.strftime("%d/%m/%Y")
             assert text[f"pernas.{i}.cotacao.compra"] == (
-                f"{brl(leg.cotacao.compra)} × {leg.cotacao.compra_qtd}")
+                f"{num(leg.cotacao.compra)} × {leg.cotacao.compra_qtd}")
             assert text[f"pernas.{i}.cotacao.venda"] == (
-                f"{brl(leg.cotacao.venda)} × {leg.cotacao.venda_qtd}")
+                f"{num(leg.cotacao.venda)} × {leg.cotacao.venda_qtd}")
             assert text[f"pernas.{i}.cotacao.idade_s"] == seconds(leg.cotacao.idade_s)
             assert all(m in text[f"pernas.{i}.guarda"] for m in leg.guarda.motivos)
         assert set(text) == expected
@@ -170,6 +189,13 @@ def test_s2_every_field_is_the_view_field() -> None:
         amount = from_brl(text["custo.liquido_assinado"].split(" ", 3)[3])
         assert amount == abs(view.custo.liquido_assinado)
         assert all(m in text["mercado"] for m in view.mercado.motivos)
+        unit = view.preco_unidade
+        assert unit is not None
+        assert [from_brl(text[f"preco_unidade.{k}"]) for k in ("meio", "limite", "natural")] == [
+            unit.meio, unit.limite, unit.natural]
+        assert [from_brl(v) for v in text["risco.vencimento.equilibrios"].split(", ")] == list(
+            view.risco.vencimento.equilibrios)
+        assert text["limite_idade_s"] == seconds(view.limite_idade_s)
 
 
 def test_s3_brl_and_seconds_formats_at_the_edges() -> None:
@@ -209,7 +235,11 @@ def test_s4_absence_unavailable_and_unlimited_are_said_in_words() -> None:
     page = read(render_ticket(ticket_view(
         empty, "T1", datetime.fromisoformat("2026-11-23T14:00:01+00:00"))))
     assert (page.text["pernas.0.cotacao.venda"], page.text["pernas.0.cotacao.compra"]) == (
-        "—", "R$ 0,95 × 50")
+        "—", "0,95 × 50")
+    assert (page.text["pernas.0.cotacao.meio"], page.text["preco_unidade"]) == (
+        "—", "indisponível: cotação incompleta")
+    assert "cautela" in page.classes["preco_unidade"]
+    assert not any(k.startswith("preco_unidade.") for k in page.text)
     halted = custom([CALM[0], (2, "14:00:01", "B", "1.45", 50, "1.55", 50, "SUSPENDED")],
                     CREDIT, net="-5.00", gross="25.00")
     page = read(render_ticket(ticket_view(
@@ -218,6 +248,9 @@ def test_s4_absence_unavailable_and_unlimited_are_said_in_words() -> None:
         "Contínuo", "Suspenso")
     closing = read(render_ticket(view_at("rapido", 2, 2, "2026-11-23T14:00:02+00:00")))
     assert closing.text["risco.vencimento"] == "indisponível: posição inicial não nula"
+    assert closing.text["risco.curva"] == "indisponível: posição inicial não nula"
+    assert "cautela" in closing.classes["risco.curva"]
+    assert "risco.vencimento.equilibrios" not in closing.text
     assert "risco.vencimento.pior_resultado" not in closing.text
     single = custom(CALM, [("A", "BUY", 10, "1.00")], net="10.00", gross="10.00", pairs=[])
     page = read(render_ticket(ticket_view(
@@ -281,8 +314,8 @@ def test_s7_page_is_inert_escaped_and_deterministic() -> None:
     page = render_ticket(view)
     assert page == render_ticket(view)
     assert page.startswith('<!DOCTYPE html>\n<html lang="pt-BR">') and page.endswith("\n")
-    assert "default-src 'none'; style-src 'unsafe-inline'" in page
     parsed = read(page)
+    assert parsed.policies == ["default-src 'none'; style-src 'unsafe-inline'"]
     assert not {"script", "img", "link", "a", "iframe", "form", "input", "button", "object",
                 "embed", "base"} & set(parsed.tags)
     assert not any(token in page.lower() for token in ("http:", "https:", "javascript:",
@@ -300,6 +333,8 @@ def test_s7_page_is_inert_escaped_and_deterministic() -> None:
     assert "script" not in parsed.tags and "b" not in parsed.tags
     assert parsed.text["avanco"] == f"Não avança: {hostile}"
     assert parsed.text["pernas.0.serie"] == hostile and parsed.text["conta"] == hostile
+    assert parsed.text["veredito.pernas"].startswith(f"Compra {hostile}: Cautela: {hostile}")
+    assert "svg" in parsed.tags and "strong" in parsed.tags
     assert evil.count("<script") == 0 and "&lt;script&gt;" in evil
 
 
@@ -312,7 +347,12 @@ def test_s8_screen_module_reads_only_the_view() -> None:
             modules.add(node.module)
         elif isinstance(node, ast.Import):
             modules.update(alias.name for alias in node.names)
-    assert modules == {"datetime", "decimal", "html", "backend.derivatives.ticket.view"}
+    assert modules == {"datetime", "decimal", "html", "backend.derivatives.ticket.view",
+                       "backend.derivatives.ticket.screen_draw"}
+    tree = ast.parse((ROOT / "backend/derivatives/ticket/screen_draw.py").read_text("utf-8"))
+    drawn = {node.module for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)}
+    assert drawn == {"collections.abc", "decimal", "fractions", "html"}
+    assert not any(isinstance(node, ast.Import) for node in ast.walk(tree))
 
 
 SHOT = ["--replay", str(FIXTURES / "bova_vencida.replay.json"),
@@ -368,3 +408,175 @@ def test_s11_script_plays_confirmations_like_the_official_replay(tmp_path: Path)
                  "--instante", "2026-11-25T14:00:15Z", "--out", str(out)]) == 0
     text = read(out.read_text(encoding="utf-8")).text
     assert (text["rotulo"], text["avanco"]) == ("Concluída", "Não se aplica: Concluída")
+
+
+BOVA = [("bova_calmo", 2, "14:00:02"), ("bova_vencida", 3, "14:00:10"),
+        ("bova_adverso", 2, "14:00:02")]
+
+
+def bova_page(name: str, seq: int, clock: str) -> str:
+    """Tela da foto do gabarito."""
+    return render_ticket(view_at(name, 1, seq, f"2026-11-25T{clock}+00:00"))
+
+
+def test_s12_destination_verdict_and_the_photo_beside_the_ages() -> None:
+    """Destino por extenso; o veredito repete cada perna; foto, instante e limite na tabela."""
+    legs = {
+        "bova_calmo": "Compra BOVAA1500: Sem aviso; Venda BOVAA1550: Sem aviso",
+        "bova_vencida": "Compra BOVAM1450: Bloqueado: cotação vencida; "
+                        "Venda BOVAM1500: Sem aviso",
+        "bova_adverso": "Compra BOVAA1550: Cautela: spread aberto, pouca profundidade; "
+                        "Venda BOVAA1600: Bloqueado: leilão",
+    }
+    for name, seq, clock in BOVA:
+        raw = bova_page(name, seq, clock)
+        page = read(raw)
+        assert page.text["ambiente"] == "Simulador local"
+        assert "D0 · nenhuma ordem sai desta máquina" in raw
+        assert page.text["veredito.pernas"] == legs[name]
+        assert page.text["limite_idade_s"] == "5,0 s"
+        caption = raw[raw.index("<caption>"):raw.index("</caption>")]
+        assert all(f'data-campo="{k}"' in caption
+                   for k in ("foto_cotacao", "instante", "limite_idade_s"))
+        assert raw.index("<caption>") < raw.index('data-campo="pernas.0.cotacao.idade_s"')
+    order = re.findall(r'data-campo="pernas\.0\.([^"]*)"', bova_page(*BOVA[0]))
+    assert order == ["lado", "quantidade", "serie", "tipo", "modalidade", "strike", "vencimento",
+                     "preco_limite", "cotacao.compra", "cotacao.venda", "cotacao.meio",
+                     "cotacao.data", "cotacao.hora", "cotacao.idade_s", "cotacao.fase", "guarda"]
+    head = re.findall(r"<th[^>]*>([^<]*)</th>", bova_page(*BOVA[0]))
+    assert head == ["Lado", "Qtd", "Ticker", "Tipo", "Mod", "Strike", "Venc.", "Limite",
+                    "Bid × qtd", "Ask × qtd", "Meio", "Data", "Hora", "Idade", "Fase",
+                    "Guarda da perna"]
+
+
+def test_s13_age_is_marked_only_by_the_guard_and_with_its_level() -> None:
+    """A idade só ganha marca com «cotação vencida» na guarda da perna, no nível da guarda."""
+    stale = read(bova_page(*BOVA[1]))
+    assert stale.classes["pernas.0.cotacao.idade_s"] == {"num", "alerta"}
+    assert stale.classes["pernas.1.cotacao.idade_s"] == {"num"}
+    adverse = read(bova_page(*BOVA[2]))
+    assert adverse.classes["pernas.0.cotacao.idade_s"] == {"num"}
+    assert adverse.classes["pernas.1.cotacao.idade_s"] == {"num"}
+    data = json.loads(view_at("bova_vencida", 1, 3, "2026-11-25T14:00:10+00:00").model_dump_json())
+    data["pernas"][0]["guarda"]["nivel"] = "CAUTION"
+    warned = read(render_ticket(TicketView.model_validate_json(json.dumps(data))))
+    assert warned.classes["pernas.0.cotacao.idade_s"] == {"num", "cautela"}
+    data["pernas"][0]["guarda"] = {"nivel": "OK", "motivos": []}
+    data["limite_idade_s"] = 0.5
+    quiet = read(render_ticket(TicketView.model_validate_json(json.dumps(data))))
+    assert quiet.classes["pernas.0.cotacao.idade_s"] == {"num"}
+    assert (quiet.text["limite_idade_s"], quiet.text["pernas.0.cotacao.idade_s"]) == (
+        "0,5 s", "10,0 s")
+
+
+def test_s14_side_label_style_flag_and_number_format() -> None:
+    """Etiqueta de lado, bandeira com texto e número exato com ao menos duas casas."""
+    adverse = read(bova_page(*BOVA[2]))
+    assert adverse.classes["pernas.0.lado"] == {"lado", "compra"}
+    assert adverse.classes["pernas.1.lado"] == {"lado", "venda"}
+    raw = bova_page(*BOVA[2])
+    assert 'title="Europeia" aria-label="Europeia">🇪🇺</span>' in raw
+    assert 'title="Americana" aria-label="Americana">🇺🇸</span>' in raw
+    assert (adverse.text["pernas.0.cotacao.meio"], adverse.text["pernas.1.cotacao.meio"]) == (
+        "1,975", "0,975")
+    plain = read(render_ticket(view_at("calmo", 1, 2, "2026-11-23T14:00:02+00:00")))
+    assert plain.text["pernas.0.modalidade"] == "—"
+    cases = [("0", "0,00"), ("1.975", "1,975"), ("2.1", "2,10"), ("-0.515", "-0,515"),
+             ("1234.5", "1.234,50"), ("1E+2", "100,00"), ("15E-1", "1,50"), ("-0.00", "0,00"),
+             ("0.025", "0,025"), ("1234567.125", "1.234.567,125"), ("1E+16", "1E+16"),
+             ("-1E+16", "-1E+16"), ("1E+15", "1.000.000.000.000.000,00")]
+    for trap in (None, True, False):
+        with localcontext(Context(prec=3) if trap is not None else None) as context:
+            if trap is not None:
+                context.traps[InvalidOperation] = trap
+            for raw_value, shown in cases:
+                assert num(D(raw_value)) == shown, raw_value
+
+
+def test_s15_unit_price_in_words_and_on_the_ruler() -> None:
+    """Meio, limite e natural por unidade; a distância ao meio dita em reais; régua exata."""
+    expected = {
+        "bova_calmo": (["2,05", "2,10", "2,10"], "R$ 5,00 pior que o meio",
+                       ["60.0 60.0", "540.0 540.0"], ["Meio", "Limite = Natural"]),
+        "bova_vencida": (["-2,05", "-2,00", "-2,00"], "R$ 10,00 pior que o meio",
+                         ["60.0 60.0", "540.0 540.0"], ["Meio", "Limite = Natural"]),
+        "bova_adverso": (["1,00", "1,20", "1,20"], "R$ 40,00 pior que o meio",
+                         ["60.0 60.0", "540.0 540.0"], ["Meio", "Limite = Natural"]),
+    }
+    for name, seq, clock in BOVA:
+        raw = bova_page(name, seq, clock)
+        text = read(raw).text
+        prices, gap, marks, names = expected[name]
+        assert [text[f"preco_unidade.{k}"] for k in ("meio", "limite", "natural")] == prices
+        assert text["preco_unidade.acima_do_meio"] == gap
+        ruler = raw[raw.index("<svg"):raw.index("</svg>")]
+        assert shapes(ruler, "marco") == marks
+        assert re.findall(r'class="t" text-anchor="middle">([^<]*)<', ruler) == names
+    three = render_ticket(view_at("calmo", 1, 2, "2026-11-23T14:00:02+00:00"))
+    assert shapes(three[:three.index("</svg>")], "marco") == [
+        "60.0 60.0", "144.7 144.7", "540.0 540.0"]
+    assert 'aria-label="Meio -0,515; Limite -0,50; Natural -0,43"' in three
+    better = read(render_ticket(view_at("rapido", 2, 2, "2026-11-23T14:00:02+00:00")))
+    assert better.text["preco_unidade.acima_do_meio"] == "R$ 0,15 melhor que o meio"
+    data = json.loads(view_at("bova_calmo", 1, 2, "2026-11-25T14:00:02+00:00").model_dump_json())
+    data["preco_unidade"].update(limite="2.05", natural="2.05", acima_do_meio="0.00")
+    level = render_ticket(TicketView.model_validate_json(json.dumps(data)))
+    assert read(level).text["preco_unidade.acima_do_meio"] == "no meio"
+    assert shapes(level[:level.index("</svg>")], "marco") == ["300.0 300.0"]
+    ratio = custom(CALM, [("A", "BUY", 3, "1.00"), ("B", "SELL", 1, "2.00")], net="1.00",
+                   gross="5.00")
+    page = read(render_ticket(ticket_view(ratio, "T1", at("14:00:01"))))
+    assert page.text["preco_unidade"] == "indisponível: quantidades diferentes por perna"
+
+
+def test_s16_curve_is_drawn_from_the_view_points() -> None:
+    """A curva liga as quebras da visão; a janela vai de um intervalo antes a um depois."""
+    expected = {
+        "bova_calmo": ("60.0,104.0 220.0,104.0 380.0,24.0 540.0,24.0", "70.4", "287.2",
+                       ["150,00", "-R$ 210,00", "155,00", "R$ 290,00", "152,10"]),
+        "bova_vencida": ("60.0,104.0 220.0,104.0 380.0,24.0 540.0,24.0", "56.0", "316.0",
+                         ["145,00", "-R$ 600,00", "150,00", "R$ 400,00", "148,00"]),
+        "bova_adverso": ("60.0,104.0 220.0,104.0 380.0,24.0 540.0,24.0", "84.8", "258.4",
+                         ["155,00", "-R$ 240,00", "160,00", "R$ 760,00", "156,20"]),
+    }
+    for name, seq, clock in BOVA:
+        raw = bova_page(name, seq, clock)
+        chart = raw[raw.index("</svg>"):]
+        chart = chart[chart.index("<svg"):chart.index("</svg>", 6)]
+        line, zero, even, labels = expected[name]
+        assert shapes(chart, "linha") == [line]
+        assert re.findall(r'y1="([^"]*)"[^>]*class="zero"', chart) == [zero]
+        assert shapes(chart, "eq") == [f"{even} {even}"]
+        assert re.findall(r">([^<]+)</text>", chart) == labels
+        assert chart.count('class="v neg"') == 1
+    single = custom(CALM, [("A", "BUY", 10, "1.00")], net="10.00", gross="10.00", pairs=[])
+    raw = render_ticket(ticket_view(single, "T1", at("14:00:01")))
+    assert shapes(raw, "linha") == ["60.0,104.0 300.0,104.0 540.0,24.0"]
+    assert shapes(raw, "eq") == ["540.0 540.0"]
+    ratio = custom(CALM, [("A", "BUY", 3, "1.00"), ("B", "SELL", 1, "2.00")], net="1.00",
+                   gross="5.00")
+    raw = render_ticket(ticket_view(ratio, "T1", at("14:00:01")))
+    assert shapes(raw, "linha") == ["60.0,104.0 220.0,104.0 380.0,56.0 540.0,24.0"]
+    assert shapes(raw, "eq") == ["272.8 272.8"]
+    assert read(raw).text["risco.vencimento.equilibrios"] == "10,33"
+    raw = render_ticket(view_at("calmo", 1, 2, "2026-11-23T14:00:02+00:00"))
+    assert read(raw).text["risco.vencimento.equilibrios"] == "não há"
+    assert shapes(raw, "linha") == ["60.0,77.3 220.0,77.3 380.0,24.0 540.0,24.0"]
+    assert re.findall(r'y1="([^"]*)"[^>]*class="zero"', raw) == ["104.0"]
+    assert shapes(raw, "eq") == []
+    far = custom(CALM, [("A", "BUY", 10, "5.00")], net="50.00", gross="50.00", pairs=[])
+    raw = render_ticket(ticket_view(far, "T1", at("14:00:01")))
+    assert read(raw).text["risco.vencimento.equilibrios"] == "15,00"
+    assert shapes(raw, "eq") == [] and shapes(raw, "linha") == [
+        "60.0,104.0 300.0,104.0 540.0,88.0"]
+
+
+def test_s17_drawings_ignore_the_callers_decimal_context() -> None:
+    """As três telas saem com os mesmos bytes sob precisão reduzida, com e sem armadilha."""
+    for name, seq, clock in BOVA:
+        view = view_at(name, 1, seq, f"2026-11-25T{clock}+00:00")
+        plain = render_ticket(view)
+        for trap in (True, False):
+            with localcontext(Context(prec=3)) as context:
+                context.traps[InvalidOperation] = trap
+                assert render_ticket(view) == plain

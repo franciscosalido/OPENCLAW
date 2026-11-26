@@ -678,3 +678,29 @@ with localcontext(Context(prec=28, traps=[])):
     assert data["risco"]["vencimento"]["equilibrios"] == []
     assert data["risco"]["vencimento"]["curva"][-1] == {"preco": "2345.67",
                                                          "resultado": "-1234.50"}
+
+
+def test_w8_unit_price_refuses_a_contract_multiplier() -> None:
+    """Com multiplicador diferente de 1 não há preço por unidade nem distância em reais."""
+    data = json.loads(ticket_view(custom(CALM, CREDIT, net="-5.00", gross="25.00", multiplier=100),
+                                  "T1", at("14:00:01")).model_dump_json())
+    assert (data["preco_unidade"], data["preco_unidade_indisponivel"]) == (
+        None, "multiplicador diferente de 1")
+    ratio = custom(CALM, [("A", "BUY", 3, "1.00"), ("B", "SELL", 1, "2.00")], net="1.00",
+                   gross="5.00", multiplier=100)
+    assert ticket_view(ratio, "T1", at("14:00:01")).preco_unidade_indisponivel == (
+        "quantidades diferentes por perna")
+    plain = ticket_view(custom(CALM, CREDIT, net="-5.00", gross="25.00"), "T1", at("14:00:01"))
+    assert plain.preco_unidade is not None and plain.preco_unidade_indisponivel is None
+
+
+@pytest.mark.parametrize("paid,expected", [("1.01", "11.00"), ("1.02", "11.02")])
+def test_w9_breakeven_on_the_half_cent_rounds_to_even(paid: str, expected: str) -> None:
+    """Equilíbrio em 11,005 sai 11,00 e em 11,015 sai 11,02: meio centavo vai para o par."""
+    quotes: list[Quote] = [(1, "14:00:00", "A", "0.95", 50, paid, 50, "CONTINUOUS"),
+                           (2, "14:00:01", "B", "0.01", 50, "1.55", 50, "CONTINUOUS")]
+    session = custom(quotes, [("A", "BUY", 2, paid), ("B", "SELL", 1, "0.01")],
+                     net=str(2 * D(paid) - D("0.01")), gross=str(2 * D(paid) + D("0.01")),
+                     holdings=[("A", "10", 0), ("B", "12", 0)])
+    data = json.loads(ticket_view(session, "T1", at("14:00:01")).model_dump_json())
+    assert data["risco"]["vencimento"]["equilibrios"] == [expected]
