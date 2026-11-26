@@ -1,6 +1,9 @@
 """Visão de leitura da boleta: traduz fatos do motor, sem decidir nem recalcular guardas."""
 from datetime import date, datetime
-from decimal import MAX_EMAX, MAX_PREC, MIN_EMIN, Context, Decimal
+from decimal import (
+    MAX_EMAX, MAX_PREC, MIN_EMIN, ROUND_HALF_EVEN, Context, Decimal, DivisionByZero,
+    InvalidOperation, Overflow,
+)
 from enum import StrEnum
 from fractions import Fraction
 from typing import Annotated, Final, Literal
@@ -24,7 +27,8 @@ NOTICE = "SIMULADO — dados sintéticos em replay; nenhuma ordem real."
 SIDE_LABELS_PT = {Side.BUY: "Compra", Side.SELL: "Venda"}
 _CENT = Decimal("0.01")
 _MAX_ADJUSTED = 15
-_EXACT = Context(prec=MAX_PREC, Emin=MIN_EMIN, Emax=MAX_EMAX)
+_EXACT = Context(prec=MAX_PREC, Emin=MIN_EMIN, Emax=MAX_EMAX, rounding=ROUND_HALF_EVEN,
+                 capitals=1, clamp=0, flags=[], traps=[InvalidOperation, DivisionByZero, Overflow])
 
 
 def _tidy(value: Decimal) -> Decimal:
