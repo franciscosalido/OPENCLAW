@@ -1,5 +1,7 @@
 """Contrato da visão de leitura da boleta: gabarito literal e equivalência com o motor."""
 import json
+import subprocess
+import sys
 from collections.abc import Sequence
 from datetime import datetime, timedelta, timezone
 from decimal import Context, Decimal as D, InvalidOperation, localcontext
@@ -635,6 +637,18 @@ def test_w6_breakevens_curve_and_final_slope() -> None:
 
 def test_w7_new_fields_ignore_the_callers_decimal_context() -> None:
     """Meio, preço por unidade, equilíbrios e curva saem iguais sob precisão reduzida."""
+    # O contexto privado é criado ao importar view. Isole esse instante do pytest.
+    probe = """
+from decimal import Context, DefaultContext, Inexact, Rounded, localcontext
+DefaultContext.traps[Inexact] = DefaultContext.traps[Rounded] = True
+with localcontext(Context(prec=28, traps=[])):
+    from tests.unit.derivatives.ticket.test_view import bova
+    import json
+    print(json.dumps(bova("bova_vencida", 3, "14:00:10")))
+"""
+    run = subprocess.run([sys.executable, "-c", probe], cwd=ROOT, capture_output=True, text=True)
+    assert run.returncode == 0, run.stderr
+    assert json.loads(run.stdout) == bova("bova_vencida", 3, "14:00:10")
     for name, seq, clock in (("bova_calmo", 2, "14:00:02"), ("bova_vencida", 3, "14:00:10"),
                              ("bova_adverso", 2, "14:00:02")):
         plain = bova(name, seq, clock)
