@@ -4,7 +4,7 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-25 · **Turno:** Claude (planejador). **Fase 4 em andamento:** DL4-PR00 a DL4-PR03 integrados; **M1 aceito com ressalva de layout**; DL4-PR03B (visão formato 2) com cartão escrito.
+**Última atualização:** 2026-11-26 · **Turno:** Claude (planejador). **Fase 4 em andamento:** DL4-PR00 a DL4-PR03 integrados; **M1 aceito com ressalva de layout**; DL4-PR03B (visão formato 2) com cartão escrito; **duas decisões de Francisco assinadas em 25/11/2026** (cotação antiga como aviso; venda sem cobertura rastreada como aviso).
 
 ## Fase 04 — A boleta que Francisco consegue usar — EM ANDAMENTO
 
@@ -23,7 +23,9 @@ Fila decidida por Francisco em 24/11/2026:
 | DL4-PR03 | tela HTML estática; prova de uso do M1 | integrado, PR #193, `de2d871` |
 | DL4-PR03B | visão formato 2: os dados da tela v3 | cartão escrito em 25/11/2026 |
 | DL4-PR03C | tela v3 em replay, lendo a visão formato 2 | — |
-| DL4-PR03D | cotação antiga como aviso | **só com o «sim» escrito de Francisco** |
+| DL4-PR03D | cotação antiga como aviso (limite configurável de 15 s) | autorizado por Francisco em 25/11/2026; sem cartão |
+| Adendo 2 à ADR-0024 | venda sem cobertura rastreada deixa de ser recusada | autorizado em 25/11/2026; **falta o commit de autoria de Francisco** |
+| DL4-PR03E | venda sem cobertura rastreada: aviso de verificação, sem proibir nem travar | autorizado em 25/11/2026; depende do Adendo 2; sem cartão |
 | DL4-PR04 a PR06 | confirmar uma versão, acompanhar por perna, visor de recibo (M2) | — |
 | DL4-PR07 | alvo de spread que só avisa (M3) | — |
 | DL4-PR08 e PR09 | leitura OpLab e confiabilidade da VI (M4) | condicionais; exigem liberação assinada do D1 |
@@ -69,17 +71,29 @@ quanto ao conteúdo; o layout é refeito na tela v3 (DL4-PR03B e DL4-PR03C).
 
 Tela v3 (25/11/2026): Francisco aprovou o protótipo v2 com ressalvas e o revisor escreveu
 `claude/derivativos/PROPOSTA_TELA_V3_PARA_PLANNER_2026-11-25.md`. O planejador fatiou:
-dados (DL4-PR03B), tela (DL4-PR03C), guarda (DL4-PR03D, condicional). Ficam fora da fila:
+dados (DL4-PR03B), tela (DL4-PR03C), guarda (DL4-PR03D), cobertura (DL4-PR03E). Ficam fora da fila:
 cadeia espelhada (sem fonte de cadeia), ciclo de atualização de 15 s (só ao vivo, M4) e
 métricas probabilísticas (com o DL4-PR09).
 
-**Decisão pendente de Francisco:** «Cotação antiga, sem falha de fonte, passa a ser só
-aviso, com limite configurável de 15 s, revertendo a L3 de 24/11?» Ele disse isso ao
-aprovar o protótipo v2; falta a confirmação escrita. O DL4-PR03B e o DL4-PR03C não dependem
-da resposta.
+**Decisões de Francisco assinadas em 25/11/2026** (no chat de planejamento; texto integral
+no §9.2 do cartão DL4-PR03B). Nenhuma das duas entra no DL4-PR03B nem no DL4-PR03C.
+
+1. **Cotação antiga nunca bloqueia, só avisa.** Reverte a L3 de 24/11 só nesse ponto.
+   «cotação vencida» passa de bloqueio a cautela, com limite configurável de 15 s. Perda de
+   sequência, leilão, suspensão, livro inválido e livro incompleto continuam bloqueando.
+   Cartão: DL4-PR03D. A sessão `bova_vencida`, o recibo, a âncora e as respostas 5 e 6 do
+   gabarito são refeitos antes do código.
+2. **Venda de call ou put sem cobertura rastreada é permitida, com aviso de verificação.**
+   Vale para a venda descoberta e para a coberta por ativo que o QUIMERA não rastreia (ação
+   ou dinheiro). Proibir ou travar não entra na versão 4. Reverte a regra de cobertura de
+   21/11 e o que a ADR-0024 fixa. Exige o **Adendo 2 à ADR-0024**, com commit de autoria de
+   Francisco, antes do cartão DL4-PR03E. Muda `plan_legs`, a exposição e o livro de
+   reservas. O Adendo 2 tem de dizer como a venda descoberta convive com a garantia do
+   Adendo 1. Segue tudo em simulador D0; a ADR-007 não muda.
 
 Decisões de Francisco que valem para os próximos cartões:
 - L3: mercado adverso é só o que `guards.assess` já emite. Condição nova é cartão de motor.
+  Revertida em 25/11/2026 só para «cotação vencida» (decisão 1 acima); vale até o DL4-PR03D integrar.
 - L4: o risco aparece em dois números, com rótulos distintos: desembolso se só a compra
   executar e pior resultado no vencimento. O rótulo é «pior resultado», não «perda máxima».
 - Lembrete para o DL4-PR09 (25/11/2026): VI, gregas e preços teóricos seguem em float64,
@@ -101,12 +115,16 @@ Pendências sem cartão:
 
 - **Implementador (Codex):** o próximo cartão é o **DL4-PR03B**
   (`claude/derivativos/cards/DL4-PR03B_SUPERCARD.md`, no projeto, versão do planejador), com
-  o patch `DL4-PR03B_PROTOTIPO.patch`. Visão formato 2; **não muda a tela nem a guarda**. A
-  base é a `main` em `de2d871` mais este commit de documentação.
+  o patch `DL4-PR03B_PROTOTIPO.patch`. Visão formato 2; **não muda a tela, a guarda, o
+  plano de pernas nem a cobertura**. As duas decisões assinadas em 25/11/2026 **não** entram
+  nele. A base é a `main` em `de2d871` mais este commit de documentação.
 - **Revisor:** em chat próprio do PR. Roda por conta própria o que o cartão lhe atribui; não
   repete o portão nem escreve cartão. Linha de base da integração: as mesmas 4 falhas
   conhecidas, pelos IDs.
-- **Planejador:** escreve o DL4-PR03C (tela v3) depois do GO.
+- **Planejador:** escreve o DL4-PR03C (tela v3) depois do GO; em seguida o DL4-PR03D, a
+  minuta do Adendo 2 à ADR-0024 e o DL4-PR03E.
+- **Francisco:** commit do Adendo 2 à ADR-0024 (a minuta sai do planejador) antes do
+  DL4-PR03E; resposta à L2 antes do DL4-PR04.
 
 ## Depois da Fase 3 — decisões de produto no simulador (D0) — EM ANDAMENTO
 
