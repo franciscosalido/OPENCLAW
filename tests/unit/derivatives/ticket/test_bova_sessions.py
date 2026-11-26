@@ -20,15 +20,15 @@ FILES_SHA = {
     "bova_calmo.replay.json":
         "ff7494c11c1adc7b859c43768a4834f48ff12cda0013c49eb7a11bfc8d540cfa",
     "bova_calmo.roteiro.json":
-        "dbd5d784e65402c78ac615beb679686ee420f7fd1e968c44b29e0d132881c30c",
+        "6d956042f507f8efb0fdd501cedf2da1316f175923dc8b93b6a55d446d43db4b",
     "bova_vencida.replay.json":
         "14583cfd46bd80135db6c69ba0bcbed3e9e577f2d92708cc89dfcbd4f4afb880",
     "bova_vencida.roteiro.json":
-        "2f4f35f2996c2f09cbdf4f2963824cc96791c159bae27a3e933fada2549363cc",
+        "2e85fd042cdf74ed284655fb724da3046e9571f6dc558e3eee76fa4f8e56b3ad",
     "bova_adverso.replay.json":
         "70409a55ca91e06d3de77fb4cc37e0593aa5162a2708cd6296b12642fc5cbd48",
     "bova_adverso.roteiro.json":
-        "83aabe19890f6fd21c9f6390d02faa6dbe640e875422f4f34ccccc7e865ab5d3",
+        "bbf79b930c2591a822f12850ccba2f3166a46c4309e17c14b8b83b6017232606",
 }
 QUESTIONS = [
     "O que a boleta compra e o que vende, em que quantidade e a que preço-limite?",

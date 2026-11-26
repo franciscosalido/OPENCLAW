@@ -1,7 +1,7 @@
 {"decision_ttl_s":60,
 "positions":[{"account":"sim","holdings":[
-    {"symbol":"BOVAA1550","strike":"155.00","underlying":"BOVA11","kind":"CALL","expiry":"2027-01-15","multiplier":1,"balance":0},
-    {"symbol":"BOVAA1600","strike":"160.00","underlying":"BOVA11","kind":"CALL","expiry":"2027-01-15","multiplier":1,"balance":0}
+    {"symbol":"BOVAA1550","strike":"155.00","underlying":"BOVA11","kind":"CALL","expiry":"2027-01-15","multiplier":1,"balance":0,"style":"EUROPEAN"},
+    {"symbol":"BOVAA1600","strike":"160.00","underlying":"BOVA11","kind":"CALL","expiry":"2027-01-15","multiplier":1,"balance":0,"style":"AMERICAN"}
   ],"pairs":[["BOVAA1550","BOVAA1600"]]}],
 "steps":[
 {"after_seq":2,"at":"2026-11-25T14:00:02Z","do":"open","ticket":"T1","account":"sim","draft":{"legs":[{"symbol":"BOVAA1550","side":"BUY","quantity":200,"limit_price":"2.15","lot_size":100},{"symbol":"BOVAA1600","side":"SELL","quantity":200,"limit_price":"0.95","lot_size":100}],"net_limit":"240.00","gross_cap":"620.00","send_deadline":"2026-11-25T15:00:00Z","order_validity":"2026-11-25T21:00:00Z","quote_snapshot_id":"bova-adverso-2"}},

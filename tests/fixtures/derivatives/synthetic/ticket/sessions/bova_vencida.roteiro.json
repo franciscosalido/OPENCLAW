@@ -1,7 +1,7 @@
 {"decision_ttl_s":60,
 "positions":[{"account":"sim","holdings":[
-    {"symbol":"BOVAM1450","strike":"145.00","underlying":"BOVA11","kind":"PUT","expiry":"2027-01-15","multiplier":1,"balance":0},
-    {"symbol":"BOVAM1500","strike":"150.00","underlying":"BOVA11","kind":"PUT","expiry":"2027-01-15","multiplier":1,"balance":0}
+    {"symbol":"BOVAM1450","strike":"145.00","underlying":"BOVA11","kind":"PUT","expiry":"2027-01-15","multiplier":1,"balance":0,"style":"EUROPEAN"},
+    {"symbol":"BOVAM1500","strike":"150.00","underlying":"BOVA11","kind":"PUT","expiry":"2027-01-15","multiplier":1,"balance":0,"style":"EUROPEAN"}
   ],"pairs":[["BOVAM1450","BOVAM1500"]]}],
 "steps":[
 {"after_seq":2,"at":"2026-11-25T14:00:02Z","do":"open","ticket":"T1","account":"sim","draft":{"legs":[{"symbol":"BOVAM1450","side":"BUY","quantity":200,"limit_price":"1.90","lot_size":100},{"symbol":"BOVAM1500","side":"SELL","quantity":200,"limit_price":"3.90","lot_size":100}],"net_limit":"-400.00","gross_cap":"1160.00","send_deadline":"2026-11-25T15:00:00Z","order_validity":"2026-11-25T21:00:00Z","quote_snapshot_id":"bova-vencida-2"}},
