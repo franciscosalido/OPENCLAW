@@ -4,7 +4,7 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-26 · **Turno:** Claude (planejador). **Fase 4 em andamento:** DL4-PR00 a DL4-PR03B integrados; **M1 aceito com ressalva de layout**; DL4-PR03C (tela v3) com cartão escrito; duas decisões de Francisco assinadas em 25/11/2026 aguardam os cartões DL4-PR03D e DL4-PR03E.
+**Última atualização:** 2026-11-26 · **Turno:** Claude (planejador). **Fase 4 em andamento:** DL4-PR00 a DL4-PR03C integrados; **M1 aceito com ressalva de layout**, prova de uso da tela v3 pendente; DL4-PR03D (cotação antiga como aviso) com cartão escrito; DL4-PR03E aguarda o Adendo 2 à ADR-0024.
 
 ## Fase 04 — A boleta que Francisco consegue usar — EM ANDAMENTO
 
@@ -22,8 +22,8 @@ Fila decidida por Francisco em 24/11/2026:
 | DL4-PR02 | três roteiros de trava de BOVA11 e gabarito do M1 | integrado, PR #191, `6ca0e5f` |
 | DL4-PR03 | tela HTML estática; prova de uso do M1 | integrado, PR #193, `de2d871` |
 | DL4-PR03B | visão formato 2: os dados da tela v3 | integrado, PR #196, `2bd6613`; revisão pós-merge com GO mantido |
-| DL4-PR03C | tela v3 em replay, lendo a visão formato 2; recusa por multiplicador; teste do meio centavo | cartão escrito em 26/11/2026 |
-| DL4-PR03D | cotação antiga como aviso (limite configurável de 15 s) | autorizado por Francisco em 25/11/2026; sem cartão |
+| DL4-PR03C | tela v3 em replay, lendo a visão formato 2; recusa por multiplicador; teste do meio centavo | integrado, PR #199, `5395015`; GO do revisor com suíte e 40 mutantes refeitos em duas plataformas |
+| DL4-PR03D | cotação antiga como aviso (limite de 15 s); sessão `bova_vencida`, gabarito e âncora refeitos | cartão escrito em 26/11/2026 |
 | Adendo 2 à ADR-0024 | venda sem cobertura rastreada deixa de ser recusada | autorizado em 25/11/2026; **falta o commit de autoria de Francisco** |
 | DL4-PR03E | venda sem cobertura rastreada: aviso de verificação, sem proibir nem travar | autorizado em 25/11/2026; depende do Adendo 2; sem cartão |
 | DL4-PR04 a PR06 | confirmar uma versão, acompanhar por perna, visor de recibo (M2) | — |
@@ -120,18 +120,27 @@ de decisão antes de dado real (M4).
 
 ### Próximo turno (aviso ao implementador e ao revisor)
 
-- **Implementador:** o próximo cartão é o **DL4-PR03C**
-  (`claude/derivativos/cards/DL4-PR03C_SUPERCARD.md`, no projeto), com o patch
-  `DL4-PR03C_PROTOTIPO.patch`. Tela v3 estática, sem script. **Não muda a guarda, o motor,
-  o formato da visão nem o esquema.** As decisões assinadas de 25/11/2026 não entram nele.
-  A base é a `main` em `2bd6613` mais este commit de documentação.
-- **Revisor:** em chat próprio do PR. Neste PR **roda** a suíte, a tipagem e os 40 mutantes
-  em ambiente próprio, e abre as três telas. Linha de base da integração: as mesmas 4
-  falhas conhecidas, pelos IDs.
-- **Francisco:** depois do GO, prova de uso nas três telas novas (18 de 18 na primeira
-  tentativa). Commit do Adendo 2 à ADR-0024 antes do DL4-PR03E; resposta à L2 antes do
-  DL4-PR04. O simulador de quantidade ficou fora da tela v3 (decisão D1 do cartão, vetável).
-- **Planejador:** depois do GO, escreve o DL4-PR03D, a minuta do Adendo 2 e o DL4-PR03E.
+- **Implementador:** o próximo cartão é o **DL4-PR03D**
+  (`claude/derivativos/cards/DL4-PR03D_SUPERCARD.md`, no projeto), com o patch
+  `DL4-PR03D_PROTOTIPO.patch`. A guarda deixa de bloquear por idade e o motivo passa a se
+  chamar «cotação antiga»; limite de 15 s. **Não muda `engine.py`, o recibo, o formato da
+  visão nem as outras cinco sessões.** Commit vermelho com testes e fixtures, publicado
+  com o PR em rascunho já aberto; depois o verde. A base é a `main` em `5395015` mais este
+  commit de documentação.
+- **Revisor:** em chat próprio do PR. Roda a suíte, a tipagem e os 24 mutantes em ambiente
+  próprio, sem bytecode e com a linha de base da cópia conferida. Os achados L-1, L-2 e S-3
+  da revisão do PR #199 estão no cartão; S-1 (validador da curva) ficou como pendência.
+- **Consequência a conferir:** com a regra nova, a venda coberta deixa de esperar cotação
+  nova durante a execução (decisão D2 do cartão, vetável por Francisco).
+- **Francisco:** depois do GO, uma prova de uso só, nas três telas (18 de 18 na primeira
+  tentativa); ela vale também pela do DL4-PR03C. Commit do Adendo 2 à ADR-0024 antes do
+  DL4-PR03E; resposta à L2 antes do DL4-PR04.
+- **Planejador:** depois do GO, minuta do Adendo 2 e cartão DL4-PR03E.
+
+Pendências sem cartão: o recibo não registra confirmação sob cautela; o motor ignora o
+multiplicador do contrato em valores em reais (decidir antes do M4); validador da curva em
+`ExpiryView`; as 4 falhas de `tests/integration`; a docstring de `series_code`; a fonte do
+spread do DL4-PR07.
 
 ## Depois da Fase 3 — decisões de produto no simulador (D0) — EM ANDAMENTO
 
