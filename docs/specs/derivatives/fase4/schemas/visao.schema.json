@@ -62,13 +62,63 @@
       "title": "CostView",
       "type": "object"
     },
+    "CurvePoint": {
+      "additionalProperties": false,
+      "description": "Resultado no vencimento com o ativo neste preço.",
+      "properties": {
+        "preco": {
+          "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[Ee][+-]?[0-9]+)?$",
+          "title": "Preco",
+          "type": "string"
+        },
+        "resultado": {
+          "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[Ee][+-]?[0-9]+)?$",
+          "title": "Resultado",
+          "type": "string"
+        }
+      },
+      "required": [
+        "preco",
+        "resultado"
+      ],
+      "title": "CurvePoint",
+      "type": "object"
+    },
+    "Environment": {
+      "description": "Ambiente admissível na fase D0.",
+      "enum": [
+        "SIMULATED"
+      ],
+      "title": "Environment",
+      "type": "string"
+    },
     "ExpiryView": {
       "additionalProperties": false,
-      "description": "Extremos com sinal do resultado no vencimento, aos preços-limite da versão.",
+      "description": "Extremos, equilíbrios e quebras do resultado no vencimento, aos preços-limite.",
       "properties": {
+        "curva": {
+          "items": {
+            "$ref": "#/$defs/CurvePoint"
+          },
+          "title": "Curva",
+          "type": "array"
+        },
+        "equilibrios": {
+          "items": {
+            "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[Ee][+-]?[0-9]+)?$",
+            "type": "string"
+          },
+          "title": "Equilibrios",
+          "type": "array"
+        },
         "ganho_ilimitado": {
           "title": "Ganho Ilimitado",
           "type": "boolean"
+        },
+        "inclinacao_final": {
+          "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[Ee][+-]?[0-9]+)?$",
+          "title": "Inclinacao Final",
+          "type": "string"
         },
         "melhor_resultado": {
           "anyOf": [
@@ -103,7 +153,10 @@
         "pior_resultado",
         "perda_ilimitada",
         "melhor_resultado",
-        "ganho_ilimitado"
+        "ganho_ilimitado",
+        "equilibrios",
+        "curva",
+        "inclinacao_final"
       ],
       "title": "ExpiryView",
       "type": "object"
@@ -168,6 +221,21 @@
           "title": "Lote",
           "type": "integer"
         },
+        "modalidade": {
+          "anyOf": [
+            {
+              "enum": [
+                "AMERICAN",
+                "EUROPEAN"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Modalidade"
+        },
         "preco_limite": {
           "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[Ee][+-]?[0-9]+)?$",
           "title": "Preco Limite",
@@ -209,6 +277,7 @@
         "preco_limite",
         "ativo",
         "tipo",
+        "modalidade",
         "strike",
         "vencimento",
         "cotacao",
@@ -267,6 +336,17 @@
           "title": "Instante",
           "type": "string"
         },
+        "meio": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Meio"
+        },
         "venda": {
           "anyOf": [
             {
@@ -289,6 +369,7 @@
         "compra_qtd",
         "venda",
         "venda_qtd",
+        "meio",
         "fase",
         "instante",
         "idade_s"
@@ -360,11 +441,49 @@
       ],
       "title": "TicketState",
       "type": "string"
+    },
+    "UnitPriceView": {
+      "additionalProperties": false,
+      "description": "Preço da estrutura por unidade: compras somam, vendas subtraem; positivo é débito.",
+      "properties": {
+        "acima_do_meio": {
+          "title": "Acima Do Meio",
+          "type": "string"
+        },
+        "limite": {
+          "title": "Limite",
+          "type": "string"
+        },
+        "meio": {
+          "title": "Meio",
+          "type": "string"
+        },
+        "natural": {
+          "title": "Natural",
+          "type": "string"
+        },
+        "quantidade": {
+          "title": "Quantidade",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "quantidade",
+        "limite",
+        "natural",
+        "meio",
+        "acima_do_meio"
+      ],
+      "title": "UnitPriceView",
+      "type": "object"
     }
   },
   "additionalProperties": false,
   "description": "Modelo de tela versionado de uma boleta em replay.",
   "properties": {
+    "ambiente": {
+      "$ref": "#/$defs/Environment"
+    },
     "avanco": {
       "$ref": "#/$defs/AdvanceView"
     },
@@ -387,7 +506,7 @@
       "$ref": "#/$defs/TicketState"
     },
     "formato": {
-      "const": 1,
+      "const": 2,
       "title": "Formato",
       "type": "integer"
     },
@@ -399,6 +518,10 @@
       "format": "date-time",
       "title": "Instante",
       "type": "string"
+    },
+    "limite_idade_s": {
+      "title": "Limite Idade S",
+      "type": "number"
     },
     "mercado": {
       "$ref": "#/$defs/GuardView"
@@ -418,6 +541,27 @@
       "format": "date-time",
       "title": "Prazo Envio",
       "type": "string"
+    },
+    "preco_unidade": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/UnitPriceView"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "preco_unidade_indisponivel": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Preco Unidade Indisponivel"
     },
     "resumo": {
       "title": "Resumo",
@@ -443,6 +587,7 @@
   "required": [
     "formato",
     "aviso",
+    "ambiente",
     "boleta",
     "conta",
     "instante",
@@ -454,7 +599,10 @@
     "foto_cotacao",
     "prazo_envio",
     "validade_ordens",
+    "limite_idade_s",
     "pernas",
+    "preco_unidade",
+    "preco_unidade_indisponivel",
     "custo",
     "risco",
     "mercado",

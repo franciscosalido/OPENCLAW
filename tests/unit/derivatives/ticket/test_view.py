@@ -1,5 +1,7 @@
 """Contrato da visão de leitura da boleta: gabarito literal e equivalência com o motor."""
 import json
+import subprocess
+import sys
 from collections.abc import Sequence
 from datetime import datetime, timedelta, timezone
 from decimal import Context, Decimal as D, InvalidOperation, localcontext
@@ -264,14 +266,22 @@ def test_v7_two_risks_are_distinct_and_signed() -> None:
     assert credit.risco.model_dump(mode="json") == {
         "exposicao_montagem": "10.00", "vencimento_indisponivel": None,
         "vencimento": {"pior_resultado": "5.00", "perda_ilimitada": False,
-                       "melhor_resultado": "15.00", "ganho_ilimitado": False}}
+                       "melhor_resultado": "15.00", "ganho_ilimitado": False,
+                       "equilibrios": [], "inclinacao_final": "0.00", "curva": [
+                           {"preco": "0.00", "resultado": "5.00"},
+                           {"preco": "10.00", "resultado": "5.00"},
+                           {"preco": "11.00", "resultado": "15.00"}]}}
     debit = ticket_view(custom(CALM, DEBIT, net="5.00", gross="25.00"), "T1", at("14:00:01"))
     assert debit.custo.model_dump(mode="json") == {
         "liquido_assinado": "5.00", "natureza": "DEBITO", "bruto_teto": "25.00"}
     assert debit.risco.model_dump(mode="json") == {
         "exposicao_montagem": "15.00", "vencimento_indisponivel": None,
         "vencimento": {"pior_resultado": "-5.00", "perda_ilimitada": False,
-                       "melhor_resultado": "5.00", "ganho_ilimitado": False}}
+                       "melhor_resultado": "5.00", "ganho_ilimitado": False,
+                       "equilibrios": ["10.50"], "inclinacao_final": "0.00", "curva": [
+                           {"preco": "0.00", "resultado": "-5.00"},
+                           {"preco": "10.00", "resultado": "-5.00"},
+                           {"preco": "11.00", "resultado": "5.00"}]}}
     flat = ticket_view(custom(CALM, [("A", "BUY", 10, "1.00"), ("B", "SELL", 10, "1.00")],
                               net="0.00", gross="25.00"), "T1", at("14:00:01"))
     assert flat.custo.natureza.value == "ZERO"
@@ -308,7 +318,9 @@ def test_v9_single_leg_and_unlimited_gain() -> None:
     assert len(view.pernas) == 1
     assert view.risco.model_dump(mode="json")["vencimento"] == {
         "pior_resultado": "-10.00", "perda_ilimitada": False,
-        "melhor_resultado": None, "ganho_ilimitado": True}
+        "melhor_resultado": None, "ganho_ilimitado": True, "equilibrios": ["11.00"],
+        "inclinacao_final": "10.00", "curva": [{"preco": "0.00", "resultado": "-10.00"},
+                                                {"preco": "10.00", "resultado": "-10.00"}]}
 
 
 def test_v10_exponent_notation_and_money_identity() -> None:
@@ -322,7 +334,10 @@ def test_v10_exponent_notation_and_money_identity() -> None:
     assert view.risco.vencimento == plain.risco.vencimento
     assert json.loads(view.model_dump_json())["risco"]["vencimento"] == {
         "pior_resultado": "-5.00", "perda_ilimitada": False,
-        "melhor_resultado": "5.00", "ganho_ilimitado": False}
+        "melhor_resultado": "5.00", "ganho_ilimitado": False, "equilibrios": ["10.50"],
+        "inclinacao_final": "0.00", "curva": [{"preco": "0.00", "resultado": "-5.00"},
+                                               {"preco": "10.00", "resultado": "-5.00"},
+                                               {"preco": "11.00", "resultado": "5.00"}]}
     assert [str(leg.strike) for leg in view.pernas] == ["1E+1", "11.000"]
     assert json.loads(view.model_dump_json())["custo"] == {
         "liquido_assinado": "5", "natureza": "DEBITO", "bruto_teto": "1E+2"}
@@ -452,12 +467,13 @@ def test_v15_json_round_trip_and_published_schema() -> None:
     assert TicketView.model_validate_json(text) == view
     data = json.loads(text)
     assert list(data) == [
-        "formato", "aviso", "boleta", "conta", "instante", "estado", "rotulo", "pausada",
-        "versao", "resumo", "foto_cotacao", "prazo_envio", "validade_ordens", "pernas",
-        "custo", "risco", "mercado", "avanco"]
+        "formato", "aviso", "ambiente", "boleta", "conta", "instante", "estado", "rotulo",
+        "pausada", "versao", "resumo", "foto_cotacao", "prazo_envio", "validade_ordens",
+        "limite_idade_s", "pernas", "preco_unidade", "preco_unidade_indisponivel", "custo",
+        "risco", "mercado", "avanco"]
     assert (data["formato"], data["aviso"]) == (
-        1, "SIMULADO — dados sintéticos em replay; nenhuma ordem real.")
-    for change in ({"extra": 1}, {"formato": 2}):
+        2, "SIMULADO — dados sintéticos em replay; nenhuma ordem real.")
+    for change in ({"extra": 1}, {"formato": 1}, {"formato": 3}):
         with pytest.raises(ValueError):
             TicketView.model_validate_json(json.dumps(data | change))
     schema = TicketView.model_json_schema(mode="serialization")
@@ -467,7 +483,7 @@ def test_v15_json_round_trip_and_published_schema() -> None:
     generated = (json.dumps(schema, sort_keys=True, indent=2, ensure_ascii=False) + "\n").encode()
     assert SCHEMA.read_bytes() == generated
     assert sha256(generated).hexdigest() == (
-        "a63d4508c126fabd38a8cb3eea01b30616f92cef99234da4cc7a3da166eb9275")
+        "0655d7ef91caec03e35c573901854b4a2fe8c26c9232b4e0cf9230991e556e4f")
 
 
 def test_v16_view_is_independent_of_the_callers_decimal_context() -> None:
@@ -482,3 +498,183 @@ def test_v16_view_is_independent_of_the_callers_decimal_context() -> None:
         with localcontext(Context(prec=3)) as context:
             context.traps[InvalidOperation] = trap
             assert ticket_view(session, "T1", now).model_dump_json().encode() == expected
+
+
+def test_w1_format_two_is_an_integer_and_nothing_else() -> None:
+    """O formato só aceita o inteiro 2, em Python e em JSON."""
+    view = ticket_view(official("calmo", 1), "T1", at("14:00:02"))
+    assert view.formato == 2 and type(view.formato) is int
+    data = view.model_dump()
+    for bad in (True, 2.0, "2", 1, 3, None, D(2)):
+        with pytest.raises(ValueError):
+            TicketView.model_validate(data | {"formato": bad})
+    text = view.model_dump_json()
+    assert text.startswith('{"formato":2,')
+    for bad_json in ("true", "2.0", '"2"', "1", "3", "null", "2e0"):
+        with pytest.raises(ValueError):
+            TicketView.model_validate_json(
+                text.replace('"formato":2,', f'"formato":{bad_json},', 1))
+
+
+def test_w2_environment_and_age_limit_come_from_the_engine() -> None:
+    """O ambiente é o da prévia; o limite de idade é o da configuração que a guarda usa."""
+    view = ticket_view(official("bova_calmo", 1), "T1",
+                       datetime.fromisoformat("2026-11-25T14:00:02+00:00"))
+    assert (view.ambiente.value, view.limite_idade_s) == ("SIMULATED", 5.0)
+    script = _read(FIXTURES / "bova_vencida.roteiro.json")
+    config = load_ticket_sim_config().model_copy(update={"max_quote_age_s": 15.0})
+    session = ReplaySession(load_replay(FIXTURES / "bova_vencida.replay.json"), config=config)
+    session.advance_to(3)
+    opening = script.steps[0]
+    assert isinstance(opening, _Open)
+    session.open("T1", script.positions[0], opening.draft, opening.at)
+    loose = ticket_view(session, "T1", datetime.fromisoformat("2026-11-25T14:00:10+00:00"))
+    assert (loose.limite_idade_s, loose.avanco.situacao.value) == (15.0, "PODE_CONFIRMAR")
+
+
+def bova(name: str, seq: int, clock: str) -> dict[str, object]:
+    """JSON da visão da T1 de uma sessão BOVA depois da abertura."""
+    session = official(name, 1)
+    session.advance_to(seq)
+    view = ticket_view(session, "T1", datetime.fromisoformat(f"2026-11-25T{clock}+00:00"))
+    data: dict[str, object] = json.loads(view.model_dump_json())
+    return data
+
+
+def test_w3_exercise_style_comes_from_the_position() -> None:
+    """A modalidade é a da foto; sem informação, fica nula."""
+    styles = {}
+    for name, seq, clock in (("bova_calmo", 2, "14:00:02"), ("bova_vencida", 3, "14:00:10"),
+                             ("bova_adverso", 2, "14:00:02")):
+        legs: list[dict[str, object]] = bova(name, seq, clock)["pernas"]  # type: ignore[assignment]
+        styles[name] = [leg["modalidade"] for leg in legs]
+    assert styles == {"bova_calmo": ["AMERICAN", "EUROPEAN"],
+                      "bova_vencida": ["EUROPEAN", "EUROPEAN"],
+                      "bova_adverso": ["EUROPEAN", "AMERICAN"]}
+    plain = ticket_view(official("calmo", 1), "T1", at("14:00:02"))
+    assert [leg.modalidade for leg in plain.pernas] == [None, None]
+    row = {"symbol": "A", "strike": "10", "underlying": "ETF", "kind": "CALL",
+           "expiry": "2027-01-15", "multiplier": 1, "balance": 0}
+    for bad in ("BERMUDAN", "american", ""):
+        with pytest.raises(ValueError):
+            Position.model_validate_json(json.dumps(
+                {"account": "sim", "pairs": [], "holdings": [row | {"style": bad}]}))
+
+
+UNIT = {
+    "bova_calmo": (["4.175", "2.125"], {"quantidade": 100, "limite": "2.10", "natural": "2.10",
+                                        "meio": "2.05", "acima_do_meio": "5.00"}),
+    "bova_vencida": (["1.875", "3.925"], {"quantidade": 200, "limite": "-2.00",
+                                          "natural": "-2.00", "meio": "-2.05",
+                                          "acima_do_meio": "10.00"}),
+    "bova_adverso": (["1.975", "0.975"], {"quantidade": 200, "limite": "1.20", "natural": "1.20",
+                                          "meio": "1.00", "acima_do_meio": "40.00"}),
+}
+
+
+def test_w4_mid_and_unit_price_by_hand() -> None:
+    """Meio por perna e preço por unidade: compra soma, venda subtrai; natural cruza o livro."""
+    for name, seq, clock in (("bova_calmo", 2, "14:00:02"), ("bova_vencida", 3, "14:00:10"),
+                             ("bova_adverso", 2, "14:00:02")):
+        data = bova(name, seq, clock)
+        mids = [leg["cotacao"]["meio"] for leg in data["pernas"]]  # type: ignore[attr-defined]
+        assert (mids, data["preco_unidade"], data["preco_unidade_indisponivel"]) == (
+            *UNIT[name], None)
+    apart = json.loads(ticket_view(official("calmo", 1), "T1", at("14:00:02")).model_dump_json())
+    assert apart["preco_unidade"] == {"quantidade": 10, "limite": "-0.50", "natural": "-0.43",
+                                      "meio": "-0.515", "acima_do_meio": "0.15"}
+    closing = ticket_view(official("rapido", 2), "T1", at("14:00:02")).preco_unidade
+    assert closing is not None and closing.acima_do_meio == D("-0.15")
+    half = [(1, "14:00:00", "A", "0.95", 50, "1.00", 50, "CONTINUOUS"), CALM[1]]
+    one = ticket_view(custom(half, [("A", "BUY", 1, "1.00")], net="1.00", gross="1.00",
+                             pairs=[]), "T1", at("14:00:01"))
+    assert json.loads(one.model_dump_json())["preco_unidade"] == {
+        "quantidade": 1, "limite": "1.00", "natural": "1.00", "meio": "0.975",
+        "acima_do_meio": "0.025"}
+    auction = ticket_view(official("leilao", 1), "T1", at("14:00:02"))
+    assert auction.avanco.situacao.value == "BLOQUEADA" and auction.preco_unidade is not None
+
+
+def test_w5_unit_price_unavailable_is_said_in_words() -> None:
+    """Sem as duas pontas em toda perna, ou com quantidades diferentes, não há preço."""
+    ratio = custom(CALM, [("A", "BUY", 3, "1.00"), ("B", "SELL", 1, "2.00")], net="1.00",
+                   gross="5.00")
+    empty = custom([(1, "14:00:00", "A", "0.95", 50, None, 0, "CONTINUOUS"), CALM[1]],
+                   CREDIT, net="-5.00", gross="25.00")
+    missing = custom(CALM[:1], CREDIT, net="-5.00", gross="25.00", open_seq=1)
+    for session, clock, reason, mids in (
+            (ratio, "14:00:01", "quantidades diferentes por perna", ["0.985", "1.50"]),
+            (empty, "14:00:01", "cotação incompleta", [None, "1.50"]),
+            (missing, "14:00:00", "cotação incompleta", ["0.985", None])):
+        data = json.loads(ticket_view(session, "T1", at(clock)).model_dump_json())
+        assert (data["preco_unidade"], data["preco_unidade_indisponivel"]) == (None, reason)
+        assert [leg["cotacao"] and leg["cotacao"]["meio"] for leg in data["pernas"]] == mids
+
+
+def test_w6_breakevens_curve_and_final_slope() -> None:
+    """Equilíbrios ao centavo, quebras da curva nos strikes e inclinação depois do último."""
+    expected = {
+        "bova_calmo": (["152.10"], [("0.00", "-210.00"), ("150.00", "-210.00"),
+                                    ("155.00", "290.00")]),
+        "bova_vencida": (["148.00"], [("0.00", "-600.00"), ("145.00", "-600.00"),
+                                      ("150.00", "400.00")]),
+        "bova_adverso": (["156.20"], [("0.00", "-240.00"), ("155.00", "-240.00"),
+                                      ("160.00", "760.00")]),
+    }
+    for name, seq, clock in (("bova_calmo", 2, "14:00:02"), ("bova_vencida", 3, "14:00:10"),
+                             ("bova_adverso", 2, "14:00:02")):
+        expiry = bova(name, seq, clock)["risco"]["vencimento"]  # type: ignore[index]
+        assert (expiry["equilibrios"], [(p["preco"], p["resultado"]) for p in expiry["curva"]],
+                expiry["inclinacao_final"]) == (*expected[name], "0.00")
+    ratio = ticket_view(custom(CALM, [("A", "BUY", 3, "1.00"), ("B", "SELL", 1, "2.00")],
+                               net="1.00", gross="5.00"), "T1", at("14:00:01"))
+    third = json.loads(ratio.model_dump_json())["risco"]["vencimento"]
+    assert (third["equilibrios"], third["inclinacao_final"], third["ganho_ilimitado"]) == (
+        ["10.33"], "2.00", True)
+    assert [(p["preco"], p["resultado"]) for p in third["curva"]] == [
+        ("0.00", "-1.00"), ("10.00", "-1.00"), ("11.00", "2.00")]
+
+
+def test_w7_new_fields_ignore_the_callers_decimal_context() -> None:
+    """Meio, preço por unidade, equilíbrios e curva saem iguais sob precisão reduzida."""
+    # O contexto privado é criado ao importar view. Isole esse instante do pytest.
+    probe = """
+from decimal import Context, DefaultContext, Inexact, Rounded, localcontext
+DefaultContext.traps[Inexact] = DefaultContext.traps[Rounded] = True
+with localcontext(Context(prec=28, traps=[])):
+    from tests.unit.derivatives.ticket.test_view import bova
+    import json
+    print(json.dumps(bova("bova_vencida", 3, "14:00:10")))
+"""
+    run = subprocess.run([sys.executable, "-c", probe], cwd=ROOT, capture_output=True, text=True)
+    assert run.returncode == 0, run.stderr
+    assert json.loads(run.stdout) == bova("bova_vencida", 3, "14:00:10")
+    for name, seq, clock in (("bova_calmo", 2, "14:00:02"), ("bova_vencida", 3, "14:00:10"),
+                             ("bova_adverso", 2, "14:00:02")):
+        plain = bova(name, seq, clock)
+        for trap in (True, False):
+            with localcontext(Context(prec=3)) as context:
+                context.traps[InvalidOperation] = trap
+                assert bova(name, seq, clock) == plain
+    wide = [(1, "14:00:00", "A", "1234.55", 50, "1234.57", 50, "CONTINUOUS"),
+            (2, "14:00:01", "B", "0.01", 50, "0.03", 50, "CONTINUOUS")]
+    session = custom(wide, [("A", "BUY", 10, "1234.57"), ("B", "SELL", 10, "0.01")],
+                     net="12345.60", gross="12345.80",
+                     holdings=[("A", "1234.56", 0), ("B", "2345.67", 0)])
+    plain_view = ticket_view(session, "T1", at("14:00:01")).model_dump_json()
+    with localcontext(Context(prec=3)) as context:
+        context.traps[InvalidOperation] = True
+        assert ticket_view(session, "T1", at("14:00:01")).model_dump_json() == plain_view
+    lone = custom(wide, [("A", "BUY", 10, "1234.57")], net="12345.70", gross="12345.70",
+                  holdings=[("A", "1234.56", 0), ("B", "2345.67", 0)], pairs=[])
+    with localcontext(Context(prec=3)) as context:
+        context.traps[InvalidOperation] = False
+        tail = ticket_view(lone, "T1", at("14:00:01")).risco.vencimento
+    assert tail is not None and str(tail.inclinacao_final) == "10.00"
+    data = json.loads(plain_view)
+    assert data["preco_unidade"] == {"quantidade": 10, "limite": "1234.56",
+                                     "natural": "1234.56", "meio": "1234.54",
+                                     "acima_do_meio": "0.20"}
+    assert data["risco"]["vencimento"]["equilibrios"] == []
+    assert data["risco"]["vencimento"]["curva"][-1] == {"preco": "2345.67",
+                                                         "resultado": "-1234.50"}

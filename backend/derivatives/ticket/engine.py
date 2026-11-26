@@ -54,6 +54,7 @@ class Reading(NamedTuple):
     guards: tuple[GuardResult, ...]
     market: GuardResult
     refusal: str | None
+    quote_age_limit_s: float
 
 
 class EngineRefusal(ValueError):
@@ -310,7 +311,8 @@ class TicketEngine:
         return Reading(
             self._position, tuple(self._book.snapshot(leg.symbol) for leg in legs),
             tuple(assess((leg,), self._book, now, self._config) for leg in legs),
-            assess(legs, self._book, now, self._config), refusal)
+            assess(legs, self._book, now, self._config), refusal,
+            self._config.max_quote_age_s)
 
     def confirm(self, decision: HumanDecision, now: datetime) -> None:
         """Confere estado, conta, prazos, mercado, limites e por último a decisão."""
