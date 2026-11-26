@@ -191,9 +191,12 @@ def _quote(snapshot: BookSnapshot | None, now: datetime) -> QuoteView | None:
                      instante=snapshot.ts, idade_s=(now - snapshot.ts).total_seconds())
 
 
-def _unit_price(legs: tuple[LegView, ...]) -> tuple[UnitPriceView | None, str | None]:
+def _unit_price(legs: tuple[LegView, ...],
+                multipliers: set[int]) -> tuple[UnitPriceView | None, str | None]:
     if len({leg.quantidade for leg in legs}) != 1:
         return None, "quantidades diferentes por perna"
+    if multipliers != {1}:
+        return None, "multiplicador diferente de 1"
     limit = natural = middle = Decimal(0)
     for leg in legs:
         quote = leg.cotacao
@@ -269,7 +272,8 @@ def ticket_view(session: ReplaySession, ticket: str, now: datetime) -> TicketVie
     net = preview.net_limit
     nature = Nature.DEBIT if net > 0 else Nature.CREDIT if net < 0 else Nature.ZERO
     profile, unavailable = _expiry(preview, reading)
-    unit, unit_unavailable = _unit_price(legs)
+    unit, unit_unavailable = _unit_price(
+        legs, {rows[leg.symbol].multiplier for leg in preview.legs})
     if engine.state not in CONFIRMABLE:
         advance = AdvanceView(situacao=Advance.NOT_APPLICABLE, motivo=None)
     elif reading.refusal is None:
