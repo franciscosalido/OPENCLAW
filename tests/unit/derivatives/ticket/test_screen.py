@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from backend.derivatives.ticket.screen import brl, num, render_ticket, seconds
+from backend.derivatives.ticket.screen import DESTINATIONS_PT, brl, num, render_ticket, seconds
 from backend.derivatives.ticket.view import TicketView, ticket_view
 from scripts.derivatives_ticket_screen import main
 from tests.unit.derivatives.ticket.test_session import FIXTURES
@@ -419,7 +419,9 @@ def bova_page(name: str, seq: int, clock: str) -> str:
     return render_ticket(view_at(name, 1, seq, f"2026-11-25T{clock}+00:00"))
 
 
-def test_s12_destination_verdict_and_the_photo_beside_the_ages() -> None:
+def test_s12_destination_verdict_and_the_photo_beside_the_ages(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Destino por extenso; o veredito repete cada perna; foto, instante e limite na tabela."""
     legs = {
         "bova_calmo": "Compra BOVAA1500: Sem aviso; Venda BOVAA1550: Sem aviso",
@@ -439,6 +441,12 @@ def test_s12_destination_verdict_and_the_photo_beside_the_ages() -> None:
         assert all(f'data-campo="{k}"' in caption
                    for k in ("foto_cotacao", "instante", "limite_idade_s"))
         assert raw.index("<caption>") < raw.index('data-campo="pernas.0.cotacao.idade_s"')
+    # Um destino sentinela distingue a leitura da visão do único destino real do D0.
+    view = view_at("bova_calmo", 1, 2, "2026-11-25T14:00:02+00:00")
+    monkeypatch.setitem(DESTINATIONS_PT, "TESTE", ("Destino de teste", "Nota de teste"))
+    raw = render_ticket(view.model_copy(update={"ambiente": "TESTE"}))
+    assert read(raw).text["ambiente"] == "Destino de teste"
+    assert "Nota de teste" in raw
     order = re.findall(r'data-campo="pernas\.0\.([^"]*)"', bova_page(*BOVA[0]))
     assert order == ["lado", "quantidade", "serie", "tipo", "modalidade", "strike", "vencimento",
                      "preco_limite", "cotacao.compra", "cotacao.venda", "cotacao.meio",
