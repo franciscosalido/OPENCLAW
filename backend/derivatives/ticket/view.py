@@ -14,6 +14,7 @@ from backend.derivatives.pricing.expiry_payoff import (
     ExpiryLeg, PayoffRefusal, expiry_profile, expiry_result,
 )
 from backend.derivatives.ticket.engine import CONFIRMABLE, Reading
+from backend.derivatives.ticket.guards import STALE_QUOTE as STALE_QUOTE
 from backend.derivatives.ticket.guards import BookSnapshot, GuardResult
 from backend.derivatives.ticket.models import (
     Environment, Instant, Money, Preview, Side, _Frozen,
