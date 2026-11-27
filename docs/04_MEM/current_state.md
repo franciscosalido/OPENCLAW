@@ -4,7 +4,143 @@
 > review. Read after `docs/04_MEM/AGENT_CONTEXT.md`. Update at the end of
 > meaningful sessions.
 
-**Última atualização:** 2026-11-24 · **Turno:** Claude (DL3-PR07F1 integrado). **Fase 3 estendida encerrada.**
+**Última atualização:** 2026-11-27 · **Turno:** Claude (planejador). **Fase 4 em andamento:** DL4-PR00 a DL4-PR03C integrados; DL4-PR03D em revisão no PR #202, parado por erro de texto do cartão e destravado pelo Adendo 1; prova de uso da tela v3 pendente; DL4-PR03E aguarda o Adendo 2 à ADR-0024.
+
+## Fase 04 — A boleta que Francisco consegue usar — EM ANDAMENTO
+
+Blueprint: `claude/derivativos/FASE4_BLUEPRINT.md` (projeto). Cartões versionados em
+`docs/specs/derivatives/fase4/`. Tudo em simulador D0, com dado sintético, sem rede e sem
+corretora. A ADR-0024 segue sem vigência operacional; `CLAUDE.md` e a ADR-007 seguem
+vigentes.
+
+Fila decidida por Francisco em 24/11/2026:
+
+| PR | Entrega | Situação |
+|---|---|---|
+| DL4-PR00 | piso e lock do pydantic em 2.14.4 | integrado, PR #186, `128e78d` |
+| DL4-PR01 | contrato de visão (`ticket_view`, `formato` 1) | integrado, PR #188, `565136d` |
+| DL4-PR02 | três roteiros de trava de BOVA11 e gabarito do M1 | integrado, PR #191, `6ca0e5f` |
+| DL4-PR03 | tela HTML estática; prova de uso do M1 | integrado, PR #193, `de2d871` |
+| DL4-PR03B | visão formato 2: os dados da tela v3 | integrado, PR #196, `2bd6613`; revisão pós-merge com GO mantido |
+| DL4-PR03C | tela v3 em replay, lendo a visão formato 2; recusa por multiplicador; teste do meio centavo | integrado, PR #199, `5395015`; GO do revisor com suíte e 40 mutantes refeitos em duas plataformas |
+| DL4-PR03D | cotação antiga como aviso (limite de 15 s); sessão `bova_vencida`, gabarito e âncora refeitos | PR #202 em rascunho, cabeça `238c250`; cartão na revisão 1 (Adendo 1, 27/11/2026) |
+| Adendo 2 à ADR-0024 | venda sem cobertura rastreada deixa de ser recusada | autorizado em 25/11/2026; **falta o commit de autoria de Francisco** |
+| DL4-PR03E | venda sem cobertura rastreada: aviso de verificação, sem proibir nem travar | autorizado em 25/11/2026; depende do Adendo 2; sem cartão |
+| DL4-PR04 a PR06 | confirmar uma versão, acompanhar por perna, visor de recibo (M2) | — |
+| DL4-PR07 | alvo de spread que só avisa (M3) | — |
+| DL4-PR08 e PR09 | leitura OpLab e confiabilidade da VI (M4) | condicionais; exigem liberação assinada do D1 |
+
+Entregue pelo DL4-PR00:
+- `pyproject.toml` declara `pydantic>=2.14.4,<3`; o lock trava 2.14.4. O delta foi de
+  quatro pacotes (pydantic, pydantic-core, typing-extensions, typing-inspection).
+- `tests/architecture/test_pydantic_floor.py` impede o piso de voltar abaixo de 2.14.2 e o
+  portão de rodar sobre ambiente que não é o do lock.
+- Os avisos GHSA-qpmf-fgh3-ff25 e GHSA-3r8g-cqwr-jr29 não atingiam a configuração do
+  QUIMERA. A atualização foi preventiva.
+
+Entregue pelo DL4-PR01:
+- `TicketEngine.reading(now)`: consulta sem efeito do que a confirmação conferiria.
+  `confirm` usa o mesmo trecho (`_admissible`); ordem e texto das recusas não mudaram.
+- `backend/derivatives/ticket/view.py`: `ticket_view(session, ticket, now)` devolve pernas,
+  custo, dois riscos, cotação e guarda por perna, guarda do conjunto e situação de avanço
+  com o motivo literal do motor. Esquema publicado em
+  `docs/specs/derivatives/fase4/schemas/visao.schema.json`.
+- Adendo 1 (Codex, autorizado por Francisco): a visão não depende do contexto decimal de
+  quem chama.
+- Portão da cabeça `af60eee`: 11.685 aprovados, 16 pulados; mypy estrito e Pyright limpos.
+
+Entregue pelo DL4-PR02:
+- Três sessões sintéticas de trava de BOVA11 em
+  `tests/fixtures/derivatives/synthetic/ticket/sessions/`: `bova_calmo` (call a débito,
+  termina Concluída), `bova_vencida` (put a crédito, recusada por cotação vencida e depois
+  Concluída) e `bova_adverso` (call a débito, recusada por leilão, termina Proposta).
+- `bova.gabarito.json`: 6 perguntas e 18 respostas da prova de uso do M1, uma foto por
+  sessão. Bytes presos por SHA-256 em `test_bova_sessions.py`.
+- Nenhum arquivo de produção mudou: o simulador já produzia as três situações.
+- Portão da cabeça `c9311f9`: 11.697 aprovados, 16 pulados; mypy estrito e Pyright limpos.
+
+Entregue pelo DL4-PR03:
+- `backend/derivatives/ticket/screen.py` (`render_ticket`) e
+  `scripts/derivatives_ticket_screen.py`: tela HTML estática, sem script nem rede, gerada de
+  um ponto do replay.
+
+Prova de uso do M1 (Francisco, 25/11/2026): `bova_calmo` 6 de 6, `bova_vencida` 6 de 6,
+`bova_adverso` 6 de 6 na segunda tentativa. **18 de 18 de conteúdo.** Todo valor estava na
+tela; a tela obrigava a caçar a resposta, e Francisco julgou o layout ruim. O M1 está aceito
+quanto ao conteúdo; o layout é refeito na tela v3 (DL4-PR03B e DL4-PR03C).
+
+Tela v3 (25/11/2026): Francisco aprovou o protótipo v2 com ressalvas e o revisor escreveu
+`claude/derivativos/PROPOSTA_TELA_V3_PARA_PLANNER_2026-11-25.md`. O planejador fatiou:
+dados (DL4-PR03B), tela (DL4-PR03C), guarda (DL4-PR03D), cobertura (DL4-PR03E). Ficam fora da fila:
+cadeia espelhada (sem fonte de cadeia), ciclo de atualização de 15 s (só ao vivo, M4) e
+métricas probabilísticas (com o DL4-PR09).
+
+**Decisões de Francisco assinadas em 25/11/2026** (no chat de planejamento; texto integral
+no §9.2 do cartão DL4-PR03B). Nenhuma das duas entra no DL4-PR03B nem no DL4-PR03C.
+
+1. **Cotação antiga nunca bloqueia, só avisa.** Reverte a L3 de 24/11 só nesse ponto.
+   «cotação vencida» passa de bloqueio a cautela, com limite configurável de 15 s. Perda de
+   sequência, leilão, suspensão, livro inválido e livro incompleto continuam bloqueando.
+   Cartão: DL4-PR03D. A sessão `bova_vencida`, o recibo, a âncora e as respostas 5 e 6 do
+   gabarito são refeitos antes do código.
+2. **Venda de call ou put sem cobertura rastreada é permitida, com aviso de verificação.**
+   Vale para a venda descoberta e para a coberta por ativo que o QUIMERA não rastreia (ação
+   ou dinheiro). Proibir ou travar não entra na versão 4. Reverte a regra de cobertura de
+   21/11 e o que a ADR-0024 fixa. Exige o **Adendo 2 à ADR-0024**, com commit de autoria de
+   Francisco, antes do cartão DL4-PR03E. Muda `plan_legs`, a exposição e o livro de
+   reservas. O Adendo 2 tem de dizer como a venda descoberta convive com a garantia do
+   Adendo 1. Segue tudo em simulador D0; a ADR-007 não muda.
+
+Decisões de Francisco que valem para os próximos cartões:
+- L3: mercado adverso é só o que `guards.assess` já emite. Condição nova é cartão de motor.
+  Revertida em 25/11/2026 só para «cotação vencida» (decisão 1 acima); vale até o DL4-PR03D integrar.
+- L4: o risco aparece em dois números, com rótulos distintos: desembolso se só a compra
+  executar e pior resultado no vencimento. O rótulo é «pior resultado», não «perda máxima».
+- Lembrete para o DL4-PR09 (25/11/2026): VI, gregas e preços teóricos seguem em float64,
+  sem arredondar cedo; oráculos com `mpmath` e estudo de convergência das malhas; a
+  incerteza da VI vem do spread e da vega, não do número de casas.
+
+Pendências sem cartão:
+- `tests/integration` tem 4 falhas conhecidas na `main`, anteriores à Fase 4 e iguais nas
+  duas versões do pydantic. São defeitos dos próprios testes. Precisam de cartão de
+  correção antes do M4. Até lá, a linha de base de cada cartão é «as mesmas 4, pelos IDs».
+- `Literal[1]` do `formato` da visão aceita `true` e `1.0` na leitura. Endurecer quando a
+  tela (DL4-PR03) passar a ler a visão.
+- A docstring de `series_code` em `test_bova_sessions.py` diz «formato B3», mas o número
+  `strike × 10` é convenção sintética do projeto. Corrigir no próximo PR que tocar o arquivo.
+- A fonte do spread para o gatilho do DL4-PR07 não está decidida: o gatilho atual olha uma
+  série só.
+
+Revisão pós-merge do PR #196 (26/11/2026, Linux aarch64, suíte, tipagem e 23 mutantes
+refeitos pelo revisor): GO mantido. Dois achados viraram pré-requisito do DL4-PR03C: L-1
+(nenhum teste fixava o meio centavo do equilíbrio) e S-2 (`acima_do_meio` ignora o
+multiplicador). Os dois estão no cartão DL4-PR03C. Fica sem cartão: **o motor ignora o
+multiplicador do contrato em todo valor em reais**; inofensivo com as fixtures (1), precisa
+de decisão antes de dado real (M4).
+
+### Próximo turno (aviso ao implementador e ao revisor)
+
+- **O que houve no PR #202:** o implementador parou, corretamente, porque o §4 do cartão
+  dizia que no S7 «cada texto volta idêntico», e o `resumo` aparece com 12 caracteres (D5 do
+  DL4-PR03). O erro é do planejador. A auditoria achou um segundo erro de texto: a lista de
+  testes alterados estava incompleta. **Código e testes do PR estão certos** e são o patch
+  de referência byte a byte.
+- **Implementador:** um commit só de documentação com `DL4-PR03D_ADENDO_1.patch`
+  (`claude/derivativos/cards/DL4-PR03D_ADENDO_1.md`, no projeto). Depois, o §8 do cartão
+  inteiro na cabeça nova. Mutante só conta se um teste falhar, não por erro de preparação.
+- **Revisor:** revisão completa na cabeça nova; no S7, campo a campo. Com GO, integra e
+  apaga o ramo `ci/dl4-pr03d-abertura`.
+- **Consequência a conferir:** com a regra nova, a venda coberta deixa de esperar cotação
+  nova durante a execução (decisão D2 do cartão, vetável por Francisco).
+- **Francisco:** depois do GO, uma prova de uso só, nas três telas (18 de 18 na primeira
+  tentativa); ela vale também pela do DL4-PR03C. Commit do Adendo 2 à ADR-0024 antes do
+  DL4-PR03E; resposta à L2 antes do DL4-PR04.
+- **Planejador:** depois do GO, minuta do Adendo 2 e cartão DL4-PR03E.
+
+Pendências sem cartão: o recibo não registra confirmação sob cautela; o motor ignora o
+multiplicador do contrato em valores em reais (decidir antes do M4); validador da curva em
+`ExpiryView`; as 4 falhas de `tests/integration`; a docstring de `series_code`; a fonte do
+spread do DL4-PR07.
 
 ## Depois da Fase 3 — decisões de produto no simulador (D0) — EM ANDAMENTO
 
