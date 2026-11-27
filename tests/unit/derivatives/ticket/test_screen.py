@@ -92,9 +92,9 @@ SCREENS = {
         "Venda 200 BOVAM1500 Put BOVA11 150,00 a 3,90",
         "Recebe no mínimo R$ 400,00; teto bruto R$ 1.160,00",
         "desembolso R$ 380,00; pior resultado -R$ 600,00",
-        "10,0 s e 1,0 s; foto bova-vencida-2",
-        "Bloqueado: cotação vencida",
-        "Não avança: cotação vencida",
+        "20,0 s e 1,0 s; foto bova-vencida-2",
+        "Cautela: cotação antiga",
+        "Pode confirmar",
     ],
     "bova_adverso": [
         "Compra 200 BOVAA1550 Call BOVA11 155,00 a 2,15; "
@@ -214,7 +214,7 @@ def test_s3_brl_and_seconds_formats_at_the_edges() -> None:
                 assert brl(D(raw)) == shown, raw
     assert [seconds(v) for v in (0.0, 1.0, 10.0, 4.96, 25186.0, 0.05)] == [
         "0,0 s", "1,0 s", "10,0 s", "5,0 s", "25186,0 s", "0,1 s"]
-    view = view_at("bova_vencida", 1, 3, "2026-11-25T14:00:10+00:00")
+    view = view_at("bova_vencida", 1, 3, "2026-11-25T14:00:20+00:00")
     plain = render_ticket(view)
     with localcontext(Context(prec=3)) as context:
         context.traps[InvalidOperation] = True
@@ -335,6 +335,24 @@ def test_s7_page_is_inert_escaped_and_deterministic() -> None:
     assert parsed.text["pernas.0.serie"] == hostile and parsed.text["conta"] == hostile
     assert parsed.text["veredito.pernas"].startswith(f"Compra {hostile}: Cautela: {hostile}")
     assert "svg" in parsed.tags and "strong" in parsed.tags
+    marks = ['<script>alert("x")</script>', "<b>", '"><img src=x onerror=1>', "&lt;b&gt;",
+             "</td></tr></table>", "<svg onload=1>", "'><i>", "]]><b>"]
+    safe = set(read(page).tags)
+    for mark in marks:
+        data = json.loads(view.model_dump_json())
+        data.update(boleta=mark, resumo=mark, preco_unidade=None,
+                    preco_unidade_indisponivel=mark)
+        data["risco"].update(vencimento=None, vencimento_indisponivel=mark)
+        for leg in data["pernas"]:
+            leg["lado_rotulo"] = mark
+        parsed = read(render_ticket(TicketView.model_validate_json(json.dumps(data))))
+        assert set(parsed.tags) <= safe, mark
+        assert parsed.text["boleta"] == mark and parsed.text["resumo"] == mark[:12]
+        assert parsed.text["pernas.0.lado"] == mark and parsed.text["pernas.1.lado"] == mark
+        assert parsed.text["preco_unidade"] == f"indisponível: {mark}"
+        assert parsed.text["risco.curva"] == f"indisponível: {mark}"
+        assert parsed.text["risco.vencimento"] == f"indisponível: {mark}"
+        assert parsed.text["veredito.pernas"].startswith(f"{mark} BOVAA1550: ")
     assert evil.count("<script") == 0 and "&lt;script&gt;" in evil
 
 
@@ -358,14 +376,14 @@ def test_s8_screen_module_reads_only_the_view() -> None:
 SHOT = ["--replay", str(FIXTURES / "bova_vencida.replay.json"),
         "--roteiro", str(FIXTURES / "bova_vencida.roteiro.json"),
         "--passos", "1", "--avanca-ate", "3", "--boleta", "T1",
-        "--instante", "2026-11-25T14:00:10Z"]
+        "--instante", "2026-11-25T14:00:20Z"]
 
 
 def test_s9_script_writes_the_same_bytes_and_never_overwrites(tmp_path: Path) -> None:
     """O script grava exatamente a tela da visão e recusa destino existente."""
     out = tmp_path / "tela.html"
     assert main([*SHOT, "--out", str(out)]) == 0
-    expected = render_ticket(view_at("bova_vencida", 1, 3, "2026-11-25T14:00:10+00:00"))
+    expected = render_ticket(view_at("bova_vencida", 1, 3, "2026-11-25T14:00:20+00:00"))
     assert out.read_bytes() == expected.encode("utf-8")
     assert sorted(p.name for p in tmp_path.iterdir()) == ["tela.html"]
     out.write_text("intocado", encoding="utf-8")
@@ -374,9 +392,9 @@ def test_s9_script_writes_the_same_bytes_and_never_overwrites(tmp_path: Path) ->
 
 
 @pytest.mark.parametrize("option,value", [
-    ("--passos", "0"), ("--passos", "4"), ("--boleta", "T9"),
-    ("--instante", "2026-11-25T14:00:10"), ("--instante", "2026-11-25T14:00:08Z"),
-    ("--instante", "2026-11-25T14:00:13Z"), ("--instante", "ontem"),
+    ("--passos", "0"), ("--passos", "3"), ("--boleta", "T9"),
+    ("--instante", "2026-11-25T14:00:20"), ("--instante", "2026-11-25T14:00:18Z"),
+    ("--instante", "2026-11-25T14:00:23Z"), ("--instante", "ontem"),
     ("--avanca-ate", "1"),
 ])
 def test_s10_script_refuses_bad_points_without_writing(option: str, value: str,
@@ -388,7 +406,7 @@ def test_s10_script_refuses_bad_points_without_writing(option: str, value: str,
     assert list(tmp_path.iterdir()) == []
 
 
-@pytest.mark.parametrize("steps,seq,clock", [("4", "6", "14:00:15"), ("-1", "4", "14:00:13")])
+@pytest.mark.parametrize("steps,seq,clock", [("3", "6", "14:00:25"), ("-1", "4", "14:00:22")])
 def test_s10b_script_refuses_step_counts_that_slicing_would_accept(
         steps: str, seq: str, clock: str, tmp_path: Path) -> None:
     """Passos além do roteiro ou negativos são recusados, mesmo num ponto válido da fita."""
@@ -404,13 +422,13 @@ def test_s11_script_plays_confirmations_like_the_official_replay(tmp_path: Path)
     out = tmp_path / "tela.html"
     assert main(["--replay", str(FIXTURES / "bova_vencida.replay.json"),
                  "--roteiro", str(FIXTURES / "bova_vencida.roteiro.json"),
-                 "--passos", "3", "--avanca-ate", "6", "--boleta", "T1",
-                 "--instante", "2026-11-25T14:00:15Z", "--out", str(out)]) == 0
+                 "--passos", "2", "--avanca-ate", "6", "--boleta", "T1",
+                 "--instante", "2026-11-25T14:00:25Z", "--out", str(out)]) == 0
     text = read(out.read_text(encoding="utf-8")).text
     assert (text["rotulo"], text["avanco"]) == ("Concluída", "Não se aplica: Concluída")
 
 
-BOVA = [("bova_calmo", 2, "14:00:02"), ("bova_vencida", 3, "14:00:10"),
+BOVA = [("bova_calmo", 2, "14:00:02"), ("bova_vencida", 3, "14:00:20"),
         ("bova_adverso", 2, "14:00:02")]
 
 
@@ -425,7 +443,7 @@ def test_s12_destination_verdict_and_the_photo_beside_the_ages(
     """Destino por extenso; o veredito repete cada perna; foto, instante e limite na tabela."""
     legs = {
         "bova_calmo": "Compra BOVAA1500: Sem aviso; Venda BOVAA1550: Sem aviso",
-        "bova_vencida": "Compra BOVAM1450: Bloqueado: cotação vencida; "
+        "bova_vencida": "Compra BOVAM1450: Cautela: cotação antiga; "
                         "Venda BOVAM1500: Sem aviso",
         "bova_adverso": "Compra BOVAA1550: Cautela: spread aberto, pouca profundidade; "
                         "Venda BOVAA1600: Bloqueado: leilão",
@@ -436,7 +454,7 @@ def test_s12_destination_verdict_and_the_photo_beside_the_ages(
         assert page.text["ambiente"] == "Simulador local"
         assert "D0 · nenhuma ordem sai desta máquina" in raw
         assert page.text["veredito.pernas"] == legs[name]
-        assert page.text["limite_idade_s"] == "5,0 s"
+        assert page.text["limite_idade_s"] == "15,0 s"
         caption = raw[raw.index("<caption>"):raw.index("</caption>")]
         assert all(f'data-campo="{k}"' in caption
                    for k in ("foto_cotacao", "instante", "limite_idade_s"))
@@ -458,23 +476,24 @@ def test_s12_destination_verdict_and_the_photo_beside_the_ages(
 
 
 def test_s13_age_is_marked_only_by_the_guard_and_with_its_level() -> None:
-    """A idade só ganha marca com «cotação vencida» na guarda da perna, no nível da guarda."""
+    """A idade só ganha marca com «cotação antiga» na guarda da perna, no nível da guarda."""
     stale = read(bova_page(*BOVA[1]))
-    assert stale.classes["pernas.0.cotacao.idade_s"] == {"num", "alerta"}
+    assert stale.classes["pernas.0.cotacao.idade_s"] == {"num", "cautela"}
+    assert stale.classes["pernas.0.guarda"] == {"quebra", "cautela"}
     assert stale.classes["pernas.1.cotacao.idade_s"] == {"num"}
     adverse = read(bova_page(*BOVA[2]))
     assert adverse.classes["pernas.0.cotacao.idade_s"] == {"num"}
     assert adverse.classes["pernas.1.cotacao.idade_s"] == {"num"}
-    data = json.loads(view_at("bova_vencida", 1, 3, "2026-11-25T14:00:10+00:00").model_dump_json())
-    data["pernas"][0]["guarda"]["nivel"] = "CAUTION"
-    warned = read(render_ticket(TicketView.model_validate_json(json.dumps(data))))
-    assert warned.classes["pernas.0.cotacao.idade_s"] == {"num", "cautela"}
+    data = json.loads(view_at("bova_vencida", 1, 3, "2026-11-25T14:00:20+00:00").model_dump_json())
+    data["pernas"][0]["guarda"]["nivel"] = "BLOCKED"
+    barred = read(render_ticket(TicketView.model_validate_json(json.dumps(data))))
+    assert barred.classes["pernas.0.cotacao.idade_s"] == {"num", "alerta"}
     data["pernas"][0]["guarda"] = {"nivel": "OK", "motivos": []}
     data["limite_idade_s"] = 0.5
     quiet = read(render_ticket(TicketView.model_validate_json(json.dumps(data))))
     assert quiet.classes["pernas.0.cotacao.idade_s"] == {"num"}
     assert (quiet.text["limite_idade_s"], quiet.text["pernas.0.cotacao.idade_s"]) == (
-        "0,5 s", "10,0 s")
+        "0,5 s", "20,0 s")
 
 
 def test_s14_side_label_style_flag_and_number_format() -> None:

@@ -31,14 +31,14 @@
    "passos": 1,
    "avanca_ate": 3,
    "boleta": "T1",
-   "instante": "2026-11-25T14:00:10Z",
+   "instante": "2026-11-25T14:00:20Z",
    "respostas": [
     "Compra 200 BOVAM1450 (PUT 145.00) a 1.90; Venda 200 BOVAM1500 (PUT 150.00) a 3.90",
     "recebe no mínimo 400.00; bruto até 1160.00",
     "desembolso se só a compra executar 380.00; pior resultado no vencimento -600.00",
-    "BOVAM1450 10.0 s, BOVAM1500 1.0 s; foto bova-vencida-2",
-    "BLOCKED: cotação vencida",
-    "não avança: cotação vencida"
+    "BOVAM1450 20.0 s, BOVAM1500 1.0 s; foto bova-vencida-2",
+    "CAUTION: cotação antiga",
+    "pode confirmar"
    ]
   },
   {

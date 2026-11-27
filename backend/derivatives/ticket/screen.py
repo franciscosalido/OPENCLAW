@@ -5,7 +5,7 @@ from html import escape
 
 from backend.derivatives.ticket.screen_draw import curve, ruler
 from backend.derivatives.ticket.view import (
-    Advance, ExpiryView, GuardView, LegView, Nature, TicketView, UnitPriceView,
+    STALE_QUOTE, Advance, ExpiryView, GuardView, LegView, Nature, TicketView, UnitPriceView,
 )
 
 _CENT = Decimal("0.01")
@@ -17,7 +17,6 @@ PHASE_LABELS_PT = {"CONTINUOUS": "Contínuo", "AUCTION": "Leilão", "SUSPENDED":
 KIND_LABELS_PT = {"CALL": "Call", "PUT": "Put"}
 STYLE_LABELS_PT = {"AMERICAN": ("🇺🇸", "Americana"), "EUROPEAN": ("🇪🇺", "Europeia")}
 DESTINATIONS_PT = {"SIMULATED": ("Simulador local", "D0 · nenhuma ordem sai desta máquina")}
-STALE = "cotação vencida"
 ABSENT = "—"
 _STYLE = (
     "body{font:15px/1.45 system-ui,sans-serif;color:#1a1d21;background:#f5f6f4;"
@@ -140,7 +139,7 @@ def _leg_row(index: int, leg: LegView) -> str:
         cells.append(f'<td data-campo="{prefix}.cotacao" class="alerta" colspan="7">'
                      "sem cotação</td>")
     else:
-        stale = mark if STALE in leg.guarda.motivos else ""
+        stale = mark if STALE_QUOTE in leg.guarda.motivos else ""
         cells += [_cell(f"{prefix}.cotacao.compra", _side(quote.compra, quote.compra_qtd), "num"),
                   _cell(f"{prefix}.cotacao.venda", _side(quote.venda, quote.venda_qtd), "num"),
                   _cell(f"{prefix}.cotacao.meio",

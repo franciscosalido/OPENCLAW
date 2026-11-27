@@ -10,6 +10,9 @@ from backend.derivatives.ticket.venue import ExecutionVenue
 from config.ticket_sim_config_model import TicketSimConfig
 
 
+STALE_QUOTE = "cotação antiga"
+
+
 class BookSnapshot(NamedTuple):
     """Última foto da série e integridade da sequência global."""
     symbol: str
@@ -64,7 +67,7 @@ def assess(legs: Sequence[Leg], book: BookView, now: datetime, config: TicketSim
             spread = q.ask - q.bid if q.ask is not None and q.bid is not None else None
             wide = spread is not None and spread > Decimal(".01") * config.max_spread_ticks
         for condition, reason, block in (
-            (age > config.max_quote_age_s, "cotação vencida", True),
+            (age > config.max_quote_age_s, STALE_QUOTE, False),
             (q.phase == "AUCTION", "leilão", True), (q.phase == "SUSPENDED", "suspensão", True),
             (spread is not None and spread <= 0, "livro inválido", True),
             (price is None, "livro incompleto", True),

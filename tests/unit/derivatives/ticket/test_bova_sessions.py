@@ -15,16 +15,16 @@ from tests.unit.derivatives.ticket.test_view import REFUSALS, answers, official
 
 SESSIONS = ("bova_calmo", "bova_vencida", "bova_adverso")
 GABARITO = FIXTURES / "bova.gabarito.json"
-GABARITO_SHA = "5a788938e8618f3141003c110d88337bd128bf4aac23068a3a4f731f43095803"
+GABARITO_SHA = "c0c3c72fa53a8237bc4cda0a7c9559def9a64244ea831fa8178af47d63abf82a"
 FILES_SHA = {
     "bova_calmo.replay.json":
         "ff7494c11c1adc7b859c43768a4834f48ff12cda0013c49eb7a11bfc8d540cfa",
     "bova_calmo.roteiro.json":
         "6d956042f507f8efb0fdd501cedf2da1316f175923dc8b93b6a55d446d43db4b",
     "bova_vencida.replay.json":
-        "14583cfd46bd80135db6c69ba0bcbed3e9e577f2d92708cc89dfcbd4f4afb880",
+        "c98ce2f12aff7b7efc67885734bf47f2b208f7139236293703fa5433eebf5bdf",
     "bova_vencida.roteiro.json":
-        "2e85fd042cdf74ed284655fb724da3046e9571f6dc558e3eee76fa4f8e56b3ad",
+        "d7ab707054788f64aff68fdc6b0f6041bce03f5d92339abd9f879805f1d1185c",
     "bova_adverso.replay.json":
         "70409a55ca91e06d3de77fb4cc37e0593aa5162a2708cd6296b12642fc5cbd48",
     "bova_adverso.roteiro.json":
@@ -51,9 +51,9 @@ ANSWERS = {
         "Compra 200 BOVAM1450 (PUT 145.00) a 1.90; Venda 200 BOVAM1500 (PUT 150.00) a 3.90",
         "recebe no mínimo 400.00; bruto até 1160.00",
         "desembolso se só a compra executar 380.00; pior resultado no vencimento -600.00",
-        "BOVAM1450 10.0 s, BOVAM1500 1.0 s; foto bova-vencida-2",
-        "BLOCKED: cotação vencida",
-        "não avança: cotação vencida",
+        "BOVAM1450 20.0 s, BOVAM1500 1.0 s; foto bova-vencida-2",
+        "CAUTION: cotação antiga",
+        "pode confirmar",
     ],
     "bova_adverso": [
         "Compra 200 BOVAA1550 (CALL 155.00) a 2.15; Venda 200 BOVAA1600 (CALL 160.00) a 0.95",
@@ -128,7 +128,7 @@ def test_b2_files_and_answer_key_are_pinned() -> None:
     assert [(f["sessao"], f["passos"], f["avanca_ate"], f["boleta"], f["instante"])
             for f in key["fotos"]] == [
         ("bova_calmo", 1, 2, "T1", "2026-11-25T14:00:02Z"),
-        ("bova_vencida", 1, 3, "T1", "2026-11-25T14:00:10Z"),
+        ("bova_vencida", 1, 3, "T1", "2026-11-25T14:00:20Z"),
         ("bova_adverso", 1, 2, "T1", "2026-11-25T14:00:02Z")]
     assert {f["sessao"]: f["respostas"] for f in key["fotos"]} == ANSWERS
     assert sum(len(f["respostas"]) for f in key["fotos"]) == 18
@@ -183,8 +183,7 @@ def test_b5_view_predicts_every_scripted_confirmation() -> None:
             seen.append((name, n, advance.situacao.value, advance.motivo))
     assert seen == [
         ("bova_calmo", 2, "PODE_CONFIRMAR", None),
-        ("bova_vencida", 2, "BLOQUEADA", "cotação vencida"),
-        ("bova_vencida", 3, "PODE_CONFIRMAR", None),
+        ("bova_vencida", 2, "PODE_CONFIRMAR", None),
         ("bova_adverso", 2, "BLOQUEADA", "spread aberto, pouca profundidade, leilão"),
     ]
 
@@ -202,10 +201,10 @@ def test_b6_guards_per_leg_at_each_photo_and_after_the_market_changes() -> None:
 
     assert guards("bova_calmo", 1, 2, "14:00:02") == (
         "PODE_CONFIRMAR", "OK", [("OK", [], 2.0), ("OK", [], 1.0)])
-    assert guards("bova_vencida", 1, 3, "14:00:10") == (
-        "BLOQUEADA", "BLOCKED", [("BLOCKED", ["cotação vencida"], 10.0), ("OK", [], 1.0)])
-    assert guards("bova_vencida", 2, 4, "14:00:13") == (
-        "PODE_CONFIRMAR", "OK", [("OK", [], 1.0), ("OK", [], 4.0)])
+    assert guards("bova_vencida", 1, 3, "14:00:20") == (
+        "PODE_CONFIRMAR", "CAUTION", [("CAUTION", ["cotação antiga"], 20.0), ("OK", [], 1.0)])
+    assert guards("bova_vencida", 1, 4, "14:00:22") == (
+        "PODE_CONFIRMAR", "OK", [("OK", [], 0.0), ("OK", [], 3.0)])
     assert guards("bova_adverso", 1, 2, "14:00:02") == (
         "BLOQUEADA", "BLOCKED", [("CAUTION", ["spread aberto", "pouca profundidade"], 2.0),
                                   ("BLOCKED", ["leilão"], 1.0)])
@@ -220,8 +219,7 @@ RUNS = {
                    "de7b45d3c7ed06b4c527a9cbc1036de57ad7a9d9126ce06740c353f0bf0da67e", []),
     "bova_vencida": ("COMPLETED", "Concluída", [200, 200], ["1.9000", "3.9000"],
                      ("1160.00", "1160.00", "1160.00"), 8,
-                   "cc91c71f694372eae35436f2cc7f6685ba9625c0595678f1d7af0af027d1584a",
-                     [{"passo": 2, "acao": "confirm", "boleta": "T1", "erro": "EngineRefusal"}]),
+                   "88908b798f830069c5c72169edc46dd00bf73a8bab349f2ccf939bcb170e1665", []),
     "bova_adverso": ("DRAFT", "Proposta", [0, 0], [None, None],
                      ("620.00", "0.00", "620.00"), 1,
                    "43c254c9e7975fa62d8e2c86a3b72a60ff25d5a8d8e69ada1e3d5edbd8d7137d",
