@@ -5,6 +5,11 @@
 diferença for só `docs/04_MEM/current_state.md`.
 **PR novo**, em rascunho. Entra antes do Adendo 2 à ADR-0024 e do DL4-PR03E.
 
+**Revisão 1, de 27/11/2026 (Adendo 1).** Só texto do §4: a frase do S7 sobre o `resumo` e a
+lista de testes alterados, que estava incompleta. **Nenhum código, teste, fixture, esperado
+numérico ou mutante muda.** Conferido contra a cabeça `238c250` do PR #202, cujo código é o
+patch de referência byte a byte.
+
 **Origem:**
 
 - Decisão de Francisco assinada em 25/11/2026: «cotação antiga nunca bloqueia, só avisa».
@@ -157,7 +162,7 @@ Resultado do roteiro inteiro: Concluída, 200 e 200 executados a 1,9000 e 3,9000
 
 ## 4. Cenários
 
-**Testes existentes que mudam, e só estes** (todos trocam «cotação vencida» por «cotação
+**Testes existentes com esperado novo** (todos trocam «cotação vencida» por «cotação
 antiga»; abaixo, o que mais muda):
 
 | Teste | Esperado novo |
@@ -177,6 +182,21 @@ antiga»; abaixo, o que mais muda):
 | B2, B3, B5, B6, B7, B8 | §3.3; B6 «depois que a fita muda»: evento 4, 14:00:22, OK com 0,0 e 3,0 s |
 | S1, S9, S10, S10b, S11, S12, S13 (`test_screen`) | instante 14:00:20; «Cautela: cotação antiga»; «Pode confirmar»; limite «15,0 s»; idade em laranja; com a guarda forçada a BLOCKED, marca-texto |
 
+**Testes existentes que mudam sem esperado novo.** A lista completa, por função, medida
+entre `5395015` e `238c250`:
+
+| Teste | O que muda |
+|---|---|
+| `test_send_deadline_with_both_books_fresh` (`test_engine`) | só a docstring («cotação antiga») |
+| W3, W4, W6, W7 (`test_view`) | só o instante da foto da `bova_vencida`, de 14:00:10 para 14:00:20; meios, preço por unidade, equilíbrio e curva são os mesmos |
+| S3 (`test_screen`) | só o mesmo instante |
+| S14 a S17 (`test_screen`) | corpo idêntico; recebem a foto nova pela constante `BOVA` |
+| auxiliar `custom` (`test_view`) | ganha `multipliers` por série (para o W8) |
+
+Constantes alteradas: `V1` (`test_view`); `GABARITO_SHA`, `FILES_SHA`, `ANSWERS`, `RUNS`
+(`test_bova_sessions`); `SCREENS`, `SHOT`, `BOVA` (`test_screen`). Nenhum outro teste,
+auxiliar ou constante muda nos cinco arquivos; nenhum outro arquivo de teste muda.
+
 **Testes novos (5):**
 
 - **G18:** cotação de 3600 s em leilão → BLOCKED («cotação antiga», «leilão»).
@@ -194,7 +214,9 @@ antiga»; abaixo, o que mais muda):
   «multiplicador diferente de 1». O auxiliar `custom` ganha `multipliers` por série.
 - **S7 (L-2):** oito cargas hostis em `boleta`, `resumo`, `lado_rotulo` das duas pernas,
   `preco_unidade_indisponivel` e `vencimento_indisponivel`. O conjunto de tags da página
-  não cresce e cada texto volta idêntico.
+  não cresce. `boleta` e `lado_rotulo` (duas pernas) voltam idênticos. Os dois motivos
+  voltam como «indisponível: <entrada>». `resumo` volta como os 12 primeiros caracteres da
+  entrada (D5 do DL4-PR03).
 
 **SHA-256 das três telas do protótipo** (só valem seguindo o patch byte a byte): calmo
 `fb18135b8e21…`, vencida `e04863eb1598…`, adverso `e6282a01b7b7…`. As três mudam: a legenda
@@ -221,6 +243,11 @@ passa a dizer «15,0 s».
 - **Tropeço do planejador:** a primeira cópia de mutação não tinha `docs/specs`; dois
   testes de esquema falhavam nela por isso e apareciam como «derrubou» em todo mutante.
   Refiz com a cópia completa. Nenhum mutante dependia só deles.
+
+- **Erro do planejador, corrigido na revisão 1:** o §4 dizia que no S7 «cada texto volta
+  idêntico» e que a lista de testes alterados era completa. As duas frases estavam erradas;
+  o código e os testes do protótipo sempre estiveram certos. O implementador parou pelo §7,
+  corretamente. A lista agora foi extraída por comparação de cada função, não de memória.
 
 **Não conferido pelo planejador:** Mac arm64; `tests/integration`; o contêiner; Windows.
 
