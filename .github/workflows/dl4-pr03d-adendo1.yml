@@ -1,0 +1,189 @@
+name: DL4-PR03D Adendo 1
+on:
+  pull_request:
+    branches: [feat/dl4-pr03d-cotacao-antiga]
+permissions:
+  contents: read
+jobs:
+  qualify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 477bb00b63752eab7c8b0b0846100d9a371b399d
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: '0.11.32'
+          enable-cache: false
+      - name: Prepare exact base and validation scripts
+        shell: bash
+        run: |
+          set -eu
+          git clone --quiet --no-hardlinks . "$RUNNER_TEMP/base"
+          git -C "$RUNNER_TEMP/base" checkout --detach 5395015613b62045aa71f31230efa9eb19dd5b8c
+          mkdir -p "$RUNNER_TEMP/harness" "$RUNNER_TEMP/evidence"
+          cd "$RUNNER_TEMP/harness"
+          cat > qualify.sh <<'SHELL'
+          set -euo pipefail
+          py="$1"
+          export PYTHONDONTWRITEBYTECODE=1
+          export PYTHONPYCACHEPREFIX="$(mktemp -d)"
+          candidate="$PWD"
+          out="$OUT"
+          mkdir -p "$out"
+          test "$(git rev-parse HEAD)" = 477bb00b63752eab7c8b0b0846100d9a371b399d
+          uname -sm | tee "$out/platform"
+          "$py" -c 'import importlib.metadata as m, platform, sys, pydantic_core._pydantic_core as c; print(sys.version,sys.executable,platform.machine(),c.__file__,[(n,m.version(n)) for n in ("pydantic","pydantic-core")]); assert m.version("pydantic") == "2.14.4"' | tee "$out/runtime"
+          git rev-parse HEAD > "$out/head"
+          for tree in base candidate; do
+            if test "$tree" = base; then cd "$BASE_TREE"; else cd "$candidate"; fi
+            mkdir -p "$out/$tree"
+            dep=tests/fixtures/derivatives/synthetic/ticket/sessions
+            for session in calmo leilao rapido bova_calmo bova_vencida bova_adverso; do
+              "$py" -m scripts.derivatives_ticket_replay --replay "$dep/$session.replay.json" --roteiro "$dep/$session.roteiro.json" --out "$out/$tree/$session"
+            done
+            (cd "$out/$tree" && find calmo leilao rapido bova* -type f | sort | xargs shasum -a 256) > "$out/$tree.sha256"
+          done
+          "$py" - "$out" <<'REPLAYS'
+          import json, hashlib, sys
+          from pathlib import Path
+
+          root = Path(sys.argv[1])
+          base, head = root / "base", root / "candidate"
+          files = sorted(p.relative_to(base) for p in base.rglob("*") if p.is_file())
+          assert len(files) == 13 and files == sorted(p.relative_to(head) for p in head.rglob("*") if p.is_file())
+          changed = {str(p) for p in files if (base / p).read_bytes() != (head / p).read_bytes()}
+          assert changed == {"bova_vencida/recibo_T1.jsonl", "bova_vencida/resumo.json"}, changed
+          for filename, prefix in [("recibo_T1.jsonl","63f3f4bed89b"),("resumo.json","a21d78f9596f")]:
+              assert hashlib.sha256((head/"bova_vencida"/filename).read_bytes()).hexdigest().startswith(prefix)
+          anchors = {}
+          for p in (base, head):
+              anchors[p.name] = {
+                  f"{f.parent.name}/{tid}": t["recibo_hash"]
+                  for f in sorted(p.glob("*/resumo.json")) for tid,t in json.loads(f.read_bytes())["boletas"].items()
+              }
+          old, new = anchors.values()
+          assert len(old) == len(new) == 7 and old.keys() == new.keys()
+          assert [k for k in old if old[k] != new[k]] == ["bova_vencida/T1"]
+          assert new["bova_vencida/T1"] == "88908b798f830069c5c72169edc46dd00bf73a8bab349f2ccf939bcb170e1665"
+          res=json.loads((head/"bova_vencida/resumo.json").read_bytes())
+          t=res["boletas"]["T1"]
+          assert res["recusas"] == [] and t["recibo_eventos"] == 8 and t["estado"] == "COMPLETED"
+          assert [(p["executado"],p["preco_medio"]) for p in t["pernas"]] == [(200,"1.9000"),(200,"3.9000")]
+          assert t["bruto"]["executado"] == "1160.00"
+          (root/"anchors.json").write_text(json.dumps(anchors, indent=2)+"\n")
+          REPLAYS
+          test "$(wc -l < "$out/candidate.sha256")" -eq 13
+          "$py" -m pytest tests/unit/derivatives/ticket -q | tee "$out/focal.log"
+          "$py" -m pytest tests/architecture -q | tee "$out/architecture.log"
+          "$py" - <<'PYCODE' | tee "$out/schema.sha256"
+          import json, hashlib, pathlib
+          from backend.derivatives.ticket.view import TicketView
+          raw=(json.dumps(TicketView.model_json_schema(mode="serialization"),sort_keys=True,indent=2,ensure_ascii=False)+"\n").encode()
+          assert raw == pathlib.Path("docs/specs/derivatives/fase4/schemas/visao.schema.json").read_bytes()
+          digest=hashlib.sha256(raw).hexdigest()
+          assert digest == "0655d7ef91caec03e35c573901854b4a2fe8c26c9232b4e0cf9230991e556e4f"
+          print(digest)
+          PYCODE
+          shasum -a 256 docs/specs/derivatives/fase3/schemas/previa.schema.json > "$out/previa.sha256"
+          git diff --exit-code 5395015 HEAD -- docs/specs/derivatives/fase3/schemas docs/specs/derivatives/fase4/schemas
+          if git grep -in "cotação vencida" -- backend config scripts tests; then exit 2; fi
+          mkdir -p "$out/telas"
+          for name in bova_calmo bova_vencida bova_adverso; do
+            seq=2; sec=02
+            if test "$name" = bova_vencida; then seq=3; sec=20; fi
+            "$py" scripts/derivatives_ticket_screen.py --replay "$dep/$name.replay.json" --roteiro "$dep/$name.roteiro.json" --passos 1 --avanca-ate "$seq" --boleta T1 --instante "2026-11-25T14:00:${sec}Z" --out "$out/telas/$name.html"
+          done
+          (cd "$out/telas" && shasum -a 256 *.html) > "$out/html.sha256"
+          grep -q '^fb18135b8e21.*bova_calmo.html$' "$out/html.sha256"
+          grep -q '^e04863eb1598.*bova_vencida.html$' "$out/html.sha256"
+          grep -q '^e6282a01b7b7.*bova_adverso.html$' "$out/html.sha256"
+          grep -q '714 passed' "$out/focal.log"
+          grep -q '136 passed' "$out/architecture.log"
+          git diff --exit-code
+          "$py" -m pytest tests/ -q --ignore=tests/integration --timeout=120 > "$out/unit.log" 2>&1 || { tail -15 "$out/unit.log"; exit 1; }
+          tail -2 "$out/unit.log"
+          grep -Eq '11738 passed, 16 skipped, 261 subtests passed' "$out/unit.log"
+          "$py" -m mypy backend/ --strict | tee "$out/mypy.log"
+          "$(dirname "$py")/pyright" --pythonpath "$py" backend/ | tee "$out/pyright.log"
+          if test "$(uname -s)" = Linux; then
+            rc=0
+            "$py" -m pytest tests/integration -q --timeout=120 > "$out/integration.log" 2>&1 || rc=$?
+            tail -8 "$out/integration.log"
+            test "$rc" = 1
+            grep -E '4 failed, 215 passed, 18 skipped' "$out/integration.log"
+            awk '/^FAILED /{print $2}' "$out/integration.log" | sort > "$out/integration-ids"
+            diff -u "$HARNESS/known-ids" "$out/integration-ids"
+          fi
+          SHELL
+          cat > known-ids <<'IDS'
+          tests/integration/test_check_finlib_readiness_live.py::test_finlib_readiness_live_is_ready_and_idempotent
+          tests/integration/test_finlib_continuous_aggregates_live.py::test_finlib_closeout_views_and_cagg_roundtrip
+          tests/integration/test_finlib_repositories_assets_live.py::test_finlib_asset_repositories_flow_idempotency_and_atomicity
+          tests/integration/test_pr09_pg_stat_statements_live.py::test_pr09_pg_stat_report_live_parseable
+          IDS
+          cd "$GITHUB_WORKSPACE"
+          uv python install 3.12.13
+          uv lock --check
+      - name: Qualify macOS ARM64
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -eu
+          test "$(uname -m)" = arm64
+          uv sync --locked --python 3.12.13
+          uv pip check
+          HARNESS="$RUNNER_TEMP/harness" OUT="$RUNNER_TEMP/evidence" BASE_TREE="$RUNNER_TEMP/base" bash "$RUNNER_TEMP/harness/qualify.sh" "$PWD/.venv/bin/python"
+      - name: Qualify isolated Linux x86_64
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --platform linux/amd64 -f Dockerfile.openclaw-sandbox -t openclaw-sandbox:pr03d .
+          docker image inspect --format '{{.Id}} {{.Architecture}}' openclaw-sandbox:pr03d | tee "$RUNNER_TEMP/evidence/image"
+          docker network create dl4-isolated
+          docker build -f infra/postgres/Dockerfile -t dl4-pg .
+          docker run -d --name dl4-pg --network dl4-isolated -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_USER=quimera -e POSTGRES_DB=quimera -v "$PWD/infra/postgres/initdb:/docker-entrypoint-initdb.d:ro" dl4-pg postgres -c shared_preload_libraries=timescaledb,pg_stat_statements
+          docker run -d --name dl4-qdrant --network dl4-isolated qdrant/qdrant:v1.18.2
+          for n in {1..60}; do docker exec dl4-pg pg_isready -h 127.0.0.1 -U quimera && break; sleep 2; done
+          docker exec dl4-pg pg_isready -h 127.0.0.1 -U quimera
+          docker run --rm --platform linux/amd64 --network dl4-isolated -e TEST_POSTGRES_DSN=postgresql://quimera@dl4-pg:5432/quimera -e QDRANT_URL=http://dl4-qdrant:6333 -e UV_PROJECT_ENVIRONMENT=/opt/openclaw-venv -e UV_FROZEN=1 -e OUT=/evidence -e HARNESS=/harness -e BASE_TREE=/base -v "$PWD:/workspace" -v "$RUNNER_TEMP/base:/base" -v "$RUNNER_TEMP/evidence:/evidence" -v "$RUNNER_TEMP/harness:/harness:ro" -w /workspace openclaw-sandbox:pr03d bash -ec '
+            if ! command -v git >/dev/null; then apt-get update -qq && apt-get install -y -qq git; fi
+            git config --global --add safe.directory /workspace
+            git config --global --add safe.directory /base
+            test "$(uname -m)" = x86_64
+            python -c "import struct,sys; b=open(sys.executable,\"rb\").read(20); assert b[:4].hex()==\"7f454c46\" and struct.unpack_from(\"<H\",b,18)[0]==62" 
+            uv pip check --python /opt/openclaw-venv/bin/python
+            bash /harness/qualify.sh /opt/openclaw-venv/bin/python
+            tar -C /evidence -czf /tmp/verified-results.tgz .
+            cp /tmp/verified-results.tgz /evidence/verified-results.tgz'
+      - name: Export test evidence
+        if: always()
+        shell: bash
+        run: |
+          set -eu
+          cd "$RUNNER_TEMP/evidence"
+          if test -e verified-results.tgz; then sudo chown -R "$(id -u):$(id -g)" .; rm verified-results.tgz; fi
+          chrome=google-chrome
+          if test "$(uname -s)" = Darwin; then chrome="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"; fi
+          "$chrome" --version > browser.txt
+          for page in telas/*.html; do
+            "$chrome" --headless --disable-gpu --no-sandbox --hide-scrollbars --window-size=1500,1050 --user-data-dir="$RUNNER_TEMP/chrome-$(basename "$page")" --screenshot="$PWD/${page%.html}.png" "file://$PWD/$page"
+            test -s "${page%.html}.png"
+          done
+          (cd telas && shasum -a 256 *.png) > png.sha256
+          tar -czf "$RUNNER_TEMP/results.tgz" .
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dl4-pr03d-a1-${{ matrix.os }}
+          path: |
+            ${{ runner.temp }}/results.tgz
+            ${{ runner.temp }}/evidence/telas/
