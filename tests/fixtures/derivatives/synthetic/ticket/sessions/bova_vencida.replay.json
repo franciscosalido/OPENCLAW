@@ -1,7 +1,7 @@
 {"session_close":"2026-11-25T21:00:00Z","events":[
 {"seq":1,"ts":"2026-11-25T14:00:00Z","type":"quote","symbol":"BOVAM1450","bid":"1.85","bid_size":500,"ask":"1.90","ask_size":500,"phase":"CONTINUOUS"},
 {"seq":2,"ts":"2026-11-25T14:00:01Z","type":"quote","symbol":"BOVAM1500","bid":"3.90","bid_size":500,"ask":"3.95","ask_size":500,"phase":"CONTINUOUS"},
-{"seq":3,"ts":"2026-11-25T14:00:09Z","type":"quote","symbol":"BOVAM1500","bid":"3.90","bid_size":500,"ask":"3.95","ask_size":500,"phase":"CONTINUOUS"},
-{"seq":4,"ts":"2026-11-25T14:00:12Z","type":"quote","symbol":"BOVAM1450","bid":"1.85","bid_size":500,"ask":"1.90","ask_size":500,"phase":"CONTINUOUS"},
-{"seq":5,"ts":"2026-11-25T14:00:14Z","type":"quote","symbol":"BOVAM1450","bid":"1.85","bid_size":500,"ask":"1.90","ask_size":500,"phase":"CONTINUOUS"},
-{"seq":6,"ts":"2026-11-25T14:00:15Z","type":"quote","symbol":"BOVAM1500","bid":"3.90","bid_size":500,"ask":"3.95","ask_size":500,"phase":"CONTINUOUS"}]}
+{"seq":3,"ts":"2026-11-25T14:00:19Z","type":"quote","symbol":"BOVAM1500","bid":"3.90","bid_size":500,"ask":"3.95","ask_size":500,"phase":"CONTINUOUS"},
+{"seq":4,"ts":"2026-11-25T14:00:22Z","type":"quote","symbol":"BOVAM1450","bid":"1.85","bid_size":500,"ask":"1.90","ask_size":500,"phase":"CONTINUOUS"},
+{"seq":5,"ts":"2026-11-25T14:00:24Z","type":"quote","symbol":"BOVAM1450","bid":"1.85","bid_size":500,"ask":"1.90","ask_size":500,"phase":"CONTINUOUS"},
+{"seq":6,"ts":"2026-11-25T14:00:25Z","type":"quote","symbol":"BOVAM1500","bid":"3.90","bid_size":500,"ask":"3.95","ask_size":500,"phase":"CONTINUOUS"}]}

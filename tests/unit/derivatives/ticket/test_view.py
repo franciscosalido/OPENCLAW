@@ -68,7 +68,8 @@ Quote = tuple[int, str, str, str | None, int, str | None, int, str]
 def custom(quotes: Sequence[Quote], legs: Sequence[tuple[str, str, int, str]], *, net: str,
            gross: str, holdings: Sequence[tuple[str, str, int]] | None = None,
            pairs: list[list[str]] | None = None, expiries: dict[str, str] | None = None,
-           multiplier: int = 1, open_seq: int = 2) -> ReplaySession:
+           multiplier: int = 1, open_seq: int = 2,
+           multipliers: dict[str, int] | None = None) -> ReplaySession:
     """Monta fita e boleta T1; cotação = (seq, hh:mm:ss, série, bid, qtd, ask, qtd, fase)."""
     events = [{"seq": seq, "ts": f"2026-11-23T{ts}Z", "type": "quote", "symbol": sym,
                "bid": bid, "bid_size": bn, "ask": ask, "ask_size": an, "phase": phase}
@@ -80,7 +81,8 @@ def custom(quotes: Sequence[Quote], legs: Sequence[tuple[str, str, int, str]], *
         "account": "sim", "pairs": [["A", "B"]] if pairs is None else pairs,
         "holdings": [{"symbol": s, "strike": k, "underlying": "ETF", "kind": "CALL",
                       "expiry": (expiries or {}).get(s, "2027-01-15"),
-                      "multiplier": multiplier, "balance": b} for s, k, b in rows]}))
+                      "multiplier": (multipliers or {}).get(s, multiplier), "balance": b}
+                     for s, k, b in rows]}))
     draft = TicketDraft.model_validate_json(json.dumps({
         "legs": [{"symbol": s, "side": side, "quantity": q, "limit_price": p, "lot_size": 1}
                  for s, side, q, p in legs],
@@ -115,23 +117,26 @@ V1 = [
     ("calmo", 2, "T1", "14:00:12", 6,
      ("TRIGGERED", "Gatilho atingido", "PODE_CONFIRMAR", None, "OK", (), OK2)),
     ("calmo", 5, "T1", "21:00:00", 9,
-     ("COMPLETED", "Concluída", "NAO_SE_APLICA", None, "BLOCKED", ("cotação vencida",),
-      (("OK", (), 0.0), ("BLOCKED", ("cotação vencida",), 25186.0)))),
+     ("COMPLETED", "Concluída", "NAO_SE_APLICA", None, "CAUTION", ("cotação antiga",),
+      (("OK", (), 0.0), ("CAUTION", ("cotação antiga",), 25186.0)))),
     ("leilao", 1, "T1", "14:00:02", None,
      ("DRAFT", "Proposta", "BLOQUEADA", "leilão, leilão", "BLOCKED", ("leilão", "leilão"),
       (("BLOCKED", ("leilão",), 2.0), ("BLOCKED", ("leilão",), 1.0)))),
     ("leilao", 1, "T1", "14:00:07", None,
-     ("DRAFT", "Proposta", "BLOQUEADA", "cotação vencida, leilão, cotação vencida, leilão",
-      "BLOCKED", ("cotação vencida", "leilão", "cotação vencida", "leilão"),
-      (("BLOCKED", ("cotação vencida", "leilão"), 7.0),
-       ("BLOCKED", ("cotação vencida", "leilão"), 6.0)))),
+     ("DRAFT", "Proposta", "BLOQUEADA", "leilão, leilão", "BLOCKED", ("leilão", "leilão"),
+      (("BLOCKED", ("leilão",), 7.0), ("BLOCKED", ("leilão",), 6.0)))),
+    ("leilao", 1, "T1", "14:00:17", None,
+     ("DRAFT", "Proposta", "BLOQUEADA", "cotação antiga, leilão, cotação antiga, leilão",
+      "BLOCKED", ("cotação antiga", "leilão", "cotação antiga", "leilão"),
+      (("BLOCKED", ("cotação antiga", "leilão"), 17.0),
+       ("BLOCKED", ("cotação antiga", "leilão"), 16.0)))),
     ("leilao", 4, "T1", "14:05:06", None,
      ("WORKING", "Em execução", "NAO_SE_APLICA", None, "BLOCKED",
       ("leilão", "pouca profundidade"),
       (("BLOCKED", ("leilão",), 1.0), ("CAUTION", ("pouca profundidade",), 2.0)))),
     ("leilao", 4, "T1", "21:00:00", 11,
-     ("STOPPED", "Parada · montagem parcial", "NAO_SE_APLICA", None, "BLOCKED",
-      ("cotação vencida",), (("BLOCKED", ("cotação vencida",), 24600.0), ("OK", (), 0.0)))),
+     ("STOPPED", "Parada · montagem parcial", "NAO_SE_APLICA", None, "CAUTION",
+      ("cotação antiga",), (("CAUTION", ("cotação antiga",), 24600.0), ("OK", (), 0.0)))),
     ("rapido", 3, "T2", "14:00:02", None,
      ("DRAFT", "Proposta", "BLOQUEADA", "conta em estado incerto", "OK", (), OK2)),
     ("rapido", 3, "T1", "14:00:02", None,
@@ -148,16 +153,16 @@ V1 = [
        ("BLOCKED", ("perda de sequência",), 1.0)))),
     ("rapido", 9, "T1", "21:00:00", 9,
      ("STOPPED", "Parada · desmontagem parcial", "NAO_SE_APLICA", None, "BLOCKED",
-      ("perda de sequência", "cotação vencida", "perda de sequência"),
+      ("perda de sequência", "cotação antiga", "perda de sequência"),
       (("BLOCKED", ("perda de sequência",), 0.0),
-       ("BLOCKED", ("cotação vencida", "perda de sequência"), 25193.0)))),
+       ("BLOCKED", ("cotação antiga", "perda de sequência"), 25193.0)))),
 ]
 
 
 @pytest.mark.parametrize("name,steps,ticket,clock,seq,expected", V1)
 def test_v1_official_sessions_literal(name: str, steps: int, ticket: str, clock: str,
                                       seq: int | None, expected: tuple[object, ...]) -> None:
-    """Treze fotos das três sessões oficiais, com estado, avanço e guardas literais."""
+    """Catorze fotos das três sessões oficiais, com estado, avanço e guardas literais."""
     session = official(name, steps)
     if seq is not None:
         session.advance_to(seq)
@@ -194,27 +199,33 @@ def test_v2_view_predicts_every_scripted_confirmation() -> None:
 
 
 def test_v3_quote_age_boundary_is_per_leg_and_inclusive() -> None:
-    """Idade igual ao limite passa; acima, só a perna vencida bloqueia."""
+    """Idade igual ao limite passa sem aviso; acima, só a perna antiga avisa, sem bloquear."""
     session = official("calmo", 1)
     session.advance_to(8)
-    edge = ticket_view(session, "T1", at("14:00:18"))
+    edge = ticket_view(session, "T1", at("14:00:28"))
     assert line(edge)[2:] == ("PODE_CONFIRMAR", None, "OK", (),
-                              (("OK", (), 5.0), ("OK", (), 4.0)))
-    over = ticket_view(session, "T1", at("14:00:19"))
-    assert line(over)[2:] == ("BLOQUEADA", "cotação vencida", "BLOCKED", ("cotação vencida",),
-                              (("BLOCKED", ("cotação vencida",), 6.0), ("OK", (), 5.0)))
-    assert ticket_view(session, "T1", at("14:00:18") + timedelta(microseconds=1)
-                       ).pernas[0].guarda.motivos == ("cotação vencida",)
+                              (("OK", (), 15.0), ("OK", (), 14.0)))
+    over = ticket_view(session, "T1", at("14:00:29"))
+    assert line(over)[2:] == ("PODE_CONFIRMAR", None, "CAUTION", ("cotação antiga",),
+                              (("CAUTION", ("cotação antiga",), 16.0), ("OK", (), 15.0)))
+    assert ticket_view(session, "T1", at("14:00:28") + timedelta(microseconds=1)
+                       ).pernas[0].guarda.motivos == ("cotação antiga",)
 
 
 def test_v4_refusal_follows_the_engine_order() -> None:
     """Pausa precede prazo; prazo precede mercado; mercado precede limites."""
     session = official("calmo", 1)
     session.advance_to(8)
-    assert ticket_view(session, "T1", at("15:00:00")).avanco.motivo == (
-        "cotação vencida, cotação vencida")
+    last = ticket_view(session, "T1", at("15:00:00"))
+    assert (last.avanco.situacao.value, last.avanco.motivo, last.mercado.nivel,
+            last.mercado.motivos) == ("PODE_CONFIRMAR", None, "CAUTION",
+                                      ("cotação antiga", "cotação antiga"))
     late = ticket_view(session, "T1", at("15:00:01"))
-    assert late.avanco.motivo == "prazo de envio vencido" and late.mercado.nivel == "BLOCKED"
+    assert late.avanco.motivo == "prazo de envio vencido" and late.mercado.nivel == "CAUTION"
+    closed = [CALM[0], (2, "14:00:01", "B", "1.45", 50, "1.55", 50, "AUCTION")]
+    halted = ticket_view(custom(closed, CREDIT, net="-5.00", gross="25.00"), "T1",
+                         at("15:00:01"))
+    assert halted.avanco.motivo == "prazo de envio vencido" and halted.mercado.nivel == "BLOCKED"
     session.engine("T1").pause(at("15:00:01"))
     paused = ticket_view(session, "T1", at("15:00:01"))
     assert paused.pausada and paused.avanco.motivo == "boleta pausada"
@@ -445,8 +456,8 @@ def test_v14_six_answers_from_json_alone() -> None:
         "recebe no mínimo 5.00; bruto até 25.00",
         "desembolso se só a compra executar 10.00; pior resultado no vencimento 5.00",
         "A 7.0 s, B 6.0 s; foto leilao-2",
-        "BLOCKED: cotação vencida, leilão, cotação vencida, leilão",
-        "não avança: cotação vencida, leilão, cotação vencida, leilão",
+        "BLOCKED: leilão, leilão",
+        "não avança: leilão, leilão",
     ]
     assert read("rapido", 3, "T2", "14:00:02") == [
         "Venda 10 A (CALL 10) a 1.00; Compra 10 B (CALL 11) a 1.50",
@@ -520,16 +531,19 @@ def test_w2_environment_and_age_limit_come_from_the_engine() -> None:
     """O ambiente é o da prévia; o limite de idade é o da configuração que a guarda usa."""
     view = ticket_view(official("bova_calmo", 1), "T1",
                        datetime.fromisoformat("2026-11-25T14:00:02+00:00"))
-    assert (view.ambiente.value, view.limite_idade_s) == ("SIMULATED", 5.0)
+    assert (view.ambiente.value, view.limite_idade_s) == ("SIMULATED", 15.0)
+    strict = bova("bova_vencida", 3, "14:00:20")
+    assert (strict["limite_idade_s"], strict["mercado"]) == (
+        15.0, {"nivel": "CAUTION", "motivos": ["cotação antiga"]})
     script = _read(FIXTURES / "bova_vencida.roteiro.json")
-    config = load_ticket_sim_config().model_copy(update={"max_quote_age_s": 15.0})
+    config = load_ticket_sim_config().model_copy(update={"max_quote_age_s": 30.0})
     session = ReplaySession(load_replay(FIXTURES / "bova_vencida.replay.json"), config=config)
     session.advance_to(3)
     opening = script.steps[0]
     assert isinstance(opening, _Open)
     session.open("T1", script.positions[0], opening.draft, opening.at)
-    loose = ticket_view(session, "T1", datetime.fromisoformat("2026-11-25T14:00:10+00:00"))
-    assert (loose.limite_idade_s, loose.avanco.situacao.value) == (15.0, "PODE_CONFIRMAR")
+    loose = ticket_view(session, "T1", datetime.fromisoformat("2026-11-25T14:00:20+00:00"))
+    assert (loose.limite_idade_s, loose.mercado.nivel, loose.mercado.motivos) == (30.0, "OK", ())
 
 
 def bova(name: str, seq: int, clock: str) -> dict[str, object]:
@@ -544,7 +558,7 @@ def bova(name: str, seq: int, clock: str) -> dict[str, object]:
 def test_w3_exercise_style_comes_from_the_position() -> None:
     """A modalidade é a da foto; sem informação, fica nula."""
     styles = {}
-    for name, seq, clock in (("bova_calmo", 2, "14:00:02"), ("bova_vencida", 3, "14:00:10"),
+    for name, seq, clock in (("bova_calmo", 2, "14:00:02"), ("bova_vencida", 3, "14:00:20"),
                              ("bova_adverso", 2, "14:00:02")):
         legs: list[dict[str, object]] = bova(name, seq, clock)["pernas"]  # type: ignore[assignment]
         styles[name] = [leg["modalidade"] for leg in legs]
@@ -574,7 +588,7 @@ UNIT = {
 
 def test_w4_mid_and_unit_price_by_hand() -> None:
     """Meio por perna e preço por unidade: compra soma, venda subtrai; natural cruza o livro."""
-    for name, seq, clock in (("bova_calmo", 2, "14:00:02"), ("bova_vencida", 3, "14:00:10"),
+    for name, seq, clock in (("bova_calmo", 2, "14:00:02"), ("bova_vencida", 3, "14:00:20"),
                              ("bova_adverso", 2, "14:00:02")):
         data = bova(name, seq, clock)
         mids = [leg["cotacao"]["meio"] for leg in data["pernas"]]  # type: ignore[attr-defined]
@@ -621,7 +635,7 @@ def test_w6_breakevens_curve_and_final_slope() -> None:
         "bova_adverso": (["156.20"], [("0.00", "-240.00"), ("155.00", "-240.00"),
                                       ("160.00", "760.00")]),
     }
-    for name, seq, clock in (("bova_calmo", 2, "14:00:02"), ("bova_vencida", 3, "14:00:10"),
+    for name, seq, clock in (("bova_calmo", 2, "14:00:02"), ("bova_vencida", 3, "14:00:20"),
                              ("bova_adverso", 2, "14:00:02")):
         expiry = bova(name, seq, clock)["risco"]["vencimento"]  # type: ignore[index]
         assert (expiry["equilibrios"], [(p["preco"], p["resultado"]) for p in expiry["curva"]],
@@ -644,12 +658,12 @@ DefaultContext.traps[Inexact] = DefaultContext.traps[Rounded] = True
 with localcontext(Context(prec=28, traps=[])):
     from tests.unit.derivatives.ticket.test_view import bova
     import json
-    print(json.dumps(bova("bova_vencida", 3, "14:00:10")))
+    print(json.dumps(bova("bova_vencida", 3, "14:00:20")))
 """
     run = subprocess.run([sys.executable, "-c", probe], cwd=ROOT, capture_output=True, text=True)
     assert run.returncode == 0, run.stderr
-    assert json.loads(run.stdout) == bova("bova_vencida", 3, "14:00:10")
-    for name, seq, clock in (("bova_calmo", 2, "14:00:02"), ("bova_vencida", 3, "14:00:10"),
+    assert json.loads(run.stdout) == bova("bova_vencida", 3, "14:00:20")
+    for name, seq, clock in (("bova_calmo", 2, "14:00:02"), ("bova_vencida", 3, "14:00:20"),
                              ("bova_adverso", 2, "14:00:02")):
         plain = bova(name, seq, clock)
         for trap in (True, False):
@@ -692,6 +706,12 @@ def test_w8_unit_price_refuses_a_contract_multiplier() -> None:
         "quantidades diferentes por perna")
     plain = ticket_view(custom(CALM, CREDIT, net="-5.00", gross="25.00"), "T1", at("14:00:01"))
     assert plain.preco_unidade is not None and plain.preco_unidade_indisponivel is None
+    two = [("A", "BUY", 10, "1.00"), ("B", "BUY", 10, "1.50")]
+    for mixed in ({"A": 100}, {"B": 100}):
+        view = ticket_view(custom(CALM, two, net="25.00", gross="25.00", pairs=[],
+                                  multipliers=mixed), "T1", at("14:00:01"))
+        assert (view.preco_unidade, view.preco_unidade_indisponivel) == (
+            None, "multiplicador diferente de 1"), mixed
 
 
 @pytest.mark.parametrize("paid,expected", [("1.01", "11.00"), ("1.02", "11.02")])

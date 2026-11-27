@@ -26,8 +26,8 @@ def quote(symbol: str = "A", bid: str | None = ".95", ask: str | None = "1", bs:
 
 
 @pytest.mark.parametrize(("photos", "legs", "level", "reasons"), [
-    ([quote()], [BUY], "OK", ()), ([quote(age=5)], [BUY], "OK", ()),
-    ([quote(age=5.000001)], [BUY], "BLOCKED", ("cotação vencida",)),
+    ([quote()], [BUY], "OK", ()), ([quote(age=15)], [BUY], "OK", ()),
+    ([quote(age=15.000001)], [BUY], "CAUTION", ("cotação antiga",)),
     ([quote(phase="AUCTION")], [BUY], "BLOCKED", ("leilão",)),
     ([quote(phase="SUSPENDED")], [BUY], "BLOCKED", ("suspensão",)),
     ([quote(bid="1")], [BUY], "BLOCKED", ("livro inválido",)),
@@ -42,7 +42,12 @@ def quote(symbol: str = "A", bid: str | None = ".95", ask: str | None = "1", bs:
     ([quote(bid=".89"),quote("B",phase="AUCTION")], [BUY,SELL], "BLOCKED",
      ("spread aberto","leilão")),
     ([quote(age=-1)], [BUY], "BLOCKED", ("tempo inválido",)),
-], ids="G1 G2 G3 G4 G5 G6 G7 G8 G8-sell G9 G11 G12 G13 G14 G15 G16 G17".split())
+    ([quote(age=3600, phase="AUCTION")], [BUY], "BLOCKED", ("cotação antiga", "leilão")),
+    ([quote(age=16, bid=".89", size=9)], [BUY], "CAUTION",
+     ("cotação antiga", "spread aberto", "pouca profundidade")),
+    ([quote(age=16), quote("B", age=86400)], [BUY, SELL], "CAUTION",
+     ("cotação antiga", "cotação antiga")),
+], ids="G1 G2 G3 G4 G5 G6 G7 G8 G8-sell G9 G11 G12 G13 G14 G15 G16 G17 G18 G19 G20".split())
 def test_book(photos: list[QuoteEvent], legs: list[Leg], level: str,
               reasons: tuple[str, ...]) -> None:
     """Somente o lado executável exige profundidade."""

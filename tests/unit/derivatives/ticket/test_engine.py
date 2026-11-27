@@ -277,7 +277,8 @@ def test_s13_expired_trigger(s: Session) -> None:
 def test_s14_refresh_and_cancel_blocked_market(s: Session) -> None:
     e=s.new()
     d=s.dec(e)
-    with pytest.raises(EngineRefusal,match="cotação vencida"):
+    s.q("A",9,phase="AUCTION")
+    with pytest.raises(EngineRefusal,match="leilão"):
         e.confirm(d,at(10))
     assert not s.submitted() and not e.orders and e.state==T.DRAFT
     s.q("A",10)
@@ -520,10 +521,21 @@ def test_x2_rejected(s: Session) -> None:
 
 def test_x3_temporary_block(s: Session) -> None:
     e=s.confirmed()
+    s.q("B",6,phase="AUCTION")
     s.q("A",7,ask="1")
     assert e.orders[A]==O.FILLED and len(s.submitted())==1 and e.state==T.WORKING
     s.q("B",8)
     assert s.submitted()[-1]==(B,10,D("1.50"),at(8))
+
+
+def test_x3b_old_quote_warns_and_never_holds(s: Session) -> None:
+    """Cotação antiga não recusa a confirmação nem segura a venda coberta."""
+    e=s.new()
+    e.confirm(s.dec(e),at(3000))
+    assert e.state==T.WORKING and s.submitted()==[(A,10,D("1"),at(3000))]
+    s.q("A",3500,ask="1")
+    assert e.orders[A]==O.FILLED and e.orders[B]==O.LIVE
+    assert s.submitted()[-1]==(B,10,D("1.50"),at(3500))
 
 
 def test_x4_edit_armed(s: Session) -> None:
@@ -571,7 +583,7 @@ def test_poll_mismatch_is_atomic(s: Session, snapshot: OrderSnapshot | None) -> 
 
 
 def test_send_deadline_with_both_books_fresh(s: Session) -> None:
-    """Isola prazo de envio da cotação vencida, que também protege S15."""
+    """Isola prazo de envio da cotação antiga, que também protege S15."""
     e = s.confirmed()
     s.q("B", 3599)
     s.q("A", 3601, ask="1")
@@ -883,9 +895,10 @@ def test_g7_paused_draft_preserves_nonce_and_receipt(s: Session) -> None:
     s.ledger.consume(d, action=Action.EXECUTE, ticket="T1", now=at(2), preview=e.preview)
 
 
-def test_g8_stale_then_fresh_quote_at_exact_send_deadline(s: Session) -> None:
+def test_g8_blocked_then_fresh_quote_at_exact_send_deadline(s: Session) -> None:
     """O prazo inclui as 15h tanto na decisão de fechar quanto no envio."""
     e = s.confirmed()
+    s.q("B", 3599, phase="AUCTION")
     s.q("A", 3600, ask="1.00")
     assert dict(e.orders) == {A: O.FILLED} and e.state == T.WORKING
     assert len(s.submitted()) == 1
